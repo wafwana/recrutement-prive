@@ -12,8 +12,10 @@ const jobSchema = z.object({
 
 export async function GET(_request: Request, { params }: { params: Promise<{ jobId: string }> }) {
   try {
-    const access = await requireCompanyAccess();
     const { jobId } = await params;
+    const existing = await prisma.job.findUnique({ where: { id: jobId }, select: { companyId: true } });
+    if (!existing) return NextResponse.json({ error: "Offre introuvable" }, { status: 404 });
+    const access = await requireCompanyAccess(existing.companyId);
     const job = await prisma.job.findFirst({
       where: { id: jobId, companyId: access.companyId },
       include: {
@@ -33,10 +35,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
 
 export async function PUT(request: Request, { params }: { params: Promise<{ jobId: string }> }) {
   try {
-    const access = await requireCompanyAccess();
     const { jobId } = await params;
-    const existing = await prisma.job.findFirst({ where: { id: jobId, companyId: access.companyId } });
+    const existing = await prisma.job.findUnique({ where: { id: jobId }, select: { companyId: true, status: true } });
     if (!existing) return NextResponse.json({ error: "Offre introuvable" }, { status: 404 });
+    const access = await requireCompanyAccess(existing.companyId);
     const parsed = jobSchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Données d'offre invalides" }, { status: 400 });
 
@@ -74,11 +76,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ jobI
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ jobId: string }> }) {
   try {
-    const access = await requireCompanyAccess();
-    if (!isCompanyManager(access.memberRole)) return NextResponse.json({ error: "Droits insuffisants" }, { status: 403 });
     const { jobId } = await params;
-    const existing = await prisma.job.findFirst({ where: { id: jobId, companyId: access.companyId } });
+    const existing = await prisma.job.findUnique({ where: { id: jobId }, select: { companyId: true, status: true } });
     if (!existing) return NextResponse.json({ error: "Offre introuvable" }, { status: 404 });
+    const access = await requireCompanyAccess(existing.companyId);
+    if (!isCompanyManager(access.memberRole)) return NextResponse.json({ error: "Droits insuffisants" }, { status: 403 });
 
     await prisma.job.update({ where: { id: jobId }, data: { status: "ARCHIVED" } });
     await prisma.recruitmentHistory.create({
