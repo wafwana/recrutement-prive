@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { hashE2EPassword } from "@/lib/e2e-password";
 
-const PASSWORD = "Validation-2026!";
+type Assert = (condition: unknown, message: string) => asserts condition;
 
-const assert = (condition: unknown, message: string): asserts condition => {
+const assert: Assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
+
+const PASSWORD = "Validation-2026!";
 
 async function main() {
   const suffix = Date.now().toString();
