@@ -1,6 +1,6 @@
 import "server-only";
-import { scrypt as nodeScrypt, randomBytes, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
+import { scrypt as nodeScrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
 
 const scrypt = promisify(nodeScrypt);
 const KEY_LENGTH = 64;
