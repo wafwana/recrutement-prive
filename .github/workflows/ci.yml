@@ -2,7 +2,22 @@ name: CI
 
 on:
   push:
-    branches: [main, lot-1-fondations, lot-2-espace-metiers, lot-3-auth-backend, lot-3-finalisation, lot-4-candidat, lot-5-entreprise, lot-5-multi-company-hardening, lot-6-consultant]
+    branches:
+      - main
+      - lot-1-fondations
+      - lot-2-espace-metiers
+      - lot-3-auth-backend
+      - lot-3-finalisation
+      - lot-4-candidat
+      - lot-5-entreprise
+      - lot-5-multi-company-hardening
+      - lot-6-consultant
+      - lot-7-consolidation
+      - lot-7-8-finalisation
+      - agent/final-platform
+      - agent/final-validation
+      - agent/e2e-finalization
+      - agent/e2e-finalization-v2
   pull_request:
 
 jobs:
@@ -34,5 +49,6 @@ jobs:
       - run: npm install
       - run: npx prisma generate
       - run: npx prisma migrate deploy
+      - run: npx tsx tests/final-validation.ts
       - run: npm run typecheck
       - run: npm run build
