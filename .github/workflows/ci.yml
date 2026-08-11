@@ -17,6 +17,7 @@ on:
       - agent/final-platform
       - agent/final-validation
       - agent/e2e-finalization
+      - agent/e2e-finalization-v2
   pull_request:
 
 jobs:
