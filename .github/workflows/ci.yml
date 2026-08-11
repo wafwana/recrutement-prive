@@ -16,6 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: ''
       - run: npm install
       - run: npx prisma generate
       - run: npm run typecheck
