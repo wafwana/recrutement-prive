@@ -10,8 +10,10 @@ const bodySchema = z.object({
 
 export async function GET(_request: Request, { params }: { params: Promise<{ applicationId: string }> }) {
   try {
-    const access = await requireCompanyAccess();
     const { applicationId } = await params;
+    const existing = await prisma.application.findUnique({ where: { id: applicationId }, select: { job: { select: { companyId: true } } } });
+    if (!existing) return NextResponse.json({ error: "Candidature introuvable" }, { status: 404 });
+    const access = await requireCompanyAccess(existing.job.companyId);
     const application = await prisma.application.findFirst({
       where: { id: applicationId, job: { companyId: access.companyId } },
       include: {
@@ -29,12 +31,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ app
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ applicationId: string }> }) {
   try {
-    const access = await requireCompanyAccess();
     const { applicationId } = await params;
-    const existing = await prisma.application.findFirst({
-      where: { id: applicationId, job: { companyId: access.companyId } },
-    });
+    const existing = await prisma.application.findUnique({ where: { id: applicationId }, select: { jobId: true, status: true, job: { select: { companyId: true } } } });
     if (!existing) return NextResponse.json({ error: "Candidature introuvable" }, { status: 404 });
+    const access = await requireCompanyAccess(existing.job.companyId);
 
     const parsed = bodySchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Mise à jour invalide" }, { status: 400 });

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
 
 const jobSchema = z.object({
+  companyId: z.string().optional(),
   title: z.string().trim().min(2).max(160),
   location: z.string().trim().max(160).optional(),
   description: z.string().trim().max(10000).optional(),
@@ -18,8 +19,8 @@ function text(value: FormDataEntryValue | null) {
 }
 
 export async function createCompanyJob(formData: FormData) {
-  const access = await requireCompanyAccess();
   const parsed = jobSchema.safeParse({
+    companyId: text(formData.get("companyId")),
     title: text(formData.get("title")),
     location: text(formData.get("location")),
     description: text(formData.get("description")),
@@ -27,6 +28,7 @@ export async function createCompanyJob(formData: FormData) {
   });
   if (!parsed.success) throw new Error("Les données de l'offre sont invalides.");
 
+  const access = await requireCompanyAccess(parsed.data.companyId);
   await prisma.$transaction(async (tx) => {
     const job = await tx.job.create({
       data: {
@@ -51,14 +53,15 @@ export async function createCompanyJob(formData: FormData) {
 }
 
 export async function updateApplicationStatus(applicationId: string, status: string, notes?: string) {
-  const access = await requireCompanyAccess();
-  const parsedStatus = z.enum(["SUBMITTED", "REVIEWING", "INTERVIEW", "SHORTLISTED", "REJECTED", "HIRED"]).safeParse(status);
-  if (!parsedStatus.success) throw new Error("Statut invalide.");
-
-  const existing = await prisma.application.findFirst({
-    where: { id: applicationId, job: { companyId: access.companyId } },
+  const existing = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: { jobId: true, status: true, job: { select: { companyId: true } } },
   });
   if (!existing) throw new Error("Candidature introuvable.");
+
+  const access = await requireCompanyAccess(existing.job.companyId);
+  const parsedStatus = z.enum(["SUBMITTED", "REVIEWING", "INTERVIEW", "SHORTLISTED", "REJECTED", "HIRED"]).safeParse(status);
+  if (!parsedStatus.success) throw new Error("Statut invalide.");
 
   await prisma.$transaction(async (tx) => {
     await tx.application.update({
