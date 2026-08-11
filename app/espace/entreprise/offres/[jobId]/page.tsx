@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { requireCompanyAccess } from "@/lib/company-access";
 
 const labels: Record<string, string> = {
   SUBMITTED: "Soumise",
@@ -15,11 +16,19 @@ export default async function CompanyJobPage({ params }: { params: Promise<{ job
   const session = await auth();
   if (!session?.user?.id || session.user.role !== "ENTREPRISE") return null;
   const { jobId } = await params;
-  const membership = await prisma.companyMember.findFirst({ where: { userId: session.user.id }, orderBy: { createdAt: "asc" } });
-  if (!membership) return null;
 
-  const job = await prisma.job.findFirst({
-    where: { id: jobId, companyId: membership.companyId },
+  const job = await prisma.job.findUnique({ where: { id: jobId }, select: { companyId: true } });
+  if (!job) return null;
+
+  let access;
+  try {
+    access = await requireCompanyAccess(job.companyId);
+  } catch {
+    return null;
+  }
+
+  const companyJob = await prisma.job.findFirst({
+    where: { id: jobId, companyId: access.companyId },
     include: {
       applications: {
         include: { candidate: { include: { user: { select: { name: true, email: true } }, documents: true } } },
@@ -29,25 +38,25 @@ export default async function CompanyJobPage({ params }: { params: Promise<{ job
     },
   });
 
-  if (!job) return null;
+  if (!companyJob) return null;
 
   return (
     <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-24">
       <Link href="/espace/entreprise" className="text-[10px] uppercase tracking-[0.2em] text-[#c7a15a]">← Retour au dashboard</Link>
       <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.35em] text-white/35">Offre · {job.status}</p>
-          <h1 className="mt-3 font-serif text-5xl">{job.title}</h1>
-          <p className="mt-3 text-sm text-white/45">{job.location || "Localisation à préciser"}</p>
+          <p className="text-[10px] uppercase tracking-[0.35em] text-white/35">Offre · {companyJob.status}</p>
+          <h1 className="mt-3 font-serif text-5xl">{companyJob.title}</h1>
+          <p className="mt-3 text-sm text-white/45">{companyJob.location || "Localisation à préciser"}</p>
         </div>
-        <p className="text-sm text-white/45">{job.applications.length} candidature(s)</p>
+        <p className="text-sm text-white/45">{companyJob.applications.length} candidature(s)</p>
       </div>
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_.7fr]">
         <section className="border border-white/10 p-8">
           <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Candidatures</p>
           <div className="mt-6 space-y-3">
-            {job.applications.length === 0 ? <p className="text-sm text-white/45">Aucune candidature pour cette offre.</p> : job.applications.map((application) => (
+            {companyJob.applications.length === 0 ? <p className="text-sm text-white/45">Aucune candidature pour cette offre.</p> : companyJob.applications.map((application) => (
               <article key={application.id} className="border border-white/10 p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -70,7 +79,7 @@ export default async function CompanyJobPage({ params }: { params: Promise<{ job
         <aside className="border border-[#c7a15a]/20 bg-[#111] p-8">
           <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Historique</p>
           <div className="mt-6 space-y-4">
-            {job.history.length === 0 ? <p className="text-sm text-white/45">Aucun événement.</p> : job.history.map((item) => (
+            {companyJob.history.length === 0 ? <p className="text-sm text-white/45">Aucun événement.</p> : companyJob.history.map((item) => (
               <div key={item.id} className="border-l border-white/10 pl-4">
                 <p className="text-xs text-white/70">{item.action}</p>
                 <p className="mt-1 text-[10px] text-white/35">{item.fromStatus ? `${item.fromStatus} → ` : ""}{item.toStatus || ""}</p>
