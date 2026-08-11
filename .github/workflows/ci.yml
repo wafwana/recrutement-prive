@@ -19,5 +19,6 @@ jobs:
           cache: ''
       - run: npm install
       - run: npx prisma generate
+      - run: npx prisma migrate deploy
       - run: npm run typecheck
       - run: npm run build
