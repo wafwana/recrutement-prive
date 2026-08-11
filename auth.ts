@@ -19,9 +19,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!email || !password) return null;
 
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user?.passwordHash) return null;
-        if (!(await verifyPassword(password, user.passwordHash))) return null;
-
+        if (!user?.passwordHash || !(await verifyPassword(password, user.passwordHash))) return null;
         return { id: user.id, name: user.name, email: user.email, role: user.role };
       },
     }),
@@ -36,8 +34,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
     authorized({ auth, request }) {
-      const path = request.nextUrl.pathname;
-      if (!path.startsWith("/espace")) return true;
+      if (!request.nextUrl.pathname.startsWith("/espace")) return true;
       return Boolean(auth?.user);
     },
   },
