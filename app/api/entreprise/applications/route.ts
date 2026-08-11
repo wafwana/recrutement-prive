@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
 
 const querySchema = z.object({
+  companyId: z.string().optional(),
   jobId: z.string().optional(),
   status: z.enum(["SUBMITTED", "REVIEWING", "INTERVIEW", "SHORTLISTED", "REJECTED", "HIRED"]).optional(),
   search: z.string().trim().max(120).optional(),
@@ -11,14 +12,15 @@ const querySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const access = await requireCompanyAccess();
     const url = new URL(request.url);
     const parsed = querySchema.safeParse({
+      companyId: url.searchParams.get("companyId") || undefined,
       jobId: url.searchParams.get("jobId") || undefined,
       status: url.searchParams.get("status") || undefined,
       search: url.searchParams.get("search") || undefined,
     });
     if (!parsed.success) return NextResponse.json({ error: "Filtres invalides" }, { status: 400 });
+    const access = await requireCompanyAccess(parsed.data.companyId);
 
     const applications = await prisma.application.findMany({
       where: {
