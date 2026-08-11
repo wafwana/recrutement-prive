@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, lot-1-fondations, lot-2-espace-metiers, lot-3-auth-backend, lot-3-finalisation]
+    branches: [main, lot-1-fondations, lot-2-espace-metiers, lot-3-auth-backend, lot-3-finalisation, lot-4-candidat]
   pull_request:
 
 jobs:
