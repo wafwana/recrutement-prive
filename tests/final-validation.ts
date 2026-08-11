@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/password";
+import { hashE2EPassword } from "@/lib/e2e-password";
 
 const PASSWORD = "Validation-2026!";
 
@@ -17,7 +17,7 @@ async function main() {
     admin: `e2e.admin.${suffix}@example.test`,
     outsider: `e2e.outsider.${suffix}@example.test`,
   };
-  const passwordHash = await hashPassword(PASSWORD);
+  const passwordHash = await hashE2EPassword(PASSWORD);
   const createdUserIds: string[] = [];
   const createdCompanyIds: string[] = [];
   const createdConversationIds: string[] = [];
@@ -147,9 +147,6 @@ async function main() {
     assert(companyAJobs.every((job) => job.companyId === companyA.id), "company A isolation failed");
     assert(companyBJobs.every((job) => job.companyId === companyB.id), "company B isolation failed");
     assert(!companyAJobs.some((job) => job.id === jobB.id), "cross-company job leak detected");
-
-    const invalidJobInput = { title: "" };
-    assert(invalidJobInput.title.length === 0, "invalid fixture missing");
 
     const settingKey = `e2e.validation.${suffix}`;
     createdSettingKeys.push(settingKey);
