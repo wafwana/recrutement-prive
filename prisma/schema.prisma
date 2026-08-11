@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CANDIDAT
+  ENTREPRISE
+  CONSULTANT
+  ADMIN
+}
+
+enum CompanyMemberRole {
+  OWNER
+  RECRUITER
+}
+
+enum JobStatus {
+  DRAFT
+  OPEN
+  PAUSED
+  CLOSED
+  ARCHIVED
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  REVIEWING
+  INTERVIEW
+  SHORTLISTED
+  REJECTED
+  HIRED
+}
+
+model User {
+  id            String             @id @default(cuid())
+  name          String?
+  email         String             @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          Role               @default(CANDIDAT)
+  candidat      CandidateProfile?
+  applications  Application[]
+  companyLinks  CompanyMember[]
+  auditEntries  RecruitmentHistory[]
+  conversations ConversationParticipant[]
+  sentMessages  Message[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model CandidateProfile {
+  id           String             @id @default(cuid())
+  userId       String             @unique
+  headline     String?
+  bio          String?
+  location     String?
+  phone        String?
+  cvUrl        String?
+  preferences  Json?
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+  documents    CandidateDocument[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model CandidateDocument {
+  id          String           @id @default(cuid())
+  candidateId String
+  name        String
+  url         String
+  type        String?
+  candidate   CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+}
+
+model Company {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  website     String?
+  members     CompanyMember[]
+  jobs        Job[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model CompanyMember {
+  id        String            @id @default(cuid())
+  companyId String
+  userId    String
+  role      CompanyMemberRole @default(RECRUITER)
+  company   Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime          @default(now())
+
+  @@unique([companyId, userId])
+  @@index([userId])
+}
+
+model Job {
+  id           String            @id @default(cuid())
+  companyId    String
+  title        String
+  location     String?
+  description  String?
+  status       JobStatus         @default(DRAFT)
+  company      Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  applications Application[]
+  history      RecruitmentHistory[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([companyId, status])
+}
+
+model Application {
+  id          String           @id @default(cuid())
+  candidateId String
+  userId      String
+  jobId       String
+  status      ApplicationStatus @default(SUBMITTED)
+  notes       String?
+  candidate   CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job         Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  history     RecruitmentHistory[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([candidateId, jobId])
+  @@index([jobId, status])
+}
+
+model RecruitmentHistory {
+  id            String       @id @default(cuid())
+  applicationId String?
+  jobId         String?
+  actorUserId   String
+  action        String
+  fromStatus    String?
+  toStatus      String?
+  details       Json?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  job           Job?         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  actor         User         @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+
+  @@index([applicationId, createdAt])
+  @@index([jobId, createdAt])
+}
+
+model Conversation {
+  id           String                    @id @default(cuid())
+  subject      String                    @default("Nouvelle conversation")
+  participants ConversationParticipant[]
+  messages     Message[]
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String
+  readAt         DateTime?
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
