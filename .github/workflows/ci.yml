@@ -2,12 +2,26 @@ name: CI
 
 on:
   push:
-    branches: [main, lot-1-fondations, lot-2-espace-metiers, lot-3-auth-backend, lot-3-finalisation]
+    branches: [main, lot-1-fondations, lot-2-espace-metiers, lot-3-auth-backend, lot-3-finalisation, lot-4-candidat]
   pull_request:
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: recrutement_prive
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d recrutement_prive"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/recrutement_prive
       AUTH_SECRET: ci-test-secret-for-recrutement-prive
@@ -19,5 +33,6 @@ jobs:
           cache: ''
       - run: npm install
       - run: npx prisma generate
+      - run: npx prisma migrate deploy
       - run: npm run typecheck
       - run: npm run build
