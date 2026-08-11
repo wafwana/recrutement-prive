@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { createCompanyJob } from "./actions";
 
@@ -68,7 +69,7 @@ export default function CompanyDashboard({ jobs, applications }: { jobs: Job[]; 
             {jobs.length === 0 ? (
               <p className="border border-white/10 p-5 text-sm text-white/45">Aucune offre pour le moment. Créez votre première offre ci-dessus.</p>
             ) : jobs.map((job) => (
-              <div key={job.id} className="border border-white/10 p-5">
+              <Link href={`/espace/entreprise/offres/${job.id}`} key={job.id} className="block border border-white/10 p-5 transition hover:border-[#c7a15a]/40">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="font-serif text-xl">{job.title}</h3>
@@ -76,7 +77,7 @@ export default function CompanyDashboard({ jobs, applications }: { jobs: Job[]; 
                   </div>
                   <div className="text-right text-xs text-white/45">{job.applications.length} candidature(s)<br /><span className="uppercase tracking-[0.12em]">{job.status}</span></div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </section>
@@ -96,11 +97,11 @@ export default function CompanyDashboard({ jobs, applications }: { jobs: Job[]; 
             {filteredApplications.length === 0 ? (
               <p className="border border-white/10 p-5 text-sm text-white/45">Aucune candidature correspondant au filtre.</p>
             ) : filteredApplications.map((application) => (
-              <div key={application.id} className="border border-white/10 p-5">
+              <Link href={`/espace/entreprise/offres/${application.job.id}`} key={application.id} className="block border border-white/10 p-5 transition hover:border-[#c7a15a]/40">
                 <p className="font-serif text-lg">{application.candidate.user.name || application.candidate.user.email}</p>
                 <p className="mt-1 text-xs text-white/40">{application.candidate.headline || "Profil professionnel"} · {application.candidate.location || "Localisation inconnue"}</p>
                 <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">{application.job.title} · {application.status}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </section>
