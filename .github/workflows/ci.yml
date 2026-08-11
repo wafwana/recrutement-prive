@@ -14,6 +14,7 @@ on:
       - lot-6-consultant
       - lot-7-consolidation
       - lot-7-8-finalisation
+      - agent/final-platform
   pull_request:
 
 jobs:
