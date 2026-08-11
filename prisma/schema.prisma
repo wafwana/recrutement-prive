@@ -48,6 +48,8 @@ model User {
   applications  Application[]
   companyLinks  CompanyMember[]
   auditEntries  RecruitmentHistory[]
+  conversations ConversationParticipant[]
+  sentMessages  Message[]
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 }
@@ -152,4 +154,39 @@ model RecruitmentHistory {
 
   @@index([applicationId, createdAt])
   @@index([jobId, createdAt])
+}
+
+model Conversation {
+  id           String                    @id @default(cuid())
+  subject      String                    @default("Nouvelle conversation")
+  participants ConversationParticipant[]
+  messages     Message[]
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String
+  readAt         DateTime?
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
 }
