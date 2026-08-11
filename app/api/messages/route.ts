@@ -14,11 +14,30 @@ const createMessageSchema = z.object({
 
 const readSchema = z.object({ conversationId: z.string().min(1) });
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
   const userId = session.user.id;
+  const conversationId = new URL(request.url).searchParams.get("conversationId");
+
+  if (conversationId) {
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: { conversationId_userId: { conversationId, userId } },
+    });
+    if (!participant) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        participants: { include: { user: { select: { id: true, name: true, email: true, role: true } } } },
+        messages: { orderBy: { createdAt: "asc" }, include: { sender: { select: { id: true, name: true, email: true } } } },
+      },
+    });
+    if (!conversation) return NextResponse.json({ error: "Conversation introuvable" }, { status: 404 });
+    return NextResponse.json({ conversation });
+  }
+
   const conversations = await prisma.conversation.findMany({
     where: { participants: { some: { userId } } },
     orderBy: { updatedAt: "desc" },
@@ -36,12 +55,7 @@ export async function POST(request: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
   let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Corps JSON invalide" }, { status: 400 });
-  }
-
+  try { body = await request.json(); } catch { return NextResponse.json({ error: "Corps JSON invalide" }, { status: 400 }); }
   const parsed = createMessageSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Message invalide", issues: parsed.error.issues }, { status: 400 });
 
@@ -86,14 +100,12 @@ export async function POST(request: Request) {
     data: { conversationId, senderId, body: parsed.data.body },
     include: { sender: { select: { id: true, name: true, email: true } } },
   });
-
   return NextResponse.json({ message }, { status: 201 });
 }
 
 export async function PATCH(request: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Corps JSON invalide" }, { status: 400 }); }
   const parsed = readSchema.safeParse(body);
