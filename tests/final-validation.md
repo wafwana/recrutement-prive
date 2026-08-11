@@ -1,6 +1,6 @@
 # Validation finale — matrice des parcours
 
-Cette matrice est la référence de la consolidation finale. Chaque scénario doit être exercé dans l'environnement CI ou de prévisualisation avec une base PostgreSQL réelle et des comptes de rôles distincts.
+Cette matrice est la référence de la consolidation finale. Les scénarios automatisables doivent être exercés dans la CI contre PostgreSQL avec des comptes de test distincts. Les parcours visuels restent à vérifier sur une preview applicative réelle.
 
 ## Candidat
 - Connexion avec compte CANDIDAT.
@@ -53,6 +53,10 @@ Cette matrice est la référence de la consolidation finale. Chaque scénario do
 - install
 - Prisma generate
 - Prisma migrate deploy
+- seed de données de validation
+- tests de validation métier/sécurité
 - typecheck
 - build
-- exécution des tests de validation métier/sécurité
+
+## Limite explicitement conservée
+Cette suite prouve les règles métier et d'autorisation au niveau serveur/base. Elle ne remplace pas un audit navigateur visuel de la preview déployée.
