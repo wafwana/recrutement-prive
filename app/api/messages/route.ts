@@ -4,15 +4,15 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 const createMessageSchema = z.object({
-  recipientId: z.string().optional(),
-  conversationId: z.string().optional(),
+  recipientId: z.string().trim().min(1).optional(),
+  conversationId: z.string().trim().min(1).optional(),
   subject: z.string().trim().min(1).max(160).optional(),
   body: z.string().trim().min(1).max(5000),
 }).refine((value) => Boolean(value.conversationId || value.recipientId), {
   message: "Destinataire ou conversation requis.",
 });
 
-const readSchema = z.object({ conversationId: z.string().min(1) });
+const readSchema = z.object({ conversationId: z.string().trim().min(1) });
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -75,8 +75,8 @@ export async function POST(request: Request) {
 
     const existing = await prisma.conversation.findFirst({
       where: {
-        participants: { every: { userId: { in: [senderId, recipientId] } } },
         AND: [
+          { participants: { every: { userId: { in: [senderId, recipientId] } } } },
           { participants: { some: { userId: senderId } } },
           { participants: { some: { userId: recipientId } } },
         ],
@@ -109,7 +109,7 @@ export async function PATCH(request: Request) {
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Corps JSON invalide" }, { status: 400 }); }
   const parsed = readSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Conversation invalide" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Conversation invalide", issues: parsed.error.issues }, { status: 400 });
 
   const participant = await prisma.conversationParticipant.findUnique({
     where: { conversationId_userId: { conversationId: parsed.data.conversationId, userId: session.user.id } },
