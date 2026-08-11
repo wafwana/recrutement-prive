@@ -14,6 +14,10 @@ on:
       - lot-6-consultant
       - lot-7-consolidation
       - lot-7-8-finalisation
+      - agent/final-platform
+      - agent/final-validation
+      - agent/e2e-finalization
+      - agent/e2e-finalization-v2
   pull_request:
 
 jobs:
@@ -45,5 +49,6 @@ jobs:
       - run: npm install
       - run: npx prisma generate
       - run: npx prisma migrate deploy
+      - run: npx tsx tests/final-validation.ts
       - run: npm run typecheck
       - run: npm run build
