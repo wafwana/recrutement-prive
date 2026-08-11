@@ -15,13 +15,80 @@ enum Role {
 }
 
 model User {
-  id            String   @id @default(cuid())
+  id            String         @id @default(cuid())
   name          String?
-  email         String   @unique
+  email         String         @unique
   emailVerified DateTime?
   image         String?
   passwordHash  String?
-  role          Role     @default(CANDIDAT)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  role          Role           @default(CANDIDAT)
+  candidat      CandidateProfile?
+  applications  Application[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model CandidateProfile {
+  id          String        @id @default(cuid())
+  userId      String        @unique
+  headline    String?
+  bio         String?
+  location    String?
+  phone       String?
+  cvUrl       String?
+  preferences Json?
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+  documents   CandidateDocument[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model CandidateDocument {
+  id          String           @id @default(cuid())
+  candidateId String
+  name        String
+  url         String
+  type        String?
+  candidate   CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  website     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  jobs        Job[]
+}
+
+model Job {
+  id           String        @id @default(cuid())
+  companyId    String
+  title        String
+  location     String?
+  description  String?
+  status       String        @default("OPEN")
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  applications Application[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Application {
+  id          String           @id @default(cuid())
+  candidateId String
+  userId      String
+  jobId       String
+  status      String           @default("SUBMITTED")
+  notes       String?
+  candidate   CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job         Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([candidateId, jobId])
 }
