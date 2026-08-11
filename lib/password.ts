@@ -1,3 +1,4 @@
+import "server-only";
 import { scrypt as nodeScrypt, randomBytes, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
