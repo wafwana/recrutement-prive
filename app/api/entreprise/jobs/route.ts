@@ -10,14 +10,13 @@ const jobSchema = z.object({
   status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]).default("DRAFT"),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const access = await requireCompanyAccess();
+    const companyId = new URL(request.url).searchParams.get("companyId") ?? undefined;
+    const access = await requireCompanyAccess(companyId);
     const jobs = await prisma.job.findMany({
       where: { companyId: access.companyId },
-      include: {
-        _count: { select: { applications: true } },
-      },
+      include: { _count: { select: { applications: true } } },
       orderBy: { updatedAt: "desc" },
     });
     return NextResponse.json(jobs);
@@ -28,8 +27,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const access = await requireCompanyAccess();
-    const parsed = jobSchema.safeParse(await request.json());
+    const body = await request.json();
+    const access = await requireCompanyAccess(body?.companyId);
+    const parsed = jobSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: "Données d'offre invalides" }, { status: 400 });
 
     const job = await prisma.$transaction(async (tx) => {
@@ -51,7 +51,6 @@ export async function POST(request: Request) {
           toStatus: created.status,
         },
       });
-
       return created;
     });
 
