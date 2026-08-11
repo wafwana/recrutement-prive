@@ -1,9 +1,11 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
+import { verifyPassword } from "@/lib/password";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
+  pages: { signIn: "/connexion" },
   providers: [
     Credentials({
       name: "Identifiants",
@@ -13,9 +15,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         const email = String(credentials?.email ?? "").trim().toLowerCase();
-        if (!email) return null;
+        const password = String(credentials?.password ?? "");
+        if (!email || !password) return null;
+
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return null;
+        if (!user?.passwordHash || !(await verifyPassword(password, user.passwordHash))) return null;
         return { id: user.id, name: user.name, email: user.email, role: user.role };
       },
     }),
@@ -26,8 +30,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (session.user) session.user.role = token.role as string;
+      if (session.user) session.user.role = token.role as string | undefined;
       return session;
+    },
+    authorized({ auth, request }) {
+      if (!request.nextUrl.pathname.startsWith("/espace")) return true;
+      return Boolean(auth?.user);
     },
   },
 });
