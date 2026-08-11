@@ -1,18 +1,14 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { requireCompanyAccess } from "@/lib/company-access";
 import CompanyDashboard from "./CompanyDashboard";
 
 export default async function EntreprisePage() {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== "ENTREPRISE") return null;
 
-  const membership = await prisma.companyMember.findFirst({
-    where: { userId: session.user.id },
-    include: { company: true },
-    orderBy: { createdAt: "asc" },
-  });
-
-  if (!membership) {
+  const membershipCount = await prisma.companyMember.count({ where: { userId: session.user.id } });
+  if (membershipCount === 0) {
     return (
       <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-24">
         <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Espace entreprise</p>
@@ -22,18 +18,33 @@ export default async function EntreprisePage() {
     );
   }
 
-  const jobs = await prisma.job.findMany({
-    where: { companyId: membership.companyId },
-    include: { applications: { select: { status: true } } },
-    orderBy: { updatedAt: "desc" },
-  });
+  if (membershipCount > 1) {
+    return (
+      <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-24">
+        <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Espace entreprise</p>
+        <h1 className="mt-5 font-serif text-5xl sm:text-6xl">Sélectionnez votre entreprise.</h1>
+        <p className="mt-5 max-w-2xl text-sm leading-7 text-white/50">Votre compte appartient à plusieurs entreprises. Chaque action doit désormais préciser le contexte de l’entreprise concernée afin d’éviter tout accès croisé.</p>
+        <div className="mt-8 space-y-2">
+          {(await prisma.companyMember.findMany({ where: { userId: session.user.id }, include: { company: true }, orderBy: { createdAt: "asc" } })).map((membership) => (
+            <a key={membership.companyId} href={`/espace/entreprise?companyId=${encodeURIComponent(membership.companyId)}`} className="block border border-white/10 p-5 transition hover:border-[#c7a15a]/40">
+              <span className="font-serif text-xl">{membership.company.name}</span>
+              <span className="ml-3 text-[10px] uppercase tracking-[0.16em] text-white/35">{membership.role}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
+  const companyId = new URLSearchParams((await import("next/headers")).headers().get("x-forwarded-query") ?? "").get("companyId") ?? undefined;
+  const access = await requireCompanyAccess(companyId);
+  const membership = await prisma.companyMember.findUnique({ where: { companyId_userId: { companyId: access.companyId, userId: session.user.id } }, include: { company: true } });
+  if (!membership) return null;
+
+  const jobs = await prisma.job.findMany({ where: { companyId: access.companyId }, include: { applications: { select: { status: true } } }, orderBy: { updatedAt: "desc" } });
   const applications = await prisma.application.findMany({
-    where: { job: { companyId: membership.companyId } },
-    include: {
-      job: { select: { id: true, title: true } },
-      candidate: { include: { user: { select: { name: true, email: true } } } },
-    },
+    where: { job: { companyId: access.companyId } },
+    include: { job: { select: { id: true, title: true } }, candidate: { include: { user: { select: { name: true, email: true } } } } },
     orderBy: { updatedAt: "desc" },
   });
 
