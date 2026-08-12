@@ -8,17 +8,30 @@ type Props = { params: Promise<{ jobId: string }> };
 
 export default async function JobOfferPage({ params }: Props) {
   const { jobId } = await params;
-  const job = await prisma.job.findFirst({
-    where: { id: jobId, status: "OPEN" },
-    select: {
-      id: true,
-      title: true,
-      location: true,
-      description: true,
-      createdAt: true,
-      company: { select: { name: true, description: true, website: true } },
-    },
-  });
+  let job: {
+    id: string;
+    title: string;
+    location: string | null;
+    description: string | null;
+    createdAt: Date;
+    company: { name: string; description: string | null; website: string | null };
+  } | null = null;
+
+  try {
+    job = await prisma.job.findFirst({
+      where: { id: jobId, status: "OPEN" },
+      select: {
+        id: true,
+        title: true,
+        location: true,
+        description: true,
+        createdAt: true,
+        company: { select: { name: true, description: true, website: true } },
+      },
+    });
+  } catch {
+    notFound();
+  }
 
   if (!job) notFound();
 
