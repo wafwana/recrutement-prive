@@ -1,10 +1,10 @@
 import React from "react";
 
 const images = {
-  hero: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=1400&q=85",
-  cabinet: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1400&q=85",
-  enterprise: "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1400&q=85",
-  tech: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1400&q=85",
+  hero: "/visuals/hero-portrait.jpeg",
+  cabinet: "/visuals/cabinet-office.jpeg",
+  enterprise: "/visuals/enterprise-handshake.jpeg",
+  tech: "/visuals/ai-human.jpeg",
 };
 
 const services = [
