@@ -4,18 +4,31 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export default async function OffersPage() {
-  const jobs = await prisma.job.findMany({
-    where: { status: "OPEN" },
-    select: {
-      id: true,
-      title: true,
-      location: true,
-      description: true,
-      createdAt: true,
-      company: { select: { name: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  let jobs: Array<{
+    id: string;
+    title: string;
+    location: string | null;
+    description: string | null;
+    createdAt: Date;
+    company: { name: string };
+  }> = [];
+
+  try {
+    jobs = await prisma.job.findMany({
+      where: { status: "OPEN" },
+      select: {
+        id: true,
+        title: true,
+        location: true,
+        description: true,
+        createdAt: true,
+        company: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch {
+    jobs = [];
+  }
 
   return (
     <main className="rp-site min-h-screen">
