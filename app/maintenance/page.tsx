@@ -21,7 +21,7 @@ export default function MaintenancePage() {
           Le site sera bientôt disponible. Merci pour votre patience.
         </p>
 
-        <Link className="maintenance-contact" href="mailto:contact@recrutement-prive.com">
+        <Link className="maintenance-contact" href="mailto:recrutement.prive@hotmail.com">
           Nous contacter
         </Link>
 
