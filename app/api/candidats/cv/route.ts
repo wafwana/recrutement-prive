@@ -136,7 +136,6 @@ export async function POST(request: Request) {
         "Cordialement,",
         "Recrutement Privé",
         "contact@recrutement-prive.com",
-        "+33 6 26 90 92 31",
         "Saint-Amand-les-Eaux",
       ].join("\n"),
     });
