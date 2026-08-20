@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
 const CONTACT_TO = "recrutement.prive@hotmail.com";
+const CONTACT_FROM = "contact@recrutement-prive.com";
 
 function getRequired(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -26,9 +27,8 @@ export async function POST(request: Request) {
     }
 
     const apiKey = process.env.RESEND_API_KEY;
-    const from = process.env.CONTACT_FROM_EMAIL;
 
-    if (!apiKey || !from) {
+    if (!apiKey) {
       console.error("[contact] email delivery is not configured");
       return NextResponse.json(
         { ok: false, error: "Le service de contact est temporairement indisponible." },
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     const resend = new Resend(apiKey);
     const result = await resend.emails.send({
-      from,
+      from: CONTACT_FROM,
       to: CONTACT_TO,
       replyTo: email,
       subject: `[Recrutement Privé] ${subject}`,
