@@ -5,13 +5,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
 
-const jobSchema = z.object({
-  companyId: z.string().optional(), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]).default("DRAFT"),
-});
-const companySchema = z.object({
-  companyId: z.string().optional(), country: z.string().trim().min(2).max(120), phonePrefix: z.string().trim().max(12).optional(), phone: z.string().trim().max(40).optional(),
-});
+const jobSchema = z.object({ companyId: z.string().optional(), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), requiredSkills: z.string().trim().max(1500).optional(), requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]).default("DRAFT") });
+const companySchema = z.object({ companyId: z.string().optional(), country: z.string().trim().min(2).max(120), phonePrefix: z.string().trim().max(12).optional(), phone: z.string().trim().max(40).optional() });
 function text(value: FormDataEntryValue | null) { const result = String(value ?? "").trim(); return result || undefined; }
+function csv(value: string | undefined) { return value ? value.split(",").map((item) => item.trim()).filter(Boolean) : []; }
 
 export async function updateCompanyContact(formData: FormData) {
   const parsed = companySchema.safeParse({ companyId: text(formData.get("companyId")), country: text(formData.get("country")), phonePrefix: text(formData.get("phonePrefix")), phone: text(formData.get("phone")) });
@@ -22,11 +19,11 @@ export async function updateCompanyContact(formData: FormData) {
 }
 
 export async function createCompanyJob(formData: FormData) {
-  const parsed = jobSchema.safeParse({ companyId: text(formData.get("companyId")), title: text(formData.get("title")), location: text(formData.get("location")), description: text(formData.get("description")), status: text(formData.get("status")) ?? "DRAFT" });
+  const parsed = jobSchema.safeParse({ companyId: text(formData.get("companyId")), title: text(formData.get("title")), location: text(formData.get("location")), description: text(formData.get("description")), requiredSkills: text(formData.get("requiredSkills")), requiredExperienceYears: text(formData.get("requiredExperienceYears")), status: text(formData.get("status")) ?? "DRAFT" });
   if (!parsed.success) throw new Error("Les données de l'offre sont invalides.");
   const access = await requireCompanyAccess(parsed.data.companyId);
   await prisma.$transaction(async (tx) => {
-    const job = await tx.job.create({ data: { companyId: access.companyId, title: parsed.data.title, location: parsed.data.location, description: parsed.data.description, status: parsed.data.status } });
+    const job = await tx.job.create({ data: { companyId: access.companyId, title: parsed.data.title, location: parsed.data.location, description: parsed.data.description, requiredSkills: csv(parsed.data.requiredSkills), requiredExperienceYears: parsed.data.requiredExperienceYears, status: parsed.data.status } });
     await tx.recruitmentHistory.create({ data: { jobId: job.id, actorUserId: access.userId, action: "JOB_CREATED", toStatus: job.status } });
   });
   revalidatePath("/espace/entreprise");
@@ -38,10 +35,6 @@ export async function updateApplicationStatus(applicationId: string, status: str
   const access = await requireCompanyAccess(existing.job.companyId);
   const parsedStatus = z.enum(["SUBMITTED", "REVIEWING", "INTERVIEW", "SHORTLISTED", "REJECTED", "HIRED"]).safeParse(status);
   if (!parsedStatus.success) throw new Error("Statut invalide.");
-  await prisma.$transaction(async (tx) => {
-    await tx.application.update({ where: { id: applicationId }, data: { status: parsedStatus.data, ...(notes !== undefined ? { notes: notes.trim().slice(0, 5000) || null } : {}) } });
-    await tx.recruitmentHistory.create({ data: { applicationId, jobId: existing.jobId, actorUserId: access.userId, action: "APPLICATION_STATUS_CHANGED", fromStatus: existing.status, toStatus: parsedStatus.data } });
-  });
-  revalidatePath("/espace/entreprise");
-  revalidatePath(`/espace/entreprise/offres/${existing.jobId}`);
+  await prisma.$transaction(async (tx) => { await tx.application.update({ where: { id: applicationId }, data: { status: parsedStatus.data, ...(notes !== undefined ? { notes: notes.trim().slice(0, 5000) || null } : {}) } }); await tx.recruitmentHistory.create({ data: { applicationId, jobId: existing.jobId, actorUserId: access.userId, action: "APPLICATION_STATUS_CHANGED", fromStatus: existing.status, toStatus: parsedStatus.data } }); });
+  revalidatePath("/espace/entreprise"); revalidatePath(`/espace/entreprise/offres/${existing.jobId}`);
 }
