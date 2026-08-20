@@ -72,7 +72,7 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
         </div>
         <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Rôle {membership.role}</p>
       </div>
-      <CompanyDashboard jobs={jobs} applications={applications} />
+      <CompanyDashboard jobs={jobs} applications={applications} companyId={access.companyId} />
     </section>
   );
 }
