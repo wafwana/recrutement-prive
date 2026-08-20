@@ -60,6 +60,8 @@ model CandidateProfile {
   headline     String?
   bio          String?
   location     String?
+  country      String?
+  phonePrefix  String?
   phone        String?
   cvUrl        String?
   preferences  Json?
@@ -85,6 +87,9 @@ model Company {
   name        String
   description String?
   website     String?
+  country     String?
+  phonePrefix String?
+  phone       String?
   members     CompanyMember[]
   jobs        Job[]
   createdAt   DateTime        @default(now())
