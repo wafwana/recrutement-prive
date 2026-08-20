@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 
 const CONTACT_TO = "recrutement.prive@hotmail.com";
+const CONTACT_FROM = "contact@recrutement-prive.com";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
   "application/pdf",
@@ -54,8 +55,7 @@ export async function POST(request: Request) {
     }
 
     const apiKey = process.env.RESEND_API_KEY;
-    const from = process.env.CONTACT_FROM_EMAIL;
-    if (!apiKey || !from) {
+    if (!apiKey) {
       console.error("[candidate-cv] email delivery is not configured");
       return NextResponse.json({ ok: false, error: "Le service de candidature est temporairement indisponible." }, { status: 503 });
     }
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     };
 
     const cabinetEmail = await resend.emails.send({
-      from,
+      from: CONTACT_FROM,
       to: CONTACT_TO,
       replyTo: parsed.data.email,
       subject: `[Recrutement Privé] Nouveau CV – ${parsed.data.name}`,
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
     }
 
     const confirmation = await resend.emails.send({
-      from,
+      from: CONTACT_FROM,
       to: parsed.data.email,
       subject: "Recrutement Privé – Confirmation de réception de votre CV",
       text: [
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
         "",
         "Cordialement,",
         "Recrutement Privé",
-        "recrutement.prive@hotmail.com",
+        "contact@recrutement-prive.com",
         "+33 6 26 90 92 31",
         "Saint-Amand-les-Eaux",
       ].join("\n"),
