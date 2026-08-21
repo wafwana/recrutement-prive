@@ -7,11 +7,43 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role { CANDIDAT ENTREPRISE CONSULTANT ADMIN }
-enum CompanyMemberRole { OWNER RECRUITER }
-enum JobStatus { DRAFT OPEN PAUSED CLOSED ARCHIVED }
-enum ApplicationStatus { SUBMITTED REVIEWING INTERVIEW SHORTLISTED REJECTED HIRED }
-enum SourcingStatus { DETECTED REVIEWING MATCHED VALIDATED CONTACTED REJECTED }
+enum Role {
+  CANDIDAT
+  ENTREPRISE
+  CONSULTANT
+  ADMIN
+}
+
+enum CompanyMemberRole {
+  OWNER
+  RECRUITER
+}
+
+enum JobStatus {
+  DRAFT
+  OPEN
+  PAUSED
+  CLOSED
+  ARCHIVED
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  REVIEWING
+  INTERVIEW
+  SHORTLISTED
+  REJECTED
+  HIRED
+}
+
+enum SourcingStatus {
+  DETECTED
+  REVIEWING
+  MATCHED
+  VALIDATED
+  CONTACTED
+  REJECTED
+}
 
 model User {
   id String @id @default(cuid())
@@ -174,6 +206,7 @@ model ConversationParticipant {
   conversationId String
   userId String
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   @@unique([conversationId, userId])
   @@index([userId])
