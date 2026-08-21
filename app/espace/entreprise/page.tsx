@@ -21,24 +21,13 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
   }
 
   if (membershipCount > 1 && !companyId) {
-    const memberships = await prisma.companyMember.findMany({
-      where: { userId: session.user.id },
-      include: { company: true },
-      orderBy: { createdAt: "asc" },
-    });
+    const memberships = await prisma.companyMember.findMany({ where: { userId: session.user.id }, include: { company: true }, orderBy: { createdAt: "asc" } });
     return (
       <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-24">
         <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Espace entreprise</p>
         <h1 className="mt-5 font-serif text-5xl sm:text-6xl">Sélectionnez votre entreprise.</h1>
         <p className="mt-5 max-w-2xl text-sm leading-7 text-white/50">Votre compte appartient à plusieurs entreprises. Sélectionnez le contexte de travail avant d'accéder aux offres et candidatures.</p>
-        <div className="mt-8 space-y-2">
-          {memberships.map((membership) => (
-            <a key={membership.companyId} href={`/espace/entreprise?companyId=${encodeURIComponent(membership.companyId)}`} className="block border border-white/10 p-5 transition hover:border-[#c7a15a]/40">
-              <span className="font-serif text-xl">{membership.company.name}</span>
-              <span className="ml-3 text-[10px] uppercase tracking-[0.16em] text-white/35">{membership.role}</span>
-            </a>
-          ))}
-        </div>
+        <div className="mt-8 space-y-2">{memberships.map((membership) => <a key={membership.companyId} href={`/espace/entreprise?companyId=${encodeURIComponent(membership.companyId)}`} className="block border border-white/10 p-5 transition hover:border-[#c7a15a]/40"><span className="font-serif text-xl">{membership.company.name}</span><span className="ml-3 text-[10px] uppercase tracking-[0.16em] text-white/35">{membership.role}</span></a>)}</div>
       </section>
     );
   }
@@ -49,29 +38,20 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
 
   const jobs = await prisma.job.findMany({
     where: { companyId: access.companyId },
-    include: { applications: { select: { status: true } } },
+    select: { id: true, title: true, location: true, status: true, attachmentName: true, applications: { select: { status: true } } },
     orderBy: { updatedAt: "desc" },
   });
 
   const applications = await prisma.application.findMany({
     where: { job: { companyId: access.companyId } },
-    include: {
-      job: { select: { id: true, title: true } },
-      candidate: { include: { user: { select: { name: true, email: true } } } },
-    },
+    include: { job: { select: { id: true, title: true } }, candidate: { include: { user: { select: { name: true, email: true } } } } },
     orderBy: { updatedAt: "desc" },
   });
 
   return (
     <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-24">
       <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Espace entreprise</p>
-      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="font-serif text-5xl sm:text-6xl">Vos recrutements, clairement pilotés.</h1>
-          <p className="mt-5 max-w-2xl text-sm leading-7 text-white/50">{membership.company.name} · gérez vos offres, suivez les candidatures et pilotez votre pipeline.</p>
-        </div>
-        <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Rôle {membership.role}</p>
-      </div>
+      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="font-serif text-5xl sm:text-6xl">Vos recrutements, clairement pilotés.</h1><p className="mt-5 max-w-2xl text-sm leading-7 text-white/50">{membership.company.name} · gérez vos offres, suivez les candidatures et pilotez votre pipeline.</p></div><p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Rôle {membership.role}</p></div>
       <CompanyDashboard jobs={jobs} applications={applications} companyId={access.companyId} />
     </section>
   );

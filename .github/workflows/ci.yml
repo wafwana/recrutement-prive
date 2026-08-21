@@ -51,5 +51,6 @@ jobs:
       - run: npx prisma generate
       - run: npx prisma migrate deploy
       - run: npx tsx tests/final-validation.ts
+      - run: npx tsx tests/offer-attachment-validation.ts
       - run: npm run typecheck
       - run: npm run build

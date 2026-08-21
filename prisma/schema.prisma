@@ -128,6 +128,9 @@ model Job {
   description String?
   requiredSkills Json?
   requiredExperienceYears Int?
+  attachmentName String?
+  attachmentMimeType String?
+  attachmentData Bytes?
   status JobStatus @default(DRAFT)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   applications Application[]
