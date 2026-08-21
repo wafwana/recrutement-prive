@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { updateCompanyContact } from "./actions";
 
 type Job = { id: string; title: string; location: string | null; status: string; attachmentName?: string | null; applications: { status: string }[] };
@@ -14,7 +14,7 @@ export default function CompanyDashboard({ jobs, applications, companyId }: { jo
   const filteredApplications = applications.filter((application) => !filter || application.status === filter);
   const activeJobs = jobs.filter((job) => ["OPEN", "PAUSED"].includes(job.status)).length;
 
-  async function handleCreateJob(event: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateJob(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCreatingJob(true);
     try {
