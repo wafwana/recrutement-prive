@@ -21,7 +21,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
     if (!attachment?.attachmentData || !attachment.attachmentName) return new Response("Attachment not found", { status: 404 });
 
     const filename = attachment.attachmentName.replace(/[\r\n"\\]/g, "_");
-    return new Response(attachment.attachmentData, {
+    const body = attachment.attachmentData.slice().buffer as ArrayBuffer;
+    return new Response(body, {
       status: 200,
       headers: {
         "Content-Type": attachment.attachmentMimeType || "application/octet-stream",
