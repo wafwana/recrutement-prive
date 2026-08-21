@@ -11,6 +11,7 @@ enum Role { CANDIDAT ENTREPRISE CONSULTANT ADMIN }
 enum CompanyMemberRole { OWNER RECRUITER }
 enum JobStatus { DRAFT OPEN PAUSED CLOSED ARCHIVED }
 enum ApplicationStatus { SUBMITTED REVIEWING INTERVIEW SHORTLISTED REJECTED HIRED }
+enum SourcingStatus { DETECTED REVIEWING MATCHED VALIDATED CONTACTED REJECTED }
 
 model User {
   id String @id @default(cuid())
@@ -26,6 +27,7 @@ model User {
   auditEntries RecruitmentHistory[]
   conversations ConversationParticipant[]
   sentMessages Message[]
+  sourcedCandidates SourcedCandidate[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -120,6 +122,28 @@ model Application {
   @@index([jobId, status])
 }
 
+model SourcedCandidate {
+  id String @id @default(cuid())
+  source String
+  sourceProfileUrl String?
+  name String?
+  headline String?
+  location String?
+  skills Json?
+  experienceYears Int?
+  consentStatus String @default("PENDING")
+  status SourcingStatus @default(DETECTED)
+  matchingScore Int?
+  matchingDetails Json?
+  notes String?
+  createdByUserId String
+  createdBy User @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, createdAt])
+  @@index([source])
+}
+
 model RecruitmentHistory {
   id String @id @default(cuid())
   applicationId String?
@@ -150,7 +174,6 @@ model ConversationParticipant {
   conversationId String
   userId String
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   @@unique([conversationId, userId])
   @@index([userId])
