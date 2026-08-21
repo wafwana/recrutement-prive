@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsultantAccess } from "@/lib/consultant-access";
+import { matchCandidateToJob } from "@/lib/matching";
 
 const sourceSchema = z.object({
   source: z.string().trim().min(2).max(80),
@@ -56,10 +57,45 @@ export async function createSourcedCandidate(formData: FormData) {
   revalidatePath("/espace/consultant");
 }
 
+async function runSourcedCandidateMatching(id: string, userId: string) {
+  const candidate = await prisma.sourcedCandidate.findUnique({ where: { id } });
+  if (!candidate || candidate.createdByUserId !== userId) throw new Error("Profil sourcé introuvable.");
+
+  const jobs = await prisma.job.findMany({
+    where: { status: "OPEN" },
+    select: { id: true, title: true, description: true, requiredSkills: true, requiredExperienceYears: true, company: { select: { id: true, name: true } } },
+    orderBy: { updatedAt: "desc" },
+    take: 100,
+  });
+
+  const ranked = jobs.map((job) => {
+    const matching = matchCandidateToJob(
+      { headline: candidate.headline, bio: candidate.notes, skills: candidate.skills, experienceYears: candidate.experienceYears },
+      job,
+    );
+    return { jobId: job.id, title: job.title, companyId: job.company.id, companyName: job.company.name, ...matching };
+  }).sort((a, b) => b.score - a.score);
+
+  const best = ranked[0];
+  await prisma.sourcedCandidate.update({
+    where: { id },
+    data: {
+      status: "MATCHED",
+      matchingScore: best?.score ?? null,
+      matchingDetails: best ? { bestMatch: best, topMatches: ranked.slice(0, 5) } : { bestMatch: null, topMatches: [] },
+    },
+  });
+}
+
 export async function updateSourcedCandidateStatus(id: string, status: "REVIEWING" | "MATCHED" | "VALIDATED" | "CONTACTED" | "REJECTED") {
   const access = await requireConsultantAccess();
   const existing = await prisma.sourcedCandidate.findUnique({ where: { id }, select: { id: true, createdByUserId: true } });
   if (!existing || existing.createdByUserId !== access.userId) throw new Error("Profil sourcé introuvable.");
-  await prisma.sourcedCandidate.update({ where: { id }, data: { status } });
+
+  if (status === "MATCHED") {
+    await runSourcedCandidateMatching(id, access.userId);
+  } else {
+    await prisma.sourcedCandidate.update({ where: { id }, data: { status } });
+  }
   revalidatePath("/espace/consultant");
 }
