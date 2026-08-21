@@ -21,6 +21,8 @@ const jobSchema = z.object({
   status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]).default("DRAFT"),
 });
 
+type JobInput = z.infer<typeof jobSchema>;
+
 function text(value: FormDataEntryValue | null) {
   const result = String(value ?? "").trim();
   return result || undefined;
@@ -59,7 +61,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const contentType = request.headers.get("content-type") ?? "";
-    let parsed: z.SafeParseReturnType<unknown, z.infer<typeof jobSchema>>;
+    let parsed: ReturnType<typeof jobSchema.safeParse>;
     let attachment: File | null = null;
 
     if (contentType.includes("multipart/form-data")) {
@@ -75,7 +77,7 @@ export async function POST(request: Request) {
       });
       attachment = validateAttachment(formData.get("attachment"));
     } else {
-      const body = await request.json();
+      const body: JobInput = await request.json();
       parsed = jobSchema.safeParse(body);
     }
 
