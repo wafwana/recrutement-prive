@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { saveCandidateProfile } from "./actions";
+import { PHONE_COUNTRIES } from "@/lib/phone-countries";
 
 type Profile = { headline: string | null; bio: string | null; location: string | null; phone: string | null; cvUrl: string | null; preferences: unknown; skills: unknown; experienceYears: number | null };
 
@@ -18,7 +19,7 @@ export default function ProfileForm({ profile }: { profile: Profile | null }) {
       <div className="mt-8 grid gap-5 md:grid-cols-2">
         <label className="text-xs uppercase tracking-[0.18em] text-white/40">Intitulé professionnel<input name="headline" defaultValue={profile?.headline ?? ""} maxLength={160} className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none" /></label>
         <label className="text-xs uppercase tracking-[0.18em] text-white/40">Localisation<input name="location" defaultValue={profile?.location ?? ""} maxLength={120} className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none" /></label>
-        <label className="text-xs uppercase tracking-[0.18em] text-white/40">Téléphone<input name="phone" defaultValue={profile?.phone ?? ""} maxLength={40} className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none" /></label>
+        <div className="text-xs uppercase tracking-[0.18em] text-white/40 md:col-span-2"><span>Téléphone</span><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_2fr]"><select name="phonePrefix" defaultValue="+33" aria-label="Préfixe téléphonique" className="border border-white/10 bg-[#111] px-4 py-3 text-sm text-white outline-none">{PHONE_COUNTRIES.map(([country, prefix]) => <option key={`${country}-${prefix}`} value={prefix}>{prefix} · {country}</option>)}</select><input name="phone" defaultValue={profile?.phone ?? ""} maxLength={40} placeholder="Numéro de téléphone" className="w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none" /></div></div>
         <label className="text-xs uppercase tracking-[0.18em] text-white/40">Années d'expérience<input name="experienceYears" type="number" min="0" max="60" defaultValue={profile?.experienceYears ?? ""} className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none" /></label>
         <label className="text-xs uppercase tracking-[0.18em] text-white/40">URL du CV<input name="cvUrl" type="url" defaultValue={profile?.cvUrl ?? ""} placeholder="https://..." className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none" /></label>
         <label className="text-xs uppercase tracking-[0.18em] text-white/40">Compétences<input name="skills" defaultValue={skills} placeholder="Management, Excel, SAP, recrutement" maxLength={1500} className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none" /></label>
