@@ -12,6 +12,7 @@ enum Role {
   ENTREPRISE
   CONSULTANT
   ADMIN
+  OWNER
 }
 
 enum CompanyMemberRole {
