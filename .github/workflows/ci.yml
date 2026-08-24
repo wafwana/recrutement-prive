@@ -48,8 +48,10 @@ jobs:
           node-version: 20
           cache: ''
       - run: npm install
+      - run: npm audit --audit-level=high
       - run: npx prisma generate
       - run: npx prisma migrate deploy
+      - run: npm run security:test
       - run: npx tsx tests/final-validation.ts
       - run: npx tsx tests/offer-attachment-validation.ts
       - run: npm run typecheck
