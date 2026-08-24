@@ -14,6 +14,33 @@ const createMessageSchema = z.object({
 
 const readSchema = z.object({ conversationId: z.string().trim().min(1) });
 
+async function canStartDirectCandidateCompanyConversation(senderId: string, recipientId: string) {
+  const users = await prisma.user.findMany({
+    where: { id: { in: [senderId, recipientId] } },
+    select: { id: true, role: true, companyLinks: { select: { companyId: true } } },
+  });
+  const sender = users.find((user) => user.id === senderId);
+  const recipient = users.find((user) => user.id === recipientId);
+  if (!sender || !recipient) return false;
+
+  const candidate = sender.role === "CANDIDAT" ? sender : recipient.role === "CANDIDAT" ? recipient : null;
+  const companyUser = sender.role === "ENTREPRISE" ? sender : recipient.role === "ENTREPRISE" ? recipient : null;
+  if (!candidate || !companyUser) return true;
+
+  const companyIds = companyUser.companyLinks.map((link) => link.companyId);
+  if (companyIds.length === 0) return false;
+
+  const presentation = await prisma.application.findFirst({
+    where: {
+      userId: candidate.id,
+      job: { companyId: { in: companyIds } },
+      status: { in: ["SHORTLISTED", "INTERVIEW", "HIRED"] },
+    },
+    select: { id: true },
+  });
+  return Boolean(presentation);
+}
+
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
@@ -72,6 +99,10 @@ export async function POST(request: Request) {
     if (recipientId === senderId) return NextResponse.json({ error: "Impossible de s'envoyer un message à soi-même." }, { status: 400 });
     const recipient = await prisma.user.findUnique({ where: { id: recipientId }, select: { id: true } });
     if (!recipient) return NextResponse.json({ error: "Destinataire introuvable" }, { status: 404 });
+
+    if (!(await canStartDirectCandidateCompanyConversation(senderId, recipientId))) {
+      return NextResponse.json({ error: "La mise en relation candidat–entreprise doit être validée par Recrutement Privé." }, { status: 403 });
+    }
 
     const existing = await prisma.conversation.findFirst({
       where: {
