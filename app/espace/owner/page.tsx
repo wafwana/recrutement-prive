@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import OwnerApplicationControl from "./OwnerApplicationControl";
 
 const applicationLabels: Record<string, string> = {
   SUBMITTED: "Soumises",
@@ -20,9 +21,20 @@ export default async function OwnerPage() {
     prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, email: true, role: true, createdAt: true } }),
     prisma.candidateProfile.count(),
     prisma.candidateDocument.count(),
-    prisma.company.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { _count: { select: { members: true, jobs: true } } } }),
+    prisma.company.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { _count: { select: { members: true, jobs: true } } }),
     prisma.job.findMany({ orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, title: true, status: true, company: { select: { name: true } }, updatedAt: true } }),
-    prisma.application.findMany({ orderBy: { updatedAt: "desc" }, take: 200, select: { id: true, status: true, createdAt: true, updatedAt: true } }),
+    prisma.application.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        candidate: { select: { headline: true, location: true, user: { select: { name: true, email: true } } } },
+        job: { select: { title: true, company: { select: { name: true } } } },
+      },
+    }),
     prisma.sourcedCandidate.findMany({ orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, name: true, source: true, status: true, matchingScore: true, updatedAt: true } }),
     prisma.systemSetting.count(),
   ]);
@@ -104,6 +116,8 @@ export default async function OwnerPage() {
           </div>
         </section>
       </div>
+
+      <OwnerApplicationControl applications={applications} />
 
       <section className="mt-8 border border-white/10 p-7">
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
