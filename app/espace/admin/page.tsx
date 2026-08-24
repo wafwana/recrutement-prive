@@ -13,7 +13,7 @@ const statusLabels: Record<string, string> = {
 
 export default async function AdminPage() {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== "ADMIN") redirect("/connexion");
+  if (!session?.user?.id || (session.user.role !== "ADMIN" && session.user.role !== "OWNER")) redirect("/connexion");
 
   const [users, companies, jobs, applications] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, email: true, role: true, createdAt: true } }),
@@ -38,7 +38,7 @@ export default async function AdminPage() {
           <h1 className="font-serif text-5xl sm:text-6xl">Pilotage global de la plateforme.</h1>
           <p className="mt-5 max-w-3xl text-sm leading-7 text-white/50">Vue consolidée des utilisateurs, entreprises, offres et candidatures. Les données affichées proviennent directement de PostgreSQL.</p>
         </div>
-        <span className="border border-white/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/40">ADMIN</span>
+        <span className="border border-white/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/40">{session.user.role}</span>
       </div>
 
       <div className="mt-12 grid gap-px bg-white/10 md:grid-cols-4">
