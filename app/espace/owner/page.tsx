@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import OwnerApplicationControl from "./OwnerApplicationControl";
 
 const applicationLabels: Record<string, string> = {
   SUBMITTED: "Soumises",
@@ -23,7 +24,18 @@ export default async function OwnerPage() {
     prisma.candidateDocument.count(),
     prisma.company.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { _count: { select: { members: true, jobs: true } } } }),
     prisma.job.findMany({ orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, title: true, status: true, company: { select: { name: true } }, updatedAt: true } }),
-    prisma.application.findMany({ orderBy: { updatedAt: "desc" }, take: 200, select: { id: true, status: true, createdAt: true, updatedAt: true } }),
+    prisma.application.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        candidate: { select: { headline: true, location: true, user: { select: { name: true, email: true } } } },
+        job: { select: { title: true, company: { select: { name: true } } } },
+      },
+    }),
     prisma.sourcedCandidate.findMany({ orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, name: true, source: true, status: true, matchingScore: true, updatedAt: true } }),
     prisma.systemSetting.count(),
     prisma.user.findFirst({ where: { role: "OWNER" }, select: { name: true, email: true } }),
@@ -75,6 +87,8 @@ export default async function OwnerPage() {
           <div className="mt-6 border-t border-white/10 pt-5 text-xs leading-6 text-white/40"><p>{activeCompanies} entreprise(s) disposent d'au moins une offre.</p><p>{pendingSourcing} profil(s) sourcé(s) restent à qualifier ou examiner.</p></div>
         </section>
       </div>
+
+      <OwnerApplicationControl applications={applications} />
 
       <section className="mt-8 border border-white/10 p-7">
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between"><div><p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Sourcing & matching</p><h2 className="mt-3 font-serif text-2xl">Profils récemment détectés</h2></div><span className="text-[10px] uppercase tracking-[0.16em] text-white/30">100 derniers</span></div>

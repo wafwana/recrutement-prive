@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
 import CompanyDashboard from "./CompanyDashboard";
 
+const companyVisibleStatuses = ["SHORTLISTED", "INTERVIEW", "REJECTED", "HIRED"] as const;
+
 export default async function EntreprisePage({ searchParams }: { searchParams: Promise<{ companyId?: string }> }) {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== "ENTREPRISE") return null;
@@ -43,7 +45,7 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
   });
 
   const applications = await prisma.application.findMany({
-    where: { job: { companyId: access.companyId } },
+    where: { job: { companyId: access.companyId }, status: { in: companyVisibleStatuses } },
     include: { job: { select: { id: true, title: true } }, candidate: { include: { user: { select: { name: true, email: true } } } } },
     orderBy: { updatedAt: "desc" },
   });
@@ -51,7 +53,7 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
   return (
     <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-24">
       <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Espace entreprise</p>
-      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="font-serif text-5xl sm:text-6xl">Vos recrutements, clairement pilotés.</h1><p className="mt-5 max-w-2xl text-sm leading-7 text-white/50">{membership.company.name} · gérez vos offres, suivez les candidatures et pilotez votre pipeline.</p></div><p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Rôle {membership.role}</p></div>
+      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="font-serif text-5xl sm:text-6xl">Vos recrutements, clairement pilotés.</h1><p className="mt-5 max-w-2xl text-sm leading-7 text-white/50">{membership.company.name} · gérez vos offres et consultez uniquement les profils présentés par Recrutement Privé.</p></div><p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Rôle {membership.role}</p></div>
       <CompanyDashboard jobs={jobs} applications={applications} companyId={access.companyId} />
     </section>
   );
