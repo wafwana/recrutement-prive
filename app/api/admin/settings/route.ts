@@ -19,20 +19,20 @@ const defaults = {
   defaultApplicationStatus: "SUBMITTED" as const,
 };
 
-async function requireAdmin() {
+async function requirePlatformControl() {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== "ADMIN") return null;
+  if (!session?.user?.id || (session.user.role !== "ADMIN" && session.user.role !== "OWNER")) return null;
   return session.user.id;
 }
 
 export async function GET() {
-  if (!(await requireAdmin())) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  if (!(await requirePlatformControl())) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   const record = await prisma.systemSetting.findUnique({ where: { key: "platform" } });
   return NextResponse.json({ settings: { ...defaults, ...(record?.value as object | null) } });
 }
 
 export async function PUT(request: Request) {
-  if (!(await requireAdmin())) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  if (!(await requirePlatformControl())) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Corps JSON invalide" }, { status: 400 }); }
   const parsed = settingsSchema.safeParse(body);
