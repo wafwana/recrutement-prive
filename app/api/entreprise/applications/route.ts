@@ -6,9 +6,11 @@ import { requireCompanyAccess } from "@/lib/company-access";
 const querySchema = z.object({
   companyId: z.string().optional(),
   jobId: z.string().optional(),
-  status: z.enum(["SUBMITTED", "REVIEWING", "INTERVIEW", "SHORTLISTED", "REJECTED", "HIRED"]).optional(),
+  status: z.enum(["SHORTLISTED", "INTERVIEW", "REJECTED", "HIRED"]).optional(),
   search: z.string().trim().max(120).optional(),
 });
+
+const companyVisibleStatuses = ["SHORTLISTED", "INTERVIEW", "REJECTED", "HIRED"] as const;
 
 export async function GET(request: Request) {
   try {
@@ -25,8 +27,8 @@ export async function GET(request: Request) {
     const applications = await prisma.application.findMany({
       where: {
         job: { companyId: access.companyId },
+        status: parsed.data.status ? parsed.data.status : { in: companyVisibleStatuses },
         ...(parsed.data.jobId ? { jobId: parsed.data.jobId } : {}),
-        ...(parsed.data.status ? { status: parsed.data.status } : {}),
         ...(parsed.data.search
           ? {
               OR: [
