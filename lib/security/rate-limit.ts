@@ -3,10 +3,9 @@ type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
 
 /**
- * Lightweight in-process rate limiter for the first security layer.
- * For multi-instance/serverless production, replace the backing store with
- * shared infrastructure (for example Redis/Upstash) before relying on it
- * for distributed enforcement.
+ * Lightweight in-process limiter. It is a first protection layer for public
+ * endpoints. Distributed enforcement should be added at the edge/store level
+ * when production traffic requires it.
  */
 export function rateLimit(key: string, limit: number, windowMs: number) {
   const now = Date.now();
@@ -24,4 +23,10 @@ export function rateLimit(key: string, limit: number, windowMs: number) {
 
   current.count += 1;
   return { allowed: true, remaining: Math.max(0, limit - current.count), resetAt: current.resetAt };
+}
+
+export function getClientAddress(request: Request) {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]?.trim() || "unknown";
+  return request.headers.get("x-real-ip")?.trim() || "unknown";
 }
