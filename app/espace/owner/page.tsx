@@ -17,7 +17,7 @@ export default async function OwnerPage() {
   const role = session?.user?.role;
   if (!session?.user?.id || (role !== "OWNER" && role !== "ADMIN")) redirect("/connexion");
 
-  const [users, candidates, documents, companies, jobs, applications, sourcedCandidates, settings] = await Promise.all([
+  const [users, candidates, documents, companies, jobs, applications, sourcedCandidates, settings, owner] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, email: true, role: true, createdAt: true } }),
     prisma.candidateProfile.count(),
     prisma.candidateDocument.count(),
@@ -26,6 +26,7 @@ export default async function OwnerPage() {
     prisma.application.findMany({ orderBy: { updatedAt: "desc" }, take: 200, select: { id: true, status: true, createdAt: true, updatedAt: true } }),
     prisma.sourcedCandidate.findMany({ orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, name: true, source: true, status: true, matchingScore: true, updatedAt: true } }),
     prisma.systemSetting.count(),
+    prisma.user.findFirst({ where: { role: "OWNER" }, select: { name: true, email: true } }),
   ]);
 
   const openJobs = jobs.filter((job) => job.status === "OPEN").length;
@@ -42,11 +43,14 @@ export default async function OwnerPage() {
           <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Vue complète de Recrutement Privé.</h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">Données opérationnelles consolidées depuis PostgreSQL. Cet espace est réservé au pilotage global et à la supervision de la plateforme.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/espace/admin" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Administration</Link>
           <Link href="/espace/owner/prestations-tarifs" className="border border-[#c7a15a]/50 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Prestations & tarifs</Link>
           <span className="border border-[#c7a15a]/30 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">{role}</span>
         </div>
       </div>
+
+      {owner && <div className="mt-6 border border-[#c7a15a]/20 bg-[#111] px-5 py-4 text-xs text-white/45">Compte Owner actif : <span className="text-white/75">{owner.name || "Owner Recrutement Privé"}</span> · {owner.email}</div>}
 
       <div className="mt-10 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
         {[["Candidats", candidates],["CV / documents", documents],["Entreprises", companies.length],["Offres ouvertes", openJobs],["Candidatures", applications.length],["Profils sourcés", sourcedCandidates.length],["Matching ≥ 80", highMatches],["Paramètres système", settings]].map(([label, value]) => (
