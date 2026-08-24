@@ -7,6 +7,7 @@ Application SaaS de recrutement haut de gamme développée avec **Next.js 15**, 
 - Lot 1 — fondations et page d’accueil premium
 - Lot 2 — espaces métiers candidat, entreprise et consultant
 - Lot 3 — socle Auth.js + Prisma/PostgreSQL
+- Lot 4 — cockpit Owner, pilotage et prestations/tarifs
 
 ## Stack technique
 
@@ -28,7 +29,12 @@ Application SaaS de recrutement haut de gamme développée avec **Next.js 15**, 
 DATABASE_URL="postgresql://..."
 AUTH_SECRET="..."
 OPENAI_API_KEY="..."
+OWNER_EMAIL="owner@votre-domaine.fr"
+OWNER_PASSWORD="mot-de-passe-fort-et-unique"
+OWNER_NAME="Owner Recrutement Privé"
 ```
+
+`OWNER_EMAIL` et `OWNER_PASSWORD` sont utilisés uniquement par `prisma db seed` pour provisionner le premier Owner. Le seed refuse de créer un second Owner si un Owner existe déjà.
 
 ## Développement
 
@@ -41,7 +47,7 @@ npm run build
 npm run dev
 ```
 
-Le Lot 3 utilise Auth.js avec une session JWT et un modèle Prisma `User` comprenant les rôles `CANDIDAT`, `ENTREPRISE`, `CONSULTANT` et `ADMIN`.
+Le système Auth.js utilise une session JWT et le modèle Prisma `User` comprend les rôles `CANDIDAT`, `ENTREPRISE`, `CONSULTANT`, `ADMIN` et `OWNER`.
 
 ## Fonctionnalités prévues
 
@@ -54,6 +60,7 @@ Le Lot 3 utilise Auth.js avec une session JWT et un modèle Prisma `User` compre
 - Contact
 
 ### Espaces métiers
+- Owner : cockpit global, supervision, pilotage, prestations et tarifs
 - Candidat : profil, candidatures, documents, messagerie
 - Entreprise : missions, profils proposés, suivi des recrutements
 - Consultant : CRM, pipeline, agenda, notes, reporting
