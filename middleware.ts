@@ -9,8 +9,7 @@ export async function middleware(request: NextRequest) {
   const isCurrentVercelDeployment = Boolean(deploymentHost) && host === deploymentHost;
 
   // Keep the public custom domains in maintenance mode while the site is
-  // being completed. The unique Vercel deployment URL remains available as
-  // the private functional test surface for ongoing development.
+  // being completed. The deployment URL is not an authentication bypass.
   if (MAINTENANCE_MODE && !isCurrentVercelDeployment) {
     const { pathname } = request.nextUrl;
 
@@ -18,10 +17,6 @@ export async function middleware(request: NextRequest) {
       return NextResponse.rewrite(new URL("/maintenance", request.url));
     }
 
-    return NextResponse.next();
-  }
-
-  if (isCurrentVercelDeployment) {
     return NextResponse.next();
   }
 
