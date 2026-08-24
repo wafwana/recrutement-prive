@@ -35,22 +35,30 @@ export async function POST(request: Request) {
   const parsed = ownerSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Nom, email ou mot de passe invalide.", issues: parsed.error.issues }, { status: 400 });
 
-  const owner = await prisma.user.findFirst({ where: { role: "OWNER" }, select: { id: true, email: true } });
-  if (owner) return NextResponse.json({ error: `Un Owner existe déjà (${owner.email}). Aucun second Owner n'est autorisé.` }, { status: 409 });
-
   const email = parsed.data.email.toLowerCase();
-  const existingUser = await prisma.user.findUnique({ where: { email }, select: { id: true, role: true } });
-  if (existingUser) return NextResponse.json({ error: "Cette adresse email est déjà utilisée par un autre compte." }, { status: 409 });
+  const result = await prisma.$transaction(async (tx) => {
+    // Serialize Owner provisioning so two simultaneous Admin requests cannot create two Owners.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('recrutement-prive:owner-provisioning'))`;
 
-  const created = await prisma.user.create({
-    data: {
-      name: parsed.data.name,
-      email,
-      passwordHash: await hashPassword(parsed.data.password),
-      role: "OWNER",
-    },
-    select: { id: true, name: true, email: true, role: true, createdAt: true },
+    const existingOwner = await tx.user.findFirst({ where: { role: "OWNER" }, select: { id: true, email: true } });
+    if (existingOwner) return { conflict: `Un Owner existe déjà (${existingOwner.email}). Aucun second Owner n'est autorisé.` };
+
+    const existingUser = await tx.user.findUnique({ where: { email }, select: { id: true, role: true } });
+    if (existingUser) return { conflict: "Cette adresse email est déjà utilisée par un autre compte." };
+
+    const created = await tx.user.create({
+      data: {
+        name: parsed.data.name,
+        email,
+        passwordHash: await hashPassword(parsed.data.password),
+        role: "OWNER",
+      },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    });
+
+    return { owner: created };
   });
 
-  return NextResponse.json({ owner: created }, { status: 201 });
+  if ("conflict" in result) return NextResponse.json({ error: result.conflict }, { status: 409 });
+  return NextResponse.json({ owner: result.owner }, { status: 201 });
 }
