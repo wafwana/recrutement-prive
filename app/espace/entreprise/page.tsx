@@ -40,7 +40,7 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
 
   const jobs = await prisma.job.findMany({
     where: { companyId: access.companyId },
-    select: { id: true, title: true, location: true, status: true, attachmentName: true, applications: { select: { status: true, where: undefined } } },
+    select: { id: true, title: true, location: true, status: true, attachmentName: true, applications: { select: { status: true } } },
     orderBy: { updatedAt: "desc" },
   });
 
