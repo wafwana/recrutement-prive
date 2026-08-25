@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
+import { validateUploadedDocument } from "@/lib/security/file-validation";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { requireFileScanInProduction, scanBufferWithClamAV } from "@/lib/security/file-scan";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = new Set(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
@@ -45,9 +48,26 @@ export async function POST(request: Request) {
     }
     if (!parsed.success) return NextResponse.json({ error: "Données d'offre invalides" }, { status: 400 });
     const access = await requireCompanyAccess(parsed.data.companyId);
-    const attachmentData = attachment ? Buffer.from(await attachment.arrayBuffer()) : undefined;
+    const requestLimit = rateLimit(`company-job:create:${access.userId}`, 20, 60 * 60_000);
+    if (!requestLimit.allowed) return NextResponse.json({ error: "Trop de créations d'offres. Merci de réessayer plus tard." }, { status: 429 });
+
+    let attachmentData: Buffer | undefined;
+    if (attachment) {
+      const validation = await validateUploadedDocument(attachment);
+      if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
+      attachmentData = Buffer.from(await attachment.arrayBuffer());
+      if (requireFileScanInProduction()) {
+        const scan = await scanBufferWithClamAV(attachmentData);
+        if (scan.status === "infected") return NextResponse.json({ error: "La pièce jointe a été bloquée par le contrôle de sécurité." }, { status: 400 });
+        if (scan.status === "unavailable") {
+          console.error("[company-job] antivirus unavailable", scan.reason);
+          return NextResponse.json({ error: "Le contrôle de sécurité de la pièce jointe est temporairement indisponible." }, { status: 503 });
+        }
+      }
+    }
+
     const job = await prisma.$transaction(async (tx) => {
-      const created = await tx.job.create({ data: { companyId: access.companyId, title: parsed.data.title, location: parsed.data.location || null, description: parsed.data.description || null, requiredSkills: csv(parsed.data.requiredSkills), requiredExperienceYears: parsed.data.requiredExperienceYears, ...(attachment ? { attachmentName: attachment.name, attachmentMimeType: attachment.type || "application/octet-stream", attachmentData } : {}), status: parsed.data.status } });
+      const created = await tx.job.create({ data: { companyId: access.companyId, title: parsed.data.title, location: parsed.data.location || null, description: parsed.data.description || null, requiredSkills: csv(parsed.data.requiredSkills), requiredExperienceYears: parsed.data.requiredExperienceYears, ...(attachment ? { attachmentName: attachment.name.replace(/[\\/\r\n\0]/g, "_").slice(-180), attachmentMimeType: attachment.type || "application/octet-stream", attachmentData } : {}), status: parsed.data.status } });
       await tx.recruitmentHistory.create({ data: { jobId: created.id, actorUserId: access.userId, action: "JOB_CREATED", toStatus: created.status, details: attachment ? { attachmentName: attachment.name, attachmentSize: attachment.size } : undefined } });
       return created;
     });
