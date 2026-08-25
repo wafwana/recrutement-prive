@@ -1,16 +1,15 @@
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
-const MAINTENANCE_MODE = true;
+// Production is now the functional platform. Maintenance can be re-enabled
+// explicitly through Vercel without changing application code.
+const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
 
 export async function middleware(request: NextRequest) {
   const host = request.headers.get("host")?.split(":")[0] ?? "";
   const deploymentHost = process.env.VERCEL_URL?.split(":")[0] ?? "";
   const isCurrentVercelDeployment = Boolean(deploymentHost) && host === deploymentHost;
 
-  // Keep the public custom domains in maintenance mode while the site is
-  // being completed. The unique Vercel deployment URL remains available as
-  // the private functional test surface for ongoing development.
   if (MAINTENANCE_MODE && !isCurrentVercelDeployment) {
     const { pathname } = request.nextUrl;
 
