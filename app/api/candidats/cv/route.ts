@@ -2,13 +2,15 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { validateUploadedDocument } from "@/lib/security/file-validation";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { requireFileScanInProduction, scanBufferWithClamAV } from "@/lib/security/file-scan";
 
 export const runtime = "nodejs";
 
 const CONTACT_TO = "recrutement.prive@hotmail.com";
 const CONTACT_FROM = "contact@recrutement-prive.com";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const ALLOWED_TYPES = new Set(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
 
 const candidateSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -23,8 +25,21 @@ const candidateSchema = z.object({
 
 function text(value: FormDataEntryValue | null) { return String(value ?? "").trim(); }
 
+function safeAttachmentName(name: string) {
+  const cleaned = name.replace(/[\\/\r\n\0]/g, "_").trim();
+  return cleaned.slice(-180) || "cv";
+}
+
 export async function POST(request: Request) {
   try {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+      ?? request.headers.get("x-real-ip")?.trim()
+      ?? "unknown";
+    const ipLimit = rateLimit(`candidate-cv:ip:${ip}`, 5, 60_000);
+    if (!ipLimit.allowed) {
+      return NextResponse.json({ ok: false, error: "Trop de tentatives. Merci de réessayer dans un instant." }, { status: 429 });
+    }
+
     const form = await request.formData();
     const parsed = candidateSchema.safeParse({
       name: text(form.get("name")), email: text(form.get("email")), country: text(form.get("country")),
@@ -34,10 +49,29 @@ export async function POST(request: Request) {
     });
     if (!parsed.success) return NextResponse.json({ ok: false, error: "Veuillez vérifier les informations saisies." }, { status: 400 });
 
+    const emailLimit = rateLimit(`candidate-cv:email:${parsed.data.email.toLowerCase()}`, 3, 15 * 60_000);
+    if (!emailLimit.allowed) {
+      return NextResponse.json({ ok: false, error: "Trop de candidatures depuis cette adresse. Merci de réessayer plus tard." }, { status: 429 });
+    }
+
     const file = form.get("cv");
     if (!(file instanceof File) || file.size === 0) return NextResponse.json({ ok: false, error: "Veuillez joindre votre CV." }, { status: 400 });
     if (file.size > MAX_FILE_SIZE) return NextResponse.json({ ok: false, error: "Le CV ne doit pas dépasser 10 Mo." }, { status: 400 });
-    if (!ALLOWED_TYPES.has(file.type)) return NextResponse.json({ ok: false, error: "Format de CV non accepté. Utilisez PDF, DOC ou DOCX." }, { status: 400 });
+
+    const validation = await validateUploadedDocument(file);
+    if (!validation.ok) return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
+
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    if (requireFileScanInProduction()) {
+      const scan = await scanBufferWithClamAV(fileBuffer);
+      if (scan.status === "infected") {
+        return NextResponse.json({ ok: false, error: "Le document a été bloqué par le contrôle de sécurité." }, { status: 400 });
+      }
+      if (scan.status === "unavailable") {
+        console.error("[candidate-cv] antivirus unavailable", scan.reason);
+        return NextResponse.json({ ok: false, error: "Le contrôle de sécurité du document est temporairement indisponible." }, { status: 503 });
+      }
+    }
 
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) return NextResponse.json({ ok: false, error: "Le service de candidature est temporairement indisponible." }, { status: 503 });
@@ -53,7 +87,7 @@ export async function POST(request: Request) {
     });
 
     const resend = new Resend(apiKey);
-    const attachment = { filename: file.name, content: Buffer.from(await file.arrayBuffer()).toString("base64"), contentType: file.type || undefined };
+    const attachment = { filename: safeAttachmentName(file.name), content: fileBuffer.toString("base64"), contentType: file.type || undefined };
     const cabinetEmail = await resend.emails.send({
       from: CONTACT_FROM, to: CONTACT_TO, replyTo: parsed.data.email,
       subject: `[Recrutement Privé] Nouveau CV – ${parsed.data.name}`,
