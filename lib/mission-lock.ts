@@ -39,6 +39,9 @@ export async function getCompanyMissionPresentation(presentationId: string, comp
           bio: true,
           location: true,
           country: true,
+          phonePrefix: true,
+          phone: true,
+          cvUrl: true,
           skills: true,
           experienceYears: true,
           user: { select: { name: true, email: true } },
@@ -78,9 +81,9 @@ export async function getCompanyMissionPresentation(presentationId: string, comp
             candidateIdentity: {
               name: presentation.candidate.user.name,
               email: presentation.candidate.user.email,
-              phone: presentation.candidate.user.email ? undefined : undefined,
-              phonePrefix: undefined,
-              cvUrl: undefined,
+              phone: presentation.candidate.phone,
+              phonePrefix: presentation.candidate.phonePrefix,
+              cvUrl: presentation.candidate.cvUrl,
               documents: presentation.candidate.documents,
             },
           }
