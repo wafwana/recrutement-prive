@@ -20,7 +20,7 @@ async function isDirectCandidateCompanyConversation(conversationId: string) {
     include: { user: { select: { role: true } } },
   });
   const roles = new Set(participants.map((participant) => participant.user.role));
-  return roles.has("CANDIDAT") && roles.has("ENTREPRISE");
+  return roles.has("CANDIDAT") && roles.has("ENTREPRISE") && participants.length === 2;
 }
 
 async function assertNoDirectCandidateCompanyContact(userId: string, recipientId?: string, conversationId?: string) {
@@ -67,12 +67,7 @@ export async function GET(request: Request) {
   }
 
   const conversations = await prisma.conversation.findMany({
-    where: {
-      participants: { some: { userId } },
-      NOT: {
-        participants: { some: { user: { role: "ENTREPRISE" } } },
-      },
-    },
+    where: { participants: { some: { userId } } },
     orderBy: { updatedAt: "desc" },
     include: {
       participants: { include: { user: { select: { id: true, name: true, email: true, role: true } } } },
@@ -80,7 +75,12 @@ export async function GET(request: Request) {
     },
   });
 
-  return NextResponse.json({ conversations });
+  const visibleConversations = conversations.filter((conversation) => {
+    const roles = new Set(conversation.participants.map((participant) => participant.user.role));
+    return !(roles.has("CANDIDAT") && roles.has("ENTREPRISE") && conversation.participants.length === 2);
+  });
+
+  return NextResponse.json({ conversations: visibleConversations });
 }
 
 export async function POST(request: Request) {
