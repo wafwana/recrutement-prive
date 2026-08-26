@@ -16,12 +16,11 @@ export default async function AdminPage() {
   const session = await auth();
   if (!session?.user?.id || (session.user.role !== "ADMIN" && session.user.role !== "OWNER")) redirect("/connexion");
 
-  const [users, companies, jobs, applications, owner] = await Promise.all([
+  const [users, companies, jobs, applications] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, email: true, role: true, createdAt: true } }),
     prisma.company.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { _count: { select: { members: true, jobs: true } } } }),
     prisma.job.findMany({ orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, title: true, status: true, company: { select: { name: true } }, updatedAt: true } }),
     prisma.application.findMany({ orderBy: { updatedAt: "desc" }, take: 200, select: { id: true, status: true, createdAt: true, updatedAt: true } }),
-    prisma.user.findFirst({ where: { role: "OWNER" }, select: { name: true, email: true } }),
   ]);
 
   const statusCounts = Object.keys(statusLabels).map((status) => ({ status, count: applications.filter((application) => application.status === status).length }));
@@ -37,13 +36,13 @@ export default async function AdminPage() {
           <p className="mt-5 max-w-3xl text-sm leading-7 text-white/50">Vue consolidée des utilisateurs, entreprises, offres et candidatures. Les données affichées proviennent directement de PostgreSQL.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Link href="/espace/owner" className="border border-[#c7a15a]/40 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Cockpit Owner</Link>
-          {session.user.role === "ADMIN" && !owner && <Link href="/espace/admin/owner" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Activer Owner</Link>}
+          {session.user.role === "OWNER" && <>
+            <Link href="/espace/owner" className="border border-[#c7a15a]/40 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Cockpit Owner</Link>
+            <Link href="/espace/owner/admins" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Gestion des Admin</Link>
+          </>}
           <span className="border border-white/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/40">{session.user.role}</span>
         </div>
       </div>
-
-      {owner && <div className="mt-6 border border-[#c7a15a]/20 bg-[#111] px-5 py-4 text-xs text-white/45">Owner configuré : <span className="text-white/75">{owner.name || owner.email}</span> · {owner.email}</div>}
 
       <div className="mt-12 grid gap-px bg-white/10 md:grid-cols-4">
         {[["Utilisateurs", users.length], ["Entreprises", companies.length], ["Offres ouvertes", openJobs], ["Candidatures", applications.length]].map(([label, value]) => (
