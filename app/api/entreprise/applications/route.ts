@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
+import { isIdentityUnlocked } from "@/lib/mission-lock";
 
 const querySchema = z.object({
   companyId: z.string().optional(),
@@ -28,23 +29,61 @@ export async function GET(request: Request) {
         ...(parsed.data.jobId ? { jobId: parsed.data.jobId } : {}),
         ...(parsed.data.status ? { status: parsed.data.status } : {}),
         ...(parsed.data.search
-          ? {
-              OR: [
-                { candidate: { user: { name: { contains: parsed.data.search, mode: "insensitive" } } } },
-                { candidate: { user: { email: { contains: parsed.data.search, mode: "insensitive" } } } },
-                { candidate: { headline: { contains: parsed.data.search, mode: "insensitive" } } },
-              ],
-            }
+          ? { candidate: { headline: { contains: parsed.data.search, mode: "insensitive" } } }
           : {}),
       },
       include: {
         job: true,
-        candidate: { include: { user: true, documents: true } },
+        candidate: { include: { user: true } },
+        presentations: { where: { companyId: access.companyId }, orderBy: { presentedAt: "desc" }, take: 1 },
       },
       orderBy: { updatedAt: "desc" },
     });
 
-    return NextResponse.json(applications);
+    const protectedApplications = applications.map((application) => {
+      const presentation = application.presentations[0];
+      const unlocked = Boolean(
+        presentation && isIdentityUnlocked(presentation.state, presentation.financialConditionStatus),
+      );
+
+      return {
+        id: application.id,
+        status: application.status,
+        notes: application.notes,
+        createdAt: application.createdAt,
+        updatedAt: application.updatedAt,
+        job: application.job,
+        presentation: presentation
+          ? {
+              id: presentation.id,
+              state: presentation.state,
+              financialConditionStatus: presentation.financialConditionStatus,
+              presentedAt: presentation.presentedAt,
+              unlocked,
+            }
+          : null,
+        candidate: {
+          id: application.candidate.id,
+          headline: application.candidate.headline,
+          bio: application.candidate.bio,
+          location: application.candidate.location,
+          country: application.candidate.country,
+          skills: application.candidate.skills,
+          experienceYears: application.candidate.experienceYears,
+          ...(unlocked
+            ? {
+                name: application.candidate.user.name,
+                email: application.candidate.user.email,
+              }
+            : {
+                name: "Candidat présenté par Recrutement Privé",
+                email: undefined,
+              }),
+        },
+      };
+    });
+
+    return NextResponse.json(protectedApplications);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Accès refusé" }, { status: 403 });
   }
