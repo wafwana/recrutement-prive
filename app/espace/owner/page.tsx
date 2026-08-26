@@ -15,7 +15,7 @@ const applicationLabels: Record<string, string> = {
 export default async function OwnerPage() {
   const session = await auth();
   const role = session?.user?.role;
-  if (!session?.user?.id || (role !== "OWNER" && role !== "ADMIN")) redirect("/connexion");
+  if (!session?.user?.id || role !== "OWNER") redirect("/connexion");
 
   const [users, candidates, documents, companies, jobs, applications, sourcedCandidates, settings, owner] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, email: true, role: true, createdAt: true } }),
@@ -45,6 +45,7 @@ export default async function OwnerPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Link href="/espace/admin" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Administration</Link>
+          <Link href="/espace/owner/admins" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Gestion des Admin</Link>
           <Link href="/espace/owner/prestations-tarifs" className="border border-[#c7a15a]/50 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Prestations & tarifs</Link>
           <span className="border border-[#c7a15a]/30 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">{role}</span>
         </div>
