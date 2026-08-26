@@ -40,7 +40,7 @@ export default function HomePage() {
     </header>
 
     <section id="accueil" className="rp-hero">
-      <div className="rp-hero-copy"><div className="rp-eyebrow">CABINET DE RECRUTEMENT</div><h1>Le recrutement d’excellence,<br/><span>guidé par l’humain</span><br/>et renforcé par<br/><span>l’intelligence artificielle.</span></h1><p>Nous connectons les entreprises aux meilleurs profils et accompagnons les candidats vers le succès.</p><div className="rp-actions"><Button href="#candidats">↥ DÉPOSER UN CV</Button><Button href="#entreprises" light>♟ RECRUTER</Button></div></div>
+      <div className="rp-hero-copy"><div className="rp-eyebrow">CABINET DE RECRUTEMENT</div><h1>Le recrutement d’excellence,<br/><span>guidé par l’humain</span><br/>et renforcé par<br/><span>l’intelligence artificielle.</span></h1><p>Nous connectons les entreprises aux meilleurs profils et accompagnons les candidats vers le succès.</p><p className="mt-4 max-w-2xl text-sm leading-7">Recrutement Privé ne vend pas les coordonnées des candidats. Recrutement Privé organise des mises en relation qualifiées, après validation de l'intérêt de l'entreprise et du candidat.</p><div className="rp-actions"><Button href="#candidats">↥ DÉPOSER UN CV</Button><Button href="#entreprises" light>♟ RECRUTER</Button></div></div>
       <div className="rp-hero-image" role="img" aria-label="Consultant Recrutement Privé" style={{backgroundImage:`url(${images.hero})`}}/>
     </section>
 
