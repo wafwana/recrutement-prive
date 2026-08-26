@@ -13,7 +13,7 @@ test("identity remains locked for every pre-unlock mission state", () => {
 
   for (const state of states) {
     assert.equal(isIdentityUnlocked(state, "PENDING"), false);
-    assert.equal(isIdentityUnlocked(state, "CONFIRMED"), state === "MISSION_TERMINEE" ? false : state === "PAIEMENT_OU_CONDITION_CONFIRME" && false);
+    assert.equal(isIdentityUnlocked(state, "CONFIRMED"), false);
   }
 });
 
