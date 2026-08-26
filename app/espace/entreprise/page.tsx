@@ -53,13 +53,10 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
       <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Espace entreprise</p>
       <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="font-serif text-5xl sm:text-6xl">Vos recrutements, clairement pilotés.</h1><p className="mt-5 max-w-2xl text-sm leading-7 text-white/50">{membership.company.name} · gérez vos offres, suivez les candidatures et pilotez votre pipeline.</p></div><p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Rôle {membership.role}</p></div>
       <section className="mt-10 grid gap-6 border border-[#c7a15a]/20 bg-[#111] p-8 md:grid-cols-2">
-        <div>
+        <div className="md:col-span-2">
           <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Notre engagement</p>
-          <p className="mt-4 text-sm leading-7 text-white/70">Recrutement Privé ne vend pas les coordonnées d'un candidat. Recrutement Privé organise une mise en relation qualifiée, après validation de l'intérêt du candidat et sécurisation des conditions financières de la mission.</p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Processus de mise en relation</p>
-          <p className="mt-4 text-sm leading-7 text-white/70">Après confirmation de l'intérêt réciproque pour la mission, les conditions financières applicables sont sécurisées avant la mise en relation directe.</p>
+          <p className="mt-4 text-sm leading-7 text-white/70">Recrutement Privé ne vend pas les coordonnées des candidats. Recrutement Privé organise des mises en relation qualifiées, après validation de l'intérêt de l'entreprise et du candidat.</p>
+          <p className="mt-3 text-xs leading-6 text-white/45">Les conditions financières sont présentées progressivement, au moment approprié du processus, après confirmation de l'intérêt réciproque.</p>
         </div>
       </section>
       <CompanyDashboard jobs={jobs} applications={applications} companyId={access.companyId} />
