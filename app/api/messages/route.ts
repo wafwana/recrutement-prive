@@ -14,6 +14,31 @@ const createMessageSchema = z.object({
 
 const readSchema = z.object({ conversationId: z.string().trim().min(1) });
 
+async function isDirectCandidateCompanyConversation(conversationId: string) {
+  const participants = await prisma.conversationParticipant.findMany({
+    where: { conversationId },
+    include: { user: { select: { role: true } } },
+  });
+  const roles = new Set(participants.map((participant) => participant.user.role));
+  return roles.has("CANDIDAT") && roles.has("ENTREPRISE");
+}
+
+async function assertNoDirectCandidateCompanyContact(userId: string, recipientId?: string, conversationId?: string) {
+  if (conversationId && await isDirectCandidateCompanyConversation(conversationId)) {
+    throw new Error("Le contact direct candidat-entreprise est interdit");
+  }
+
+  if (!recipientId || recipientId === userId) return;
+  const users = await prisma.user.findMany({
+    where: { id: { in: [userId, recipientId] } },
+    select: { id: true, role: true },
+  });
+  const roles = new Set(users.map((user) => user.role));
+  if (roles.has("CANDIDAT") && roles.has("ENTREPRISE")) {
+    throw new Error("Le contact direct candidat-entreprise est interdit");
+  }
+}
+
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
@@ -26,6 +51,9 @@ export async function GET(request: Request) {
       where: { conversationId_userId: { conversationId, userId } },
     });
     if (!participant) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    if (await isDirectCandidateCompanyConversation(conversationId)) {
+      return NextResponse.json({ error: "Le contact direct candidat-entreprise est interdit" }, { status: 403 });
+    }
 
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -39,7 +67,12 @@ export async function GET(request: Request) {
   }
 
   const conversations = await prisma.conversation.findMany({
-    where: { participants: { some: { userId } } },
+    where: {
+      participants: { some: { userId } },
+      NOT: {
+        participants: { some: { user: { role: "ENTREPRISE" } } },
+      },
+    },
     orderBy: { updatedAt: "desc" },
     include: {
       participants: { include: { user: { select: { id: true, name: true, email: true, role: true } } } },
@@ -60,6 +93,12 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Message invalide", issues: parsed.error.issues }, { status: 400 });
 
   const senderId = session.user.id;
+  try {
+    await assertNoDirectCandidateCompanyContact(senderId, parsed.data.recipientId, parsed.data.conversationId ?? undefined);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Contact interdit" }, { status: 403 });
+  }
+
   let conversationId = parsed.data.conversationId;
 
   if (conversationId) {
@@ -115,6 +154,9 @@ export async function PATCH(request: Request) {
     where: { conversationId_userId: { conversationId: parsed.data.conversationId, userId: session.user.id } },
   });
   if (!participant) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  if (await isDirectCandidateCompanyConversation(parsed.data.conversationId)) {
+    return NextResponse.json({ error: "Le contact direct candidat-entreprise est interdit" }, { status: 403 });
+  }
 
   await prisma.message.updateMany({
     where: { conversationId: parsed.data.conversationId, senderId: { not: session.user.id }, readAt: null },
