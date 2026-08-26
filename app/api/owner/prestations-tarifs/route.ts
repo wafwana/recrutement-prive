@@ -16,12 +16,12 @@ const defaultCatalog = [
 
 async function requireOwner() {
   const session = await auth();
-  if (!session?.user?.id || (session.user.role !== "OWNER" && session.user.role !== "ADMIN")) return null;
-  return session;
+  if (!session?.user?.id || session.user.role !== "OWNER") return null;
+  return session.user.id;
 }
 
 export async function GET() {
-  if (!(await requireOwner())) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  if (!(await requireOwner())) return NextResponse.json({ error: "Accès réservé à l'Owner" }, { status: 403 });
   const setting = await prisma.systemSetting.findUnique({ where: { key: SETTING_KEY } });
   if (!setting) {
     await prisma.systemSetting.create({ data: { key: SETTING_KEY, value: defaultCatalog } });
@@ -31,7 +31,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  if (!(await requireOwner())) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  if (!(await requireOwner())) return NextResponse.json({ error: "Accès réservé à l'Owner" }, { status: 403 });
   const body = await request.json();
   if (!Array.isArray(body?.items)) return NextResponse.json({ error: "Format invalide" }, { status: 400 });
 
