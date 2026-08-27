@@ -1,15 +1,17 @@
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
-// Production is functional. Maintenance can be enabled explicitly through Vercel.
-const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
+// Public production remains in construction until the OWNER explicitly authorizes launch.
+// Preview/development deployments remain available for authorized testing.
+const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
+const MAINTENANCE_MODE = IS_PRODUCTION || process.env.MAINTENANCE_MODE === "true";
 const PUBLIC_PATHS = new Set(["/", "/connexion", "/maintenance"]);
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (MAINTENANCE_MODE) {
-    if (pathname !== "/maintenance" && !pathname.startsWith("/_next/") && !pathname.startsWith("/api/")) {
+    if (pathname !== "/maintenance" && !pathname.startsWith("/_next/")) {
       return NextResponse.rewrite(new URL("/maintenance", request.url));
     }
     return NextResponse.next();
