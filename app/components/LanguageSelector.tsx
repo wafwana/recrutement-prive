@@ -15,13 +15,13 @@ export default function LanguageSelector({ value }: { value: Locale }) {
   }
 
   return (
-    <label className="sr-only" htmlFor="rp-language">
-      Choisir la langue
+    <div className="rp-language-selector">
+      <label htmlFor="rp-language">Langue</label>
       <select id="rp-language" value={value} onChange={(event) => changeLocale(event.target.value as Locale)} aria-label="Choisir la langue">
         {SUPPORTED_LOCALES.map((locale) => (
           <option key={locale} value={locale}>{LOCALE_LABELS[locale]}</option>
         ))}
       </select>
-    </label>
+    </div>
   );
 }
