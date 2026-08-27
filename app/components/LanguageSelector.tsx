@@ -1,0 +1,27 @@
+"use client";
+
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { LOCALE_LABELS, SUPPORTED_LOCALES, type Locale } from "../../lib/i18n/config";
+
+export default function LanguageSelector({ value }: { value: Locale }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  function changeLocale(next: Locale) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("lang", next);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  return (
+    <label className="sr-only" htmlFor="rp-language">
+      Choisir la langue
+      <select id="rp-language" value={value} onChange={(event) => changeLocale(event.target.value as Locale)} aria-label="Choisir la langue">
+        {SUPPORTED_LOCALES.map((locale) => (
+          <option key={locale} value={locale}>{LOCALE_LABELS[locale]}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
