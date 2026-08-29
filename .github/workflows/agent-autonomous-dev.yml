@@ -32,32 +32,11 @@ jobs:
           git config user.name "Recrutement Privé Autonomous Agent"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Prepare Codex permission profile
-        run: |
-          mkdir -p "$RUNNER_TEMP/codex-home"
-          cat > "$RUNNER_TEMP/codex-home/config.toml" <<'EOF'
-          default_permissions = "workspace-network"
-
-          [permissions.workspace-network]
-          extends = ":workspace"
-          filesystem = { ":workspace_roots" = { ".git" = "write" } }
-
-          [permissions.workspace-network.network]
-          enabled = true
-
-          [permissions.workspace-network.network.domains]
-          "github.com" = "allow"
-          "api.github.com" = "allow"
-          "raw.githubusercontent.com" = "allow"
-          "objects.githubusercontent.com" = "allow"
-          EOF
-
       - name: Run autonomous development agent
         uses: openai/codex-action@v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          codex-home: ${{ runner.temp }}/codex-home
-          permission-profile: "workspace-network"
+          permission-profile: ":workspace"
           safety-strategy: "drop-sudo"
           effort: "high"
           prompt: |
