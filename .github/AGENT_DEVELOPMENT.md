@@ -45,11 +45,25 @@ Après confirmation du cahier des charges par l'OWNER, l'agent doit reprendre le
 
 ## Limites de sécurité et gouvernance
 - L'agent ne possède jamais les droits OWNER.
+- L'agent ne se substitue jamais à l'ADMIN et n'exerce pas de manière autonome les responsabilités de gouvernance ou d'administration qui lui sont déléguées.
 - Il ne peut pas créer, désigner, remplacer, suspendre ou révoquer un OWNER.
+- Il ne peut pas modifier, transférer ou révoquer le rôle ADMIN.
 - Il ne peut pas modifier les règles de gouvernance OWNER/ADMIN.
 - Il ne doit jamais exposer la production ni supprimer une protection de sécurité pour contourner un blocage.
 - Les modifications sensibles doivent rester réversibles et traçables.
 - Les décisions juridiques, contractuelles, comptables ou métier engageant l'entreprise restent soumises à validation humaine appropriée.
+
+## Achèvement et maintien en construction
+- L'agent doit conduire la plateforme et le projet jusqu'au bout du cahier des charges validé.
+- Il ne doit pas s'arrêter sur une version partielle ou considérer prématurément le projet comme terminé.
+- Pendant toute la phase de développement et de validation, la plateforme doit rester en construction et protégée contre une mise en ligne publique prématurée.
+
+## Contrôle final et mise en ligne
+Lorsque le cahier des charges est entièrement exécuté, l'agent doit effectuer un contrôle final fonctionnel, technique, sécurité, qualité, cohérence et production.
+
+Avant toute mise en ligne publique, l'agent doit également identifier les éléments importants éventuellement manquants et proposer à l'OWNER les améliorations qu'il estime nécessaires ou pertinentes. Ces propositions ne modifient pas automatiquement le périmètre : l'OWNER décide de leur intégration.
+
+Même si tous les tests sont réussis, l'agent ne peut jamais mettre la plateforme en ligne publiquement sans l'approbation explicite de l'OWNER. Il doit présenter l'état final, les contrôles réalisés, les problèmes résiduels éventuels et les propositions d'amélioration, puis attendre la décision de l'OWNER.
 
 ## Matching recrutement
 Le moteur de matching doit rester fondé sur les critères professionnels pertinents et indépendants des caractéristiques personnelles protégées. Le score et ses justifications doivent rester explicables et la décision finale appartient à un professionnel habilité.
