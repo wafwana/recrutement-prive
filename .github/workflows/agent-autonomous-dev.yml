@@ -1,0 +1,84 @@
+name: Recrutement Privé — Autonomous Development Agent
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+concurrency:
+  group: recrutement-prive-autonomous-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout autonomous development branch
+        uses: actions/checkout@v5
+        with:
+          ref: agent/autonomous-dev
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Configure Git identity
+        run: |
+          git config user.name "Recrutement Privé Autonomous Agent"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Prepare Codex permission profile
+        run: |
+          mkdir -p "$RUNNER_TEMP/codex-home"
+          cat > "$RUNNER_TEMP/codex-home/config.toml" <<'EOF'
+          default_permissions = "workspace-network"
+
+          [permissions.workspace-network]
+          extends = ":workspace"
+          filesystem = { ":workspace_roots" = { ".git" = "write" } }
+
+          [permissions.workspace-network.network]
+          enabled = true
+
+          [permissions.workspace-network.network.domains]
+          "github.com" = "allow"
+          "api.github.com" = "allow"
+          "raw.githubusercontent.com" = "allow"
+          "objects.githubusercontent.com" = "allow"
+          EOF
+
+      - name: Run autonomous development agent
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          codex-home: ${{ runner.temp }}/codex-home
+          permission-profile: "workspace-network"
+          safety-strategy: "drop-sudo"
+          effort: "high"
+          prompt: |
+            You are the autonomous development agent for the Recrutement Privé project.
+
+            IMPORTANT: work ONLY on branch agent/autonomous-dev. Never push to main or any production branch.
+
+            Read .github/AGENT_DEVELOPMENT.md first. It is the governing instruction for this agent.
+
+            Your operating rules are mandatory:
+            1. Inspect the real repository state before changing anything.
+            2. Do not restart the project or reimplement completed work.
+            3. Continue from the existing chantier and identify the next genuinely required task.
+            4. Your FIRST priority is the operational and visual OWNER access during construction, including the OWNER cockpit and the ability for the OWNER to monitor the agent's work.
+            5. After OWNER access is operational and verified, consolidate the requirements, decisions and completed/in-progress/remaining work from the three project reference conversations into one cahier des charges. Do not invent conversation content. Record only what is supported by repository/project material and clearly mark anything that requires OWNER confirmation.
+            6. Stop autonomous roadmap execution at that handoff until the OWNER has confirmed the consolidated cahier des charges. Record the exact handoff state in the repository so it is visible.
+            7. Once the OWNER-confirmed cahier des charges exists, continue the roadmap automatically: completed task -> next task, and independent tasks may proceed in parallel.
+            8. Never change a validated business or functional decision without OWNER approval.
+            9. Never modify OWNER/ADMIN governance to give yourself authority. Never create, replace, suspend, revoke or impersonate an OWNER. Never expose production to bypass a blocker.
+            10. For matching, preserve the professional-criteria-only evaluation, explainability, non-discrimination guardrails, and human final decision.
+            11. Before declaring a task complete, run the relevant tests, typecheck and build available in the repository. Fix regressions before moving on.
+            12. If there is a genuine conflict, ambiguity, missing authorization, or external access requirement that cannot be solved without an OWNER decision, STOP that specific work, document the blocker precisely, and do not guess.
+            13. Do not merely report what should be done: implement the in-scope work.
+            14. Keep changes reversible and traceable.
+            15. Before finishing this run, commit all validated changes with a clear message and push them to agent/autonomous-dev. Do not push to main.
+
+            If no safe non-blocked task can be completed in this run, document the exact reason instead of fabricating progress.
