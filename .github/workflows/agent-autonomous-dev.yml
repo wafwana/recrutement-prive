@@ -2,6 +2,9 @@ name: Recrutement Privé — Autonomous Development Agent
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - agent/autonomous-dev
   schedule:
     - cron: "17 * * * *"
 
