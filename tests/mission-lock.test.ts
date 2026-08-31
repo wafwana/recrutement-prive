@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isIdentityUnlocked } from "@/lib/mission-lock";
+import { isIdentityUnlocked } from "../lib/mission-lock-utils";
 
 test("identity remains locked for every pre-unlock mission state", () => {
   const states = [
