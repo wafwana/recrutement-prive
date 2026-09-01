@@ -52,7 +52,7 @@ function checkDocumentAccess(input: {
     if (!input.companyId || !input.presentation) return false;
     return isIdentityUnlocked(input.presentation.state, input.presentation.financialConditionStatus);
   }
-  return ["ADMIN", "OWNER", "CONSULTANT"].includes(input.userRole);
+  return ["ADMIN", "OWNER"].includes(input.userRole);
 }
 
 test("checkDocumentAccess enforces candidate ownership isolation", () => {
@@ -107,7 +107,7 @@ test("checkDocumentAccess enforces company anonymity unlock rules", () => {
   assert.equal(allowUnlocked, true);
 });
 
-test("checkDocumentAccess allows ADMIN / OWNER / CONSULTANT", () => {
+test("checkDocumentAccess allows ADMIN / OWNER and denies CONSULTANT direct archive access", () => {
   const candAUserId = "user_cand_A";
   const candAId = "cand_A";
 
@@ -119,8 +119,9 @@ test("checkDocumentAccess allows ADMIN / OWNER / CONSULTANT", () => {
     checkDocumentAccess({ userRole: "OWNER", userId: "owner1", docCandidateUserId: candAUserId, docCandidateId: candAId }),
     true
   );
+  // CONSULTANT is explicitly excluded from direct document archive access
   assert.equal(
     checkDocumentAccess({ userRole: "CONSULTANT", userId: "cons1", docCandidateUserId: candAUserId, docCandidateId: candAId }),
-    true
+    false
   );
 });

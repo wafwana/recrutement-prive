@@ -63,7 +63,7 @@ export async function GET(
         { status: 403 }
       );
     }
-  } else if (!userRole || !["ADMIN", "OWNER", "CONSULTANT"].includes(userRole)) {
+  } else if (!userRole || !["ADMIN", "OWNER"].includes(userRole)) {
     return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
   }
 
