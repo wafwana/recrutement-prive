@@ -106,7 +106,8 @@ model CandidateDocument {
   id String @id @default(cuid())
   candidateId String
   name String
-  url String
+  url String?
+  fileData Bytes?
   type String?
   candidate CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())

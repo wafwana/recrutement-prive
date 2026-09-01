@@ -3,7 +3,7 @@
 import { useActionState, useTransition } from "react";
 import { uploadCandidateDocument, deleteCandidateDocument } from "./actions";
 
-type Doc = { id: string; name: string; url: string; createdAt: Date };
+type Doc = { id: string; name: string; url?: string | null; createdAt: Date };
 
 export default function DocumentManager({ documents, cvUrl }: { documents: Doc[]; cvUrl: string | null }) {
   const [isDeleting, startTransition] = useTransition();
@@ -45,23 +45,26 @@ export default function DocumentManager({ documents, cvUrl }: { documents: Doc[]
           </div>
         ) : null}
 
-        {documents.map((doc) => (
-          <div key={doc.id} className="flex items-center justify-between border-b border-white/10 pb-3 last:border-0 last:pb-0">
-            <div>
-              <p className="text-sm text-white font-medium">{doc.name}</p>
-              <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs text-[#c7a15a] hover:underline">
-                Télécharger / Afficher ↗
-              </a>
+        {documents.map((doc) => {
+          const downloadUrl = `/api/candidats/documents/${doc.id}`;
+          return (
+            <div key={doc.id} className="flex items-center justify-between border-b border-white/10 pb-3 last:border-0 last:pb-0">
+              <div>
+                <p className="text-sm text-white font-medium">{doc.name}</p>
+                <a href={downloadUrl} target="_blank" rel="noreferrer" className="text-xs text-[#c7a15a] hover:underline">
+                  Télécharger / Afficher ↗
+                </a>
+              </div>
+              <button
+                onClick={() => handleDelete(doc.id)}
+                disabled={isDeleting}
+                className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
+              >
+                Supprimer
+              </button>
             </div>
-            <button
-              onClick={() => handleDelete(doc.id)}
-              disabled={isDeleting}
-              className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
-            >
-              Supprimer
-            </button>
-          </div>
-        ))}
+          );
+        })}
 
         {!cvUrl && documents.length === 0 ? (
           <p className="text-sm leading-6 text-white/45">Aucun document joint pour le moment.</p>

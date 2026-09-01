@@ -59,16 +59,14 @@ export async function uploadCandidateDocument(formData: FormData) {
   }
 
   const name = docName || file.name;
-  // Standardised document attachment storage URL (using data url or document path)
   const buffer = Buffer.from(await file.arrayBuffer());
   const mimeType = file.type || "application/pdf";
-  const url = `data:${mimeType};base64,${buffer.toString("base64")}`;
 
   await prisma.candidateDocument.create({
     data: {
       candidateId: profile.id,
       name: name.slice(0, 180),
-      url,
+      fileData: buffer,
       type: mimeType,
     },
   });
@@ -121,7 +119,7 @@ export async function applyToJob(jobId: string, notes?: string) {
         actorUserId: userId,
         action: "APPLICATION_SUBMITTED",
         toStatus: "SUBMITTED",
-        details: { source: "CANIDAT_PORTAL" },
+        details: { source: "CANDIDAT_PORTAL" },
       },
     });
 
