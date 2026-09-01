@@ -26,6 +26,7 @@ export async function GET(request: Request) {
     const applications = await prisma.application.findMany({
       where: {
         job: { companyId: access.companyId },
+        presentations: { some: { companyId: access.companyId } },
         ...(parsed.data.jobId ? { jobId: parsed.data.jobId } : {}),
         ...(parsed.data.status ? { status: parsed.data.status } : {}),
         ...(parsed.data.search

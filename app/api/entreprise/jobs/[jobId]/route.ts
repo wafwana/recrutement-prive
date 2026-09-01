@@ -7,6 +7,9 @@ const jobSchema = z.object({
   title: z.string().trim().min(2).max(160),
   location: z.string().trim().max(160).optional(),
   description: z.string().trim().max(10000).optional(),
+  missionType: z.string().trim().max(100).optional(),
+  requiredSkills: z.union([z.string(), z.array(z.string())]).optional(),
+  requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(),
   status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]),
 });
 
@@ -20,6 +23,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
       where: { id: jobId, companyId: access.companyId },
       include: {
         applications: {
+          where: { presentations: { some: { companyId: access.companyId } } },
           include: { candidate: { include: { user: true, documents: true } } },
           orderBy: { updatedAt: "desc" },
         },
@@ -42,6 +46,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ jobI
     const parsed = jobSchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Données d'offre invalides" }, { status: 400 });
 
+    const skills = typeof parsed.data.requiredSkills === "string"
+      ? parsed.data.requiredSkills.split(",").map((s) => s.trim()).filter(Boolean)
+      : parsed.data.requiredSkills ?? undefined;
+
     const job = await prisma.$transaction(async (tx) => {
       const updated = await tx.job.update({
         where: { id: jobId },
@@ -49,6 +57,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ jobI
           title: parsed.data.title,
           location: parsed.data.location || null,
           description: parsed.data.description || null,
+          missionType: parsed.data.missionType || null,
+          ...(skills !== undefined ? { requiredSkills: skills } : {}),
+          ...(parsed.data.requiredExperienceYears !== undefined ? { requiredExperienceYears: parsed.data.requiredExperienceYears } : {}),
           status: parsed.data.status,
         },
       });

@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
+import { isIdentityUnlocked } from "@/lib/mission-lock";
 import CompanyDashboard from "./CompanyDashboard";
 
 export default async function EntreprisePage({ searchParams }: { searchParams: Promise<{ companyId?: string }> }) {
@@ -42,10 +43,39 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
     orderBy: { updatedAt: "desc" },
   });
 
-  const applications = await prisma.application.findMany({
-    where: { job: { companyId: access.companyId } },
-    include: { job: { select: { id: true, title: true } }, candidate: { include: { user: { select: { name: true, email: true } } } } },
+  const rawApplications = await prisma.application.findMany({
+    where: {
+      job: { companyId: access.companyId },
+      presentations: { some: { companyId: access.companyId } },
+    },
+    include: {
+      job: { select: { id: true, title: true } },
+      candidate: { include: { user: { select: { name: true, email: true } } } },
+      presentations: { where: { companyId: access.companyId }, orderBy: { presentedAt: "desc" }, take: 1 },
+    },
     orderBy: { updatedAt: "desc" },
+  });
+
+  const applications = rawApplications.map((app) => {
+    const presentation = app.presentations[0];
+    const unlocked = Boolean(presentation && isIdentityUnlocked(presentation.state, presentation.financialConditionStatus));
+    return {
+      id: app.id,
+      status: app.status,
+      job: app.job,
+      presentationState: presentation?.state ?? null,
+      financialConditionStatus: presentation?.financialConditionStatus ?? null,
+      unlocked,
+      candidate: {
+        id: app.candidate.id,
+        headline: app.candidate.headline,
+        location: app.candidate.location,
+        user: {
+          name: unlocked ? (app.candidate.user.name || app.candidate.user.email) : `Candidat #${app.candidate.id.slice(-6).toUpperCase()}`,
+          email: unlocked ? app.candidate.user.email : "",
+        },
+      },
+    };
   });
 
   return (
