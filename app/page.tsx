@@ -1,5 +1,6 @@
 import React from "react";
 import CandidateCvForm from "./components/CandidateCvForm";
+import LanguageSelector from "./components/LanguageSelector";
 
 const images = {
   hero: "/visuals/hero-portrait.jpeg",
@@ -36,7 +37,7 @@ export default function HomePage() {
     <header className="rp-header">
       <a href="#accueil" className="rp-brand" aria-label="Recrutement Privé - accueil"><span className="rp-logo">RP</span><span><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></a>
       <nav className="rp-nav" aria-label="Navigation principale">{quickNav.map(([label,href],i)=><a key={label} className={i===0?"active":""} href={href}>{label}</a>)}</nav>
-      <a className="rp-login" href="/espace">ESPACE CONNECTÉ</a>
+      <div className="rp-header-actions"><LanguageSelector /><a className="rp-login" href="/espace">ESPACE CONNECTÉ</a></div>
     </header>
 
     <section id="accueil" className="rp-hero">
