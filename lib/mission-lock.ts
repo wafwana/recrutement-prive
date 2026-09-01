@@ -1,5 +1,3 @@
-import "server-only";
-
 import { prisma } from "@/lib/prisma";
 
 const IDENTIFYING_FIELDS = ["name", "email", "phone", "phonePrefix", "cvUrl", "documents"] as const;
