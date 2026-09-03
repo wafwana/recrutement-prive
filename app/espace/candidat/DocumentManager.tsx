@@ -5,7 +5,7 @@ import { uploadCandidateDocument, deleteCandidateDocument } from "./actions";
 
 type Doc = { id: string; name: string; url?: string | null; createdAt: Date };
 
-export default function DocumentManager({ documents, cvUrl }: { documents: Doc[]; cvUrl: string | null }) {
+export default function DocumentManager({ documents }: { documents: Doc[]; cvUrl?: string | null }) {
   const [isDeleting, startTransition] = useTransition();
   const [uploadState, uploadAction, uploadPending] = useActionState(async (_prev: string, formData: FormData) => {
     try {
@@ -33,18 +33,6 @@ export default function DocumentManager({ documents, cvUrl }: { documents: Doc[]
       <h3 className="mt-2 font-serif text-xl">Vos pièces justificatives</h3>
 
       <div className="mt-6 space-y-3">
-        {cvUrl ? (
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <div>
-              <p className="text-sm text-white font-medium">CV Principal (Lien URL)</p>
-              <a href={cvUrl} target="_blank" rel="noreferrer" className="text-xs text-[#c7a15a] hover:underline">
-                Consulter ↗
-              </a>
-            </div>
-            <span className="text-[10px] uppercase tracking-[0.15em] text-white/40">Profil</span>
-          </div>
-        ) : null}
-
         {documents.map((doc) => {
           const downloadUrl = `/api/candidats/documents/${doc.id}`;
           return (
@@ -66,13 +54,13 @@ export default function DocumentManager({ documents, cvUrl }: { documents: Doc[]
           );
         })}
 
-        {!cvUrl && documents.length === 0 ? (
+        {documents.length === 0 ? (
           <p className="text-sm leading-6 text-white/45">Aucun document joint pour le moment.</p>
         ) : null}
       </div>
 
       <form action={uploadAction} className="mt-8 border-t border-white/10 pt-6">
-        <p className="text-xs uppercase tracking-[0.18em] text-white/50">Ajouter un document (PDF, Word, image - 10 Mo max)</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-white/50">Ajouter un document (PDF, Word - 10 Mo max)</p>
         {uploadState ? <p aria-live="polite" className="mt-2 text-xs text-[#c7a15a]">{uploadState}</p> : null}
 
         <div className="mt-4 grid gap-3">
@@ -85,7 +73,7 @@ export default function DocumentManager({ documents, cvUrl }: { documents: Doc[]
           <input
             type="file"
             name="document"
-            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             required
             className="w-full border border-white/10 bg-transparent px-4 py-2 text-xs text-white/70 file:mr-4 file:border-0 file:bg-white/10 file:px-3 file:py-1 file:text-xs file:text-white hover:file:bg-white/20"
           />
