@@ -106,7 +106,8 @@ model CandidateDocument {
   id String @id @default(cuid())
   candidateId String
   name String
-  url String
+  url String?
+  fileData Bytes?
   type String?
   candidate CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
@@ -278,4 +279,15 @@ model SystemSetting {
   value Json
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
 }
