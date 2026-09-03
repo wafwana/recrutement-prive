@@ -38,7 +38,7 @@ export default async function CandidatPage({ searchParams }: Props) {
   const stats = [
     ["Profil", profile?.headline ? "Complété" : "À compléter", "Votre présentation professionnelle"],
     ["Candidatures", String(applications.length), "Suivi de vos opportunités"],
-    ["Documents", String(documents.length), "CV et pièces protégées"],
+    ["Documents", String(documents.length + (profile?.cvUrl ? 1 : 0)), "CV et pièces utiles"],
   ];
 
   return (
@@ -65,7 +65,7 @@ export default async function CandidatPage({ searchParams }: Props) {
       <div className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-8">
           <ProfileForm profile={profile} />
-          <DocumentManager documents={documents} />
+          <DocumentManager documents={documents} cvUrl={profile?.cvUrl ?? null} />
         </div>
         <aside>
           <ApplicationsList applications={applications} targetJob={targetJob} />
