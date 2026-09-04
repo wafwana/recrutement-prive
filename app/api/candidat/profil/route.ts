@@ -3,6 +3,29 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { candidateProfileSchema } from "@/lib/validation";
 
+const profileSelect = {
+  id: true,
+  userId: true,
+  headline: true,
+  bio: true,
+  location: true,
+  country: true,
+  phonePrefix: true,
+  phone: true,
+  skills: true,
+  experienceYears: true,
+  preferences: true,
+  createdAt: true,
+  updatedAt: true,
+  documents: {
+    select: { id: true, name: true, type: true, createdAt: true },
+  },
+  applications: {
+    include: { job: true },
+    orderBy: { updatedAt: "desc" as const },
+  },
+} as const;
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== "CANDIDAT") {
@@ -11,7 +34,7 @@ export async function GET() {
 
   const profile = await prisma.candidateProfile.findUnique({
     where: { userId: session.user.id },
-    include: { documents: true, applications: { include: { job: true }, orderBy: { updatedAt: "desc" } } },
+    select: profileSelect,
   });
 
   return NextResponse.json(profile);
@@ -58,7 +81,6 @@ export async function PUT(request: Request) {
       country: parsed.data.country || null,
       phonePrefix: parsed.data.phonePrefix || null,
       phone,
-      cvUrl: parsed.data.cvUrl || null,
       skills,
       experienceYears: parsed.data.experienceYears ?? null,
       preferences,
@@ -71,11 +93,11 @@ export async function PUT(request: Request) {
       country: parsed.data.country || null,
       phonePrefix: parsed.data.phonePrefix || null,
       phone,
-      cvUrl: parsed.data.cvUrl || null,
       skills,
       experienceYears: parsed.data.experienceYears ?? null,
       preferences,
     },
+    select: profileSelect,
   });
 
   return NextResponse.json(profile);
