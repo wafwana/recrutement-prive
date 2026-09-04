@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test:mission-lock": "node --import tsx --test tests/mission-lock.test.ts",
     "test:candidate-auth": "node --import tsx --test tests/candidate-auth.test.ts",
+    "test:candidate-integration": "tsx tests/candidate-integration.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

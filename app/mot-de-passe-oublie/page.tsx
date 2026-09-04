@@ -6,17 +6,23 @@ import { requestPasswordReset } from "./actions";
 
 export default function MotDePasseOubliePage() {
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
+    setError(null);
     setPending(true);
 
     const formData = new FormData(event.currentTarget);
     const result = await requestPasswordReset(formData);
 
-    setMessage(result.message);
+    if (result.ok) {
+      setMessage(result.message);
+    } else {
+      setError(result.error);
+    }
     setPending(false);
   }
 
@@ -46,6 +52,8 @@ export default function MotDePasseOubliePage() {
                 className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"
               />
             </label>
+
+            {error ? <p role="alert" className="text-sm text-red-300">{error}</p> : null}
 
             <button
               disabled={pending}
