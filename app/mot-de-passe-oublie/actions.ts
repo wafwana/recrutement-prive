@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { hashToken } from "@/lib/password";
+import { hashToken } from "@/lib/password-crypto";
 import { randomBytes } from "crypto";
 import { Resend } from "resend";
 

@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/password";
+import { hashPassword } from "@/lib/password-crypto";
 import { validatePassword } from "@/lib/password-policy";
 import { z } from "zod";
 

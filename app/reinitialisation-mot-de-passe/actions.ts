@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { hashPassword, hashToken } from "@/lib/password";
+import { hashPassword, hashToken } from "@/lib/password-crypto";
 import { validatePassword } from "@/lib/password-policy";
 
 export async function resetPassword(formData: FormData) {

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { registerCandidate } from "@/app/inscription/actions";
 import { requestPasswordReset } from "@/app/mot-de-passe-oublie/actions";
 import { resetPassword } from "@/app/reinitialisation-mot-de-passe/actions";
-import { verifyPassword, hashToken } from "@/lib/password";
+import { verifyPassword, hashToken } from "@/lib/password-crypto";
 import { randomBytes } from "crypto";
 
 type Assert = (condition: unknown, message: string) => asserts condition;
