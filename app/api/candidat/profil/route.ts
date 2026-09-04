@@ -47,7 +47,9 @@ export async function PUT(request: Request) {
       ? parsed.data.skills.split(",").map((item) => item.trim()).filter(Boolean)
       : [];
 
-  const phone = parsed.data.phone ? (parsed.data.phone.startsWith("+") ? parsed.data.phone : `${parsed.data.phonePrefix ?? "+33"} ${parsed.data.phone}`) : null;
+  const phone = parsed.data.phone
+    ? (parsed.data.phone.startsWith("+") ? parsed.data.phone : `${parsed.data.phonePrefix ?? "+33"} ${parsed.data.phone}`)
+    : null;
 
   const profile = await prisma.candidateProfile.upsert({
     where: { userId: session.user.id },
@@ -58,7 +60,6 @@ export async function PUT(request: Request) {
       country: parsed.data.country || null,
       phonePrefix: parsed.data.phonePrefix || null,
       phone,
-      cvUrl: parsed.data.cvUrl || null,
       skills,
       experienceYears: parsed.data.experienceYears ?? null,
       preferences,
@@ -71,7 +72,6 @@ export async function PUT(request: Request) {
       country: parsed.data.country || null,
       phonePrefix: parsed.data.phonePrefix || null,
       phone,
-      cvUrl: parsed.data.cvUrl || null,
       skills,
       experienceYears: parsed.data.experienceYears ?? null,
       preferences,
