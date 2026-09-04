@@ -291,3 +291,20 @@ model PasswordResetToken {
 
   @@index([email])
 }
+
+model JobCategory {
+  id          String        @id @default(cuid())
+  code        String        @unique
+  name        Json
+  description Json?
+  parentId    String?
+  parent      JobCategory?  @relation("JobCategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    JobCategory[] @relation("JobCategoryHierarchy")
+  sortOrder   Int           @default(0)
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([parentId])
+  @@index([code])
+}
