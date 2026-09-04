@@ -18,7 +18,6 @@ export const candidateProfileSchema = z.object({
   country: z.string().trim().max(120).optional(),
   phonePrefix: z.string().trim().regex(/^\+\d{1,4}$/).optional(),
   phone: z.string().trim().max(40).optional(),
-  cvUrl: z.string().trim().url().or(z.literal("")).optional(),
   skills: z.union([z.array(z.string().trim().min(1).max(80)), z.string().trim().max(1500)]).optional(),
   experienceYears: z.coerce.number().int().min(0).max(60).nullable().optional(),
   preferences: z.union([z.array(z.string().trim().min(1).max(80)), z.string().trim().max(1000)]).optional(),
