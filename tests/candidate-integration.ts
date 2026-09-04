@@ -61,7 +61,6 @@ async function main() {
     );
 
     console.log("3. Testing real password reset request & anti-enumeration...");
-    // Request reset for existing user
     const reqFormData = new FormData();
     reqFormData.set("email", testEmail);
     const reqResult = await requestPasswordReset(reqFormData);
@@ -93,7 +92,6 @@ async function main() {
     assert(nonExistTokenRecord === null, "Token should not be created for non-existing email");
 
     console.log("4. Testing real password reset execution & single-use...");
-    // Create a known raw token linked to testEmail in DB to test resetPassword action
     const rawTestToken = randomBytes(32).toString("hex");
     const testTokenHash = hashToken(rawTestToken);
     await prisma.passwordResetToken.create({
@@ -155,6 +153,33 @@ async function main() {
       `Unexpected expired error: ${expiredResult.error}`
     );
 
+    console.log("6. Testing concurrent password reset calls with same token...");
+    const concurrentToken = randomBytes(32).toString("hex");
+    const concurrentTokenHash = hashToken(concurrentToken);
+    await prisma.passwordResetToken.create({
+      data: {
+        email: testEmail,
+        tokenHash: concurrentTokenHash,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      },
+    });
+
+    const fdConcurrent1 = new FormData();
+    fdConcurrent1.set("token", concurrentToken);
+    fdConcurrent1.set("password", "PassOne@123");
+
+    const fdConcurrent2 = new FormData();
+    fdConcurrent2.set("token", concurrentToken);
+    fdConcurrent2.set("password", "PassTwo@123");
+
+    const [res1, res2] = await Promise.all([
+      resetPassword(fdConcurrent1),
+      resetPassword(fdConcurrent2),
+    ]);
+
+    const successCount = (res1.ok ? 1 : 0) + (res2.ok ? 1 : 0);
+    assert(successCount === 1, `Expected exactly 1 concurrent reset to succeed, got ${successCount}`);
+
     console.log(
       JSON.stringify(
         {
@@ -169,6 +194,7 @@ async function main() {
             passwordResetExecution: true,
             tokenSingleUse: true,
             tokenExpirationEnforcement: true,
+            concurrentResetAtomicity: true,
             reloginWithNewPassword: true,
           },
         },

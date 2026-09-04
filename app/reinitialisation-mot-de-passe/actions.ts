@@ -22,45 +22,51 @@ export async function resetPassword(formData: FormData) {
     }
 
     const tokenHash = hashToken(token);
+    const now = new Date();
 
-    const resetRecord = await prisma.passwordResetToken.findUnique({
+    const existingToken = await prisma.passwordResetToken.findUnique({
       where: { tokenHash },
     });
 
-    if (!resetRecord) {
+    if (!existingToken) {
       return { ok: false, error: "Lien de réinitialisation invalide ou expiré." };
     }
 
-    if (resetRecord.usedAt !== null) {
+    if (existingToken.usedAt !== null) {
       return { ok: false, error: "Ce lien de réinitialisation a déjà été utilisé." };
     }
 
-    if (resetRecord.expiresAt < new Date()) {
+    if (existingToken.expiresAt < now) {
       return { ok: false, error: "Ce lien de réinitialisation a expiré." };
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: resetRecord.email },
-    });
-
-    if (!user) {
-      return { ok: false, error: "Compte utilisateur introuvable." };
     }
 
     const newHash = await hashPassword(newPassword);
 
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: user.id },
-        data: { passwordHash: newHash },
-      }),
-      prisma.passwordResetToken.update({
-        where: { id: resetRecord.id },
-        data: { usedAt: new Date() },
-      }),
-    ]);
+    const result = await prisma.$transaction(async (tx) => {
+      const consumed = await tx.passwordResetToken.updateMany({
+        where: {
+          tokenHash,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: {
+          usedAt: now,
+        },
+      });
 
-    return { ok: true };
+      if (consumed.count === 0) {
+        return { ok: false, error: "Ce lien de réinitialisation a déjà été utilisé." };
+      }
+
+      await tx.user.update({
+        where: { email: existingToken.email },
+        data: { passwordHash: newHash },
+      });
+
+      return { ok: true };
+    });
+
+    return result;
   } catch (error) {
     console.error("[resetPassword] error occurred during password reset");
     return { ok: false, error: "Une erreur est survenue lors de la réinitialisation du mot de passe." };
