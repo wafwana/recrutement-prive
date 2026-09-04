@@ -15,3 +15,7 @@ CREATE UNIQUE INDEX "PasswordResetToken_tokenHash_key" ON "PasswordResetToken"("
 
 -- CreateIndex
 CREATE INDEX "PasswordResetToken_email_idx" ON "PasswordResetToken"("email");
+
+-- AlterTable CandidateDocument to support binary file storage
+ALTER TABLE "CandidateDocument" ADD COLUMN IF NOT EXISTS "fileData" BYTEA;
+ALTER TABLE "CandidateDocument" ALTER COLUMN "url" DROP NOT NULL;
