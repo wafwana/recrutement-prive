@@ -7,15 +7,7 @@ import { z } from "zod";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 
 const profileSchema = z.object({
-  headline: z.string().trim().max(160).optional(),
-  bio: z.string().trim().max(2000).optional(),
-  location: z.string().trim().max(120).optional(),
-  country: z.string().trim().max(120).optional(),
-  phone: z.string().trim().max(40).optional(),
-  phonePrefix: z.string().regex(/^\+\d{1,4}$/).default("+33"),
-  preferences: z.string().trim().max(1000).optional(),
-  skills: z.string().trim().max(1500).optional(),
-  experienceYears: z.coerce.number().int().min(0).max(60).optional(),
+  headline: z.string().trim().max(160).optional(), bio: z.string().trim().max(2000).optional(), location: z.string().trim().max(120).optional(), country: z.string().trim().max(120).optional(), phone: z.string().trim().max(40).optional(), phonePrefix: z.string().regex(/^\+\d{1,4}$/).default("+33"), preferences: z.string().trim().max(1000).optional(), skills: z.string().trim().max(1500).optional(), experienceYears: z.coerce.number().int().min(0).max(60).optional(),
 });
 function asOptional(value: FormDataEntryValue | null) { const text = String(value ?? "").trim(); return text || undefined; }
 function csv(value: string | undefined) { return value ? value.split(",").map((item) => item.trim()).filter(Boolean) : []; }
