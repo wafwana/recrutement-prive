@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { isIdentityUnlocked } from "../lib/mission-lock";
 import { candidateProfileSchema } from "../lib/validation";
+import { matchCandidateToJob } from "../lib/matching/candidate-job";
 
 test("candidateProfileSchema validates schema and phone format correctly", () => {
   const valid = candidateProfileSchema.safeParse({
@@ -124,4 +125,38 @@ test("checkDocumentAccess allows ADMIN / OWNER and denies CONSULTANT direct arch
     checkDocumentAccess({ userRole: "CONSULTANT", userId: "cons1", docCandidateUserId: candAUserId, docCandidateId: candAId }),
     false
   );
+});
+
+test("matchCandidateToJob distinguishes exact subcategory match from parent category match", () => {
+  const job = {
+    title: "Contrôleur de Gestion Senior",
+    categoryCode: "FINANCE",
+    subCategoryCode: "CONTROLE_DE_GESTION",
+    requiredSkills: "Budget, Forecast, Excel",
+    requiredExperienceYears: 5,
+  };
+
+  const exactCandidate = {
+    headline: "Contrôleur de gestion",
+    skills: "Budget, Forecast, Excel",
+    experienceYears: 6,
+    primaryCategoryCode: "FINANCE",
+    subCategoryCodes: ["CONTROLE_DE_GESTION", "AUDIT"],
+  };
+
+  const parentCandidate = {
+    headline: "Comptable Unique",
+    skills: "Budget, Excel",
+    experienceYears: 6,
+    primaryCategoryCode: "FINANCE",
+    subCategoryCodes: ["COMPTABILITE"],
+  };
+
+  const exactResult = matchCandidateToJob(exactCandidate, job);
+  const parentResult = matchCandidateToJob(parentCandidate, job);
+
+  assert.equal(exactResult.categoryMatchLevel, "EXACT_SUBCATEGORY");
+  assert.equal(parentResult.categoryMatchLevel, "PARENT_CATEGORY");
+  assert.ok(exactResult.categoryScore > parentResult.categoryScore);
+  assert.ok(exactResult.score > parentResult.score);
 });
