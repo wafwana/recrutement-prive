@@ -3,7 +3,7 @@
 import { useActionState, useTransition } from "react";
 import { uploadCandidateDocument, deleteCandidateDocument } from "./actions";
 
-type Doc = { id: string; name: string; url?: string | null; createdAt: Date };
+type Doc = { id: string; name: string; createdAt: Date };
 
 export default function DocumentManager({ documents }: { documents: Doc[] }) {
   const [isDeleting, startTransition] = useTransition();

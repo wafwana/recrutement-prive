@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "fs";
+import path from "path";
 import { validatePassword } from "../lib/password-policy";
 import { hashPassword, verifyPassword, hashToken } from "../lib/password-crypto";
 
@@ -132,4 +134,34 @@ test("password update and re-login flow simulation", async () => {
   // Old password must fail, new password must succeed
   assert.equal(await verifyPassword(oldPassword, storedHash), false);
   assert.equal(await verifyPassword(newPassword, storedHash), true);
+});
+
+test("regression guard: no cvUrl references exist in app or lib application code", () => {
+  function scanDir(dir: string): string[] {
+    const results: string[] = [];
+    const list = fs.readdirSync(dir);
+    for (const file of list) {
+      const filePath = path.join(dir, file);
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        results.push(...scanDir(filePath));
+      } else if (/\.(ts|tsx|js|jsx)$/.test(file)) {
+        const content = fs.readFileSync(filePath, "utf8");
+        if (content.includes("cvUrl")) {
+          results.push(filePath);
+        }
+      }
+    }
+    return results;
+  }
+
+  const appLeakingFiles = scanDir(path.resolve("app"));
+  const libLeakingFiles = scanDir(path.resolve("lib"));
+  const totalLeaks = [...appLeakingFiles, ...libLeakingFiles];
+
+  assert.equal(
+    totalLeaks.length,
+    0,
+    `Regression detected! cvUrl references found in application files: ${totalLeaks.join(", ")}`
+  );
 });
