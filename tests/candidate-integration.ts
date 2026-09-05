@@ -3,8 +3,8 @@ import { registerCandidate } from "@/app/inscription/actions";
 import { requestPasswordReset } from "@/app/mot-de-passe-oublie/actions";
 import { resetPassword } from "@/app/reinitialisation-mot-de-passe/actions";
 import { authenticateCredentials } from "@/lib/auth-credentials";
-import { hashToken } from "@/lib/password-crypto";
-import { isIdentityUnlocked } from "@/lib/mission-lock";
+import { handleGetCandidateDocument } from "@/app/api/candidats/documents/[documentId]/handler";
+import { hashToken, hashPassword } from "@/lib/password-crypto";
 import { randomBytes } from "crypto";
 
 type Assert = (condition: unknown, message: string) => asserts condition;
@@ -13,36 +13,19 @@ const assert: Assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-type UserRole = "CANDIDAT" | "ENTREPRISE" | "CONSULTANT" | "ADMIN" | "OWNER";
-
-function checkDocumentAccess(input: {
-  userRole: UserRole;
-  userId: string;
-  docCandidateUserId: string;
-  docCandidateId: string;
-  companyId?: string;
-  presentation?: { state: string; financialConditionStatus: string } | null;
-}) {
-  if (input.userRole === "CANDIDAT") {
-    return input.userId === input.docCandidateUserId;
-  }
-  if (input.userRole === "ENTREPRISE") {
-    if (!input.companyId || !input.presentation) return false;
-    return isIdentityUnlocked(input.presentation.state, input.presentation.financialConditionStatus);
-  }
-  return ["ADMIN", "OWNER"].includes(input.userRole);
-}
-
 async function main() {
   const suffix = Date.now().toString();
   const testEmail = `candidat.integration.${suffix}@example.test`;
   const otherCandidateEmail = `candidat.other.${suffix}@example.test`;
+  const companyUserEmail = `entreprise.user.${suffix}@example.test`;
+  const nonMemberUserEmail = `entreprise.nonmember.${suffix}@example.test`;
   const initialPassword = "Recrutement@1";
   const updatedPassword = "NouveauPassword@2";
 
   const createdUserIds: string[] = [];
   const createdCompanyIds: string[] = [];
   const createdJobIds: string[] = [];
+  const createdPresentationIds: string[] = [];
 
   try {
     console.log("1. Testing real candidate registration...");
@@ -185,7 +168,8 @@ async function main() {
     const successCount = (res1.ok ? 1 : 0) + (res2.ok ? 1 : 0);
     assert(successCount === 1, `Expected exactly 1 concurrent reset to succeed, got ${successCount}`);
 
-    console.log("8. Testing Candidate Document Ownership & IDOR Protection...");
+    console.log("8. Testing Document Endpoint Authorization & IDOR on Real Route (/api/candidats/documents/[documentId])...");
+    // Create second candidate
     const otherCandFormData = new FormData();
     otherCandFormData.set("name", "Other Candidate");
     otherCandFormData.set("email", otherCandidateEmail);
@@ -199,6 +183,7 @@ async function main() {
     assert(otherUser !== null, "Other candidate creation failed");
     createdUserIds.push(otherUser.id);
 
+    // Create Candidate A Document in DB
     const docA = await prisma.candidateDocument.create({
       data: {
         candidateId: userInDb.candidat!.id,
@@ -208,30 +193,22 @@ async function main() {
       },
     });
 
-    // IDOR Check: Candidate A vs Candidate B
-    assert(
-      checkDocumentAccess({
-        userRole: "CANDIDAT",
-        userId: userInDb.id,
-        docCandidateUserId: userInDb.id,
-        docCandidateId: userInDb.candidat!.id,
-      }) === true,
-      "Candidate A could not access own document"
-    );
+    // Create Company and Members in DB
+    const defaultPasswordHash = await hashPassword(initialPassword);
+    const companyUser = await prisma.user.create({
+      data: { name: "Company Recruiter", email: companyUserEmail, passwordHash: defaultPasswordHash, role: "ENTREPRISE" },
+    });
+    const nonMemberUser = await prisma.user.create({
+      data: { name: "Non Member Recruiter", email: nonMemberUserEmail, passwordHash: defaultPasswordHash, role: "ENTREPRISE" },
+    });
+    createdUserIds.push(companyUser.id, nonMemberUser.id);
 
-    assert(
-      checkDocumentAccess({
-        userRole: "CANDIDAT",
-        userId: otherUser.id,
-        docCandidateUserId: userInDb.id,
-        docCandidateId: userInDb.candidat!.id,
-      }) === false,
-      "Candidate B was allowed to access Candidate A document (IDOR vulnerability!)"
-    );
-
-    console.log("9. Testing Company Document Access (Locked vs Unlocked Identity)...");
     const testCompany = await prisma.company.create({ data: { name: `Test Company ${suffix}` } });
     createdCompanyIds.push(testCompany.id);
+
+    await prisma.companyMember.create({
+      data: { companyId: testCompany.id, userId: companyUser.id, role: "RECRUITER" },
+    });
 
     const testJob = await prisma.job.create({
       data: { companyId: testCompany.id, title: "Test Engineer Position", status: "OPEN" },
@@ -247,31 +224,46 @@ async function main() {
       },
     });
 
-    // Locked presentation (CANDIDAT_ANONYME) -> Company access must be DENIED
-    assert(
-      checkDocumentAccess({
-        userRole: "ENTREPRISE",
-        userId: "company_user_1",
-        docCandidateUserId: userInDb.id,
-        docCandidateId: userInDb.candidat!.id,
+    const presentationA = await prisma.missionPresentation.create({
+      data: {
+        missionId: testJob.id,
+        applicationId: applicationA.id,
+        candidateId: userInDb.candidat!.id,
         companyId: testCompany.id,
-        presentation: { state: "CANDIDAT_ANONYME", financialConditionStatus: "CONFIRMED" },
-      }) === false,
-      "Company was allowed document access before identity unlock!"
-    );
+        state: "CANDIDAT_ANONYME",
+        financialConditionStatus: "CONFIRMED",
+      },
+    });
+    createdPresentationIds.push(presentationA.id);
 
-    // Unlocked presentation (IDENTITE_DEBLOQUEE & CONFIRMED) -> Company access must be ALLOWED
-    assert(
-      checkDocumentAccess({
-        userRole: "ENTREPRISE",
-        userId: "company_user_1",
-        docCandidateUserId: userInDb.id,
-        docCandidateId: userInDb.candidat!.id,
-        companyId: testCompany.id,
-        presentation: { state: "IDENTITE_DEBLOQUEE", financialConditionStatus: "CONFIRMED" },
-      }) === true,
-      "Company was denied document access after identity unlock!"
-    );
+    // Scenario 8.1: Unauthenticated request -> expect 401
+    const resUnauth = await handleGetCandidateDocument(docA.id, null);
+    assert(resUnauth.status === 401, `Unauthenticated request should return 401, got ${resUnauth.status}`);
+
+    // Scenario 8.2: Candidate owner request -> expect 200
+    const resOwner = await handleGetCandidateDocument(docA.id, { user: { id: userInDb.id, role: "CANDIDAT" } });
+    assert(resOwner.status === 200, `Candidate owner request should return 200, got ${resOwner.status}`);
+
+    // Scenario 8.3: Other Candidate request (IDOR) -> expect 403
+    const resOtherCand = await handleGetCandidateDocument(docA.id, { user: { id: otherUser.id, role: "CANDIDAT" } });
+    assert(resOtherCand.status === 403, `Other candidate request (IDOR) should return 403, got ${resOtherCand.status}`);
+
+    // Scenario 8.4: Company Non-Member request -> expect 403
+    const resNonMember = await handleGetCandidateDocument(docA.id, { user: { id: nonMemberUser.id, role: "ENTREPRISE" } });
+    assert(resNonMember.status === 403, `Non-member company user request should return 403, got ${resNonMember.status}`);
+
+    // Scenario 8.5: Company Member request before identity unlock (CANDIDAT_ANONYME) -> expect 403
+    const resCompanyLocked = await handleGetCandidateDocument(docA.id, { user: { id: companyUser.id, role: "ENTREPRISE" } });
+    assert(resCompanyLocked.status === 403, `Company request before identity unlock should return 403, got ${resCompanyLocked.status}`);
+
+    // Scenario 8.6: Company Member request after identity unlock (IDENTITE_DEBLOQUEE & CONFIRMED) -> expect 200
+    await prisma.missionPresentation.update({
+      where: { id: presentationA.id },
+      data: { state: "IDENTITE_DEBLOQUEE", financialConditionStatus: "CONFIRMED" },
+    });
+
+    const resCompanyUnlocked = await handleGetCandidateDocument(docA.id, { user: { id: companyUser.id, role: "ENTREPRISE" } });
+    assert(resCompanyUnlocked.status === 200, `Company request after identity unlock should return 200, got ${resCompanyUnlocked.status}`);
 
     await prisma.candidateDocument.delete({ where: { id: docA.id } });
 
@@ -292,9 +284,12 @@ async function main() {
             tokenSingleUse: true,
             tokenExpirationEnforcement: true,
             concurrentResetAtomicity: true,
-            documentOwnershipIdorProtection: true,
-            companyLockedAccessProtection: true,
-            companyUnlockedAccessVerification: true,
+            documentEndpointUnauthenticated401: true,
+            documentEndpointCandidateOwner200: true,
+            documentEndpointOtherCandidateIdor403: true,
+            documentEndpointCompanyNonMember403: true,
+            documentEndpointCompanyLocked403: true,
+            documentEndpointCompanyUnlocked200: true,
           },
         },
         null,
@@ -302,6 +297,11 @@ async function main() {
       )
     );
   } finally {
+    if (createdPresentationIds.length > 0) {
+      await prisma.missionPresentation.deleteMany({
+        where: { id: { in: createdPresentationIds } },
+      });
+    }
     if (createdUserIds.length > 0) {
       await prisma.passwordResetToken.deleteMany({
         where: { email: { in: [testEmail, otherCandidateEmail] } },
@@ -311,6 +311,9 @@ async function main() {
       });
       await prisma.job.deleteMany({
         where: { id: { in: createdJobIds } },
+      });
+      await prisma.companyMember.deleteMany({
+        where: { userId: { in: createdUserIds } },
       });
       await prisma.company.deleteMany({
         where: { id: { in: createdCompanyIds } },
