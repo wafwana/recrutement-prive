@@ -81,12 +81,22 @@ export async function POST(request: Request) {
     const requestLimit = rateLimit(`company-job:create:${access.userId}`, 20, 60 * 60_000);
     if (!requestLimit.allowed) return NextResponse.json({ error: "Trop de créations d'offres. Merci de réessayer plus tard." }, { status: 429 });
 
-    if (parsed.data.jobCategoryId && parsed.data.subCategoryId) {
-      const subCategoryRecord = await prisma.jobCategory.findUnique({
-        where: { id: parsed.data.subCategoryId },
-        select: { parentId: true },
+    if (parsed.data.jobCategoryId) {
+      const parentCat = await prisma.jobCategory.findUnique({
+        where: { id: parsed.data.jobCategoryId },
+        select: { id: true, isActive: true, parentId: true },
       });
-      if (subCategoryRecord && subCategoryRecord.parentId !== parsed.data.jobCategoryId) {
+      if (!parentCat || !parentCat.isActive) {
+        return NextResponse.json({ error: "La catégorie métier sélectionnée est invalide ou inactive." }, { status: 400 });
+      }
+    }
+
+    if (parsed.data.subCategoryId) {
+      const subCat = await prisma.jobCategory.findUnique({
+        where: { id: parsed.data.subCategoryId },
+        select: { id: true, isActive: true, parentId: true },
+      });
+      if (!subCat || !subCat.isActive || (parsed.data.jobCategoryId && subCat.parentId !== parsed.data.jobCategoryId)) {
         return NextResponse.json({ error: "La sous-catégorie sélectionnée ne correspond pas au métier principal." }, { status: 400 });
       }
     }

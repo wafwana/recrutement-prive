@@ -71,7 +71,7 @@ export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJ
   let categoryMatchLevel: "EXACT_SUBCATEGORY" | "PARENT_CATEGORY" | "NONE" = "NONE";
   const candSubCategories = new Set(toSkills(candidate.subCategoryCodes));
 
-  if (job.subCategoryCode && (candSubCategories.has(normalize(job.subCategoryCode)) || (candidate.primaryCategoryCode && normalize(candidate.primaryCategoryCode) === normalize(job.subCategoryCode)))) {
+  if (job.subCategoryCode && candSubCategories.has(normalize(job.subCategoryCode))) {
     categoryScore = 15;
     categoryMatchLevel = "EXACT_SUBCATEGORY";
   } else if (job.categoryCode && candidate.primaryCategoryCode && normalize(candidate.primaryCategoryCode) === normalize(job.categoryCode)) {

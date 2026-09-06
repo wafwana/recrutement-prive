@@ -48,6 +48,30 @@ export async function saveCandidateProfile(formData: FormData) {
 
   const subCategoryIds = formData.getAll("subCategoryIds").map(String).filter(Boolean);
 
+  if (parsed.data.primaryCategoryId) {
+    const parentCat = await prisma.jobCategory.findUnique({
+      where: { id: parsed.data.primaryCategoryId },
+      select: { id: true, isActive: true },
+    });
+    if (!parentCat || !parentCat.isActive) {
+      throw new Error("La catégorie métier sélectionnée est invalide ou inactive.");
+    }
+  }
+
+  if (subCategoryIds.length > 0) {
+    const validSubCats = await prisma.jobCategory.findMany({
+      where: {
+        id: { in: subCategoryIds },
+        isActive: true,
+        ...(parsed.data.primaryCategoryId ? { parentId: parsed.data.primaryCategoryId } : {}),
+      },
+      select: { id: true },
+    });
+    if (validSubCats.length !== subCategoryIds.length) {
+      throw new Error("Une ou plusieurs sous-catégories sélectionnées sont invalides.");
+    }
+  }
+
   const phone = parsed.data.phone
     ? (parsed.data.phone.startsWith("+") ? parsed.data.phone : `${parsed.data.phonePrefix} ${parsed.data.phone}`)
     : undefined;
