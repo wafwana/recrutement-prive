@@ -27,6 +27,7 @@ async function main() {
   const createdCompanyIds: string[] = [];
   const createdJobIds: string[] = [];
   const createdPresentationIds: string[] = [];
+  const createdCategoryIds: string[] = [];
 
   try {
     console.log("1. Testing real candidate registration...");
@@ -286,6 +287,34 @@ async function main() {
 
     await prisma.candidateDocument.delete({ where: { id: docA.id } });
 
+    console.log("9. Testing Job Creation & Taxonomy Association...");
+    const parentCategory = await prisma.jobCategory.upsert({
+      where: { code: `FINANCE_${suffix}` },
+      update: {},
+      create: { code: `FINANCE_${suffix}`, name: { fr: "Finance", en: "Finance" } },
+    });
+    const subCategory = await prisma.jobCategory.upsert({
+      where: { code: `CONTROLE_${suffix}` },
+      update: {},
+      create: { code: `CONTROLE_${suffix}`, name: { fr: "Contrôle de gestion", en: "Controlling" }, parentId: parentCategory.id },
+    });
+    createdCategoryIds.push(parentCategory.id, subCategory.id);
+
+    const taxonomyJob = await prisma.job.create({
+      data: {
+        companyId: testCompany.id,
+        title: "Directeur Contrôle de Gestion",
+        jobCategoryId: parentCategory.id,
+        subCategoryId: subCategory.id,
+        status: "OPEN",
+      },
+      include: { jobCategory: true, subCategory: true },
+    });
+    createdJobIds.push(taxonomyJob.id);
+
+    assert(taxonomyJob.jobCategory?.id === parentCategory.id, "Job category mismatch");
+    assert(taxonomyJob.subCategory?.id === subCategory.id, "Job subcategory mismatch");
+
     console.log(
       JSON.stringify(
         {
@@ -310,6 +339,7 @@ async function main() {
             documentEndpointCompanyNonMember403: true,
             documentEndpointCompanyLocked403: true,
             documentEndpointCompanyUnlocked200: true,
+            jobTaxonomyAssociation: true,
           },
         },
         null,
@@ -346,6 +376,11 @@ async function main() {
       });
       await prisma.user.deleteMany({
         where: { id: { in: createdUserIds } },
+      });
+    }
+    if (createdCategoryIds.length > 0) {
+      await prisma.jobCategory.deleteMany({
+        where: { id: { in: createdCategoryIds } },
       });
     }
   }
