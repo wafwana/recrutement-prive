@@ -24,6 +24,7 @@ export default async function CandidatPage({ searchParams }: Props) {
   const documents = profile
     ? await prisma.candidateDocument.findMany({
         where: { candidateId: profile.id },
+        select: { id: true, name: true, createdAt: true },
         orderBy: { createdAt: "desc" },
       })
     : [];

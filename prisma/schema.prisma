@@ -306,5 +306,4 @@ model JobCategory {
   updatedAt   DateTime      @updatedAt
 
   @@index([parentId])
-  @@index([code])
 }

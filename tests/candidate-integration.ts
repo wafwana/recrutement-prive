@@ -17,6 +17,7 @@ async function main() {
   const suffix = Date.now().toString();
   const testEmail = `candidat.integration.${suffix}@example.test`;
   const otherCandidateEmail = `candidat.other.${suffix}@example.test`;
+  const concurrentRegEmail = `candidat.concurrent.${suffix}@example.test`;
   const companyUserEmail = `entreprise.user.${suffix}@example.test`;
   const nonMemberUserEmail = `entreprise.nonmember.${suffix}@example.test`;
   const initialPassword = "Recrutement@1";
@@ -64,13 +65,34 @@ async function main() {
     const nonExistAuth = await authenticateCredentials({ email: "nonexist@example.test", password: initialPassword });
     assert(nonExistAuth === null, "Login should have failed for non-existing email");
 
-    console.log("3. Testing duplicate email rejection...");
+    console.log("3. Testing duplicate email rejection & concurrent registration atomicity...");
     const dupResult = await registerCandidate(regFormData);
     assert(dupResult.ok === false, "Duplicate email registration should have failed");
     assert(
       dupResult.error === "Un compte existe déjà avec cette adresse e-mail.",
       `Unexpected duplicate error: ${dupResult.error}`
     );
+
+    const fdReg1 = new FormData();
+    fdReg1.set("name", "User Concurrent 1");
+    fdReg1.set("email", concurrentRegEmail);
+    fdReg1.set("password", initialPassword);
+
+    const fdReg2 = new FormData();
+    fdReg2.set("name", "User Concurrent 2");
+    fdReg2.set("email", concurrentRegEmail);
+    fdReg2.set("password", initialPassword);
+
+    const [regRes1, regRes2] = await Promise.all([
+      registerCandidate(fdReg1),
+      registerCandidate(fdReg2),
+    ]);
+
+    const regSuccessCount = (regRes1.ok ? 1 : 0) + (regRes2.ok ? 1 : 0);
+    assert(regSuccessCount === 1, `Expected exactly 1 registration to succeed under concurrency, got ${regSuccessCount}`);
+
+    const concurrentUserInDb = await prisma.user.findUnique({ where: { email: concurrentRegEmail } });
+    if (concurrentUserInDb) createdUserIds.push(concurrentUserInDb.id);
 
     console.log("4. Testing real password reset request & anti-enumeration...");
     const reqFormData = new FormData();
@@ -169,7 +191,6 @@ async function main() {
     assert(successCount === 1, `Expected exactly 1 concurrent reset to succeed, got ${successCount}`);
 
     console.log("8. Testing Document Endpoint Authorization & IDOR on Real Route (/api/candidats/documents/[documentId])...");
-    // Create second candidate
     const otherCandFormData = new FormData();
     otherCandFormData.set("name", "Other Candidate");
     otherCandFormData.set("email", otherCandidateEmail);
@@ -183,7 +204,6 @@ async function main() {
     assert(otherUser !== null, "Other candidate creation failed");
     createdUserIds.push(otherUser.id);
 
-    // Create Candidate A Document in DB
     const docA = await prisma.candidateDocument.create({
       data: {
         candidateId: userInDb.candidat!.id,
@@ -193,7 +213,6 @@ async function main() {
       },
     });
 
-    // Create Company and Members in DB
     const defaultPasswordHash = await hashPassword(initialPassword);
     const companyUser = await prisma.user.create({
       data: { name: "Company Recruiter", email: companyUserEmail, passwordHash: defaultPasswordHash, role: "ENTREPRISE" },
@@ -236,27 +255,27 @@ async function main() {
     });
     createdPresentationIds.push(presentationA.id);
 
-    // Scenario 8.1: Unauthenticated request -> expect 401
+    // Scenario 8.1: Unauthenticated -> 401
     const resUnauth = await handleGetCandidateDocument(docA.id, null);
     assert(resUnauth.status === 401, `Unauthenticated request should return 401, got ${resUnauth.status}`);
 
-    // Scenario 8.2: Candidate owner request -> expect 200
+    // Scenario 8.2: Candidate owner -> 200
     const resOwner = await handleGetCandidateDocument(docA.id, { user: { id: userInDb.id, role: "CANDIDAT" } });
     assert(resOwner.status === 200, `Candidate owner request should return 200, got ${resOwner.status}`);
 
-    // Scenario 8.3: Other Candidate request (IDOR) -> expect 403
+    // Scenario 8.3: Other Candidate (IDOR) -> 403
     const resOtherCand = await handleGetCandidateDocument(docA.id, { user: { id: otherUser.id, role: "CANDIDAT" } });
     assert(resOtherCand.status === 403, `Other candidate request (IDOR) should return 403, got ${resOtherCand.status}`);
 
-    // Scenario 8.4: Company Non-Member request -> expect 403
+    // Scenario 8.4: Company Non-Member -> 403
     const resNonMember = await handleGetCandidateDocument(docA.id, { user: { id: nonMemberUser.id, role: "ENTREPRISE" } });
     assert(resNonMember.status === 403, `Non-member company user request should return 403, got ${resNonMember.status}`);
 
-    // Scenario 8.5: Company Member request before identity unlock (CANDIDAT_ANONYME) -> expect 403
+    // Scenario 8.5: Company Member before identity unlock (CANDIDAT_ANONYME) -> 403
     const resCompanyLocked = await handleGetCandidateDocument(docA.id, { user: { id: companyUser.id, role: "ENTREPRISE" } });
     assert(resCompanyLocked.status === 403, `Company request before identity unlock should return 403, got ${resCompanyLocked.status}`);
 
-    // Scenario 8.6: Company Member request after identity unlock (IDENTITE_DEBLOQUEE & CONFIRMED) -> expect 200
+    // Scenario 8.6: Company Member after identity unlock (IDENTITE_DEBLOQUEE & CONFIRMED) -> 200
     await prisma.missionPresentation.update({
       where: { id: presentationA.id },
       data: { state: "IDENTITE_DEBLOQUEE", financialConditionStatus: "CONFIRMED" },
@@ -277,6 +296,7 @@ async function main() {
             realAuthenticationCredentials: true,
             wrongPasswordRejection: true,
             duplicateEmailRejection: true,
+            concurrentRegistrationAtomicity: true,
             passwordResetRequest: true,
             antiEnumerationConsistency: true,
             passwordResetExecution: true,
@@ -304,7 +324,7 @@ async function main() {
     }
     if (createdUserIds.length > 0) {
       await prisma.passwordResetToken.deleteMany({
-        where: { email: { in: [testEmail, otherCandidateEmail] } },
+        where: { email: { in: [testEmail, otherCandidateEmail, concurrentRegEmail] } },
       });
       await prisma.application.deleteMany({
         where: { userId: { in: createdUserIds } },

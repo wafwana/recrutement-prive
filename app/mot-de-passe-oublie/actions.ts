@@ -78,6 +78,7 @@ export async function requestPasswordReset(formData: FormData): Promise<RequestP
 
       if (sendResult.error) {
         console.error("[requestPasswordReset] Resend email delivery failed:", sendResult.error.message);
+        await prisma.passwordResetToken.delete({ where: { tokenHash } });
         return {
           ok: false,
           error: "Impossible d'envoyer l'e-mail de réinitialisation pour le moment.",

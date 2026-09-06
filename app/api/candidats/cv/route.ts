@@ -86,6 +86,16 @@ export async function POST(request: Request) {
       update: { headline: parsed.data.headline || undefined, location: parsed.data.location || undefined, country: parsed.data.country, phonePrefix: parsed.data.phonePrefix || undefined, phone: parsed.data.phone || undefined },
     });
 
+    // Store document securely in CandidateDocument
+    await prisma.candidateDocument.create({
+      data: {
+        candidateId: profile.id,
+        name: safeAttachmentName(file.name),
+        fileData: fileBuffer,
+        type: file.type || "application/pdf",
+      },
+    });
+
     const resend = new Resend(apiKey);
     const attachment = { filename: safeAttachmentName(file.name), content: fileBuffer.toString("base64"), contentType: file.type || undefined };
     const cabinetEmail = await resend.emails.send({
