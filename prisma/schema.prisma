@@ -95,6 +95,7 @@ model CandidateProfile {
   experienceYears Int?
   preferences Json?
   primaryCategoryId String?
+  subCategoryIds    Json?
   primaryCategory   JobCategory? @relation("CandidatePrimaryCategory", fields: [primaryCategoryId], references: [id], onDelete: SetNull)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   applications Application[]

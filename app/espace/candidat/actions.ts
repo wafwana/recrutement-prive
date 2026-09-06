@@ -46,6 +46,8 @@ export async function saveCandidateProfile(formData: FormData) {
 
   if (!parsed.success) throw new Error("Données du profil invalides");
 
+  const subCategoryIds = formData.getAll("subCategoryIds").map(String).filter(Boolean);
+
   const phone = parsed.data.phone
     ? (parsed.data.phone.startsWith("+") ? parsed.data.phone : `${parsed.data.phonePrefix} ${parsed.data.phone}`)
     : undefined;
@@ -64,6 +66,7 @@ export async function saveCandidateProfile(formData: FormData) {
       skills: csv(parsed.data.skills),
       experienceYears: parsed.data.experienceYears,
       primaryCategoryId: parsed.data.primaryCategoryId || undefined,
+      subCategoryIds: subCategoryIds.length ? subCategoryIds : [],
     },
     update: {
       headline: parsed.data.headline,
@@ -76,6 +79,7 @@ export async function saveCandidateProfile(formData: FormData) {
       skills: csv(parsed.data.skills),
       experienceYears: parsed.data.experienceYears ?? null,
       primaryCategoryId: parsed.data.primaryCategoryId || null,
+      subCategoryIds: subCategoryIds.length ? subCategoryIds : [],
     },
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { saveCandidateProfile } from "./actions";
 import { PHONE_COUNTRIES } from "@/lib/phone-countries";
 
@@ -19,6 +19,7 @@ type Profile = {
   phonePrefix: string | null;
   phone: string | null;
   primaryCategoryId?: string | null;
+  subCategoryIds?: unknown;
   preferences: unknown;
   skills: unknown;
   experienceYears: number | null;
@@ -40,6 +41,15 @@ export default function ProfileForm({
   profile: Profile | null;
   categories?: CategoryOption[];
 }) {
+  const [selectedPrimaryCategory, setSelectedPrimaryCategory] = useState<string>(
+    profile?.primaryCategoryId ?? ""
+  );
+
+  const initialSubCategories = Array.isArray(profile?.subCategoryIds)
+    ? (profile.subCategoryIds as string[])
+    : [];
+  const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>(initialSubCategories);
+
   const [message, formAction, pending] = useActionState(async (_prev: string, formData: FormData) => {
     try {
       await saveCandidateProfile(formData);
@@ -56,6 +66,17 @@ export default function ProfileForm({
     ? profile.skills.filter((item): item is string => typeof item === "string").join(", ")
     : "";
   const defaultPhonePrefix = profile?.phonePrefix || "+33";
+
+  const parentCategories = categories.filter((c) => !c.parentId);
+  const availableSubCategories = categories.filter(
+    (c) => c.parentId && c.parentId === selectedPrimaryCategory
+  );
+
+  const toggleSubCategory = (subId: string) => {
+    setSelectedSubCategories((prev) =>
+      prev.includes(subId) ? prev.filter((id) => id !== subId) : [...prev, subId]
+    );
+  };
 
   return (
     <form action={formAction} className="border border-white/10 bg-[#111] p-8">
@@ -80,20 +101,57 @@ export default function ProfileForm({
         </label>
 
         <label className="text-xs uppercase tracking-[0.18em] text-white/40">
-          Secteur / Domaine d'expertise
+          Métier principal / Secteur
           <select
             name="primaryCategoryId"
-            defaultValue={profile?.primaryCategoryId ?? ""}
+            value={selectedPrimaryCategory}
+            onChange={(e) => {
+              setSelectedPrimaryCategory(e.target.value);
+              setSelectedSubCategories([]);
+            }}
             className="mt-2 w-full border border-white/10 bg-[#111] px-4 py-3 text-sm text-white outline-none"
           >
-            <option value="">-- Sélectionner une catégorie métier --</option>
-            {categories.map((cat) => (
+            <option value="">-- Sélectionner un métier principal --</option>
+            {parentCategories.map((cat) => (
               <option key={cat.id} value={cat.id}>
-                {cat.parentId ? "↳ " : ""}{formatCategoryName(cat.name)} ({cat.code})
+                {formatCategoryName(cat.name)} ({cat.code})
               </option>
             ))}
           </select>
         </label>
+
+        {availableSubCategories.length > 0 && (
+          <div className="md:col-span-2 border border-white/10 p-4 bg-black/20">
+            <p className="text-xs uppercase tracking-[0.18em] text-[#c7a15a]">
+              Sous-catégories & Spécialités
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              {availableSubCategories.map((sub) => {
+                const isSelected = selectedSubCategories.includes(sub.id);
+                return (
+                  <label
+                    key={sub.id}
+                    className={`cursor-pointer border px-3 py-2 text-xs transition ${
+                      isSelected
+                        ? "border-[#c7a15a] bg-[#c7a15a]/20 text-white"
+                        : "border-white/10 bg-transparent text-white/60 hover:border-white/30"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      name="subCategoryIds"
+                      value={sub.id}
+                      checked={isSelected}
+                      onChange={() => toggleSubCategory(sub.id)}
+                      className="sr-only"
+                    />
+                    {isSelected ? "✓ " : "+ "}{formatCategoryName(sub.name)}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <label className="text-xs uppercase tracking-[0.18em] text-white/40">
           Ville / Région
