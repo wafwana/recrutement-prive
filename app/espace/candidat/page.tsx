@@ -12,7 +12,15 @@ export default async function CandidatPage({ searchParams }: Props) {
 
   const { jobId } = await searchParams;
 
-  const profile = await prisma.candidateProfile.findUnique({ where: { userId: session.user.id } });
+  const [profile, categories] = await Promise.all([
+    prisma.candidateProfile.findUnique({ where: { userId: session.user.id } }),
+    prisma.jobCategory.findMany({
+      where: { isActive: true },
+      select: { id: true, code: true, name: true, parentId: true },
+      orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
+    }),
+  ]);
+
   const applications = profile
     ? await prisma.application.findMany({
         where: { candidateId: profile.id, userId: session.user.id },
@@ -65,7 +73,7 @@ export default async function CandidatPage({ searchParams }: Props) {
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-8">
-          <ProfileForm profile={profile} />
+          <ProfileForm profile={profile} categories={categories} />
           <DocumentManager documents={documents} />
         </div>
         <aside>
