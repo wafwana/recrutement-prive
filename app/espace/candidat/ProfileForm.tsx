@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { saveCandidateProfile } from "./actions";
 import { PHONE_COUNTRIES } from "@/lib/phone-countries";
 
-type Profile = { headline: string | null; bio: string | null; location: string | null; country: string | null; phonePrefix: string | null; phone: string | null; preferences: unknown; skills: unknown; experienceYears: number | null };
+type Profile = { headline: string | null; bio: string | null; location: string | null; country: string | null; phonePrefix: string | null; phone: string | null; primaryCategoryId?: string | null; preferences: unknown; skills: unknown; experienceYears: number | null };
 
 export default function ProfileForm({ profile }: { profile: Profile | null }) {
   const [message, formAction, pending] = useActionState(async (_prev: string, formData: FormData) => {

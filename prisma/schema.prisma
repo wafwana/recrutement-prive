@@ -94,12 +94,16 @@ model CandidateProfile {
   skills Json?
   experienceYears Int?
   preferences Json?
+  primaryCategoryId String?
+  primaryCategory   JobCategory? @relation("CandidatePrimaryCategory", fields: [primaryCategoryId], references: [id], onDelete: SetNull)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   applications Application[]
   documents CandidateDocument[]
   presentations MissionPresentation[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([primaryCategoryId])
 }
 
 model CandidateDocument {
@@ -155,6 +159,10 @@ model Job {
   missionType String?
   financialCondition Json?
   financialConditionStatus FinancialConditionStatus @default(PENDING)
+  jobCategoryId String?
+  subCategoryId String?
+  jobCategory JobCategory? @relation("JobCategoryJobs", fields: [jobCategoryId], references: [id], onDelete: SetNull)
+  subCategory JobCategory? @relation("SubCategoryJobs", fields: [subCategoryId], references: [id], onDelete: SetNull)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   applications Application[]
   presentations MissionPresentation[]
@@ -162,6 +170,8 @@ model Job {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([companyId, status])
+  @@index([jobCategoryId])
+  @@index([subCategoryId])
 }
 
 model Application {
@@ -293,17 +303,20 @@ model PasswordResetToken {
 }
 
 model JobCategory {
-  id          String        @id @default(cuid())
-  code        String        @unique
-  name        Json
-  description Json?
-  parentId    String?
-  parent      JobCategory?  @relation("JobCategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children    JobCategory[] @relation("JobCategoryHierarchy")
-  sortOrder   Int           @default(0)
-  isActive    Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id                       String             @id @default(cuid())
+  code                     String             @unique
+  name                     Json
+  description              Json?
+  parentId                 String?
+  parent                   JobCategory?       @relation("JobCategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children                 JobCategory[]      @relation("JobCategoryHierarchy")
+  jobs                     Job[]              @relation("JobCategoryJobs")
+  subCategoryJobs          Job[]              @relation("SubCategoryJobs")
+  primaryCandidateProfiles CandidateProfile[] @relation("CandidatePrimaryCategory")
+  sortOrder                Int                @default(0)
+  isActive                 Boolean            @default(true)
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
 
   @@index([parentId])
 }
