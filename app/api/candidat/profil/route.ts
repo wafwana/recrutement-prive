@@ -32,7 +32,26 @@ export async function GET() {
         orderBy: { createdAt: "desc" },
       },
       applications: {
-        include: { job: true },
+        select: {
+          id: true,
+          status: true,
+          notes: true,
+          createdAt: true,
+          updatedAt: true,
+          job: {
+            select: {
+              id: true,
+              title: true,
+              location: true,
+              description: true,
+              missionType: true,
+              requiredSkills: true,
+              requiredExperienceYears: true,
+              status: true,
+              company: { select: { id: true, name: true } },
+            },
+          },
+        },
         orderBy: { updatedAt: "desc" },
       },
     },
