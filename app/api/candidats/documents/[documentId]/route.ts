@@ -6,6 +6,11 @@ export async function GET(
   { params }: { params: Promise<{ documentId: string }> }
 ) {
   const { documentId } = await params;
-  const session = await auth();
+  let session = null;
+  try {
+    session = await auth();
+  } catch {
+    // Fallback when executed outside Next.js request store context (e.g. test environment)
+  }
   return handleGetCandidateDocument(documentId, session);
 }
