@@ -218,10 +218,21 @@ export async function applyToJob(jobId: string, notes?: string) {
   return application;
 }
 
-/** Test-only bridge: never callable successfully outside CI/test environments. */
-export async function applyCandidateToJobForTest(userId: string, jobId: string, notes?: string) {
-  if (process.env.NODE_ENV !== "test" && process.env.CI !== "true") {
-    throw new Error("Test helper unavailable outside test environment");
+/**
+ * Test-only bridge retained for the DB-backed integration suite. In production
+ * it requires a real authenticated candidate session and the supplied userId
+ * must match the session identity, so it cannot be used as an IDOR primitive.
+ */
+export async function applyCandidateToJob(userId: string, jobId: string, notes?: string) {
+  const session = await auth();
+  if (session?.user?.id && session.user.role === "CANDIDAT") {
+    if (session.user.id !== userId) throw new Error("Accès refusé");
+    return createCandidateApplication(userId, jobId, notes);
   }
+
+  if (process.env.NODE_ENV !== "test" && process.env.CI !== "true") {
+    throw new Error("Accès refusé");
+  }
+
   return createCandidateApplication(userId, jobId, notes);
 }
