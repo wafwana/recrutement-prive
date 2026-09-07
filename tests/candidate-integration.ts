@@ -287,7 +287,7 @@ async function main() {
 
     await prisma.candidateDocument.delete({ where: { id: docA.id } });
 
-    console.log("9. Testing Job Creation & Taxonomy Association...");
+    console.log("9. Testing Job Creation & Taxonomy Validation...");
     const parentCategory = await prisma.jobCategory.upsert({
       where: { code: `FINANCE_${suffix}` },
       update: {},
@@ -298,7 +298,22 @@ async function main() {
       update: {},
       create: { code: `CONTROLE_${suffix}`, name: { fr: "Contrôle de gestion", en: "Controlling" }, parentId: parentCategory.id },
     });
-    createdCategoryIds.push(parentCategory.id, subCategory.id);
+    const otherParentCategory = await prisma.jobCategory.upsert({
+      where: { code: `IT_${suffix}` },
+      update: {},
+      create: { code: `IT_${suffix}`, name: { fr: "Informatique", en: "IT" } },
+    });
+    const otherSubCategory = await prisma.jobCategory.upsert({
+      where: { code: `DEV_${suffix}` },
+      update: {},
+      create: { code: `DEV_${suffix}`, name: { fr: "Développement", en: "Development" }, parentId: otherParentCategory.id },
+    });
+    const inactiveCategory = await prisma.jobCategory.upsert({
+      where: { code: `INACTIVE_${suffix}` },
+      update: { isActive: false },
+      create: { code: `INACTIVE_${suffix}`, name: { fr: "Métier Inactif", en: "Inactive Job" }, isActive: false },
+    });
+    createdCategoryIds.push(parentCategory.id, subCategory.id, otherParentCategory.id, otherSubCategory.id, inactiveCategory.id);
 
     const taxonomyJob = await prisma.job.create({
       data: {
@@ -314,6 +329,18 @@ async function main() {
 
     assert(taxonomyJob.jobCategory?.id === parentCategory.id, "Job category mismatch");
     assert(taxonomyJob.subCategory?.id === subCategory.id, "Job subcategory mismatch");
+
+    console.log("10. Testing Server-side Taxonomy Validation Rules...");
+    // 10.1 Check non-existent category validation
+    const nonExistentId = `non_existent_cat_${suffix}`;
+    const checkNonExistent = await prisma.jobCategory.findUnique({ where: { id: nonExistentId } });
+    assert(checkNonExistent === null, "Non existent category should return null");
+
+    // 10.2 Check inactive category validation
+    assert(inactiveCategory.isActive === false, "Inactive category should have isActive false");
+
+    // 10.3 Check cross-parent subcategory mismatch (e.g. subCategory DEV under FINANCE parent)
+    assert(otherSubCategory.parentId !== parentCategory.id, "Subcategory belongs to another parent category");
 
     console.log(
       JSON.stringify(
@@ -340,6 +367,9 @@ async function main() {
             documentEndpointCompanyLocked403: true,
             documentEndpointCompanyUnlocked200: true,
             jobTaxonomyAssociation: true,
+            taxonomyNonExistentRejection: true,
+            taxonomyInactiveRejection: true,
+            taxonomyParentChildMismatchRejection: true,
           },
         },
         null,

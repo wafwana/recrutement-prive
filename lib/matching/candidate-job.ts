@@ -69,12 +69,28 @@ export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJ
 
   let categoryScore = 0;
   let categoryMatchLevel: "EXACT_SUBCATEGORY" | "PARENT_CATEGORY" | "NONE" = "NONE";
-  const candSubCategories = new Set(toSkills(candidate.subCategoryCodes));
 
-  if (job.subCategoryCode && candSubCategories.has(normalize(job.subCategoryCode))) {
+  const primaryCode = candidate.primaryCategoryCode ? normalize(candidate.primaryCategoryCode) : null;
+  const parentJobCatCode = job.categoryCode ? normalize(job.categoryCode) : null;
+  const jobSubCatCode = job.subCategoryCode ? normalize(job.subCategoryCode) : null;
+
+  // Filter candidate subcategory codes to strictly exclude primaryCategoryCode
+  const candSubCategoryCodes = new Set(
+    toSkills(candidate.subCategoryCodes).filter((code) => !primaryCode || code !== primaryCode)
+  );
+
+  // Exact subcategory match requires an explicit subcategory on the job that is NOT equal to primary or parent category
+  const isSubCategoryMatch = Boolean(
+    jobSubCatCode &&
+    jobSubCatCode !== parentJobCatCode &&
+    jobSubCatCode !== primaryCode &&
+    candSubCategoryCodes.has(jobSubCatCode)
+  );
+
+  if (isSubCategoryMatch) {
     categoryScore = 15;
     categoryMatchLevel = "EXACT_SUBCATEGORY";
-  } else if (job.categoryCode && candidate.primaryCategoryCode && normalize(candidate.primaryCategoryCode) === normalize(job.categoryCode)) {
+  } else if (parentJobCatCode && primaryCode && primaryCode === parentJobCatCode) {
     categoryScore = 8;
     categoryMatchLevel = "PARENT_CATEGORY";
   }

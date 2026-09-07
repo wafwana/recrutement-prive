@@ -86,17 +86,20 @@ export async function POST(request: Request) {
         where: { id: parsed.data.jobCategoryId },
         select: { id: true, isActive: true, parentId: true },
       });
-      if (!parentCat || !parentCat.isActive) {
+      if (!parentCat || !parentCat.isActive || parentCat.parentId !== null) {
         return NextResponse.json({ error: "La catégorie métier sélectionnée est invalide ou inactive." }, { status: 400 });
       }
     }
 
     if (parsed.data.subCategoryId) {
+      if (!parsed.data.jobCategoryId) {
+        return NextResponse.json({ error: "Une sous-catégorie requiert une catégorie métier principale." }, { status: 400 });
+      }
       const subCat = await prisma.jobCategory.findUnique({
         where: { id: parsed.data.subCategoryId },
         select: { id: true, isActive: true, parentId: true },
       });
-      if (!subCat || !subCat.isActive || (parsed.data.jobCategoryId && subCat.parentId !== parsed.data.jobCategoryId)) {
+      if (!subCat || !subCat.isActive || subCat.parentId !== parsed.data.jobCategoryId) {
         return NextResponse.json({ error: "La sous-catégorie sélectionnée ne correspond pas au métier principal." }, { status: 400 });
       }
     }

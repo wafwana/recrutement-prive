@@ -160,3 +160,40 @@ test("matchCandidateToJob distinguishes exact subcategory match from parent cate
   assert.ok(exactResult.categoryScore > parentResult.categoryScore);
   assert.ok(exactResult.score > parentResult.score);
 });
+
+test("matchCandidateToJob guarantees primaryCategory NEVER yields EXACT_SUBCATEGORY", () => {
+  const job = {
+    title: "Développeur Fullstack",
+    categoryCode: "INFORMATIQUE",
+    subCategoryCode: "INFORMATIQUE", // edge case: subcategory code equals parent category code
+    requiredSkills: "TypeScript, React",
+  };
+
+  const candidateWithPrimary = {
+    headline: "Développeur Software",
+    primaryCategoryCode: "INFORMATIQUE",
+    subCategoryCodes: ["INFORMATIQUE"], // accidentally contains primary category
+  };
+
+  const result = matchCandidateToJob(candidateWithPrimary, job);
+  assert.notEqual(result.categoryMatchLevel, "EXACT_SUBCATEGORY");
+  assert.equal(result.categoryMatchLevel, "PARENT_CATEGORY");
+});
+
+test("matchCandidateToJob returns NONE for mismatching categories", () => {
+  const job = {
+    title: "Directeur Juridique",
+    categoryCode: "JURIDIQUE",
+    subCategoryCode: "DROIT_DES_AFFAIRES",
+  };
+
+  const candidate = {
+    headline: "Ingénieur Système",
+    primaryCategoryCode: "INFORMATIQUE",
+    subCategoryCodes: ["SYSTEME_RESEAU"],
+  };
+
+  const result = matchCandidateToJob(candidate, job);
+  assert.equal(result.categoryMatchLevel, "NONE");
+  assert.equal(result.categoryScore, 0);
+});
