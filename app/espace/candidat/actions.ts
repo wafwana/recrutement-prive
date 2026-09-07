@@ -158,7 +158,7 @@ export async function uploadCandidateDocument(formData: FormData) {
   revalidatePath("/espace/candidat");
 }
 
-export async function applyCandidateToJob(userId: string, jobId: string, notes?: string) {
+async function createCandidateApplication(userId: string, jobId: string, notes?: string) {
   const job = await prisma.job.findFirst({
     where: { id: jobId, status: "OPEN" },
   });
@@ -179,7 +179,7 @@ export async function applyCandidateToJob(userId: string, jobId: string, notes?:
     throw new Error("Vous avez déjà postulé à cette offre d'emploi.");
   }
 
-  const application = await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     const app = await tx.application.create({
       data: {
         candidateId: profile.id,
@@ -203,8 +203,6 @@ export async function applyCandidateToJob(userId: string, jobId: string, notes?:
 
     return app;
   });
-
-  return application;
 }
 
 export async function applyToJob(jobId: string, notes?: string) {
@@ -214,8 +212,16 @@ export async function applyToJob(jobId: string, notes?: string) {
     throw new Error("Vous devez être connecté en tant que candidat pour postuler.");
   }
 
-  const application = await applyCandidateToJob(userId, jobId, notes);
+  const application = await createCandidateApplication(userId, jobId, notes);
   revalidatePath("/espace/candidat");
   revalidatePath(`/offres/${jobId}`);
   return application;
+}
+
+/** Test-only bridge: never callable successfully outside CI/test environments. */
+export async function applyCandidateToJobForTest(userId: string, jobId: string, notes?: string) {
+  if (process.env.NODE_ENV !== "test" && process.env.CI !== "true") {
+    throw new Error("Test helper unavailable outside test environment");
+  }
+  return createCandidateApplication(userId, jobId, notes);
 }
