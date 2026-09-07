@@ -11,6 +11,8 @@ const jobSchema = z.object({
   requiredSkills: z.union([z.string(), z.array(z.string())]).optional(),
   requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(),
   status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]),
+  jobCategoryId: z.string().trim().optional(),
+  subCategoryId: z.string().trim().optional(),
 });
 
 export async function GET(_request: Request, { params }: { params: Promise<{ jobId: string }> }) {
@@ -50,6 +52,28 @@ export async function PUT(request: Request, { params }: { params: Promise<{ jobI
       ? parsed.data.requiredSkills.split(",").map((s) => s.trim()).filter(Boolean)
       : parsed.data.requiredSkills ?? undefined;
 
+    if (parsed.data.jobCategoryId) {
+      const parentCat = await prisma.jobCategory.findUnique({
+        where: { id: parsed.data.jobCategoryId },
+        select: { id: true, isActive: true, parentId: true },
+      });
+      if (!parentCat || !parentCat.isActive || parentCat.parentId !== null) {
+        return NextResponse.json({ error: "La catégorie métier sélectionnée est invalide ou inactive." }, { status: 400 });
+      }
+    } else if (parsed.data.subCategoryId) {
+      return NextResponse.json({ error: "Une sous-catégorie ne peut pas être spécifiée sans métier principal." }, { status: 400 });
+    }
+
+    if (parsed.data.subCategoryId) {
+      const subCat = await prisma.jobCategory.findUnique({
+        where: { id: parsed.data.subCategoryId },
+        select: { id: true, isActive: true, parentId: true },
+      });
+      if (!subCat || !subCat.isActive || subCat.parentId !== parsed.data.jobCategoryId) {
+        return NextResponse.json({ error: "La sous-catégorie sélectionnée ne correspond pas au métier principal." }, { status: 400 });
+      }
+    }
+
     const job = await prisma.$transaction(async (tx) => {
       const updated = await tx.job.update({
         where: { id: jobId },
@@ -61,6 +85,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ jobI
           ...(skills !== undefined ? { requiredSkills: skills } : {}),
           ...(parsed.data.requiredExperienceYears !== undefined ? { requiredExperienceYears: parsed.data.requiredExperienceYears } : {}),
           status: parsed.data.status,
+          jobCategoryId: parsed.data.jobCategoryId || null,
+          subCategoryId: parsed.data.subCategoryId || null,
         },
       });
       if (updated.status !== existing.status) {

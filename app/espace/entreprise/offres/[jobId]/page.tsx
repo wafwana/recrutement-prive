@@ -101,16 +101,20 @@ export default async function CompanyJobPage({ params }: { params: Promise<{ job
                     <div className="mt-4 flex flex-wrap gap-3 text-[10px] uppercase tracking-[0.14em] text-white/40 border-t border-white/5 pt-3">
                       <span>Localisation : {application.candidate.location || "Inconnue"}</span>
                       {application.candidate.experienceYears !== null && <span>· Expérience : {application.candidate.experienceYears} an(s)</span>}
-                      {unlocked && application.candidate.cvUrl && (
-                        <span>
-                          ·{" "}
-                          <a href={application.candidate.cvUrl} target="_blank" rel="noreferrer" className="text-[#c7a15a] underline">
-                            Voir le CV
-                          </a>
-                        </span>
-                      )}
                       {unlocked && application.candidate.documents.length > 0 && (
-                        <span>· {application.candidate.documents.length} document(s) disponible(s)</span>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {application.candidate.documents.map((doc) => (
+                            <a
+                              key={doc.id}
+                              href={`/api/candidats/documents/${doc.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[#c7a15a] underline"
+                            >
+                              📄 {doc.name}
+                            </a>
+                          ))}
+                        </div>
                       )}
                     </div>
 
