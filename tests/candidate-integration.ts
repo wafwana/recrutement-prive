@@ -269,8 +269,21 @@ async function main() {
     });
     createdJobIds.push(testJob.id);
 
-    console.log("8.1 Exercising applyCandidateToJob() and verifying Application & RecruitmentHistory...");
-    const submittedApp = await applyCandidateToJob(userInDb.id, testJob.id, "Note de candidature de test");
+    console.log("8.1 Exercising applyCandidateToJob() and verifying Application, History & Concurrency...");
+    const concurrentAppJob = await prisma.job.create({
+      data: { companyId: testCompany.id, title: "Concurrent Application Position", status: "OPEN" },
+    });
+    createdJobIds.push(concurrentAppJob.id);
+
+    const [appRes1, appRes2] = await Promise.allSettled([
+      applyCandidateToJob(userInDb.id, concurrentAppJob.id, "Concurrent note 1"),
+      applyCandidateToJob(userInDb.id, concurrentAppJob.id, "Concurrent note 2"),
+    ]);
+
+    const appSuccessCount = (appRes1.status === "fulfilled" ? 1 : 0) + (appRes2.status === "fulfilled" ? 1 : 0);
+    assert(appSuccessCount === 1, `Expected exactly 1 concurrent application to succeed, got ${appSuccessCount}`);
+
+    const submittedApp = appRes1.status === "fulfilled" ? appRes1.value : (appRes2 as PromiseFulfilledResult<Awaited<ReturnType<typeof applyCandidateToJob>>>).value;
     assert(submittedApp !== null, "applyCandidateToJob failed to create application");
     assert(submittedApp.status === "SUBMITTED", "Application status is not SUBMITTED");
 
@@ -286,7 +299,7 @@ async function main() {
 
     let duplicateThrown = false;
     try {
-      await applyCandidateToJob(userInDb.id, testJob.id);
+      await applyCandidateToJob(userInDb.id, concurrentAppJob.id);
     } catch (err) {
       duplicateThrown = true;
       assert(err instanceof Error && err.message.includes("déjà postulé"), "Unexpected error on duplicate application");
@@ -420,6 +433,7 @@ async function main() {
             tokenExpirationEnforcement: true,
             concurrentResetAtomicity: true,
             candidateApplicationWorkflowAndHistory: true,
+            candidateApplicationConcurrency: true,
             documentRouteTraversalUnauthenticated401: true,
             documentEndpointUnauthenticated401: true,
             documentEndpointCandidateOwner200: true,

@@ -22,7 +22,12 @@ export default async function CompanyJobPage({ params }: { params: Promise<{ job
       applications: {
         where: { presentations: { some: { companyId: access.companyId } } },
         include: {
-          candidate: { include: { user: { select: { name: true, email: true } }, documents: true } },
+          candidate: {
+            include: {
+              user: { select: { name: true, email: true } },
+              documents: { select: { id: true, name: true, type: true } },
+            },
+          },
           presentations: { where: { companyId: access.companyId }, orderBy: { presentedAt: "desc" }, take: 1 },
         },
         orderBy: { updatedAt: "desc" },

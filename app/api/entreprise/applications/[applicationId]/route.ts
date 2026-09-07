@@ -23,7 +23,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ app
       },
       include: {
         job: true,
-        candidate: { include: { user: true, documents: true } },
+        candidate: {
+          include: {
+            user: true,
+            documents: { select: { id: true, name: true, type: true } },
+          },
+        },
         presentations: { where: { companyId: access.companyId }, orderBy: { presentedAt: "desc" }, take: 1 },
         history: { include: { actor: true }, orderBy: { createdAt: "desc" } },
       },

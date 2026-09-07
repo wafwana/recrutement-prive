@@ -24,7 +24,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
       include: {
         applications: {
           where: { presentations: { some: { companyId: access.companyId } } },
-          include: { candidate: { include: { user: true, documents: true } } },
+          include: {
+            candidate: {
+              include: {
+                user: true,
+                documents: { select: { id: true, name: true, type: true } },
+              },
+            },
+          },
           orderBy: { updatedAt: "desc" },
         },
         history: { include: { actor: true }, orderBy: { createdAt: "desc" } },
