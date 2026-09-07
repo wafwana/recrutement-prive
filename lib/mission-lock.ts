@@ -42,7 +42,7 @@ export async function getCompanyMissionPresentation(presentationId: string, comp
           skills: true,
           experienceYears: true,
           user: { select: { name: true, email: true } },
-          documents: { select: { id: true, name: true, url: true, type: true } },
+          documents: { select: { id: true, name: true, type: true } },
         },
       },
     },
