@@ -158,13 +158,7 @@ export async function uploadCandidateDocument(formData: FormData) {
   revalidatePath("/espace/candidat");
 }
 
-export async function applyToJob(jobId: string, notes?: string) {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId || session.user.role !== "CANDIDAT") {
-    throw new Error("Vous devez être connecté en tant que candidat pour postuler.");
-  }
-
+export async function applyCandidateToJob(userId: string, jobId: string, notes?: string) {
   const job = await prisma.job.findFirst({
     where: { id: jobId, status: "OPEN" },
   });
@@ -210,6 +204,17 @@ export async function applyToJob(jobId: string, notes?: string) {
     return app;
   });
 
+  return application;
+}
+
+export async function applyToJob(jobId: string, notes?: string) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId || session.user.role !== "CANDIDAT") {
+    throw new Error("Vous devez être connecté en tant que candidat pour postuler.");
+  }
+
+  const application = await applyCandidateToJob(userId, jobId, notes);
   revalidatePath("/espace/candidat");
   revalidatePath(`/offres/${jobId}`);
   return application;

@@ -4,6 +4,8 @@ import { requestPasswordReset } from "@/app/mot-de-passe-oublie/actions";
 import { resetPassword } from "@/app/reinitialisation-mot-de-passe/actions";
 import { authenticateCredentials } from "@/lib/auth-credentials";
 import { handleGetCandidateDocument } from "@/app/api/candidats/documents/[documentId]/handler";
+import { GET as getCandidateDocumentRoute } from "@/app/api/candidats/documents/[documentId]/route";
+import { applyCandidateToJob } from "@/app/espace/candidat/actions";
 import { hashToken, hashPassword } from "@/lib/password-crypto";
 import { randomBytes } from "crypto";
 
@@ -92,10 +94,42 @@ async function main() {
     const regSuccessCount = (regRes1.ok ? 1 : 0) + (regRes2.ok ? 1 : 0);
     assert(regSuccessCount === 1, `Expected exactly 1 registration to succeed under concurrency, got ${regSuccessCount}`);
 
-    const concurrentUserInDb = await prisma.user.findUnique({ where: { email: concurrentRegEmail } });
-    if (concurrentUserInDb) createdUserIds.push(concurrentUserInDb.id);
+    const concurrentUsersInDb = await prisma.user.findMany({
+      where: { email: concurrentRegEmail },
+      include: { candidat: true },
+    });
+    assert(
+      concurrentUsersInDb.length === 1,
+      `Expected exactly 1 user in DB for concurrent registration email, found ${concurrentUsersInDb.length}`
+    );
+    const winnerUser = concurrentUsersInDb[0];
+    assert(winnerUser.role === "CANDIDAT", "Winner user role is not CANDIDAT");
+    assert(winnerUser.candidat !== null, "Winner candidate profile is missing in DB");
+    createdUserIds.push(winnerUser.id);
 
-    console.log("4. Testing real password reset request & anti-enumeration...");
+    const allProfiles = await prisma.candidateProfile.findMany({
+      where: { user: { email: concurrentRegEmail } },
+    });
+    assert(
+      allProfiles.length === 1,
+      `Expected exactly 1 candidate profile in DB for concurrent email, found ${allProfiles.length}`
+    );
+
+    console.log("4. Testing real password reset request, rate-limiting & anti-enumeration...");
+    const rateLimitEmail = `ratelimit.${suffix}@example.test`;
+    const rlFormData = new FormData();
+    rlFormData.set("email", rateLimitEmail);
+
+    for (let i = 0; i < 5; i++) {
+      const rlRes = await requestPasswordReset(rlFormData);
+      assert(rlRes.ok === true, `Password reset request ${i + 1} failed unexpectedly`);
+    }
+    const rlBlocked = await requestPasswordReset(rlFormData);
+    assert(rlBlocked.ok === false, "Password reset request should have been blocked by rate limiting after 5 attempts");
+    assert(
+      rlBlocked.error?.includes("Trop de demandes"),
+      `Unexpected rate limit error message: ${rlBlocked.error}`
+    );
     const reqFormData = new FormData();
     reqFormData.set("email", testEmail);
     const reqResult = await requestPasswordReset(reqFormData);
@@ -235,19 +269,34 @@ async function main() {
     });
     createdJobIds.push(testJob.id);
 
-    const applicationA = await prisma.application.create({
-      data: {
-        candidateId: userInDb.candidat!.id,
-        userId: userInDb.id,
-        jobId: testJob.id,
-        status: "SUBMITTED",
-      },
+    console.log("8.1 Exercising applyCandidateToJob() and verifying Application & RecruitmentHistory...");
+    const submittedApp = await applyCandidateToJob(userInDb.id, testJob.id, "Note de candidature de test");
+    assert(submittedApp !== null, "applyCandidateToJob failed to create application");
+    assert(submittedApp.status === "SUBMITTED", "Application status is not SUBMITTED");
+
+    const appInDb = await prisma.application.findUnique({
+      where: { id: submittedApp.id },
+      include: { history: true },
     });
+    assert(appInDb !== null, "Application not found in DB");
+    assert(appInDb.history.length > 0, "No recruitment history generated for application");
+    const submitHistoryEntry = appInDb.history.find((h) => h.action === "APPLICATION_SUBMITTED");
+    assert(submitHistoryEntry !== undefined, "APPLICATION_SUBMITTED recruitment history entry missing");
+    assert(submitHistoryEntry.actorUserId === userInDb.id, "Recruitment history actorUserId mismatch");
+
+    let duplicateThrown = false;
+    try {
+      await applyCandidateToJob(userInDb.id, testJob.id);
+    } catch (err) {
+      duplicateThrown = true;
+      assert(err instanceof Error && err.message.includes("déjà postulé"), "Unexpected error on duplicate application");
+    }
+    assert(duplicateThrown, "Duplicate application did not throw an error");
 
     const presentationA = await prisma.missionPresentation.create({
       data: {
         missionId: testJob.id,
-        applicationId: applicationA.id,
+        applicationId: submittedApp.id,
         candidateId: userInDb.candidat!.id,
         companyId: testCompany.id,
         state: "CANDIDAT_ANONYME",
@@ -256,7 +305,15 @@ async function main() {
     });
     createdPresentationIds.push(presentationA.id);
 
-    // Scenario 8.1: Unauthenticated -> 401
+    console.log("8.2 Testing Document Route GET Handler and Session Access Rules...");
+    // Scenario 8.2a: Unauthenticated call traversing real route.ts GET -> auth() -> handler -> 401
+    const routeResUnauth = await getCandidateDocumentRoute(
+      new Request(`http://localhost/api/candidats/documents/${docA.id}`),
+      { params: Promise.resolve({ documentId: docA.id }) }
+    );
+    assert(routeResUnauth.status === 401, `Route GET request without session should return 401, got ${routeResUnauth.status}`);
+
+    // Scenario 8.2b: Handler level unauthenticated call -> 401
     const resUnauth = await handleGetCandidateDocument(docA.id, null);
     assert(resUnauth.status === 401, `Unauthenticated request should return 401, got ${resUnauth.status}`);
 
@@ -353,13 +410,17 @@ async function main() {
             wrongPasswordRejection: true,
             duplicateEmailRejection: true,
             concurrentRegistrationAtomicity: true,
+            concurrentRegistrationWinnerStateComplete: true,
             passwordResetRequest: true,
+            passwordResetRateLimiting: true,
             antiEnumerationConsistency: true,
             passwordResetExecution: true,
             reloginWithNewPassword: true,
             tokenSingleUse: true,
             tokenExpirationEnforcement: true,
             concurrentResetAtomicity: true,
+            candidateApplicationWorkflowAndHistory: true,
+            documentRouteTraversalUnauthenticated401: true,
             documentEndpointUnauthenticated401: true,
             documentEndpointCandidateOwner200: true,
             documentEndpointOtherCandidateIdor403: true,
