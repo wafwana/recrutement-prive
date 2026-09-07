@@ -5,7 +5,7 @@ import { resetPassword } from "@/app/reinitialisation-mot-de-passe/actions";
 import { authenticateCredentials } from "@/lib/auth-credentials";
 import { handleGetCandidateDocument } from "@/app/api/candidats/documents/[documentId]/handler";
 import { GET as getCandidateDocumentRoute } from "@/app/api/candidats/documents/[documentId]/route";
-import { applyCandidateToJob } from "@/app/espace/candidat/actions";
+import { applyCandidateToJob } from "@/lib/candidate-application";
 import { hashToken, hashPassword } from "@/lib/password-crypto";
 import { randomBytes } from "crypto";
 
