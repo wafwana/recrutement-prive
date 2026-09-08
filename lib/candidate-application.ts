@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export async function applyCandidateToJob(userId: string, jobId: string, notes?: string) {
   const job = await prisma.job.findFirst({
@@ -8,10 +9,11 @@ export async function applyCandidateToJob(userId: string, jobId: string, notes?:
     throw new Error("L'offre d'emploi n'est plus ouverte aux candidatures.");
   }
 
-  let profile = await prisma.candidateProfile.findUnique({ where: { userId } });
-  if (!profile) {
-    profile = await prisma.candidateProfile.create({ data: { userId } });
-  }
+  const profile = await prisma.candidateProfile.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+  });
 
   const existingApp = await prisma.application.findUnique({
     where: { candidateId_jobId: { candidateId: profile.id, jobId } },
@@ -21,30 +23,37 @@ export async function applyCandidateToJob(userId: string, jobId: string, notes?:
     throw new Error("Vous avez déjà postulé à cette offre d'emploi.");
   }
 
-  const application = await prisma.$transaction(async (tx) => {
-    const app = await tx.application.create({
-      data: {
-        candidateId: profile.id,
-        userId,
-        jobId,
-        status: "SUBMITTED",
-        notes: notes ? notes.trim().slice(0, 1000) : null,
-      },
+  try {
+    const application = await prisma.$transaction(async (tx) => {
+      const app = await tx.application.create({
+        data: {
+          candidateId: profile.id,
+          userId,
+          jobId,
+          status: "SUBMITTED",
+          notes: notes ? notes.trim().slice(0, 1000) : null,
+        },
+      });
+
+      await tx.recruitmentHistory.create({
+        data: {
+          applicationId: app.id,
+          jobId,
+          actorUserId: userId,
+          action: "APPLICATION_SUBMITTED",
+          toStatus: "SUBMITTED",
+          details: { source: "CANDIDAT_PORTAL" },
+        },
+      });
+
+      return app;
     });
 
-    await tx.recruitmentHistory.create({
-      data: {
-        applicationId: app.id,
-        jobId,
-        actorUserId: userId,
-        action: "APPLICATION_SUBMITTED",
-        toStatus: "SUBMITTED",
-        details: { source: "CANDIDAT_PORTAL" },
-      },
-    });
-
-    return app;
-  });
-
-  return application;
+    return application;
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new Error("Vous avez déjà postulé à cette offre d'emploi.");
+    }
+    throw error;
+  }
 }
