@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { hashToken } from "@/lib/password-crypto";
+import { Prisma } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { Resend } from "resend";
 
@@ -21,21 +22,6 @@ export async function requestPasswordReset(formData: FormData): Promise<RequestP
     return genericResponse;
   }
 
-  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-  const recentTokenCount = await prisma.passwordResetToken.count({
-    where: {
-      email,
-      createdAt: { gte: fifteenMinutesAgo },
-    },
-  });
-
-  if (recentTokenCount >= 5) {
-    return {
-      ok: false,
-      error: "Trop de demandes de réinitialisation pour cette adresse e-mail. Veuillez réessayer dans quelques minutes.",
-    };
-  }
-
   const apiKey = process.env.RESEND_API_KEY;
   const isTestEnv = process.env.NODE_ENV === "test" || process.env.CI === "true";
 
@@ -47,39 +33,65 @@ export async function requestPasswordReset(formData: FormData): Promise<RequestP
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
 
-    if (!user) {
-      // Record dummy token to persistently track attempts across serverless instances without revealing user existence
-      const dummyRawToken = randomBytes(32).toString("hex");
-      await prisma.passwordResetToken.create({
-        data: {
+    const txResult = await prisma.$transaction(async (tx) => {
+      const recentTokenCount = await tx.passwordResetToken.count({
+        where: {
           email,
-          tokenHash: hashToken(`dummy-${dummyRawToken}`),
-          expiresAt: new Date(),
-          usedAt: new Date(),
+          createdAt: { gte: fifteenMinutesAgo },
         },
       });
-      return genericResponse;
-    }
 
-    const rawToken = randomBytes(32).toString("hex");
-    const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      if (recentTokenCount >= 5) {
+        return {
+          ok: false as const,
+          error: "Trop de demandes de réinitialisation pour cette adresse e-mail. Veuillez réessayer dans quelques minutes.",
+        };
+      }
 
-    await prisma.passwordResetToken.create({
-      data: {
-        email,
-        tokenHash,
-        expiresAt,
-      },
+      const user = await tx.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+
+      const rawToken = randomBytes(32).toString("hex");
+
+      if (!user) {
+        await tx.passwordResetToken.create({
+          data: {
+            email,
+            tokenHash: hashToken(`dummy-${rawToken}`),
+            expiresAt: new Date(),
+            usedAt: new Date(),
+          },
+        });
+        return { ok: true as const, isDummy: true as const };
+      }
+
+      const tokenHash = hashToken(rawToken);
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+      await tx.passwordResetToken.create({
+        data: {
+          email,
+          tokenHash,
+          expiresAt,
+        },
+      });
+
+      return { ok: true as const, isDummy: false as const, rawToken, tokenHash };
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     });
 
-    if (apiKey) {
+    if (!txResult.ok) {
+      return { ok: false, error: txResult.error };
+    }
+
+    if (!txResult.isDummy && apiKey && txResult.rawToken && txResult.tokenHash) {
       const baseUrl = process.env.NEXTAUTH_URL || process.env.APP_URL || "http://localhost:3000";
-      const resetUrl = `${baseUrl}/reinitialisation-mot-de-passe?token=${rawToken}`;
+      const resetUrl = `${baseUrl}/reinitialisation-mot-de-passe?token=${txResult.rawToken}`;
       const resend = new Resend(apiKey);
       const emailFrom = process.env.EMAIL_FROM || "contact@recrutement-prive.com";
 
@@ -103,7 +115,7 @@ export async function requestPasswordReset(formData: FormData): Promise<RequestP
 
       if (sendResult.error) {
         console.error("[requestPasswordReset] Resend email delivery failed:", sendResult.error.message);
-        await prisma.passwordResetToken.delete({ where: { tokenHash } });
+        await prisma.passwordResetToken.delete({ where: { tokenHash: txResult.tokenHash } });
         return {
           ok: false,
           error: "Impossible d'envoyer l'e-mail de réinitialisation pour le moment.",
@@ -113,7 +125,13 @@ export async function requestPasswordReset(formData: FormData): Promise<RequestP
 
     return genericResponse;
   } catch (error) {
-    console.error("[requestPasswordReset] unexpected error during password reset request");
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      return {
+        ok: false,
+        error: "Trop de demandes de réinitialisation pour cette adresse e-mail. Veuillez réessayer dans quelques minutes.",
+      };
+    }
+    console.error("[requestPasswordReset] unexpected error during password reset request", error);
     return genericResponse;
   }
 }
