@@ -41,7 +41,22 @@ export async function GET(request: Request) {
     const access = await requireCompanyAccess(companyId);
     const jobs = await prisma.job.findMany({
       where: { companyId: access.companyId },
-      include: {
+      select: {
+        id: true,
+        companyId: true,
+        title: true,
+        location: true,
+        description: true,
+        requiredSkills: true,
+        requiredExperienceYears: true,
+        attachmentName: true,
+        attachmentMimeType: true,
+        status: true,
+        missionType: true,
+        jobCategoryId: true,
+        subCategoryId: true,
+        createdAt: true,
+        updatedAt: true,
         jobCategory: { select: { id: true, code: true, name: true } },
         subCategory: { select: { id: true, code: true, name: true } },
         _count: { select: { applications: true } },

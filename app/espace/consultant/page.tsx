@@ -10,10 +10,41 @@ export default async function ConsultantPage() {
   if (!access) redirect("/connexion");
   const [applications, sourcedCandidates] = await Promise.all([
     prisma.application.findMany({
-      include: {
-        candidate: { include: { user: { select: { name: true, email: true } } } },
-        job: { include: { company: { select: { id: true, name: true } } } },
-      }, orderBy: { updatedAt: "desc" }, take: 200,
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        candidate: {
+          select: {
+            id: true,
+            headline: true,
+            bio: true,
+            location: true,
+            country: true,
+            skills: true,
+            experienceYears: true,
+            subCategoryIds: true,
+            primaryCategory: { select: { code: true } },
+            user: { select: { name: true, email: true } },
+          },
+        },
+        job: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            location: true,
+            requiredSkills: true,
+            requiredExperienceYears: true,
+            jobCategory: { select: { code: true } },
+            subCategory: { select: { code: true } },
+            company: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
     }),
     prisma.sourcedCandidate.findMany({
       where: { createdByUserId: access.userId },
@@ -21,10 +52,37 @@ export default async function ConsultantPage() {
     }),
   ]);
   const serialised = applications.map((application) => ({
-    id: application.id, status: application.status, createdAt: application.createdAt.toISOString(), updatedAt: application.updatedAt.toISOString(),
-    candidate: { id: application.candidate.id, headline: application.candidate.headline, location: application.candidate.location, skills: application.candidate.skills, experienceYears: application.candidate.experienceYears, user: application.candidate.user },
-    job: { id: application.job.id, title: application.job.title, description: application.job.description, requiredSkills: application.job.requiredSkills, requiredExperienceYears: application.job.requiredExperienceYears, company: application.job.company },
-    matching: matchCandidateToJob(application.candidate, application.job),
+    id: application.id,
+    status: application.status,
+    createdAt: application.createdAt.toISOString(),
+    updatedAt: application.updatedAt.toISOString(),
+    candidate: {
+      id: application.candidate.id,
+      headline: application.candidate.headline,
+      location: application.candidate.location,
+      skills: application.candidate.skills,
+      experienceYears: application.candidate.experienceYears,
+      user: application.candidate.user,
+    },
+    job: {
+      id: application.job.id,
+      title: application.job.title,
+      company: application.job.company,
+    },
+    matching: matchCandidateToJob(
+      {
+        headline: application.candidate.headline,
+        bio: application.candidate.bio,
+        skills: application.candidate.skills,
+        experienceYears: application.candidate.experienceYears,
+      },
+      {
+        title: application.job.title,
+        description: application.job.description,
+        requiredSkills: application.job.requiredSkills,
+        requiredExperienceYears: application.job.requiredExperienceYears,
+      }
+    ),
   }));
   const serialisedSourced = sourcedCandidates.map((candidate) => ({
     id: candidate.id, source: candidate.source, sourceProfileUrl: candidate.sourceProfileUrl, name: candidate.name, headline: candidate.headline,

@@ -24,7 +24,20 @@ export default async function CandidatPage({ searchParams }: Props) {
   const applications = profile
     ? await prisma.application.findMany({
         where: { candidateId: profile.id, userId: session.user.id },
-        include: { job: { include: { company: true } } },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          job: {
+            select: {
+              id: true,
+              title: true,
+              location: true,
+              company: { select: { name: true } },
+            },
+          },
+        },
         orderBy: { updatedAt: "desc" },
       })
     : [];
@@ -40,7 +53,12 @@ export default async function CandidatPage({ searchParams }: Props) {
   const targetJob = jobId
     ? await prisma.job.findFirst({
         where: { id: jobId, status: "OPEN" },
-        include: { company: true },
+        select: {
+          id: true,
+          title: true,
+          location: true,
+          company: { select: { name: true } },
+        },
       })
     : null;
 
