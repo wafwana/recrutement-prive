@@ -21,13 +21,57 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
     const access = await requireCompanyAccess(existing.companyId);
     const job = await prisma.job.findFirst({
       where: { id: jobId, companyId: access.companyId },
-      include: {
+      select: {
+        id: true,
+        companyId: true,
+        title: true,
+        location: true,
+        description: true,
+        requiredSkills: true,
+        requiredExperienceYears: true,
+        attachmentName: true,
+        attachmentMimeType: true,
+        status: true,
+        missionType: true,
+        jobCategoryId: true,
+        subCategoryId: true,
+        createdAt: true,
+        updatedAt: true,
         applications: {
           where: { presentations: { some: { companyId: access.companyId } } },
-          include: { candidate: { include: { user: true, documents: true } } },
+          select: {
+            id: true,
+            status: true,
+            notes: true,
+            createdAt: true,
+            updatedAt: true,
+            candidate: {
+              select: {
+                id: true,
+                headline: true,
+                bio: true,
+                location: true,
+                country: true,
+                skills: true,
+                experienceYears: true,
+                user: { select: { name: true, email: true } },
+                documents: { select: { id: true, name: true, type: true } },
+              },
+            },
+          },
           orderBy: { updatedAt: "desc" },
         },
-        history: { include: { actor: true }, orderBy: { createdAt: "desc" } },
+        history: {
+          select: {
+            id: true,
+            action: true,
+            fromStatus: true,
+            toStatus: true,
+            createdAt: true,
+            actor: { select: { id: true, name: true, email: true } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
     if (!job) return NextResponse.json({ error: "Offre introuvable" }, { status: 404 });

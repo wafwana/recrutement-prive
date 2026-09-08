@@ -3,10 +3,10 @@ type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
 
 /**
- * Lightweight in-process rate limiter for the first security layer.
- * For multi-instance/serverless production, replace the backing store with
- * shared infrastructure (for example Redis/Upstash) before relying on it
- * for distributed enforcement.
+ * In-process sliding window rate limiter for edge protection and first-line defense.
+ * Sensitive serverless actions (e.g., password reset requests) combine this in-process limiter
+ * with persistent, atomic database transaction checks (PostgreSQL Serializable Isolation)
+ * to guarantee distributed rate limiting across all Vercel serverless instances and cold starts.
  */
 export function rateLimit(key: string, limit: number, windowMs: number) {
   const now = Date.now();

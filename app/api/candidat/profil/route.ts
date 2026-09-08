@@ -11,7 +11,33 @@ export async function GET() {
 
   const profile = await prisma.candidateProfile.findUnique({
     where: { userId: session.user.id },
-    include: { documents: true, applications: { include: { job: true }, orderBy: { updatedAt: "desc" } } },
+    include: {
+      documents: { select: { id: true, candidateId: true, name: true, type: true, createdAt: true } },
+      applications: {
+        select: {
+          id: true,
+          candidateId: true,
+          jobId: true,
+          status: true,
+          notes: true,
+          createdAt: true,
+          updatedAt: true,
+          job: {
+            select: {
+              id: true,
+              title: true,
+              location: true,
+              missionType: true,
+              status: true,
+              jobCategoryId: true,
+              subCategoryId: true,
+              company: { select: { id: true, name: true } },
+            },
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+      },
+    },
   });
 
   return NextResponse.json(profile);
@@ -41,14 +67,25 @@ export async function PUT(request: Request) {
       ? parsed.data.preferences.split(",").map((item) => item.trim()).filter(Boolean)
       : [];
 
+  const skills = Array.isArray(parsed.data.skills)
+    ? parsed.data.skills
+    : parsed.data.skills
+      ? parsed.data.skills.split(",").map((item) => item.trim()).filter(Boolean)
+      : [];
+
+  const phone = parsed.data.phone ? (parsed.data.phone.startsWith("+") ? parsed.data.phone : `${parsed.data.phonePrefix ?? "+33"} ${parsed.data.phone}`) : null;
+
   const profile = await prisma.candidateProfile.upsert({
     where: { userId: session.user.id },
     update: {
       headline: parsed.data.headline || null,
       bio: parsed.data.bio || null,
       location: parsed.data.location || null,
-      phone: parsed.data.phone || null,
-      cvUrl: parsed.data.cvUrl || null,
+      country: parsed.data.country || null,
+      phonePrefix: parsed.data.phonePrefix || null,
+      phone,
+      skills,
+      experienceYears: parsed.data.experienceYears ?? null,
       preferences,
     },
     create: {
@@ -56,8 +93,11 @@ export async function PUT(request: Request) {
       headline: parsed.data.headline || null,
       bio: parsed.data.bio || null,
       location: parsed.data.location || null,
-      phone: parsed.data.phone || null,
-      cvUrl: parsed.data.cvUrl || null,
+      country: parsed.data.country || null,
+      phonePrefix: parsed.data.phonePrefix || null,
+      phone,
+      skills,
+      experienceYears: parsed.data.experienceYears ?? null,
       preferences,
     },
   });

@@ -47,10 +47,13 @@ jobs:
         with:
           node-version: 20
           cache: ''
-      - run: npm install
+      - run: npm ci
       - run: npx prisma generate
       - run: npx prisma migrate deploy
       - run: npm run test:mission-lock
+      - run: npm run test:candidate-auth
+      - run: npm run test:candidate-flow
+      - run: npx tsx tests/candidate-integration.ts
       - run: npx tsx tests/final-validation.ts
       - run: npx tsx tests/offer-attachment-validation.ts
       - run: npm run typecheck

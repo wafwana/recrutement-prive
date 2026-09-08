@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-const IDENTIFYING_FIELDS = ["name", "email", "phone", "phonePrefix", "cvUrl", "documents"] as const;
+const IDENTIFYING_FIELDS = ["name", "email", "phone", "phonePrefix", "documents"] as const;
 
 export type MissionPresentationView = {
   id: string;
@@ -39,11 +39,10 @@ export async function getCompanyMissionPresentation(presentationId: string, comp
           country: true,
           phonePrefix: true,
           phone: true,
-          cvUrl: true,
           skills: true,
           experienceYears: true,
           user: { select: { name: true, email: true } },
-          documents: { select: { id: true, name: true, url: true, type: true } },
+          documents: { select: { id: true, name: true, type: true, createdAt: true } },
         },
       },
     },
@@ -81,7 +80,6 @@ export async function getCompanyMissionPresentation(presentationId: string, comp
               email: presentation.candidate.user.email,
               phone: presentation.candidate.phone,
               phonePrefix: presentation.candidate.phonePrefix,
-              cvUrl: presentation.candidate.cvUrl,
               documents: presentation.candidate.documents,
             },
           }

@@ -23,7 +23,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ app
       },
       include: {
         job: true,
-        candidate: { include: { user: true, documents: true } },
+        candidate: {
+          include: {
+            user: true,
+            documents: { select: { id: true, name: true, type: true } },
+          },
+        },
         presentations: { where: { companyId: access.companyId }, orderBy: { presentedAt: "desc" }, take: 1 },
         history: { include: { actor: true }, orderBy: { createdAt: "desc" } },
       },
@@ -64,8 +69,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ app
               email: application.candidate.user.email,
               phone: application.candidate.phone,
               phonePrefix: application.candidate.phonePrefix,
-              cvUrl: application.candidate.cvUrl,
-              documents: application.candidate.documents,
+              documents: application.candidate.documents.map((d) => ({
+                id: d.id,
+                name: d.name,
+                type: d.type,
+              })),
             }
           : {
               name: "Candidat présenté par Recrutement Privé",

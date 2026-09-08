@@ -78,7 +78,7 @@ export default async function JobOfferPage({ params }: Props) {
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center" }}>
             <Link className="rp-btn" href={`/espace/candidat?jobId=${job.id}`}>POSTULER À CETTE OFFRE →</Link>
-            <Link className="rp-btn rp-btn-light" href="/">RETOUR AU SITE</Link>
+            <Link className="rp-btn rp-btn-light" href="/offres">TOUTES LES OFFRES</Link>
           </div>
         </div>
       </section>

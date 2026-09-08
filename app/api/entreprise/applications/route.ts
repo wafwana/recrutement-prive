@@ -34,8 +34,27 @@ export async function GET(request: Request) {
           : {}),
       },
       include: {
-        job: true,
-        candidate: { include: { user: true } },
+        job: {
+          select: {
+            id: true,
+            title: true,
+            location: true,
+            missionType: true,
+            status: true,
+          },
+        },
+        candidate: {
+          select: {
+            id: true,
+            headline: true,
+            bio: true,
+            location: true,
+            country: true,
+            skills: true,
+            experienceYears: true,
+            user: { select: { name: true, email: true } },
+          },
+        },
         presentations: { where: { companyId: access.companyId }, orderBy: { presentedAt: "desc" }, take: 1 },
       },
       orderBy: { updatedAt: "desc" },
