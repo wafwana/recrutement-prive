@@ -184,7 +184,11 @@ export async function applyToJob(jobId: string, notes?: string) {
   }
 
   const application = await applyCandidateToJob(userId, jobId, notes);
-  revalidatePath("/espace/candidat");
-  revalidatePath(`/offres/${jobId}`);
+  try {
+    revalidatePath("/espace/candidat");
+    revalidatePath(`/offres/${jobId}`);
+  } catch {
+    // revalidatePath only works inside Next.js request lifecycle
+  }
   return application;
 }
