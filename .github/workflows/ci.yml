@@ -47,7 +47,7 @@ jobs:
         with:
           node-version: 20
           cache: ''
-      - run: npm install
+      - run: npm ci
       - run: npx prisma generate
       - run: npx prisma migrate deploy
       - run: npm run test:mission-lock

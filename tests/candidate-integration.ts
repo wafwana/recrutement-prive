@@ -6,7 +6,7 @@ import { authenticateCredentials } from "@/lib/auth-credentials";
 import { handleGetCandidateDocument } from "@/app/api/candidats/documents/[documentId]/handler";
 import { GET as getCandidateDocumentRoute } from "@/app/api/candidats/documents/[documentId]/route";
 import { applyCandidateToJob } from "@/lib/candidate-application";
-import { applyToJob } from "@/app/espace/candidat/actions";
+import { applyToJob, uploadCandidateDocument, deleteCandidateDocument } from "@/app/espace/candidat/actions";
 import { runWithTestSession } from "@/auth";
 import { hashToken, hashPassword } from "@/lib/password-crypto";
 import { randomBytes } from "crypto";
@@ -241,6 +241,41 @@ async function main() {
     assert(otherUser !== null, "Other candidate creation failed");
     createdUserIds.push(otherUser.id);
 
+    console.log("8.0 Testing uploadCandidateDocument Server Action, Magic-Bytes & DB Persistence...");
+    const pdfBlob = new File([Buffer.from("%PDF-1.4 sample candidate resume content")], "CV_Upload_Test.pdf", { type: "application/pdf" });
+    const uploadFd = new FormData();
+    uploadFd.set("document", pdfBlob);
+    uploadFd.set("name", "CV_Upload_Test.pdf");
+
+    await runWithTestSession({ user: { id: userInDb.id, role: "CANDIDAT" } }, () =>
+      uploadCandidateDocument(uploadFd)
+    );
+
+    const uploadedDocInDb = await prisma.candidateDocument.findFirst({
+      where: { candidateId: userInDb.candidat!.id, name: "CV_Upload_Test.pdf" },
+    });
+    assert(uploadedDocInDb !== null, "uploadCandidateDocument failed to persist CandidateDocument in DB");
+    assert(uploadedDocInDb.fileData !== null, "CandidateDocument fileData binary buffer missing in DB");
+    assert(uploadedDocInDb.type === "application/pdf", "CandidateDocument type mismatch");
+
+    await runWithTestSession({ user: { id: userInDb.id, role: "CANDIDAT" } }, () =>
+      deleteCandidateDocument(uploadedDocInDb.id)
+    );
+
+    const invalidFile = new File([Buffer.from("INVALID_FILE_HEADER")], "invalid.pdf", { type: "application/pdf" });
+    const invalidFd = new FormData();
+    invalidFd.set("document", invalidFile);
+    let invalidThrown = false;
+    try {
+      await runWithTestSession({ user: { id: userInDb.id, role: "CANDIDAT" } }, () =>
+        uploadCandidateDocument(invalidFd)
+      );
+    } catch (err) {
+      invalidThrown = true;
+      assert(err instanceof Error && err.message.includes("correspond pas"), "Unexpected magic bytes validation error message");
+    }
+    assert(invalidThrown, "Invalid file signature upload did not throw an error");
+
     const docA = await prisma.candidateDocument.create({
       data: {
         candidateId: userInDb.candidat!.id,
@@ -444,6 +479,7 @@ async function main() {
             concurrentResetAtomicity: true,
             candidateApplicationWorkflowAndHistory: true,
             candidateApplicationConcurrency: true,
+            uploadCandidateDocumentPersistenceAndValidation: true,
             documentRouteTraversalUnauthenticated401: true,
             documentEndpointUnauthenticated401: true,
             documentEndpointCandidateOwner200: true,
