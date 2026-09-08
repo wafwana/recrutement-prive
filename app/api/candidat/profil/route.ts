@@ -11,9 +11,43 @@ export async function GET() {
 
   const profile = await prisma.candidateProfile.findUnique({
     where: { userId: session.user.id },
-    include: {
-      documents: { select: { id: true, candidateId: true, name: true, type: true, createdAt: true } },
-      applications: { include: { job: true }, orderBy: { updatedAt: "desc" } },
+    select: {
+      id: true,
+      userId: true,
+      headline: true,
+      bio: true,
+      location: true,
+      country: true,
+      phonePrefix: true,
+      phone: true,
+      skills: true,
+      experienceYears: true,
+      preferences: true,
+      primaryCategoryId: true,
+      subCategoryIds: true,
+      createdAt: true,
+      updatedAt: true,
+      documents: {
+        select: { id: true, candidateId: true, name: true, type: true, createdAt: true },
+      },
+      applications: {
+        select: {
+          id: true,
+          status: true,
+          notes: true,
+          createdAt: true,
+          updatedAt: true,
+          job: {
+            select: {
+              id: true,
+              title: true,
+              location: true,
+              company: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+      },
     },
   });
 
