@@ -6,6 +6,8 @@ import { authenticateCredentials } from "@/lib/auth-credentials";
 import { handleGetCandidateDocument } from "@/app/api/candidats/documents/[documentId]/handler";
 import { GET as getCandidateDocumentRoute } from "@/app/api/candidats/documents/[documentId]/route";
 import { applyCandidateToJob } from "@/lib/candidate-application";
+import { applyToJob } from "@/app/espace/candidat/actions";
+import { runWithTestSession } from "@/auth";
 import { hashToken, hashPassword } from "@/lib/password-crypto";
 import { randomBytes } from "crypto";
 
@@ -269,22 +271,24 @@ async function main() {
     });
     createdJobIds.push(testJob.id);
 
-    console.log("8.1 Exercising applyCandidateToJob() and verifying Application, History & Concurrency...");
+    console.log("8.1 Exercising real Server Action applyToJob() and verifying Application, History & Concurrency...");
     const concurrentAppJob = await prisma.job.create({
       data: { companyId: testCompany.id, title: "Concurrent Application Position", status: "OPEN" },
     });
     createdJobIds.push(concurrentAppJob.id);
 
+    // Concurrency test exercising the real applyToJob Server Action
+    const candSession = { user: { id: userInDb.id, role: "CANDIDAT" } };
     const [appRes1, appRes2] = await Promise.allSettled([
-      applyCandidateToJob(userInDb.id, concurrentAppJob.id, "Concurrent note 1"),
-      applyCandidateToJob(userInDb.id, concurrentAppJob.id, "Concurrent note 2"),
+      runWithTestSession(candSession, () => applyToJob(concurrentAppJob.id, "Concurrent note 1")),
+      runWithTestSession(candSession, () => applyToJob(concurrentAppJob.id, "Concurrent note 2")),
     ]);
 
     const appSuccessCount = (appRes1.status === "fulfilled" ? 1 : 0) + (appRes2.status === "fulfilled" ? 1 : 0);
-    assert(appSuccessCount === 1, `Expected exactly 1 concurrent application to succeed, got ${appSuccessCount}`);
+    assert(appSuccessCount === 1, `Expected exactly 1 concurrent application to succeed via applyToJob, got ${appSuccessCount}`);
 
-    const submittedApp = appRes1.status === "fulfilled" ? appRes1.value : (appRes2 as PromiseFulfilledResult<Awaited<ReturnType<typeof applyCandidateToJob>>>).value;
-    assert(submittedApp !== null, "applyCandidateToJob failed to create application");
+    const submittedApp = appRes1.status === "fulfilled" ? appRes1.value : (appRes2 as PromiseFulfilledResult<Awaited<ReturnType<typeof applyToJob>>>).value;
+    assert(submittedApp !== null, "applyToJob failed to create application");
     assert(submittedApp.status === "SUBMITTED", "Application status is not SUBMITTED");
 
     const appInDb = await prisma.application.findUnique({
@@ -299,7 +303,7 @@ async function main() {
 
     let duplicateThrown = false;
     try {
-      await applyCandidateToJob(userInDb.id, concurrentAppJob.id);
+      await runWithTestSession(candSession, () => applyToJob(concurrentAppJob.id));
     } catch (err) {
       duplicateThrown = true;
       assert(err instanceof Error && err.message.includes("déjà postulé"), "Unexpected error on duplicate application");
@@ -318,42 +322,48 @@ async function main() {
     });
     createdPresentationIds.push(presentationA.id);
 
-    console.log("8.2 Testing Document Route GET Handler and Session Access Rules...");
-    // Scenario 8.2a: Unauthenticated call traversing real route.ts GET -> auth() -> handler -> 401
-    const routeResUnauth = await getCandidateDocumentRoute(
-      new Request(`http://localhost/api/candidats/documents/${docA.id}`),
-      { params: Promise.resolve({ documentId: docA.id }) }
-    );
+    console.log("8.2 Testing Document Route GET Handler and Session Access Rules on Real Route GET...");
+    const docReq = () => new Request(`http://localhost/api/candidats/documents/${docA.id}`);
+    const docParams = Promise.resolve({ documentId: docA.id });
+
+    // Scenario 8.2a: Unauthenticated call traversing real route.ts GET -> 401
+    const routeResUnauth = await getCandidateDocumentRoute(docReq(), { params: docParams });
     assert(routeResUnauth.status === 401, `Route GET request without session should return 401, got ${routeResUnauth.status}`);
 
-    // Scenario 8.2b: Handler level unauthenticated call -> 401
-    const resUnauth = await handleGetCandidateDocument(docA.id, null);
-    assert(resUnauth.status === 401, `Unauthenticated request should return 401, got ${resUnauth.status}`);
+    // Scenario 8.2b: Candidate owner traversing real route.ts GET -> 200
+    const routeResOwner = await runWithTestSession({ user: { id: userInDb.id, role: "CANDIDAT" } }, () =>
+      getCandidateDocumentRoute(docReq(), { params: docParams })
+    );
+    assert(routeResOwner.status === 200, `Candidate owner route request should return 200, got ${routeResOwner.status}`);
 
-    // Scenario 8.2: Candidate owner -> 200
-    const resOwner = await handleGetCandidateDocument(docA.id, { user: { id: userInDb.id, role: "CANDIDAT" } });
-    assert(resOwner.status === 200, `Candidate owner request should return 200, got ${resOwner.status}`);
+    // Scenario 8.2c: Other Candidate (IDOR) traversing real route.ts GET -> 403
+    const routeResIDOR = await runWithTestSession({ user: { id: otherUser.id, role: "CANDIDAT" } }, () =>
+      getCandidateDocumentRoute(docReq(), { params: docParams })
+    );
+    assert(routeResIDOR.status === 403, `Other candidate route request (IDOR) should return 403, got ${routeResIDOR.status}`);
 
-    // Scenario 8.3: Other Candidate (IDOR) -> 403
-    const resOtherCand = await handleGetCandidateDocument(docA.id, { user: { id: otherUser.id, role: "CANDIDAT" } });
-    assert(resOtherCand.status === 403, `Other candidate request (IDOR) should return 403, got ${resOtherCand.status}`);
+    // Scenario 8.2d: Company Non-Member traversing real route.ts GET -> 403
+    const routeResNonMember = await runWithTestSession({ user: { id: nonMemberUser.id, role: "ENTREPRISE" } }, () =>
+      getCandidateDocumentRoute(docReq(), { params: docParams })
+    );
+    assert(routeResNonMember.status === 403, `Non-member company user route request should return 403, got ${routeResNonMember.status}`);
 
-    // Scenario 8.4: Company Non-Member -> 403
-    const resNonMember = await handleGetCandidateDocument(docA.id, { user: { id: nonMemberUser.id, role: "ENTREPRISE" } });
-    assert(resNonMember.status === 403, `Non-member company user request should return 403, got ${resNonMember.status}`);
+    // Scenario 8.2e: Company Member before identity unlock (CANDIDAT_ANONYME) traversing real route.ts GET -> 403
+    const routeResCompanyLocked = await runWithTestSession({ user: { id: companyUser.id, role: "ENTREPRISE" } }, () =>
+      getCandidateDocumentRoute(docReq(), { params: docParams })
+    );
+    assert(routeResCompanyLocked.status === 403, `Company route request before unlock should return 403, got ${routeResCompanyLocked.status}`);
 
-    // Scenario 8.5: Company Member before identity unlock (CANDIDAT_ANONYME) -> 403
-    const resCompanyLocked = await handleGetCandidateDocument(docA.id, { user: { id: companyUser.id, role: "ENTREPRISE" } });
-    assert(resCompanyLocked.status === 403, `Company request before identity unlock should return 403, got ${resCompanyLocked.status}`);
-
-    // Scenario 8.6: Company Member after identity unlock (IDENTITE_DEBLOQUEE & CONFIRMED) -> 200
+    // Scenario 8.2f: Company Member after identity unlock (IDENTITE_DEBLOQUEE & CONFIRMED) traversing real route.ts GET -> 200
     await prisma.missionPresentation.update({
       where: { id: presentationA.id },
       data: { state: "IDENTITE_DEBLOQUEE", financialConditionStatus: "CONFIRMED" },
     });
 
-    const resCompanyUnlocked = await handleGetCandidateDocument(docA.id, { user: { id: companyUser.id, role: "ENTREPRISE" } });
-    assert(resCompanyUnlocked.status === 200, `Company request after identity unlock should return 200, got ${resCompanyUnlocked.status}`);
+    const routeResCompanyUnlocked = await runWithTestSession({ user: { id: companyUser.id, role: "ENTREPRISE" } }, () =>
+      getCandidateDocumentRoute(docReq(), { params: docParams })
+    );
+    assert(routeResCompanyUnlocked.status === 200, `Company route request after unlock should return 200, got ${routeResCompanyUnlocked.status}`);
 
     await prisma.candidateDocument.delete({ where: { id: docA.id } });
 

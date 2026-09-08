@@ -30,6 +30,21 @@ export async function requestPasswordReset(formData: FormData): Promise<RequestP
     };
   }
 
+  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+  const recentTokenCount = await prisma.passwordResetToken.count({
+    where: {
+      email,
+      createdAt: { gte: fifteenMinutesAgo },
+    },
+  });
+
+  if (recentTokenCount >= 5) {
+    return {
+      ok: false,
+      error: "Trop de demandes de réinitialisation pour cette adresse e-mail. Veuillez réessayer dans quelques minutes.",
+    };
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const isTestEnv = process.env.NODE_ENV === "test" || process.env.CI === "true";
 

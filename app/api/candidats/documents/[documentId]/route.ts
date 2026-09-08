@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { auth, getActiveSessionContext } from "@/auth";
 import { handleGetCandidateDocument } from "./handler";
 
 export async function GET(
@@ -6,11 +6,13 @@ export async function GET(
   { params }: { params: Promise<{ documentId: string }> }
 ) {
   const { documentId } = await params;
-  let session = null;
-  try {
-    session = await auth();
-  } catch {
-    // Fallback when executed outside Next.js request store context (e.g. test environment)
+  let session = getActiveSessionContext();
+  if (!session) {
+    try {
+      session = await auth();
+    } catch {
+      // Fallback when executed outside Next.js request store context (e.g. test environment)
+    }
   }
   return handleGetCandidateDocument(documentId, session);
 }

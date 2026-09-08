@@ -1,6 +1,20 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authenticateCredentials } from "@/lib/auth-credentials";
+import { AsyncLocalStorage } from "node:async_hooks";
+
+export type AuthSessionUser = { id?: string | null; role?: string | null; name?: string | null; email?: string | null };
+export type AuthSession = { user?: AuthSessionUser };
+
+const testSessionStorage = new AsyncLocalStorage<AuthSession>();
+
+export function runWithTestSession<T>(session: AuthSession, fn: () => Promise<T>): Promise<T> {
+  return testSessionStorage.run(session, fn);
+}
+
+export function getActiveSessionContext(): AuthSession | null {
+  return testSessionStorage.getStore() || null;
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },

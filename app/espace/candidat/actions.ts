@@ -1,10 +1,11 @@
 "use server";
 
-import { auth } from "@/auth";
+import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
+import { requireFileScanInProduction, scanBufferWithClamAV } from "@/lib/security/file-scan";
 import { applyCandidateToJob } from "@/lib/candidate-application";
 
 const profileSchema = z.object({
@@ -128,7 +129,10 @@ export async function deleteCandidateDocument(documentId: string) {
 }
 
 export async function uploadCandidateDocument(formData: FormData) {
-  const session = await auth();
+  let session = getActiveSessionContext();
+  if (!session) {
+    try { session = await auth(); } catch { /* test context */ }
+  }
   if (!session?.user?.id || session.user.role !== "CANDIDAT") throw new Error("Accès refusé");
 
   const file = formData.get("document");
@@ -145,6 +149,16 @@ export async function uploadCandidateDocument(formData: FormData) {
 
   const name = docName || file.name;
   const buffer = Buffer.from(await file.arrayBuffer());
+
+  if (requireFileScanInProduction()) {
+    const scan = await scanBufferWithClamAV(buffer);
+    if (scan.status === "infected") throw new Error("Le document a été bloqué par le contrôle de sécurité.");
+    if (scan.status === "unavailable") {
+      console.error("[uploadCandidateDocument] antivirus unavailable", scan.reason);
+      throw new Error("Le contrôle de sécurité des documents est temporairement indisponible.");
+    }
+  }
+
   const mimeType = file.type || "application/pdf";
 
   await prisma.candidateDocument.create({
@@ -160,9 +174,12 @@ export async function uploadCandidateDocument(formData: FormData) {
 }
 
 export async function applyToJob(jobId: string, notes?: string) {
-  const session = await auth();
+  let session = getActiveSessionContext();
+  if (!session) {
+    try { session = await auth(); } catch { /* test context */ }
+  }
   const userId = session?.user?.id;
-  if (!userId || session.user.role !== "CANDIDAT") {
+  if (!userId || session?.user?.role !== "CANDIDAT") {
     throw new Error("Vous devez être connecté en tant que candidat pour postuler.");
   }
 

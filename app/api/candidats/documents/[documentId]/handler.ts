@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 export async function handleGetCandidateDocument(
   documentId: string,
-  session: { user?: { id?: string; role?: string } } | null
+  session: { user?: { id?: string | null; role?: string | null } } | null
 ) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
