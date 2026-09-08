@@ -13,23 +13,7 @@ export async function GET() {
     where: { userId: session.user.id },
     include: {
       documents: { select: { id: true, candidateId: true, name: true, type: true, createdAt: true } },
-      applications: {
-        select: {
-          id: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-          job: {
-            select: {
-              id: true,
-              title: true,
-              location: true,
-              company: { select: { name: true } },
-            },
-          },
-        },
-        orderBy: { updatedAt: "desc" },
-      },
+      applications: { include: { job: true }, orderBy: { updatedAt: "desc" } },
     },
   });
 
