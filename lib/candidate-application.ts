@@ -24,29 +24,23 @@ export async function applyCandidateToJob(userId: string, jobId: string, notes?:
   }
 
   try {
-    const application = await prisma.$transaction(async (tx) => {
-      const app = await tx.application.create({
-        data: {
-          candidateId: profile.id,
-          userId,
-          jobId,
-          status: "SUBMITTED",
-          notes: notes ? notes.trim().slice(0, 1000) : null,
+    const application = await prisma.application.create({
+      data: {
+        candidateId: profile.id,
+        userId,
+        jobId,
+        status: "SUBMITTED",
+        notes: notes ? notes.trim().slice(0, 1000) : null,
+        history: {
+          create: {
+            jobId,
+            actorUserId: userId,
+            action: "APPLICATION_SUBMITTED",
+            toStatus: "SUBMITTED",
+            details: { source: "CANDIDAT_PORTAL" },
+          },
         },
-      });
-
-      await tx.recruitmentHistory.create({
-        data: {
-          applicationId: app.id,
-          jobId,
-          actorUserId: userId,
-          action: "APPLICATION_SUBMITTED",
-          toStatus: "SUBMITTED",
-          details: { source: "CANDIDAT_PORTAL" },
-        },
-      });
-
-      return app;
+      },
     });
 
     return application;
