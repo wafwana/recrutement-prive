@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { hashToken } from "@/lib/password-crypto";
+import { rateLimit } from "@/lib/security/rate-limit";
 import { randomBytes } from "crypto";
 import { Resend } from "resend";
 
@@ -19,6 +20,14 @@ export async function requestPasswordReset(formData: FormData): Promise<RequestP
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return genericResponse;
+  }
+
+  const resetLimit = rateLimit(`password-reset:${email}`, 5, 15 * 60_000);
+  if (!resetLimit.allowed) {
+    return {
+      ok: false,
+      error: "Trop de demandes de réinitialisation pour cette adresse e-mail. Veuillez réessayer dans quelques minutes.",
+    };
   }
 
   const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
