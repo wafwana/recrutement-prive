@@ -106,5 +106,6 @@ export async function PUT(request: Request) {
     },
   });
 
-  return NextResponse.json(profile);
+  const safeProfile = Object.fromEntries(Object.entries(profile).filter(([key]) => key !== "cvUrl"));
+  return NextResponse.json(safeProfile);
 }
