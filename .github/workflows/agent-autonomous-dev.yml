@@ -2,11 +2,8 @@ name: Recrutement Privé — Autonomous Development Agent
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - agent/autonomous-dev
-  schedule:
-    - cron: "17 * * * *"
+  # TEMPORARILY DISABLED: autonomous agent is intentionally in standby.
+  # Keep the workflow file and branch intact so the agent can be reactivated later.
 
 concurrency:
   group: recrutement-prive-autonomous-dev
