@@ -13,8 +13,8 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
 ]);
 const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([".pdf", ".doc", ".docx"]);
 
-const jobSchema = z.object({ companyId: z.string().optional(), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), missionType: z.string().trim().max(100).optional(), requiredSkills: z.string().trim().max(1500).optional(), requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]).default("DRAFT") });
-const updateJobSchema = z.object({ companyId: z.string().optional(), jobId: z.string().min(1), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), missionType: z.string().trim().max(100).optional(), requiredSkills: z.string().trim().max(1500).optional(), requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]) });
+const jobSchema = z.object({ companyId: z.string().optional(), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), missionType: z.string().trim().max(100).optional(), requiredSkills: z.string().trim().max(1500).optional(), requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]).default("DRAFT"), jobCategoryId: z.string().trim().optional(), subCategoryId: z.string().trim().optional() });
+const updateJobSchema = z.object({ companyId: z.string().optional(), jobId: z.string().min(1), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), missionType: z.string().trim().max(100).optional(), requiredSkills: z.string().trim().max(1500).optional(), requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]), jobCategoryId: z.string().trim().optional(), subCategoryId: z.string().trim().optional() });
 const companyProfileSchema = z.object({ companyId: z.string().optional(), name: z.string().trim().min(2).max(180).optional(), description: z.string().trim().max(2000).optional(), website: z.string().trim().url().or(z.literal("")).optional(), country: z.string().trim().min(2).max(120).optional(), phonePrefix: z.string().trim().max(12).optional(), phone: z.string().trim().max(40).optional() });
 function text(value: FormDataEntryValue | null) { const result = String(value ?? "").trim(); return result || undefined; }
 function csv(value: string | undefined) { return value ? value.split(",").map((item) => item.trim()).filter(Boolean) : []; }
@@ -62,13 +62,37 @@ export async function updateCompanyContact(formData: FormData) {
 }
 
 export async function createCompanyJob(formData: FormData) {
-  const parsed = jobSchema.safeParse({ companyId: text(formData.get("companyId")), title: text(formData.get("title")), location: text(formData.get("location")), description: text(formData.get("description")), missionType: text(formData.get("missionType")), requiredSkills: text(formData.get("requiredSkills")), requiredExperienceYears: text(formData.get("requiredExperienceYears")), status: text(formData.get("status")) ?? "DRAFT" });
+  const parsed = jobSchema.safeParse({ companyId: text(formData.get("companyId")), title: text(formData.get("title")), location: text(formData.get("location")), description: text(formData.get("description")), missionType: text(formData.get("missionType")), requiredSkills: text(formData.get("requiredSkills")), requiredExperienceYears: text(formData.get("requiredExperienceYears")), status: text(formData.get("status")) ?? "DRAFT", jobCategoryId: text(formData.get("jobCategoryId")), subCategoryId: text(formData.get("subCategoryId")) });
   if (!parsed.success) throw new Error("Les données de l'offre sont invalides.");
   const access = await requireCompanyAccess(parsed.data.companyId);
+
+  if (parsed.data.jobCategoryId) {
+    const parentCat = await prisma.jobCategory.findUnique({
+      where: { id: parsed.data.jobCategoryId },
+      select: { id: true, isActive: true, parentId: true },
+    });
+    if (!parentCat || !parentCat.isActive || parentCat.parentId !== null) {
+      throw new Error("La catégorie métier sélectionnée est invalide ou inactive.");
+    }
+  }
+
+  if (parsed.data.subCategoryId) {
+    if (!parsed.data.jobCategoryId) {
+      throw new Error("Une sous-catégorie ne peut pas être spécifiée sans métier principal.");
+    }
+    const subCat = await prisma.jobCategory.findUnique({
+      where: { id: parsed.data.subCategoryId },
+      select: { id: true, isActive: true, parentId: true },
+    });
+    if (!subCat || !subCat.isActive || subCat.parentId !== parsed.data.jobCategoryId) {
+      throw new Error("La sous-catégorie sélectionnée ne correspond pas au métier principal.");
+    }
+  }
+
   const attachment = getAttachment(formData);
   const attachmentData = attachment ? Buffer.from(await attachment.arrayBuffer()) : undefined;
   await prisma.$transaction(async (tx) => {
-    const job = await tx.job.create({ data: { companyId: access.companyId, title: parsed.data.title, location: parsed.data.location, description: parsed.data.description, missionType: parsed.data.missionType, requiredSkills: csv(parsed.data.requiredSkills), requiredExperienceYears: parsed.data.requiredExperienceYears, ...(attachment ? { attachmentName: attachment.name, attachmentMimeType: attachment.type || "application/octet-stream", attachmentData } : {}), status: parsed.data.status } });
+    const job = await tx.job.create({ data: { companyId: access.companyId, title: parsed.data.title, location: parsed.data.location, description: parsed.data.description, missionType: parsed.data.missionType, requiredSkills: csv(parsed.data.requiredSkills), requiredExperienceYears: parsed.data.requiredExperienceYears, jobCategoryId: parsed.data.jobCategoryId || null, subCategoryId: parsed.data.subCategoryId || null, ...(attachment ? { attachmentName: attachment.name, attachmentMimeType: attachment.type || "application/octet-stream", attachmentData } : {}), status: parsed.data.status } });
     await tx.recruitmentHistory.create({ data: { jobId: job.id, actorUserId: access.userId, action: "JOB_CREATED", toStatus: job.status, details: attachment ? { attachmentName: attachment.name, attachmentSize: attachment.size } : undefined } });
   });
   revalidatePath("/espace/entreprise");
@@ -85,6 +109,8 @@ export async function updateCompanyJob(formData: FormData) {
     requiredSkills: text(formData.get("requiredSkills")),
     requiredExperienceYears: text(formData.get("requiredExperienceYears")),
     status: text(formData.get("status")),
+    jobCategoryId: text(formData.get("jobCategoryId")),
+    subCategoryId: text(formData.get("subCategoryId")),
   });
   if (!parsed.success) throw new Error("Les données de la mission sont invalides.");
   const access = await requireCompanyAccess(parsed.data.companyId);
@@ -93,6 +119,29 @@ export async function updateCompanyJob(formData: FormData) {
     where: { id: parsed.data.jobId, companyId: access.companyId },
   });
   if (!existing) throw new Error("Mission introuvable.");
+
+  if (parsed.data.jobCategoryId) {
+    const parentCat = await prisma.jobCategory.findUnique({
+      where: { id: parsed.data.jobCategoryId },
+      select: { id: true, isActive: true, parentId: true },
+    });
+    if (!parentCat || !parentCat.isActive || parentCat.parentId !== null) {
+      throw new Error("La catégorie métier sélectionnée est invalide ou inactive.");
+    }
+  }
+
+  if (parsed.data.subCategoryId) {
+    if (!parsed.data.jobCategoryId) {
+      throw new Error("Une sous-catégorie ne peut pas être spécifiée sans métier principal.");
+    }
+    const subCat = await prisma.jobCategory.findUnique({
+      where: { id: parsed.data.subCategoryId },
+      select: { id: true, isActive: true, parentId: true },
+    });
+    if (!subCat || !subCat.isActive || subCat.parentId !== parsed.data.jobCategoryId) {
+      throw new Error("La sous-catégorie sélectionnée ne correspond pas au métier principal.");
+    }
+  }
 
   await prisma.$transaction(async (tx) => {
     const updated = await tx.job.update({
@@ -105,6 +154,8 @@ export async function updateCompanyJob(formData: FormData) {
         requiredSkills: csv(parsed.data.requiredSkills),
         requiredExperienceYears: parsed.data.requiredExperienceYears ?? null,
         status: parsed.data.status,
+        jobCategoryId: parsed.data.jobCategoryId || null,
+        subCategoryId: parsed.data.subCategoryId || null,
       },
     });
 

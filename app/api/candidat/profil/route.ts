@@ -75,6 +75,39 @@ export async function PUT(request: Request) {
 
   const phone = parsed.data.phone ? (parsed.data.phone.startsWith("+") ? parsed.data.phone : `${parsed.data.phonePrefix ?? "+33"} ${parsed.data.phone}`) : null;
 
+  const subCategoryIds = Array.isArray(parsed.data.subCategoryIds)
+    ? parsed.data.subCategoryIds
+    : parsed.data.subCategoryIds
+      ? [parsed.data.subCategoryIds]
+      : [];
+
+  if (parsed.data.primaryCategoryId) {
+    const parentCat = await prisma.jobCategory.findUnique({
+      where: { id: parsed.data.primaryCategoryId },
+      select: { id: true, isActive: true, parentId: true },
+    });
+    if (!parentCat || !parentCat.isActive || parentCat.parentId !== null) {
+      return NextResponse.json({ error: "La catégorie métier sélectionnée est invalide ou inactive." }, { status: 400 });
+    }
+  }
+
+  if (subCategoryIds.length > 0) {
+    if (!parsed.data.primaryCategoryId) {
+      return NextResponse.json({ error: "Sélectionner des sous-catégories requiert une catégorie principale." }, { status: 400 });
+    }
+    const validSubCats = await prisma.jobCategory.findMany({
+      where: {
+        id: { in: subCategoryIds },
+        isActive: true,
+        parentId: parsed.data.primaryCategoryId,
+      },
+      select: { id: true },
+    });
+    if (validSubCats.length !== subCategoryIds.length) {
+      return NextResponse.json({ error: "Une ou plusieurs sous-catégories sélectionnées sont invalides." }, { status: 400 });
+    }
+  }
+
   const profile = await prisma.candidateProfile.upsert({
     where: { userId: session.user.id },
     update: {
@@ -87,6 +120,8 @@ export async function PUT(request: Request) {
       skills,
       experienceYears: parsed.data.experienceYears ?? null,
       preferences,
+      primaryCategoryId: parsed.data.primaryCategoryId || null,
+      subCategoryIds: subCategoryIds.length ? subCategoryIds : [],
     },
     create: {
       userId: session.user.id,
@@ -99,6 +134,8 @@ export async function PUT(request: Request) {
       skills,
       experienceYears: parsed.data.experienceYears ?? null,
       preferences,
+      primaryCategoryId: parsed.data.primaryCategoryId || undefined,
+      subCategoryIds: subCategoryIds.length ? subCategoryIds : [],
     },
   });
 
