@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 export type CompanyAccess = {
@@ -8,7 +8,15 @@ export type CompanyAccess = {
 };
 
 export async function requireCompanyAccess(companyId?: string): Promise<CompanyAccess> {
-  const session = await auth();
+  let session = getActiveSessionContext();
+  if (!session) {
+    try {
+      session = await auth();
+    } catch {
+      // test context or no request scope
+    }
+  }
+
   if (!session?.user?.id || session.user.role !== "ENTREPRISE") {
     throw new Error("Accès entreprise requis");
   }
