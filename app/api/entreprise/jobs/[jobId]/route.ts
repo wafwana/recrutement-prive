@@ -11,6 +11,8 @@ const jobSchema = z.object({
   requiredSkills: z.union([z.string(), z.array(z.string())]).optional(),
   requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(),
   status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]),
+  jobCategoryId: z.string().trim().nullable().optional(),
+  subCategoryId: z.string().trim().nullable().optional(),
 });
 
 export async function GET(_request: Request, { params }: { params: Promise<{ jobId: string }> }) {
@@ -37,6 +39,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
         subCategoryId: true,
         createdAt: true,
         updatedAt: true,
+        jobCategory: { select: { id: true, code: true, name: true } },
+        subCategory: { select: { id: true, code: true, name: true } },
         applications: {
           where: { presentations: { some: { companyId: access.companyId } } },
           select: {
@@ -84,11 +88,46 @@ export async function GET(_request: Request, { params }: { params: Promise<{ job
 export async function PUT(request: Request, { params }: { params: Promise<{ jobId: string }> }) {
   try {
     const { jobId } = await params;
-    const existing = await prisma.job.findUnique({ where: { id: jobId }, select: { companyId: true, status: true } });
+    const existing = await prisma.job.findUnique({
+      where: { id: jobId },
+      select: { companyId: true, status: true, jobCategoryId: true, subCategoryId: true },
+    });
     if (!existing) return NextResponse.json({ error: "Offre introuvable" }, { status: 404 });
     const access = await requireCompanyAccess(existing.companyId);
     const parsed = jobSchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Données d'offre invalides" }, { status: 400 });
+
+    const jobCategoryId = parsed.data.jobCategoryId !== undefined
+      ? (parsed.data.jobCategoryId ? parsed.data.jobCategoryId.trim() : null)
+      : undefined;
+
+    const subCategoryId = parsed.data.subCategoryId !== undefined
+      ? (parsed.data.subCategoryId ? parsed.data.subCategoryId.trim() : null)
+      : undefined;
+
+    if (jobCategoryId) {
+      const parentCat = await prisma.jobCategory.findUnique({
+        where: { id: jobCategoryId },
+        select: { id: true, isActive: true, parentId: true },
+      });
+      if (!parentCat || !parentCat.isActive || parentCat.parentId !== null) {
+        return NextResponse.json({ error: "La catégorie métier sélectionnée est invalide ou inactive." }, { status: 400 });
+      }
+    }
+
+    if (subCategoryId) {
+      const effectiveCategoryId = jobCategoryId !== undefined ? jobCategoryId : existing.jobCategoryId;
+      if (!effectiveCategoryId) {
+        return NextResponse.json({ error: "Une sous-catégorie requiert une catégorie métier principale." }, { status: 400 });
+      }
+      const subCat = await prisma.jobCategory.findUnique({
+        where: { id: subCategoryId },
+        select: { id: true, isActive: true, parentId: true },
+      });
+      if (!subCat || !subCat.isActive || subCat.parentId !== effectiveCategoryId) {
+        return NextResponse.json({ error: "La sous-catégorie sélectionnée ne correspond pas au métier principal." }, { status: 400 });
+      }
+    }
 
     const skills = typeof parsed.data.requiredSkills === "string"
       ? parsed.data.requiredSkills.split(",").map((s) => s.trim()).filter(Boolean)
@@ -104,7 +143,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ jobI
           missionType: parsed.data.missionType || null,
           ...(skills !== undefined ? { requiredSkills: skills } : {}),
           ...(parsed.data.requiredExperienceYears !== undefined ? { requiredExperienceYears: parsed.data.requiredExperienceYears } : {}),
+          ...(jobCategoryId !== undefined ? { jobCategoryId } : {}),
+          ...(subCategoryId !== undefined ? { subCategoryId } : {}),
           status: parsed.data.status,
+        },
+        include: {
+          jobCategory: { select: { id: true, code: true, name: true } },
+          subCategory: { select: { id: true, code: true, name: true } },
         },
       });
       if (updated.status !== existing.status) {
@@ -125,7 +170,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ jobI
 
     return NextResponse.json(job);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Impossible de modifier l'offre" }, { status: 403 });
+    const message = error instanceof Error ? error.message : "Impossible de modifier l'offre";
+    const isAccessError = message.toLowerCase().includes("acc") || message.toLowerCase().includes("refus");
+    return NextResponse.json({ error: message }, { status: isAccessError ? 403 : 400 });
   }
 }
 
