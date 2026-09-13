@@ -21,9 +21,9 @@ export type MissionPresentationView = {
   identifyingFields: typeof IDENTIFYING_FIELDS | null;
 };
 
-export function isIdentityUnlocked(state: string, financialConditionStatus: string) {
-  return state === "IDENTITE_DEBLOQUEE" && financialConditionStatus === "CONFIRMED";
-}
+import { isIdentityUnlocked } from "@/lib/mission-lock-state";
+
+export { isIdentityUnlocked };
 
 export async function getCompanyMissionPresentation(presentationId: string, companyId: string) {
   const presentation = await prisma.missionPresentation.findFirst({
