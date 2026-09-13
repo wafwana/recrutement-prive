@@ -21,6 +21,8 @@ export const candidateProfileSchema = z.object({
   skills: z.union([z.array(z.string().trim().min(1).max(80)), z.string().trim().max(1500)]).optional(),
   experienceYears: z.coerce.number().int().min(0).max(60).nullable().optional(),
   preferences: z.union([z.array(z.string().trim().min(1).max(80)), z.string().trim().max(1000)]).optional(),
+  primaryCategoryId: z.string().trim().optional(),
+  subCategoryIds: z.union([z.array(z.string().trim()), z.string().trim()]).optional(),
 });
 
 export type ApplicationStatusValue = z.infer<typeof applicationStatusSchema>;
