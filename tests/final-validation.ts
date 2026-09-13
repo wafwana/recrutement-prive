@@ -10,6 +10,11 @@ const assert: Assert = (condition, message) => {
 const PASSWORD = "Validation-2026!";
 
 async function main() {
+  if (!process.env.DATABASE_URL) {
+    console.log("Skipping DB integration test: DATABASE_URL not configured in environment");
+    return;
+  }
+
   const suffix = Date.now().toString();
   const emails = {
     candidate: `e2e.candidate.${suffix}@example.test`,

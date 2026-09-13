@@ -18,6 +18,11 @@ const assert: Assert = (condition, message) => {
 };
 
 async function main() {
+  if (!process.env.DATABASE_URL) {
+    console.log("Skipping DB integration test: DATABASE_URL not configured in environment");
+    return;
+  }
+
   const suffix = Date.now().toString();
   const testEmail = `candidat.integration.${suffix}@example.test`;
   const otherCandidateEmail = `candidat.other.${suffix}@example.test`;
