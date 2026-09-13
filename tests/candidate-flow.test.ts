@@ -4,7 +4,7 @@ import { isIdentityUnlocked } from "../lib/mission-lock";
 import { candidateProfileSchema } from "../lib/validation";
 import { matchCandidateToJob } from "../lib/matching/candidate-job";
 
-test("candidateProfileSchema validates schema and phone format correctly", () => {
+test("candidateProfileSchema validates schema, phone format, and taxonomy correctly", () => {
   const valid = candidateProfileSchema.safeParse({
     headline: "Directeur Financier",
     bio: "Bio professionnelle",
@@ -14,12 +14,16 @@ test("candidateProfileSchema validates schema and phone format correctly", () =>
     phone: "0612345678",
     skills: "Finance, Management",
     experienceYears: 10,
+    primaryCategoryId: "cat_123",
+    subCategoryIds: ["sub_1", "sub_2"],
   });
 
   assert.equal(valid.success, true);
   if (valid.success) {
     assert.equal(valid.data.country, "France");
     assert.equal(valid.data.phonePrefix, "+33");
+    assert.equal(valid.data.primaryCategoryId, "cat_123");
+    assert.deepEqual(valid.data.subCategoryIds, ["sub_1", "sub_2"]);
   }
 
   const invalidPhonePrefix = candidateProfileSchema.safeParse({
