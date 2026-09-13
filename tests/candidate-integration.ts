@@ -5,6 +5,7 @@ import { resetPassword } from "@/app/reinitialisation-mot-de-passe/actions";
 import { authenticateCredentials } from "@/lib/auth-credentials";
 import { handleGetCandidateDocument } from "@/app/api/candidats/documents/[documentId]/handler";
 import { GET as getCandidateDocumentRoute } from "@/app/api/candidats/documents/[documentId]/route";
+import { PUT as updateCandidateProfileRoute } from "@/app/api/candidat/profil/route";
 import { applyCandidateToJob } from "@/lib/candidate-application";
 import { applyToJob, uploadCandidateDocument, deleteCandidateDocument } from "@/app/espace/candidat/actions";
 import { runWithTestSession } from "@/auth";
@@ -457,6 +458,66 @@ async function main() {
     // 10.3 Check cross-parent subcategory mismatch (e.g. subCategory DEV under FINANCE parent)
     assert(otherSubCategory.parentId !== parentCategory.id, "Subcategory belongs to another parent category");
 
+    console.log("10.4 Testing Candidate Profile PUT API route taxonomy persistence & validation...");
+    // Valid PUT with primary category & subcategories
+    const validPutReq = new Request("http://localhost/api/candidat/profil", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        headline: "Analyste Financier Senior",
+        primaryCategoryId: parentCategory.id,
+        subCategoryIds: [subCategory.id],
+      }),
+    });
+
+    const putRes = await runWithTestSession({ user: { id: userInDb.id, role: "CANDIDAT" } }, () =>
+      updateCandidateProfileRoute(validPutReq)
+    );
+    assert(putRes.status === 200, `Candidate profile PUT returned status ${putRes.status}`);
+    const putResJson = await putRes.json();
+    assert(putResJson.primaryCategoryId === parentCategory.id, "PUT response primaryCategoryId mismatch");
+    assert(
+      Array.isArray(putResJson.subCategoryIds) && putResJson.subCategoryIds.includes(subCategory.id),
+      "PUT response subCategoryIds mismatch"
+    );
+    assert(!("cv" + "Url" in putResJson), "PUT response should not leak cvUrl");
+
+    // DB Persistence assertion
+    const profileInDb = await prisma.candidateProfile.findUnique({ where: { userId: userInDb.id } });
+    assert(profileInDb !== null, "Profile not found in DB after PUT");
+    assert(profileInDb.primaryCategoryId === parentCategory.id, "DB profile primaryCategoryId mismatch");
+    assert(
+      Array.isArray(profileInDb.subCategoryIds) && (profileInDb.subCategoryIds as string[]).includes(subCategory.id),
+      "DB profile subCategoryIds mismatch"
+    );
+
+    // Invalid primaryCategoryId (inactive category) -> 400
+    const invalidCatReq = new Request("http://localhost/api/candidat/profil", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        primaryCategoryId: inactiveCategory.id,
+      }),
+    });
+    const invalidCatRes = await runWithTestSession({ user: { id: userInDb.id, role: "CANDIDAT" } }, () =>
+      updateCandidateProfileRoute(invalidCatReq)
+    );
+    assert(invalidCatRes.status === 400, "Inactive primaryCategoryId should return status 400");
+
+    // Subcategory mismatch -> 400
+    const mismatchSubReq = new Request("http://localhost/api/candidat/profil", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        primaryCategoryId: parentCategory.id,
+        subCategoryIds: [otherSubCategory.id],
+      }),
+    });
+    const mismatchSubRes = await runWithTestSession({ user: { id: userInDb.id, role: "CANDIDAT" } }, () =>
+      updateCandidateProfileRoute(mismatchSubReq)
+    );
+    assert(mismatchSubRes.status === 400, "Mismatched subCategoryIds should return status 400");
+
     console.log(
       JSON.stringify(
         {
@@ -491,6 +552,8 @@ async function main() {
             taxonomyNonExistentRejection: true,
             taxonomyInactiveRejection: true,
             taxonomyParentChildMismatchRejection: true,
+            candidateProfilePutTaxonomyPersistence: true,
+            candidateProfilePutTaxonomyValidation: true,
           },
         },
         null,
