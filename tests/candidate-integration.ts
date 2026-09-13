@@ -5,6 +5,7 @@ import { resetPassword } from "@/app/reinitialisation-mot-de-passe/actions";
 import { authenticateCredentials } from "@/lib/auth-credentials";
 import { handleGetCandidateDocument } from "@/app/api/candidats/documents/[documentId]/handler";
 import { GET as getCandidateDocumentRoute } from "@/app/api/candidats/documents/[documentId]/route";
+import { GET as getCandidateProfileRoute, PUT as putCandidateProfileRoute } from "@/app/api/candidat/profil/route";
 import { applyCandidateToJob } from "@/lib/candidate-application";
 import { applyToJob, uploadCandidateDocument, deleteCandidateDocument } from "@/app/espace/candidat/actions";
 import { runWithTestSession } from "@/auth";
@@ -457,6 +458,49 @@ async function main() {
     // 10.3 Check cross-parent subcategory mismatch (e.g. subCategory DEV under FINANCE parent)
     assert(otherSubCategory.parentId !== parentCategory.id, "Subcategory belongs to another parent category");
 
+    console.log("11. Testing Candidate Profile Taxonomy Persistence & cvUrl non-exposure via PUT and GET...");
+    const candSessionContext = { user: { id: userInDb.id, role: "CANDIDAT" } };
+
+    const putPayload = {
+      headline: "Directeur Financier / Contrôleur",
+      primaryCategoryId: parentCategory.id,
+      subCategoryIds: [subCategory.id],
+    };
+
+    const putReq = new Request("http://localhost/api/candidat/profil", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(putPayload),
+    });
+
+    const putRes = await runWithTestSession(candSessionContext, () => putCandidateProfileRoute(putReq));
+    assert(putRes.status === 200, `Candidate profile PUT route failed with status ${putRes.status}`);
+
+    const putJson = await putRes.json();
+    assert(putJson.primaryCategoryId === parentCategory.id, "PUT response missing or incorrect primaryCategoryId");
+    assert(Array.isArray(putJson.subCategoryIds) && putJson.subCategoryIds.includes(subCategory.id), "PUT response missing or incorrect subCategoryIds");
+    assert(!("cvUrl" in putJson), "cvUrl exposed in PUT candidate profile response!");
+
+    // Verify actual DB persistence
+    const profileInDb = await prisma.candidateProfile.findUnique({
+      where: { userId: userInDb.id },
+    });
+    assert(profileInDb !== null, "Candidate profile missing in DB after PUT");
+    assert(profileInDb.primaryCategoryId === parentCategory.id, "primaryCategoryId NOT persisted in DB!");
+    assert(
+      Array.isArray(profileInDb.subCategoryIds as string[]) && (profileInDb.subCategoryIds as string[]).includes(subCategory.id),
+      "subCategoryIds NOT persisted in DB!"
+    );
+
+    // Verify GET route response
+    const getRes = await runWithTestSession(candSessionContext, () => getCandidateProfileRoute());
+    assert(getRes.status === 200, `Candidate profile GET route failed with status ${getRes.status}`);
+
+    const getJson = await getRes.json();
+    assert(getJson.primaryCategoryId === parentCategory.id, "GET response missing or incorrect primaryCategoryId");
+    assert(Array.isArray(getJson.subCategoryIds) && getJson.subCategoryIds.includes(subCategory.id), "GET response missing or incorrect subCategoryIds");
+    assert(!("cvUrl" in getJson), "cvUrl exposed in GET candidate profile response!");
+
     console.log(
       JSON.stringify(
         {
@@ -491,6 +535,8 @@ async function main() {
             taxonomyNonExistentRejection: true,
             taxonomyInactiveRejection: true,
             taxonomyParentChildMismatchRejection: true,
+            candidateProfileTaxonomyPersistence: true,
+            candidateProfileCvUrlNonExposure: true,
           },
         },
         null,

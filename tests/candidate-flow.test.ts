@@ -14,12 +14,16 @@ test("candidateProfileSchema validates schema and phone format correctly", () =>
     phone: "0612345678",
     skills: "Finance, Management",
     experienceYears: 10,
+    primaryCategoryId: "cat_1",
+    subCategoryIds: ["subcat_1", "subcat_2"],
   });
 
   assert.equal(valid.success, true);
   if (valid.success) {
     assert.equal(valid.data.country, "France");
     assert.equal(valid.data.phonePrefix, "+33");
+    assert.equal(valid.data.primaryCategoryId, "cat_1");
+    assert.deepEqual(valid.data.subCategoryIds, ["subcat_1", "subcat_2"]);
   }
 
   const invalidPhonePrefix = candidateProfileSchema.safeParse({
