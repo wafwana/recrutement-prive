@@ -13,6 +13,7 @@
     "test:candidate-flow": "node --import tsx --test tests/candidate-flow.test.ts",
     "test:company-flow": "node --import tsx --test tests/company-flow.test.ts",
     "test:taxonomy-cv-protection": "node --import tsx --test tests/taxonomy-and-cv-protection.test.ts",
+    "test:security": "tsx tests/security-validation.ts",
     "test:candidate-integration": "tsx tests/candidate-integration.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
