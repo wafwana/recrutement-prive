@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { registerCandidate } from "./actions";
+import { registerCompany } from "./actions";
 import { PHONE_COUNTRIES } from "@/lib/phone-countries";
 import { PASSWORD_REQUIREMENTS, validatePassword } from "@/lib/password-policy";
 import { signIn } from "next-auth/react";
 
-export default function InscriptionPage() {
+export default function InscriptionEntreprisePage() {
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
@@ -29,10 +29,10 @@ export default function InscriptionPage() {
 
     setPending(true);
 
-    const result = await registerCandidate(formData);
+    const result = await registerCompany(formData);
 
     if (!result.ok) {
-      setError(result.error || "Impossible de créer le compte.");
+      setError(result.error || "Impossible de créer le compte entreprise.");
       setPending(false);
       return;
     }
@@ -42,53 +42,76 @@ export default function InscriptionPage() {
       email,
       password: pass,
       redirect: false,
-      callbackUrl: "/espace",
+      callbackUrl: "/espace/entreprise",
     });
 
     if (signInResult?.error) {
       window.location.assign("/connexion?registered=true");
     } else {
-      window.location.assign(signInResult?.url ?? "/espace");
+      window.location.assign(signInResult?.url ?? "/espace/entreprise");
     }
   }
 
   return (
     <main className="min-h-screen bg-[#0b0b0b] px-5 py-16 text-white md:px-8 md:py-24">
       <div className="mx-auto max-w-xl border border-white/10 bg-[#111] p-8 md:p-12">
-        <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Recrutement Privé</p>
-        <h1 className="mt-5 font-serif text-4xl md:text-5xl">Créer un compte candidat.</h1>
+        <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Recrutement Privé · Entreprises</p>
+        <h1 className="mt-5 font-serif text-4xl md:text-5xl">Créer un compte entreprise.</h1>
         <p className="mt-5 text-sm leading-7 text-white/45">
-          Inscrivez-vous pour déposer votre candidature et accéder à votre espace sécurisé.
+          Inscrivez votre entreprise pour mandater des missions de recrutement et consulter les profils qualifiés.
         </p>
 
         <form className="mt-10 space-y-6" onSubmit={handleSubmit}>
           <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
-            Nom complet / Prénom et Nom *
+            Nom de l&apos;entreprise *
             <input
-              name="name"
+              name="companyName"
               type="text"
               required
-              maxLength={100}
-              placeholder="ex: Jean Dupont"
+              maxLength={120}
+              placeholder="ex: AcroCorp SA"
               className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"
             />
           </label>
 
           <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
-            Adresse email *
+            Nom complet du représentant / recruteur *
+            <input
+              name="userName"
+              type="text"
+              required
+              maxLength={100}
+              placeholder="ex: Marie Curie"
+              className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"
+            />
+          </label>
+
+          <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
+            Adresse email professionnelle *
             <input
               name="email"
               type="email"
               autoComplete="email"
               required
-              placeholder="ex: jean.dupont@exemple.com"
+              placeholder="ex: contact@acrocorp.com"
+              className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"
+            />
+          </label>
+
+          <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
+            Site web de l&apos;entreprise
+            <input
+              name="website"
+              type="url"
+              maxLength={250}
+              placeholder="https://www.acrocorp.com"
               className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"
             />
           </label>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
-              Pays de résidence
+              Pays du siège
               <input
                 name="country"
                 type="text"
@@ -118,7 +141,7 @@ export default function InscriptionPage() {
                   name="phone"
                   type="tel"
                   maxLength={40}
-                  placeholder="06 12 34 56 78"
+                  placeholder="01 23 45 67 89"
                   className="w-full border border-white/10 bg-transparent px-3 py-3 text-sm text-white outline-none"
                 />
               </div>
@@ -163,9 +186,6 @@ export default function InscriptionPage() {
                   );
                 })}
               </ul>
-              <p className="mt-2 text-[11px] italic text-white/40">
-                Exemple valide : <code className="text-[#c7a15a]">Recrutement@1</code>
-              </p>
             </div>
           </div>
 
@@ -180,16 +200,16 @@ export default function InscriptionPage() {
             type="submit"
             className="w-full border border-[#c7a15a] px-5 py-4 text-[10px] uppercase tracking-[0.22em] text-[#c7a15a] transition hover:bg-[#c7a15a] hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {pending ? "Création du compte…" : "Créer mon compte"}
+            {pending ? "Création du compte…" : "Créer le compte entreprise"}
           </button>
         </form>
 
         <div className="mt-8 flex flex-col gap-3 text-[10px] uppercase tracking-[0.2em] text-white/35 sm:flex-row sm:justify-between">
-          <Link href="/inscription/entreprise" className="text-[#c7a15a] hover:underline">
-            Vous êtes une entreprise ? Créer un compte entreprise
+          <Link href="/inscription" className="hover:text-white">
+            Inscription candidat
           </Link>
           <Link href="/connexion" className="hover:text-white">
-            Déjà inscrit ? Se connecter
+            Déjà inscrit ? Connexion
           </Link>
         </div>
       </div>
