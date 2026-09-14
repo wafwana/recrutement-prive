@@ -15,6 +15,7 @@ const createStaffSchema = z.object({
 const updateStaffSchema = z.object({
   userId: z.string().min(1),
   action: z.enum(["SUSPEND", "REACTIVATE", "REVOKE"]),
+  reason: z.string().trim().min(5, "Le motif de modification est obligatoire (5 caractères minimum)."),
 });
 
 async function requireOwner() {
@@ -108,7 +109,7 @@ export async function PATCH(request: Request) {
 
   const parsed = updateStaffSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Identifiant ou action invalide." }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message || "Identifiant, action ou motif invalide." }, { status: 400 });
   }
 
   const targetUser = await prisma.user.findUnique({
@@ -155,6 +156,7 @@ export async function PATCH(request: Request) {
         newStatus,
         previousRole: targetUser.role,
         newRole,
+        reason: parsed.data.reason,
       },
     },
   });

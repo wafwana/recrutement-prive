@@ -52,10 +52,16 @@ export default function OwnerAdminsPage() {
 
   async function handleAction(userId: string, action: "SUSPEND" | "REACTIVATE" | "REVOKE") {
     setMessage("");
+    const reason = window.prompt(`Veuillez indiquer le motif obligatoire de cette action (${action}) :`);
+    if (!reason || reason.trim().length < 5) {
+      setMessage("Action annulée : un motif d'au moins 5 caractères est obligatoire.");
+      return;
+    }
+
     const response = await fetch("/api/owner/admins", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, action }),
+      body: JSON.stringify({ userId, action, reason: reason.trim() }),
     });
     const data = await response.json();
     if (!response.ok) {

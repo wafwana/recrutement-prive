@@ -7,7 +7,7 @@ const exclusionSchema = z.object({
   targetType: z.enum(["CANDIDATE", "COMPANY"]),
   targetId: z.string().min(1),
   action: z.enum(["EXCLUDE", "RESTORE"]),
-  reason: z.string().trim().optional(),
+  reason: z.string().trim().min(5, "Le motif d'exclusion/restauration est obligatoire (5 caractères minimum)."),
 });
 
 async function requireOwner() {
