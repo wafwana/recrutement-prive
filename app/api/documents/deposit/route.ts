@@ -3,6 +3,7 @@ import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { classifyDocument } from "@/lib/archiving/classifier";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
+import { sendDepositConfirmation, sendOwnerAlert } from "@/lib/email/service";
 
 export async function POST(request: Request) {
   const activeSession = getActiveSessionContext();
@@ -109,6 +110,19 @@ export async function POST(request: Request) {
     const now = new Date();
     const dateStr = now.toLocaleDateString("fr-FR");
     const timeStr = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+    // Send emails operational dispatch
+    if (userEmail) {
+      await sendDepositConfirmation(userEmail, file.name, transmissionRef, dateStr, timeStr);
+    }
+    await sendOwnerAlert(
+      classification.isAmbiguous ? "Document à vérifier / classer" : "Nouveau dépôt documentaire",
+      `<p><strong>Document :</strong> ${file.name}</p>
+       <p><strong>Expéditeur :</strong> ${userEmail} (${userRole})</p>
+       <p><strong>Date & Heure :</strong> ${dateStr} à ${timeStr}</p>
+       <p><strong>Référence :</strong> ${transmissionRef}</p>
+       <p><strong>Emplacement proposé :</strong> <code>${classification.categoryPath}</code></p>`
+    );
 
     return NextResponse.json({
       ok: true,

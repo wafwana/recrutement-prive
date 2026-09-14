@@ -107,3 +107,16 @@ test("adversarial check: mandatory reason (min 5 chars) is enforced for exclusio
   assert.equal(validateReason("abc").valid, false);
   assert.equal(validateReason("Motif d'exclusion valide pour audit.").valid, true);
 });
+
+test("email service configuration adheres to public sender contact@recrutement-prive.com and OWNER hotmail inbox", async () => {
+  const { PUBLIC_CONTACT_EMAIL, OWNER_HOTMAIL_EMAIL, sendDepositConfirmation, sendOwnerAlert } = await import("../lib/email/service");
+
+  assert.equal(PUBLIC_CONTACT_EMAIL, "contact@recrutement-prive.com");
+  assert.equal(OWNER_HOTMAIL_EMAIL, "recrutement.prive@hotmail.com");
+
+  const depositRes = await sendDepositConfirmation("test.candidat@example.com", "CV.pdf", "DEP-12345", "14/09/2026", "12:00");
+  assert.equal(depositRes.ok, true);
+
+  const ownerRes = await sendOwnerAlert("Test Dépôt", "<p>Nouveau dépôt à vérifier</p>");
+  assert.equal(ownerRes.ok, true);
+});
