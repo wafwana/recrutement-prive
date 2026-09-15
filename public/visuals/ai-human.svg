@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgAI" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050e18"/>
+      <stop offset="50%" stop-color="#0b1b2b"/>
+      <stop offset="100%" stop-color="#081625"/>
+    </linearGradient>
+    <linearGradient id="goldAI" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#c7a15a"/>
+    </linearGradient>
+    <linearGradient id="cyanAI" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="url(#bgAI)"/>
+
+  <!-- Neural Network & Human Collaboration Grid -->
+  <g stroke="url(#goldAI)" stroke-width="1.5" opacity="0.3" fill="none">
+    <!-- Concentric Circles -->
+    <circle cx="600" cy="400" r="300" stroke-dasharray="10 6"/>
+    <circle cx="600" cy="400" r="220"/>
+    <circle cx="600" cy="400" r="140" stroke-dasharray="6 4"/>
+
+    <!-- Nodes -->
+    <circle cx="380" cy="280" r="8" fill="#38bdf8"/>
+    <circle cx="820" cy="280" r="8" fill="#f97316"/>
+    <circle cx="380" cy="520" r="8" fill="#c7a15a"/>
+    <circle cx="820" cy="520" r="8" fill="#38bdf8"/>
+
+    <!-- Connecting Rays -->
+    <line x1="380" y1="280" x2="600" y2="400"/>
+    <line x1="820" y1="280" x2="600" y2="400"/>
+    <line x1="380" y1="520" x2="600" y2="400"/>
+    <line x1="820" y1="520" x2="600" y2="400"/>
+  </g>
+
+  <!-- Central Intelligence & Expertise Core -->
+  <circle cx="600" cy="400" r="70" fill="url(#goldAI)"/>
+  <circle cx="600" cy="400" r="50" fill="#0b1b2b"/>
+
+  <!-- Human & AI Icons -->
+  <!-- Human Head Contour (Left) -->
+  <path d="M 570 360 C 530 360 520 400 520 420 C 520 450 550 460 570 460" stroke="#f8fafc" stroke-width="4" fill="none"/>
+  <!-- AI Circuit Contour (Right) -->
+  <path d="M 630 360 C 670 360 680 400 680 420 C 680 450 650 460 630 460" stroke="#38bdf8" stroke-width="4" fill="none"/>
+
+  <!-- Caption -->
+  <text x="600" y="620" text-anchor="middle" fill="#f8fafc" font-family="serif" font-size="28" font-weight="bold">COLLABORATION EXPERTISE HUMAINE &amp; IA</text>
+  <text x="600" y="660" text-anchor="middle" fill="#c7a15a" font-family="sans-serif" font-size="16" letter-spacing="3">MATCHING EXPLICABLE &amp; DECISION CHASSEUR</text>
+</svg>

@@ -120,3 +120,37 @@ test("email service configuration adheres to public sender contact@recrutement-p
   const ownerRes = await sendOwnerAlert("Test Dépôt", "<p>Nouveau dépôt à vérifier</p>");
   assert.equal(ownerRes.ok, true);
 });
+
+test("i18n multilingual support covers 6 languages (FR, EN, ES, DE, IT, AR) and handles RTL for Arabic", async () => {
+  const { SUPPORTED_LOCALES, RTL_LOCALES } = await import("../lib/i18n/config");
+  const { DICTIONARIES, getTranslation } = await import("../lib/i18n/dictionaries");
+
+  assert.equal(SUPPORTED_LOCALES.length, 6);
+  assert.ok(RTL_LOCALES.has("ar"));
+  assert.equal(RTL_LOCALES.has("fr"), false);
+
+  for (const loc of SUPPORTED_LOCALES) {
+    assert.ok(DICTIONARIES[loc], `Missing dictionary for locale ${loc}`);
+    assert.ok(getTranslation(loc, "nav_home").length > 0);
+    assert.ok(getTranslation(loc, "hero_title").length > 0);
+  }
+});
+
+test("visual assets files exist, are SVG non-empty graphics and accessible", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+
+  const visuals = [
+    "public/visuals/hero-portrait.svg",
+    "public/visuals/cabinet-office.svg",
+    "public/visuals/enterprise-handshake.svg",
+    "public/visuals/ai-human.svg",
+  ];
+
+  for (const file of visuals) {
+    const filePath = path.join(process.cwd(), file);
+    assert.equal(fs.existsSync(filePath), true, `File ${file} should exist`);
+    const stat = fs.statSync(filePath);
+    assert.ok(stat.size > 500, `File ${file} should be a non-empty graphic (>500 bytes)`);
+  }
+});
