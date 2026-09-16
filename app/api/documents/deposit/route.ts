@@ -5,6 +5,15 @@ import { classifyDocument } from "@/lib/archiving/classifier";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { sendDepositConfirmation, sendOwnerAlert } from "@/lib/email/service";
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 export async function POST(request: Request) {
   const activeSession = getActiveSessionContext();
   const session = activeSession || (await auth());
@@ -82,9 +91,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Un candidat ne peut pas rattacher un document à une entreprise ou une offre arbitraire." }, { status: 403 });
       }
     } else if (userRole !== "OWNER" && userRole !== "ADMIN") {
-      // Consultants may deposit generic documents, but cannot arbitrarily attach them to protected entities.
       if (companyId || candidateId || jobId) {
-        return NextResponse.json({ error: "Rattachement à une entité protégé réservé aux rôles autorisés." }, { status: 403 });
+        return NextResponse.json({ error: "Rattachement à une entité protégée réservé aux rôles autorisés." }, { status: 403 });
       }
     }
 
@@ -174,17 +182,24 @@ export async function POST(request: Request) {
     const now = new Date();
     const dateStr = now.toLocaleDateString("fr-FR");
     const timeStr = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    const safeFileName = escapeHtml(file.name);
+    const safeUserEmail = escapeHtml(userEmail);
+    const safeRole = escapeHtml(userRole);
+    const safeDate = escapeHtml(dateStr);
+    const safeTime = escapeHtml(timeStr);
+    const safeReference = escapeHtml(transmissionRef);
+    const safeCategoryPath = escapeHtml(classification.categoryPath);
 
     if (userEmail) {
       await sendDepositConfirmation(userEmail, file.name, transmissionRef, dateStr, timeStr);
     }
     await sendOwnerAlert(
       classification.isAmbiguous ? "Document à vérifier / classer" : "Nouveau dépôt documentaire",
-      `<p><strong>Document :</strong> ${file.name}</p>
-       <p><strong>Expéditeur :</strong> ${userEmail} (${userRole})</p>
-       <p><strong>Date & Heure :</strong> ${dateStr} à ${timeStr}</p>
-       <p><strong>Référence :</strong> ${transmissionRef}</p>
-       <p><strong>Emplacement proposé :</strong> <code>${classification.categoryPath}</code></p>`
+      `<p><strong>Document :</strong> ${safeFileName}</p>
+       <p><strong>Expéditeur :</strong> ${safeUserEmail} (${safeRole})</p>
+       <p><strong>Date & Heure :</strong> ${safeDate} à ${safeTime}</p>
+       <p><strong>Référence :</strong> ${safeReference}</p>
+       <p><strong>Emplacement proposé :</strong> <code>${safeCategoryPath}</code></p>`
     );
 
     return NextResponse.json({
