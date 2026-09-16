@@ -48,7 +48,7 @@ export default function HomePage() {
       <div className="rp-hero-image" role="img" aria-label="Consultant Recrutement Privé" style={{backgroundImage:`url(${images.hero})`}}/>
     </section>
 
-    <section className="rp-white rp-services"><SectionTitle title="Nos services"/><div className="rp-grid-4">{services.map(([icon,title,text])=><Card key={title} icon={icon} title={title} text={text}/>)}</div></section>
+    <section className="rp-white rp-services"><SectionTitle title="Pourquoi nous choisir"/><div className="rp-grid-4">{services.map(([icon,title,text])=><Card key={title} icon={icon} title={title} text={text}/>)}</div></section>
     <section className="rp-stats" aria-label="Chiffres clés">{stats.map(([value,label])=><div className="rp-stat" key={label}><strong>{value}</strong><span>{label}</span></div>)}</section>
 
     <section className="rp-white rp-testimonials"><SectionTitle title="Ils nous font confiance"/><div className="rp-grid-3">{[["Sarah D.","Directrice des Ressources Humaines","Grâce à Recrutement Privé, nous avons trouvé des profils de qualité en un temps record. Une équipe professionnelle et à l'écoute."],["Mariam K.","Responsable recrutement","Un travail de qualité qui comprend parfaitement nos enjeux. Merci pour votre accompagnement et votre réactivité."],["Julien G.","Responsable Talent Acquisition","Leur expertise en recrutement et en évaluation des talents fait vraiment la différence. Je recommande !"]].map(([name,role,quote])=><article className="rp-quote" key={name}><span className="quote-mark" aria-hidden="true">“</span><p>{quote}</p><strong>{name}</strong><small>{role}</small></article>)}</div></section>
