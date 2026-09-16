@@ -136,21 +136,25 @@ test("i18n multilingual support covers 6 languages (FR, EN, ES, DE, IT, AR) and 
   }
 });
 
-test("visual assets files exist, are SVG non-empty graphics and accessible", async () => {
+test("real photographic visual assets exist, are valid JPEG binary files and non-empty", async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
 
   const visuals = [
-    "public/visuals/hero-portrait.svg",
-    "public/visuals/cabinet-office.svg",
-    "public/visuals/enterprise-handshake.svg",
-    "public/visuals/ai-human.svg",
+    "public/visuals/hero-portrait.jpeg",
+    "public/visuals/cabinet-office.jpeg",
+    "public/visuals/enterprise-handshake.jpeg",
+    "public/visuals/ai-human.jpeg",
   ];
 
   for (const file of visuals) {
     const filePath = path.join(process.cwd(), file);
     assert.equal(fs.existsSync(filePath), true, `File ${file} should exist`);
-    const stat = fs.statSync(filePath);
-    assert.ok(stat.size > 500, `File ${file} should be a non-empty graphic (>500 bytes)`);
+    const buffer = fs.readFileSync(filePath);
+    assert.ok(buffer.length > 100, `File ${file} should be non-empty`);
+    // JPEG magic number check (0xFF, 0xD8, 0xFF)
+    assert.equal(buffer[0], 0xff, `${file} must be valid JPEG binary`);
+    assert.equal(buffer[1], 0xd8, `${file} must be valid JPEG binary`);
+    assert.equal(buffer[2], 0xff, `${file} must be valid JPEG binary`);
   }
 });

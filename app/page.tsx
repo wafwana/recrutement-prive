@@ -3,10 +3,10 @@ import CandidateCvForm from "./components/CandidateCvForm";
 import LanguageSelector from "./components/LanguageSelector";
 
 const images = {
-  hero: "/visuals/hero-portrait.svg",
-  cabinet: "/visuals/cabinet-office.svg",
-  enterprise: "/visuals/enterprise-handshake.svg",
-  tech: "/visuals/ai-human.svg",
+  hero: "/visuals/hero-portrait.jpeg",
+  cabinet: "/visuals/cabinet-office.jpeg",
+  enterprise: "/visuals/enterprise-handshake.jpeg",
+  tech: "/visuals/ai-human.jpeg",
 };
 
 const services = [
