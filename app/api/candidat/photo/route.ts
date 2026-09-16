@@ -9,6 +9,16 @@ function hasPrefix(bytes: Uint8Array, prefix: number[]) {
   return prefix.every((value, index) => bytes[index] === value);
 }
 
+function isValidImageSignature(bytes: Uint8Array) {
+  const isJpeg = hasPrefix(bytes, [0xff, 0xd8, 0xff]);
+  const isPng = hasPrefix(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const isWebp =
+    hasPrefix(bytes, [0x52, 0x49, 0x46, 0x46]) &&
+    bytes.length >= 12 &&
+    hasPrefix(bytes.slice(8, 12), [0x57, 0x45, 0x42, 0x50]);
+  return { isJpeg, isPng, isWebp };
+}
+
 export async function POST(request: Request) {
   const activeSession = getActiveSessionContext();
   const session = activeSession || (await auth());
@@ -34,14 +44,14 @@ export async function POST(request: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const bytes = new Uint8Array(buffer.slice(0, 8));
+    const { isJpeg, isPng, isWebp } = isValidImageSignature(new Uint8Array(buffer.slice(0, 12)));
+    const signatureMatchesMime =
+      (file.type === "image/jpeg" && isJpeg) ||
+      (file.type === "image/png" && isPng) ||
+      (file.type === "image/webp" && isWebp);
 
-    const isJpeg = hasPrefix(bytes, [0xff, 0xd8, 0xff]);
-    const isPng = hasPrefix(bytes, [0x89, 0x50, 0x4e, 0x47]);
-    const isWebp = hasPrefix(bytes, [0x52, 0x49, 0x46, 0x46]);
-
-    if (!isJpeg && !isPng && !isWebp) {
-      return NextResponse.json({ error: "Type d'image binaire non conforme." }, { status: 400 });
+    if (!signatureMatchesMime) {
+      return NextResponse.json({ error: "Le contenu binaire ne correspond pas au type d'image déclaré." }, { status: 400 });
     }
 
     const updatedProfile = await prisma.candidateProfile.update({
