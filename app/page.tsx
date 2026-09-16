@@ -3,10 +3,10 @@ import CandidateCvForm from "./components/CandidateCvForm";
 import LanguageSelector from "./components/LanguageSelector";
 
 const images = {
-  hero: "/visuals/hero-portrait.jpeg",
-  cabinet: "/visuals/cabinet-office.jpeg",
-  enterprise: "/visuals/enterprise-handshake.jpeg",
-  tech: "/visuals/ai-human.jpeg",
+  hero: "https://images.unsplash.com/photo-1758518729466-827cd8293992?auto=format&fit=crop&fm=jpg&q=82&w=2400",
+  cabinet: "https://images.unsplash.com/photo-1770992225308-154250075727?auto=format&fit=crop&fm=jpg&q=82&w=2400",
+  enterprise: "https://images.unsplash.com/photo-1521790797524-b2497295b8a0?auto=format&fit=crop&fm=jpg&q=82&w=2400",
+  tech: "https://images.unsplash.com/photo-1677442135136-760c813028c0?auto=format&fit=crop&fm=jpg&q=82&w=2400",
 };
 
 const services = [
