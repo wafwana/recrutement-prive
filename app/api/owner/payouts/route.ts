@@ -31,7 +31,7 @@ async function requireOwner() {
   return session.user;
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   const owner = await requireOwner();
   if (!owner) {
     return NextResponse.json({ error: "Accès strictement réservé à l'Owner." }, { status: 403 });
@@ -67,63 +67,66 @@ export async function POST(request: Request) {
     );
   }
 
-  const existing = await prisma.financialPayoutRequest.findUnique({
-    where: { idempotencyKey: parsed.data.idempotencyKey },
-  });
-
-  if (existing) {
-    return NextResponse.json(
-      { error: "Demande de versement déjà existante pour cette clé d'idempotence.", payout: existing },
-      { status: 409 }
-    );
-  }
-
-  // Strictly starts in status PENDING. NO money leaves without explicit SERVER-SIDE authorization from OWNER.
-  const payout = await prisma.financialPayoutRequest.create({
-    data: {
-      idempotencyKey: parsed.data.idempotencyKey,
-      beneficiaryName: parsed.data.beneficiaryName,
-      beneficiaryEmail: parsed.data.beneficiaryEmail,
-      beneficiaryIban: parsed.data.beneficiaryIban || null,
-      reason: parsed.data.reason,
-      jobId: parsed.data.jobId || null,
-      invoiceRef: parsed.data.invoiceRef || null,
-      amountHt: parsed.data.amountHt,
-      amountTva: parsed.data.amountTva,
-      amountTtc: parsed.data.amountTtc,
-      fees: parsed.data.fees,
-      currency: parsed.data.currency,
-      status: "PENDING",
-    },
-  });
-
-  await prisma.ownerNotification.create({
-    data: {
-      title: "Demande de versement en attente d'autorisation OWNER",
-      message: `Montant : ${payout.amountTtc} ${payout.currency} pour ${payout.beneficiaryName} (${payout.beneficiaryEmail}). Motif : ${payout.reason}`,
-      status: "UNREAD",
-      senderName: session.user.name || session.user.email || "Système",
-      senderRole: session.user.role || "UNKNOWN",
-    },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      actorUserId: session.user.id,
-      actorRole: session.user.role || "UNKNOWN",
-      action: "CREATE_PAYOUT_REQUEST",
-      targetType: "FINANCIAL_PAYOUT",
-      targetId: payout.id,
-      details: {
-        idempotencyKey: payout.idempotencyKey,
-        amountTtc: payout.amountTtc,
-        beneficiaryEmail: payout.beneficiaryEmail,
+  try {
+    const payout = await prisma.financialPayoutRequest.create({
+      data: {
+        idempotencyKey: parsed.data.idempotencyKey,
+        beneficiaryName: parsed.data.beneficiaryName,
+        beneficiaryEmail: parsed.data.beneficiaryEmail,
+        beneficiaryIban: parsed.data.beneficiaryIban || null,
+        reason: parsed.data.reason,
+        jobId: parsed.data.jobId || null,
+        invoiceRef: parsed.data.invoiceRef || null,
+        amountHt: parsed.data.amountHt,
+        amountTva: parsed.data.amountTva,
+        amountTtc: parsed.data.amountTtc,
+        fees: parsed.data.fees,
+        currency: parsed.data.currency,
         status: "PENDING",
       },
-    },
-  });
+    });
 
-  return NextResponse.json({ payout, message: "Demande enregistrée en attente d'autorisation OWNER." }, { status: 201 });
+    await prisma.ownerNotification.create({
+      data: {
+        title: "Demande de versement en attente d'autorisation OWNER",
+        message: `Montant : ${payout.amountTtc} ${payout.currency} pour ${payout.beneficiaryName} (${payout.beneficiaryEmail}). Motif : ${payout.reason}`,
+        status: "UNREAD",
+        senderName: session.user.name || session.user.email || "Système",
+        senderRole: session.user.role || "UNKNOWN",
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: session.user.id,
+        actorRole: session.user.role || "UNKNOWN",
+        action: "CREATE_PAYOUT_REQUEST",
+        targetType: "FINANCIAL_PAYOUT",
+        targetId: payout.id,
+        details: {
+          idempotencyKey: payout.idempotencyKey,
+          amountTtc: payout.amountTtc,
+          beneficiaryEmail: payout.beneficiaryEmail,
+          status: "PENDING",
+        },
+      },
+    });
+
+    return NextResponse.json({ payout, message: "Demande enregistrée en attente d'autorisation OWNER." }, { status: 201 });
+  } catch (error: unknown) {
+    // A concurrent request with the same idempotency key is rejected by the DB unique constraint.
+    if (error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "P2002") {
+      const existing = await prisma.financialPayoutRequest.findUnique({
+        where: { idempotencyKey: parsed.data.idempotencyKey },
+      });
+      return NextResponse.json(
+        { error: "Demande de versement déjà existante pour cette clé d'idempotence.", payout: existing },
+        { status: 409 }
+      );
+    }
+    console.error("[payout create error]", error);
+    return NextResponse.json({ error: "Impossible d'enregistrer la demande de versement." }, { status: 500 });
+  }
 }
 
 export async function PATCH(request: Request) {
@@ -155,16 +158,9 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Demande de versement introuvable." }, { status: 404 });
   }
 
-  // Idempotency & status guard: cannot re-authorize or re-process an already decided payout
-  if (existingPayout.status !== "PENDING") {
-    return NextResponse.json(
-      { error: `Ce versement a déjà été traité (statut actuel : ${existingPayout.status}). Modification impossible.` },
-      { status: 400 }
-    );
-  }
-
-  const updatedPayout = await prisma.financialPayoutRequest.update({
-    where: { id: existingPayout.id },
+  // Atomically transition only PENDING -> AUTHORIZED/REJECTED to prevent concurrent decisions.
+  const transition = await prisma.financialPayoutRequest.updateMany({
+    where: { id: existingPayout.id, status: "PENDING" },
     data: {
       status: parsed.data.decision,
       decisionAt: new Date(),
@@ -172,6 +168,21 @@ export async function PATCH(request: Request) {
       decisionNotes: parsed.data.decisionNotes,
     },
   });
+
+  if (transition.count !== 1) {
+    return NextResponse.json(
+      { error: "Ce versement a déjà été traité par une autre opération." },
+      { status: 409 }
+    );
+  }
+
+  const updatedPayout = await prisma.financialPayoutRequest.findUnique({
+    where: { id: existingPayout.id },
+  });
+
+  if (!updatedPayout) {
+    return NextResponse.json({ error: "Versement introuvable après mise à jour." }, { status: 500 });
+  }
 
   await prisma.auditLog.create({
     data: {
