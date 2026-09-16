@@ -90,7 +90,8 @@ export async function requestPasswordReset(formData: FormData): Promise<RequestP
     }
 
     if (!txResult.isDummy && apiKey && txResult.rawToken && txResult.tokenHash) {
-      const baseUrl = process.env.NEXTAUTH_URL || process.env.APP_URL || "http://localhost:3000";
+      const { getAppBaseUrl } = await import("@/lib/url");
+      const baseUrl = getAppBaseUrl();
       const resetUrl = `${baseUrl}/reinitialisation-mot-de-passe?token=${txResult.rawToken}`;
       const resend = new Resend(apiKey);
       const emailFrom = process.env.EMAIL_FROM || "contact@recrutement-prive.com";
