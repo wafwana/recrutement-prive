@@ -1,70 +1,163 @@
 import React from "react";
-import CandidateCvForm from "./components/CandidateCvForm";
 import LanguageSelector from "./components/LanguageSelector";
 
 const images = {
-  hero: "https://images.unsplash.com/photo-1758518729466-827cd8293992?auto=format&fit=crop&fm=jpg&q=82&w=2400",
-  cabinet: "https://images.unsplash.com/photo-1770992225308-154250075727?auto=format&fit=crop&fm=jpg&q=82&w=2400",
-  enterprise: "https://images.unsplash.com/photo-1521790797524-b2497295b8a0?auto=format&fit=crop&fm=jpg&q=82&w=2400",
-  tech: "https://images.unsplash.com/photo-1677442135136-760c813028c0?auto=format&fit=crop&fm=jpg&q=82&w=2400",
+  hero: "https://images.unsplash.com/photo-1758518729466-827cd8293992?auto=format&fit=crop&fm=jpg&q=88&w=2200",
+  talents: "https://images.unsplash.com/photo-1770992225308-154250075727?auto=format&fit=crop&fm=jpg&q=88&w=1400",
+  enterprise: "https://images.unsplash.com/photo-1521790797524-b2497295b8a0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
+  intelligence: "https://images.unsplash.com/photo-1677442135136-760c813028c0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
+  confidence: "https://images.unsplash.com/photo-1758518729466-827cd8293992?auto=format&fit=crop&fm=jpg&q=88&w=1400",
 };
 
-const services = [
-  ["◉", "Recrutement", "Nous diffusons les meilleures offres pour répondre à vos besoins."],
-  ["◆", "Formation professionnelle", "Nous développons les compétences pour améliorer les performances et la croissance."],
-  ["◇", "Accompagnement RH", "Nous accompagnons les entreprises dans la gestion et le développement de leurs talents."],
-  ["↗", "Conseil en gestion des talents", "Nous aidons à élaborer des stratégies efficaces pour attirer, fidéliser et valoriser vos talents."],
+const nav = [
+  ["Accueil", "#accueil"],
+  ["Le Cabinet", "#cabinet"],
+  ["Entreprises", "#entreprises"],
+  ["Candidats", "#candidats"],
+  ["Notre technologie", "#technologie"],
+  ["Contact", "#contact"],
 ];
-const stats = [["+850","Candidats accompagnés"],["+350","Entreprises partenaires"],["+30","Ans d'expérience"],["98%","De satisfaction client"]];
 
-function Button({ children, href = "#contact", light = false }: { children: React.ReactNode; href?: string; light?: boolean }) {
-  return <a className={`rp-btn ${light ? "rp-btn-light" : ""}`} href={href}>{children}</a>;
-}
-function SectionTitle({ eyebrow, title, children }: { eyebrow?: string; title: React.ReactNode; children?: React.ReactNode }) {
-  return <div className="rp-section-title">{eyebrow && <div className="rp-eyebrow">{eyebrow}</div>}<h2>{title}</h2>{children}</div>;
-}
-function Card({ icon, title, text }: { icon: string; title: string; text: string }) {
-  return <article className="rp-card"><div className="rp-icon" aria-hidden="true">{icon}</div><h3>{title}</h3><p>{text}</p></article>;
-}
-
-const quickNav = [
-  ["Accueil", "#accueil"], ["Le Cabinet", "#cabinet"], ["Entreprises", "#entreprises"],
-  ["Candidats", "#candidats"], ["Notre technologie", "#technologie"], ["Contact", "#contact"],
+const reasons = [
+  ["⌯", "MATCHING PAR COMPÉTENCES", "Compétences démontrées et transférables, potentiel et besoins réels - au-delà du CV."],
+  ["▣", "PROJECT-TO-PROJECT", "Talent on Demand pour une mission ou un projet de courte, moyenne ou longue durée."],
+  ["♙", "LONG-TERM TALENT", "Des talents capables de rejoindre durablement votre organisation et d’évoluer avec elle."],
+  ["◎", "TALENTS SANS FRONTIÈRES", "Mobilité virtuelle et collaboration transfrontalière, localement ou à l’international."],
 ];
+
+const assurances = [
+  ["IA EXPLICABLE", "Des recommandations compréhensibles"],
+  ["VALIDATION HUMAINE", "La technologie éclaire, l’humain décide"],
+  ["PROFILS CONFIDENTIELS", "Données et identités protégées"],
+  ["MATCHING INTERNATIONAL", "Belgique, France, Europe et monde"],
+];
+
+const featureCards = [
+  ["TALENTS", images.talents, "Votre parcours ne vous limite pas.", "Faites reconnaître vos compétences, votre potentiel et vos ambitions.", "CRÉER MON PROFIL →", "#candidats"],
+  ["ENTREPRISES", images.enterprise, "Vos prochaines pépites sont peut-être déjà disponibles.", "Trouvez les compétences adaptées à un poste, une mission ou un projet.", "DÉCRIRE MON BESOIN →", "#entreprises"],
+  ["NOTRE INTELLIGENCE", images.intelligence, "L’IA recommande. L’humain décide.", "Chaque correspondance révèle les forces, les écarts et le potentiel d’évolution.", "DÉCOUVRIR LE MATCHING →", "#technologie"],
+  ["CONFIANCE", images.confidence, "Des rencontres professionnelles sécurisées.", "Profils vérifiés, données protégées et mise en relation encadrée.", "NOS ENGAGEMENTS →", "#contact"],
+];
+
+const testimonials = [
+  ["Marc D.", "Directeur des Ressources Humaines", "Grâce à Recrutement Privé, nous avons trouvé des profils de qualité en un temps record. Une équipe professionnelle et à l’écoute."],
+  ["Sophie L.", "Directrice Générale", "Un cabinet qui allie parfaitement performance et humanité. Merci pour votre engagement à nos côtés."],
+  ["Jean B.", "Responsable Talent Acquisition", "Leur expertise en recrutement et en formation fait vraiment la différence. Un partenaire de confiance."],
+];
+
+function ArrowButton({ children, href, outline = false }: { children: React.ReactNode; href: string; outline?: boolean }) {
+  return <a className={`rp-btn ${outline ? "rp-btn-outline" : ""}`} href={href}>{children}</a>;
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return <div className="rp-heading"><span className="rp-heading-line" />{children}</div>;
+}
 
 export default function HomePage() {
-  return <main className="rp-site">
-    <header className="rp-header">
-      <a href="#accueil" className="rp-brand" aria-label="Recrutement Privé - accueil"><span className="rp-logo">RP</span><span><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></a>
-      <nav className="rp-nav" aria-label="Navigation principale">{quickNav.map(([label,href],i)=><a key={label} className={i===0?"active":""} href={href}>{label}</a>)}</nav>
-      <div className="flex items-center gap-4">
-        <LanguageSelector />
-        <a className="rp-login" href="/espace">ESPACE CONNECTÉ</a>
-      </div>
-    </header>
+  return (
+    <main className="rp-home">
+      <header className="rp-header">
+        <a href="#accueil" className="rp-brand" aria-label="Recrutement Privé - accueil">
+          <span className="rp-logo">RP</span>
+          <span className="rp-brand-copy"><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span>
+        </a>
+        <nav className="rp-nav" aria-label="Navigation principale">
+          {nav.map(([label, href], index) => <a key={label} href={href} className={index === 0 ? "active" : ""}>{label}</a>)}
+        </nav>
+        <div className="rp-header-actions">
+          <LanguageSelector />
+          <a className="rp-login" href="/espace"><span aria-hidden="true">●</span> Espace connecté</a>
+        </div>
+      </header>
 
-    <section id="accueil" className="rp-hero">
-      <div className="rp-hero-copy"><div className="rp-eyebrow">CABINET DE RECRUTEMENT</div><h1>Le recrutement d’excellence,<br/><span>guidé par l’humain</span><br/>et renforcé par<br/><span>l’intelligence artificielle.</span></h1><p>Nous connectons les entreprises aux meilleurs profils et accompagnons les candidats vers le succès.</p><p className="mt-4 max-w-2xl text-sm leading-7">Recrutement Privé ne vend pas les coordonnées des candidats. Recrutement Privé organise des mises en relation qualifiées, après validation de l'intérêt de l'entreprise et du candidat.</p><div className="rp-actions"><Button href="#candidats">↥ DÉPOSER UN CV</Button><Button href="#entreprises" light>♟ RECRUTER</Button></div></div>
-      <div className="rp-hero-image" role="img" aria-label="Consultant Recrutement Privé" style={{backgroundImage:`url(${images.hero})`}}/>
-    </section>
+      <section id="accueil" className="rp-hero">
+        <div className="rp-hero-copy">
+          <h1>Votre partenaire en<br />recrutement et<br /><span>développement des talents</span></h1>
+          <p>Nous connectons les entreprises aux meilleurs profils<br className="desktop-only" /> et accompagnons les candidats vers l’emploi.</p>
+          <div className="rp-actions">
+            <ArrowButton href="#candidats">▣ &nbsp; DÉPOSER UN CV &nbsp; →</ArrowButton>
+            <ArrowButton href="#entreprises" outline>● &nbsp; RECRUTER &nbsp; →</ArrowButton>
+          </div>
+        </div>
+        <div className="rp-hero-image" role="img" aria-label="Professionnelle du recrutement" style={{ backgroundImage: `url(${images.hero})` }} />
+      </section>
 
-    <section className="rp-white rp-services"><SectionTitle title="Pourquoi nous choisir"/><div className="rp-grid-4">{services.map(([icon,title,text])=><Card key={title} icon={icon} title={title} text={text}/>)}</div></section>
-    <section className="rp-stats" aria-label="Chiffres clés">{stats.map(([value,label])=><div className="rp-stat" key={label}><strong>{value}</strong><span>{label}</span></div>)}</section>
+      <section className="rp-reasons">
+        <SectionHeading><h2>POURQUOI <span>nous choisir</span> ?</h2></SectionHeading>
+        <div className="rp-reason-grid">
+          {reasons.map(([icon, title, text]) => (
+            <article className="rp-reason" key={title}>
+              <div className="rp-reason-icon" aria-hidden="true">{icon}</div>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
 
-    <section className="rp-white rp-testimonials"><SectionTitle title="Ils nous font confiance"/><div className="rp-grid-3">{[["Sarah D.","Directrice des Ressources Humaines","Grâce à Recrutement Privé, nous avons trouvé des profils de qualité en un temps record. Une équipe professionnelle et à l'écoute."],["Mariam K.","Responsable recrutement","Un travail de qualité qui comprend parfaitement nos enjeux. Merci pour votre accompagnement et votre réactivité."],["Julien G.","Responsable Talent Acquisition","Leur expertise en recrutement et en évaluation des talents fait vraiment la différence. Je recommande !"]].map(([name,role,quote])=><article className="rp-quote" key={name}><span className="quote-mark" aria-hidden="true">“</span><p>{quote}</p><strong>{name}</strong><small>{role}</small></article>)}</div></section>
-    <section className="rp-cta"><div><strong>Vous recrutez ou recherchez un emploi ?</strong><span>Contactez-nous dès aujourd'hui.</span></div><Button>NOUS CONTACTER →</Button></section>
+      <section className="rp-assurances" aria-label="Nos engagements">
+        {assurances.map(([title, text]) => (
+          <div className="rp-assurance" key={title}>
+            <span className="rp-assurance-ring" aria-hidden="true" />
+            <div><strong>{title}</strong><small>{text}</small></div>
+          </div>
+        ))}
+      </section>
 
-    <section id="cabinet" className="rp-white rp-split"><div><SectionTitle eyebrow="LE CABINET" title={<>Recrutement Privé,<br/><span>plus de 6 ans</span> à vos côtés</>}><p>Fort de plus de 30 ans d'expérience dans le recrutement et les ressources humaines, nous mettons notre expertise au service de votre réussite.</p></SectionTitle></div><div className="rp-photo" role="img" aria-label="Bureau Recrutement Privé" style={{backgroundImage:`url(${images.cabinet})`}}/></section>
-    <section className="rp-white rp-approach"><div className="rp-mini-stats">{[["+6","Années d'existence"],["+30","Ans d'expérience"],["+850","Recrutements réalisés"],["+350","Entreprises partenaires"]].map(([v,l])=><div key={l}><strong>{v}</strong><span>{l}</span></div>)}</div><div className="rp-approach-grid"><SectionTitle title="Notre approche"><p>Nous combinons expertise humaine et technologie pour offrir des solutions sur-mesure à chaque besoin.</p></SectionTitle><ul>{["Écoute et compréhension","Analyse précise des besoins","Sélection rigoureuse des talents","Suivi et accompagnement personnalisé"].map(x=><li key={x}>✓ {x}</li>)}</ul></div><SectionTitle title="Nos valeurs"/><div className="rp-grid-4">{["Intégrité","Excellence","Engagement","Confiance"].map((x,i)=><Card key={x} icon={["◉","✦","♙","▣"][i]} title={x} text="Nous plaçons cette valeur au cœur de notre relation et de nos décisions."/>)}</div><div className="rp-section-cta"><Button>NOUS CONTACTER →</Button></div></section>
+      <section className="rp-feature-grid" aria-label="Talents, entreprises, intelligence et confiance">
+        {featureCards.map(([eyebrow, image, title, text, cta, href]) => (
+          <article className="rp-feature" key={eyebrow}>
+            <div className="rp-feature-image" style={{ backgroundImage: `url(${image})` }} role="img" aria-label={eyebrow} />
+            <div className="rp-feature-body">
+              <span className="rp-feature-eyebrow">{eyebrow}</span>
+              <h3>{title}</h3>
+              <p>{text}</p>
+              <a href={href}>{cta}</a>
+            </div>
+          </article>
+        ))}
+      </section>
 
-    <section id="entreprises" className="rp-white rp-enterprises"><div className="rp-enterprise-image rp-photo" role="img" aria-label="Partenariat entreprise" style={{backgroundImage:`url(${images.enterprise})`}}/><div className="rp-enterprise-copy"><SectionTitle eyebrow="ENTREPRISES" title={<>Trouvez les <span>talents</span><br/>qui feront la différence</>}><p>Nous vous accompagnons dans toutes vos étapes de recrutement pour vous faire gagner du temps et mieux recruter.</p></SectionTitle><div className="rp-actions"><Button href="/espace/entreprise">DÉPOSER UNE OFFRE</Button><a className="rp-text-link" href="#contact">Nous contacter →</a></div></div></section>
-    <section className="rp-white rp-solutions"><SectionTitle title="Nos solutions pour les entreprises"/><div className="rp-grid-4">{[["▣","Recrutement sur-mesure","Nous identifions les meilleurs profils adaptés à vos besoins."],["◷","Gain de temps","Nous gérons l'ensemble du processus pour vous."],["♙","Qualité garantie","Des candidats rigoureusement sélectionnés et évalués."],["♧","Accompagnement","Un suivi personnalisé avant, pendant et après le recrutement."]].map(([i,t,d])=><Card key={t} icon={i} title={t} text={d}/>)}</div><div className="rp-sectors"><h3>Secteurs d'activité</h3><div>{["Industrie","Logistique","Commerce","Service","Informatique","BTP"].map(x=><span key={x}>▦<b>{x}</b></span>)}</div><a href="/offres">VOIR NOS OFFRES →</a></div></section>
+      <section className="rp-numbers">
+        <SectionHeading><h2>EN QUELQUES CHIFFRES</h2></SectionHeading>
+        <div className="rp-number-grid">
+          {[["♟", "+850", "Candidats accompagnés"], ["▤", "120+", "Entreprises partenaires"], ["▣", "350+", "Recrutements réalisés"], ["◆", "200+", "Formations dispensées"]].map(([icon, value, label]) => (
+            <div className="rp-number" key={label}><span className="rp-number-icon">{icon}</span><strong>{value}</strong><small>{label}</small></div>
+          ))}
+        </div>
+      </section>
 
-    <section id="technologie" className="rp-white rp-tech"><div className="rp-tech-copy"><SectionTitle eyebrow="NOTRE TECHNOLOGIE" title={<>L'IA au service de <span>l'humain</span></>}><p>Notre IA transforme l'information en insights pertinents pour faciliter nos recherches et mieux servir entreprises et talents.</p></SectionTitle></div><div className="rp-tech-image rp-photo" role="img" aria-label="Technologie IA" style={{backgroundImage:`url(${images.tech})`}}/><div className="rp-tech-list">{["Analyse intelligente","Matching précis","Gain de temps","Décision humaine"].map((x,i)=><Card key={x} icon={["◈","♢","◷","◉"][i]} title={x} text="Des outils avancés au service d'un recrutement plus précis et plus humain."/>)}</div></section>
+      <section className="rp-trust">
+        <SectionHeading><h2>ILS NOUS FONT CONFIANCE</h2></SectionHeading>
+        <div className="rp-testimonial-grid">
+          {testimonials.map(([name, role, quote], index) => (
+            <article className="rp-testimonial" key={name}>
+              <span className="rp-quote-mark">“</span>
+              <p>{quote}</p>
+              <div className="rp-person"><span className="rp-avatar">{index === 1 ? "SL" : index === 2 ? "JB" : "MD"}</span><div><strong>{name}</strong><small>{role}</small></div></div>
+            </article>
+          ))}
+        </div>
+        <div className="rp-dots" aria-hidden="true"><span className="selected" /><span /><span /></div>
+      </section>
 
-    <section id="candidats" className="rp-white rp-candidates"><SectionTitle eyebrow="CANDIDATS" title="Une opportunité à la hauteur de votre parcours"><p>Faites-nous connaître votre projet professionnel. Nous vous accompagnons avec confidentialité.</p></SectionTitle><CandidateCvForm /></section>
-    <section id="contact" className="rp-white rp-contact"><div><SectionTitle eyebrow="CONTACT" title="Contactez-nous"><p>Nous sommes à votre écoute du lundi au vendredi.</p></SectionTitle><div className="rp-contact-details"><b>✉ Email</b><a href="mailto:contact@recrutement-prive.com">contact@recrutement-prive.com</a><b>⌖ Adresse</b><span>Saint-Amand-les-Eaux</span><b>⌚ Horaires</b><span>Lundi - Vendredi · 9h00 - 18h00</span></div></div><form className="rp-form" action="/api/contact" method="post"><label className="sr-only" htmlFor="contact-name">Nom complet</label><input id="contact-name" name="name" placeholder="Nom complet*" required/><label className="sr-only" htmlFor="contact-email">Email</label><input id="contact-email" name="email" type="email" placeholder="Email*" required/><label className="sr-only" htmlFor="contact-phone">Téléphone</label><input id="contact-phone" name="phone" placeholder="Téléphone"/><label className="sr-only" htmlFor="contact-subject">Sujet</label><select id="contact-subject" name="subject" defaultValue="" required><option value="" disabled>Sujet*</option><option>Recrutement</option><option>Candidature</option><option>Autre</option></select><label className="sr-only" htmlFor="contact-message">Votre message</label><textarea id="contact-message" name="message" placeholder="Votre message*" rows={5} required/><button className="rp-btn" type="submit">ENVOYER LE MESSAGE</button></form><div className="rp-map"><span>● Recrutement Privé<br/><small>Saint-Amand-les-Eaux</small></span></div></section>
-    <section className="rp-footer-cta"><div><strong>Envie d'en savoir plus ?</strong><span>Contactez-nous pour échanger sur vos besoins.</span></div><Button>NOUS CONTACTER →</Button></section>
-    <footer className="rp-footer"><div className="rp-brand"><span className="rp-logo">RP</span><span><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></div><div><b>NAVIGATION</b>{quickNav.map(([label,href])=><a key={label} href={href}>{label}</a>)}</div><div><b>LIENS UTILES</b><a href="/offres">Offres d'emploi</a><a href="#candidats">Déposer un CV</a><a href="/espace/entreprise">Espace entreprise</a><a href="/mentions-legales">Mentions légales</a></div><div><b>CONTACT</b><a href="mailto:contact@recrutement-prive.com">✉ contact@recrutement-prive.com</a><span>⌖ Saint-Amand-les-Eaux</span></div></footer>
-  </main>;
+      <section className="rp-final-cta">
+        <div className="rp-final-icon" aria-hidden="true">●●●</div>
+        <div><strong>Vous recrutez ou vous recherchez un emploi ?</strong><span>Contactez-nous dès aujourd’hui.</span></div>
+        <ArrowButton href="#contact" outline>NOUS CONTACTER &nbsp; →</ArrowButton>
+      </section>
+
+      <footer className="rp-footer">
+        <div className="rp-footer-brand">
+          <a href="#accueil" className="rp-brand"><span className="rp-logo">RP</span><span className="rp-brand-copy"><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></a>
+          <p>Des talents d’aujourd’hui<br />pour les réussites de demain.</p>
+          <div className="rp-socials"><span>in</span><span>𝕏</span><span>◎</span><span>▶</span></div>
+        </div>
+        <div><h3>Navigation</h3>{nav.map(([label, href]) => <a key={label} href={href}>{label}</a>)}</div>
+        <div><h3>Liens utiles</h3><a href="/offres">Offres d’emploi</a><a href="#candidats">Formation</a><a href="/espace/entreprise">Espace entreprise</a><a href="/espace">Espace candidat</a><a href="/mentions-legales">Mentions légales</a><a href="/politique-confidentialite">Politique de confidentialité</a><a href="#accueil">Plan du site</a></div>
+        <div><h3>Contact</h3><a href="tel:+33612345678">☎ &nbsp; +33 6 12 34 56 78</a><a href="mailto:contact@recrutement-prive.com">✉ &nbsp; contact@recrutement-prive.com</a><span>⌖ &nbsp; Paris, France</span></div>
+        <div className="rp-copyright">© 2026 Recrutement Privé. Tous droits réservés.</div>
+      </footer>
+    </main>
+  );
 }
