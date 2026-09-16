@@ -39,6 +39,72 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
+    // Never trust client-supplied entity IDs. Resolve the allowed scope server-side.
+    let authorizedCompanyIds: string[] = [];
+    if (userRole === "ENTREPRISE") {
+      const memberships = await prisma.companyMember.findMany({
+        where: { userId },
+        select: { companyId: true },
+      });
+      authorizedCompanyIds = memberships.map((membership) => membership.companyId);
+
+      if (companyId && !authorizedCompanyIds.includes(companyId)) {
+        return NextResponse.json({ error: "Accès refusé à cette entreprise." }, { status: 403 });
+      }
+
+      if (jobId) {
+        const job = await prisma.job.findUnique({ where: { id: jobId }, select: { companyId: true } });
+        if (!job || !authorizedCompanyIds.includes(job.companyId)) {
+          return NextResponse.json({ error: "Accès refusé à cette offre." }, { status: 403 });
+        }
+        if (companyId && job.companyId !== companyId) {
+          return NextResponse.json({ error: "L'offre ne correspond pas à l'entreprise." }, { status: 400 });
+        }
+      }
+
+      if (candidateId) {
+        const presentation = await prisma.missionPresentation.findFirst({
+          where: { candidateId, companyId: { in: authorizedCompanyIds } },
+          select: { id: true },
+        });
+        if (!presentation) {
+          return NextResponse.json({ error: "Accès refusé à ce candidat." }, { status: 403 });
+        }
+      }
+    } else if (userRole === "CANDIDAT") {
+      if (candidateId) {
+        const candidate = await prisma.candidateProfile.findUnique({ where: { id: candidateId }, select: { userId: true } });
+        if (!candidate || candidate.userId !== userId) {
+          return NextResponse.json({ error: "Accès refusé à ce candidat." }, { status: 403 });
+        }
+      }
+      if (companyId || jobId) {
+        return NextResponse.json({ error: "Un candidat ne peut pas rattacher un document à une entreprise ou une offre arbitraire." }, { status: 403 });
+      }
+    } else if (userRole !== "OWNER" && userRole !== "ADMIN") {
+      // Consultants may deposit generic documents, but cannot arbitrarily attach them to protected entities.
+      if (companyId || candidateId || jobId) {
+        return NextResponse.json({ error: "Rattachement à une entité protégé réservé aux rôles autorisés." }, { status: 403 });
+      }
+    }
+
+    if (jobId && userRole !== "ENTREPRISE" && userRole !== "OWNER" && userRole !== "ADMIN") {
+      return NextResponse.json({ error: "Accès refusé à cette offre." }, { status: 403 });
+    }
+
+    if (jobId && (userRole === "OWNER" || userRole === "ADMIN")) {
+      const job = await prisma.job.findUnique({ where: { id: jobId }, select: { companyId: true } });
+      if (!job) return NextResponse.json({ error: "Offre introuvable." }, { status: 404 });
+      if (companyId && job.companyId !== companyId) {
+        return NextResponse.json({ error: "L'offre ne correspond pas à l'entreprise." }, { status: 400 });
+      }
+    }
+
+    // Financial metadata is server-trusted only for privileged back-office roles.
+    const trustedAmountHt = userRole === "OWNER" || userRole === "ADMIN" ? amountHt : undefined;
+    const trustedAmountTva = userRole === "OWNER" || userRole === "ADMIN" ? amountTva : undefined;
+    const trustedAmountTtc = userRole === "OWNER" || userRole === "ADMIN" ? amountTtc : undefined;
+
     const classification = classifyDocument({
       fileName: file.name,
       docType,
@@ -46,8 +112,8 @@ export async function POST(request: Request) {
       companyId,
       candidateId,
       jobId,
-      amountHt,
-      amountTtc,
+      amountHt: trustedAmountHt,
+      amountTtc: trustedAmountTtc,
       date: new Date(),
     });
 
@@ -69,16 +135,15 @@ export async function POST(request: Request) {
         companyId: companyId || null,
         candidateId: candidateId || null,
         jobId: jobId || null,
-        amountHt: amountHt || null,
-        amountTva: amountTva || null,
-        amountTtc: amountTtc || null,
+        amountHt: trustedAmountHt ?? null,
+        amountTva: trustedAmountTva ?? null,
+        amountTtc: trustedAmountTtc ?? null,
         year: classification.year,
         month: classification.month,
         quarter: classification.quarter,
       },
     });
 
-    // Create Owner Notification immediately
     await prisma.ownerNotification.create({
       data: {
         title: classification.isAmbiguous ? "Nouveau document à classer" : "Nouveau document déposé",
@@ -90,7 +155,6 @@ export async function POST(request: Request) {
       },
     });
 
-    // Audit log
     await prisma.auditLog.create({
       data: {
         actorUserId: userId,
@@ -111,7 +175,6 @@ export async function POST(request: Request) {
     const dateStr = now.toLocaleDateString("fr-FR");
     const timeStr = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-    // Send emails operational dispatch
     if (userEmail) {
       await sendDepositConfirmation(userEmail, file.name, transmissionRef, dateStr, timeStr);
     }
