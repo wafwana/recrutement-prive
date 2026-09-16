@@ -1,10 +1,9 @@
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
-// Public production remains in construction until the OWNER explicitly authorizes launch.
-// Preview/development deployments remain available for authorized testing.
-const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
-const MAINTENANCE_MODE = IS_PRODUCTION || process.env.MAINTENANCE_MODE === "true";
+// Production remains in construction by default. The OWNER can explicitly authorize
+// the public launch by setting MAINTENANCE_MODE=false in the production environment.
+const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE !== "false";
 const PUBLIC_PATHS = new Set(["/", "/connexion", "/maintenance", "/mot-de-passe-oublie", "/reinitialisation-mot-de-passe"]);
 
 export async function middleware(request: NextRequest) {
