@@ -15,6 +15,26 @@ enum Role {
   OWNER
 }
 
+enum EntityStatus {
+  ACTIVE
+  EXCLUDED
+  ARCHIVED
+  SUSPENDED
+}
+
+enum DocumentArchiveStatus {
+  A_VERIFIER
+  VERIFIE
+  RECLASSE
+  ANOMALIE
+}
+
+enum PayoutStatus {
+  PENDING
+  AUTHORIZED
+  REJECTED
+}
+
 enum CompanyMemberRole {
   OWNER
   RECRUITER
@@ -70,6 +90,7 @@ model User {
   image String?
   passwordHash String?
   role Role @default(CANDIDAT)
+  status EntityStatus @default(ACTIVE)
   candidat CandidateProfile?
   applications Application[]
   companyLinks CompanyMember[]
@@ -91,9 +112,12 @@ model CandidateProfile {
   phonePrefix String?
   phone String?
   cvUrl String?
+  photoMimeType String?
+  photoData Bytes?
   skills Json?
   experienceYears Int?
   preferences Json?
+  status EntityStatus @default(ACTIVE)
   primaryCategoryId String?
   subCategoryIds    Json?
   primaryCategory   JobCategory? @relation("CandidatePrimaryCategory", fields: [primaryCategoryId], references: [id], onDelete: SetNull)
@@ -126,6 +150,9 @@ model Company {
   country String?
   phonePrefix String?
   phone String?
+  logoMimeType String?
+  logoData Bytes?
+  status EntityStatus @default(ACTIVE)
   members CompanyMember[]
   jobs Job[]
   presentations MissionPresentation[]
@@ -320,4 +347,109 @@ model JobCategory {
   updatedAt                DateTime           @updatedAt
 
   @@index([parentId])
+}
+
+model ArchivedDocument {
+  id                 String                @id @default(cuid())
+  name               String
+  originalName       String?
+  mimeType           String?
+  fileData           Bytes?
+  size               Int?
+  senderUserId       String
+  senderRole         String
+  senderEmail        String
+  categoryPath       String
+  status             DocumentArchiveStatus @default(A_VERIFIER)
+  docType            String?
+  companyId          String?
+  candidateId        String?
+  jobId              String?
+  amountHt           Float?
+  amountTva          Float?
+  amountTtc          Float?
+  year               Int?
+  month              Int?
+  quarter            Int?
+  verificationNotes  String?
+  verifiedAt         DateTime?
+  verifiedByUserId   String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@index([categoryPath])
+  @@index([senderUserId])
+  @@index([companyId])
+  @@index([candidateId])
+  @@index([year, month])
+  @@index([year, quarter])
+}
+
+model OwnerNotification {
+  id               String   @id @default(cuid())
+  title            String
+  message          String
+  documentId       String?
+  senderName       String?
+  senderRole       String?
+  status           String   @default("UNREAD")
+  createdAt        DateTime @default(now())
+
+  @@index([status, createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String
+  actorRole   String
+  action      String
+  targetType  String?
+  targetId    String?
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+}
+
+model AccountingPeriod {
+  id             String   @id @default(cuid())
+  year           Int
+  month          Int?
+  quarter        Int?
+  periodType     String
+  isLocked       Boolean  @default(false)
+  lockedAt       DateTime?
+  lockedByUserId String?
+  summaryData    Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([year, month, periodType])
+  @@index([year, quarter, periodType])
+}
+
+model FinancialPayoutRequest {
+  id               String       @id @default(cuid())
+  idempotencyKey   String       @unique
+  beneficiaryName  String
+  beneficiaryEmail String
+  beneficiaryIban  String?
+  reason           String
+  jobId            String?
+  invoiceRef       String?
+  amountHt         Float
+  amountTva        Float        @default(0)
+  amountTtc        Float
+  fees             Float        @default(0)
+  currency         String       @default("EUR")
+  status           PayoutStatus @default(PENDING)
+  decisionAt       DateTime?
+  decisionByUserId String?
+  decisionNotes    String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([status, createdAt])
+  @@index([beneficiaryEmail])
 }
