@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 import ProfileForm from "./ProfileForm";
 import DocumentManager from "./DocumentManager";
 import ApplicationsList from "./ApplicationsList";
@@ -8,7 +9,16 @@ type Props = { searchParams: Promise<{ jobId?: string }> };
 
 export default async function CandidatPage({ searchParams }: Props) {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== "CANDIDAT") return null;
+
+  // Never leave a protected candidate route blank. A missing/invalid session
+  // must return the user to the normal authentication entry point.
+  if (!session?.user?.id) {
+    redirect("/connexion");
+  }
+
+  if (session.user.role !== "CANDIDAT") {
+    redirect("/espace");
+  }
 
   const { jobId } = await searchParams;
 
@@ -16,7 +26,7 @@ export default async function CandidatPage({ searchParams }: Props) {
     prisma.candidateProfile.findUnique({ where: { userId: session.user.id } }),
     prisma.jobCategory.findMany({
       where: { isActive: true },
-      select: { id: true, code: true, name: true, parentId: true },
+      select: { id: true, code: true, name: true, parentId: true, sortOrder: true },
       orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
     }),
   ]);
