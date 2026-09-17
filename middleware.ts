@@ -1,5 +1,5 @@
-import { getToken } from "next-auth/jwt";
-import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { NextResponse } from "next/server";
 
 // Production remains in construction by default. The OWNER can explicitly authorize
 // the public launch by setting MAINTENANCE_MODE=false in the production environment.
@@ -13,15 +13,10 @@ const PUBLIC_PATHS = new Set([
   "/owner/initialisation",
 ]);
 
-export async function middleware(request: NextRequest) {
+export default auth((request) => {
   const { pathname } = request.nextUrl;
-
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-  });
-
-  const isOwner = token?.role === "OWNER";
+  const token = request.auth;
+  const isOwner = token?.user?.role === "OWNER";
   const isOwnerInitialization = pathname === "/owner/initialisation";
 
   if (MAINTENANCE_MODE && !isOwner) {
@@ -35,16 +30,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (PUBLIC_PATHS.has(pathname) || pathname.startsWith("/inscription") || pathname.startsWith("/_next/")) {
+  if (
+    PUBLIC_PATHS.has(pathname) ||
+    pathname.startsWith("/inscription") ||
+    pathname.startsWith("/_next/")
+  ) {
     return NextResponse.next();
   }
 
-  if (!token) {
+  if (!token?.user) {
     return NextResponse.redirect(new URL("/connexion", request.url));
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/((?!api/).*)"],
