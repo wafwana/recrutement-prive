@@ -5,7 +5,7 @@ import LanguageSelector from "./components/LanguageSelector";
 import { useI18n } from "@/lib/i18n/context";
 
 const images = {
-  hero: "/visuals/hero-final.webp",
+  hero: "/visuals/hero-final.webp?v=hero-final-20260917",
   talents: "https://images.unsplash.com/photo-1770992225308-154250075727?auto=format&fit=crop&fm=jpg&q=88&w=1400",
   enterprise: "https://images.unsplash.com/photo-1521790797524-b2497295b8a0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
   intelligence: "https://images.unsplash.com/photo-1677442135136-760c813028c0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
