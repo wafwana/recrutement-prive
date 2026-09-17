@@ -13,157 +13,44 @@ const images = {
 };
 
 const nav = [
-  ["nav_home", "#accueil"],
-  ["nav_cabinet", "#cabinet"],
-  ["nav_enterprises", "#entreprises"],
-  ["nav_candidates", "#candidats"],
-  ["nav_tech", "#technologie"],
-  ["nav_contact", "#contact"],
+  ["nav_home", "#accueil"], ["nav_cabinet", "#cabinet"], ["nav_enterprises", "#entreprises"],
+  ["nav_candidates", "#candidats"], ["nav_tech", "#technologie"], ["nav_contact", "#contact"],
 ] as const;
+const reasons = [["⌯", "reason_matching_title", "reason_matching_text"], ["▣", "reason_project_title", "reason_project_text"], ["♙", "reason_longterm_title", "reason_longterm_text"], ["◎", "reason_global_title", "reason_global_text"]] as const;
+const assurances = [["assurance_ai_title", "assurance_ai_text"], ["assurance_human_title", "assurance_human_text"], ["assurance_private_title", "assurance_private_text"], ["assurance_global_title", "assurance_global_text"]] as const;
+const featureCards = [["feature_talents_eyebrow", images.talents, "feature_talents_title", "feature_talents_text", "feature_talents_cta", "#candidats"], ["feature_enterprise_eyebrow", images.enterprise, "feature_enterprise_title", "feature_enterprise_text", "feature_enterprise_cta", "#entreprises"], ["feature_ai_eyebrow", images.intelligence, "feature_ai_title", "feature_ai_text", "feature_ai_cta", "#technologie"], ["feature_confidence_eyebrow", images.confidence, "feature_confidence_title", "feature_confidence_text", "feature_confidence_cta", "#contact"]] as const;
+const testimonials = [["testimonial_1_name", "testimonial_1_role", "testimonial_1_quote", "MD"], ["testimonial_2_name", "testimonial_2_role", "testimonial_2_quote", "SL"], ["testimonial_3_name", "testimonial_3_role", "testimonial_3_quote", "JB"]] as const;
 
-const reasons = [
-  ["⌯", "reason_matching_title", "reason_matching_text"],
-  ["▣", "reason_project_title", "reason_project_text"],
-  ["♙", "reason_longterm_title", "reason_longterm_text"],
-  ["◎", "reason_global_title", "reason_global_text"],
-] as const;
-
-const assurances = [
-  ["assurance_ai_title", "assurance_ai_text"],
-  ["assurance_human_title", "assurance_human_text"],
-  ["assurance_private_title", "assurance_private_text"],
-  ["assurance_global_title", "assurance_global_text"],
-] as const;
-
-const featureCards = [
-  ["feature_talents_eyebrow", images.talents, "feature_talents_title", "feature_talents_text", "feature_talents_cta", "#candidats"],
-  ["feature_enterprise_eyebrow", images.enterprise, "feature_enterprise_title", "feature_enterprise_text", "feature_enterprise_cta", "#entreprises"],
-  ["feature_ai_eyebrow", images.intelligence, "feature_ai_title", "feature_ai_text", "feature_ai_cta", "#technologie"],
-  ["feature_confidence_eyebrow", images.confidence, "feature_confidence_title", "feature_confidence_text", "feature_confidence_cta", "#contact"],
-] as const;
-
-const testimonials = [
-  ["testimonial_1_name", "testimonial_1_role", "testimonial_1_quote", "MD"],
-  ["testimonial_2_name", "testimonial_2_role", "testimonial_2_quote", "SL"],
-  ["testimonial_3_name", "testimonial_3_role", "testimonial_3_quote", "JB"],
-] as const;
-
-function ArrowButton({ children, href, outline = false }: { children: React.ReactNode; href: string; outline?: boolean }) {
-  return <a className={`rp-btn ${outline ? "rp-btn-outline" : ""}`} href={href}>{children}</a>;
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return <div className="rp-heading"><span className="rp-heading-line" />{children}</div>;
-}
+function ArrowButton({ children, href, outline = false }: { children: React.ReactNode; href: string; outline?: boolean }) { return <a className={`rp-btn ${outline ? "rp-btn-outline" : ""}`} href={href}>{children}</a>; }
+function SectionHeading({ children }: { children: React.ReactNode }) { return <div className="rp-heading"><span className="rp-heading-line" />{children}</div>; }
 
 export default function HomePage() {
   const { t } = useI18n();
-
   return (
     <main className="rp-home">
       <header className="rp-header">
-        <a href="#accueil" className="rp-brand" aria-label="Recrutement Privé - accueil">
-          <span className="rp-logo">RP</span>
-          <span className="rp-brand-copy"><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span>
-        </a>
-        <nav className="rp-nav" aria-label="Navigation principale">
-          {nav.map(([key, href], index) => <a key={key} href={href} className={index === 0 ? "active" : ""}>{t(key)}</a>)}
-        </nav>
-        <div className="rp-header-actions">
-          <LanguageSelector />
-          <a className="rp-login" href="/espace"><span aria-hidden="true">●</span> {t("nav_connected_space")}</a>
-        </div>
+        <a href="#accueil" className="rp-brand" aria-label="Recrutement Privé - accueil"><span className="rp-logo">RP</span><span className="rp-brand-copy"><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></a>
+        <nav className="rp-nav" aria-label="Navigation principale">{nav.map(([key, href], index) => <a key={key} href={href} className={index === 0 ? "active" : ""}>{t(key)}</a>)}</nav>
+        <div className="rp-header-actions"><LanguageSelector /><a className="rp-login" href="/espace"><span aria-hidden="true">●</span> {t("nav_connected_space")}</a></div>
       </header>
 
       <section id="accueil" className="rp-hero">
         <div className="rp-hero-copy">
-          <h1>{t("hero_title_line_1")}<br />{t("hero_title_line_2")}<br /><span>{t("hero_title_line_3")}</span></h1>
-          <p>{t("hero_desc_line_1")}<br className="desktop-only" /> {t("hero_desc_line_2")}</p>
-          <p className="rp-hero-privacy">{t("hero_privacy_line_1")}<br />{t("hero_privacy_line_2")}<br />{t("hero_privacy_line_3")}</p>
-          <div className="rp-actions">
-            <ArrowButton href="#candidats">▣ &nbsp; {t("hero_cv_btn")} &nbsp; →</ArrowButton>
-            <ArrowButton href="#entreprises" outline>● &nbsp; {t("hero_recruit_btn")} &nbsp; →</ArrowButton>
-          </div>
+          <h1>Le recrutement d'excellence,<br />guidé par l'humain et renforcé<br /><span>par l'intelligence artificielle.</span></h1>
+          <p>Nous connectons les entreprises aux meilleurs profils et accompagnons<br className="desktop-only" /> les candidats vers le succès.</p>
+          <p className="rp-hero-privacy">Recrutement Privé ne vend pas les coordonnées des candidats,<br />Recrutement Privé organise des mises en relation qualifiées, après<br />validation de l'intéret de l'entreprise et du candidat.</p>
+          <div className="rp-actions"><ArrowButton href="#candidats">▣ &nbsp; {t("hero_cv_btn")} &nbsp; →</ArrowButton><ArrowButton href="#entreprises" outline>● &nbsp; {t("hero_recruit_btn")} &nbsp; →</ArrowButton></div>
         </div>
         <div className="rp-hero-image" role="img" aria-label={t("hero_image_alt")} style={{ backgroundImage: `url(${images.hero})` }} />
       </section>
 
-      <section className="rp-reasons">
-        <SectionHeading><h2>{t("why_prefix")} <span>{t("why_emphasis")}</span> ?</h2></SectionHeading>
-        <div className="rp-reason-grid">
-          {reasons.map(([icon, titleKey, textKey]) => (
-            <article className="rp-reason" key={titleKey}>
-              <div className="rp-reason-icon" aria-hidden="true">{icon}</div>
-              <h3>{t(titleKey)}</h3>
-              <p>{t(textKey)}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="rp-assurances" aria-label={t("assurances_label")}>
-        {assurances.map(([titleKey, textKey]) => (
-          <div className="rp-assurance" key={titleKey}>
-            <span className="rp-assurance-ring" aria-hidden="true" />
-            <div><strong>{t(titleKey)}</strong><small>{t(textKey)}</small></div>
-          </div>
-        ))}
-      </section>
-
-      <section className="rp-feature-grid" aria-label={t("features_label")}>
-        {featureCards.map(([eyebrowKey, image, titleKey, textKey, ctaKey, href]) => (
-          <article className="rp-feature" key={eyebrowKey}>
-            <div className="rp-feature-image" style={{ backgroundImage: `url(${image})` }} role="img" aria-label={t(eyebrowKey)} />
-            <div className="rp-feature-body">
-              <span className="rp-feature-eyebrow">{t(eyebrowKey)}</span>
-              <h3>{t(titleKey)}</h3>
-              <p>{t(textKey)}</p>
-              <a href={href}>{t(ctaKey)}</a>
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <section className="rp-numbers">
-        <SectionHeading><h2>{t("numbers_title")}</h2></SectionHeading>
-        <div className="rp-number-grid">
-          {[["♟", "+850", "numbers_candidates"], ["▤", "120+", "numbers_companies"], ["▣", "350+", "numbers_recruitments"], ["◆", "200+", "numbers_training"]].map(([icon, value, labelKey]) => (
-            <div className="rp-number" key={labelKey}><span className="rp-number-icon">{icon}</span><strong>{value}</strong><small>{t(labelKey)}</small></div>
-          ))}
-        </div>
-      </section>
-
-      <section className="rp-trust">
-        <SectionHeading><h2>{t("testimonials_title")}</h2></SectionHeading>
-        <div className="rp-testimonial-grid">
-          {testimonials.map(([nameKey, roleKey, quoteKey, initials], index) => (
-            <article className="rp-testimonial" key={nameKey}>
-              <span className="rp-quote-mark">“</span>
-              <p>{t(quoteKey)}</p>
-              <div className="rp-person"><span className="rp-avatar">{index === 1 ? "SL" : index === 2 ? "JB" : initials}</span><div><strong>{t(nameKey)}</strong><small>{t(roleKey)}</small></div></div>
-            </article>
-          ))}
-        </div>
-        <div className="rp-dots" aria-hidden="true"><span className="selected" /><span /><span /></div>
-      </section>
-
-      <section className="rp-final-cta">
-        <div className="rp-final-icon" aria-hidden="true">●●●</div>
-        <div><strong>{t("final_cta_title")}</strong><span>{t("final_cta_text")}</span></div>
-        <ArrowButton href="#contact" outline>{t("final_cta_button")} &nbsp; →</ArrowButton>
-      </section>
-
-      <footer className="rp-footer">
-        <div className="rp-footer-brand">
-          <a href="#accueil" className="rp-brand"><span className="rp-logo">RP</span><span className="rp-brand-copy"><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></a>
-          <p>{t("footer_tagline_line_1")}<br />{t("footer_tagline_line_2")}</p>
-          <div className="rp-socials"><span>in</span><span>𝕏</span><span>◎</span><span>▶</span></div>
-        </div>
-        <div><h3>{t("footer_navigation")}</h3>{nav.map(([key, href]) => <a key={key} href={href}>{t(key)}</a>)}</div>
-        <div><h3>{t("footer_useful_links")}</h3><a href="/offres">{t("footer_jobs")}</a><a href="#candidats">{t("footer_training")}</a><a href="/espace/entreprise">{t("footer_company_space")}</a><a href="/espace">{t("footer_candidate_space")}</a><a href="/mentions-legales">{t("footer_legal")}</a><a href="/politique-confidentialite">{t("footer_privacy")}</a><a href="#accueil">{t("footer_sitemap")}</a></div>
-        <div id="contact"><h3>{t("footer_contact")}</h3><a href="mailto:contact@recrutement-prive.com">✉ &nbsp; contact@recrutement-prive.com</a><span>⌖ &nbsp; Saint-Amand-les-Eaux, France</span></div>
-        <div className="rp-copyright">© 2026 Recrutement Privé. {t("footer_rights")}</div>
-      </footer>
+      <section className="rp-reasons"><SectionHeading><h2>{t("why_prefix")} <span>{t("why_emphasis")}</span> ?</h2></SectionHeading><div className="rp-reason-grid">{reasons.map(([icon, titleKey, textKey]) => <article className="rp-reason" key={titleKey}><div className="rp-reason-icon" aria-hidden="true">{icon}</div><h3>{t(titleKey)}</h3><p>{t(textKey)}</p></article>)}</div></section>
+      <section className="rp-assurances" aria-label={t("assurances_label")}>{assurances.map(([titleKey, textKey]) => <div className="rp-assurance" key={titleKey}><span className="rp-assurance-ring" aria-hidden="true" /><div><strong>{t(titleKey)}</strong><small>{t(textKey)}</small></div></div>)}</section>
+      <section className="rp-feature-grid" aria-label={t("features_label")}>{featureCards.map(([eyebrowKey, image, titleKey, textKey, ctaKey, href]) => <article className="rp-feature" key={eyebrowKey}><div className="rp-feature-image" style={{ backgroundImage: `url(${image})` }} role="img" aria-label={t(eyebrowKey)} /><div className="rp-feature-body"><span className="rp-feature-eyebrow">{t(eyebrowKey)}</span><h3>{t(titleKey)}</h3><p>{t(textKey)}</p><a href={href}>{t(ctaKey)}</a></div></article>)}</section>
+      <section className="rp-numbers"><SectionHeading><h2>{t("numbers_title")}</h2></SectionHeading><div className="rp-number-grid">{[["♟", "+850", "numbers_candidates"], ["▤", "120+", "numbers_companies"], ["▣", "350+", "numbers_recruitments"], ["◆", "200+", "numbers_training"]].map(([icon, value, labelKey]) => <div className="rp-number" key={labelKey}><span className="rp-number-icon">{icon}</span><strong>{value}</strong><small>{t(labelKey)}</small></div>)}</div></section>
+      <section className="rp-trust"><SectionHeading><h2>{t("testimonials_title")}</h2></SectionHeading><div className="rp-testimonial-grid">{testimonials.map(([nameKey, roleKey, quoteKey, initials], index) => <article className="rp-testimonial" key={nameKey}><span className="rp-quote-mark">“</span><p>{t(quoteKey)}</p><div className="rp-person"><span className="rp-avatar">{index === 1 ? "SL" : index === 2 ? "JB" : initials}</span><div><strong>{t(nameKey)}</strong><small>{t(roleKey)}</small></div></div></article>)}</div><div className="rp-dots" aria-hidden="true"><span className="selected" /><span /><span /></div></section>
+      <section className="rp-final-cta"><div className="rp-final-icon" aria-hidden="true">●●●</div><div><strong>{t("final_cta_title")}</strong><span>{t("final_cta_text")}</span></div><ArrowButton href="#contact" outline>{t("final_cta_button")} &nbsp; →</ArrowButton></section>
+      <footer className="rp-footer"><div className="rp-footer-brand"><a href="#accueil" className="rp-brand"><span className="rp-logo">RP</span><span className="rp-brand-copy"><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></a><p>{t("footer_tagline_line_1")}<br />{t("footer_tagline_line_2")}</p><div className="rp-socials"><span>in</span><span>𝕏</span><span>◎</span><span>▶</span></div></div><div><h3>{t("footer_navigation")}</h3>{nav.map(([key, href]) => <a key={key} href={href}>{t(key)}</a>)}</div><div><h3>{t("footer_useful_links")}</h3><a href="/offres">{t("footer_jobs")}</a><a href="#candidats">{t("footer_training")}</a><a href="/espace/entreprise">{t("footer_company_space")}</a><a href="/espace">{t("footer_candidate_space")}</a><a href="/mentions-legales">{t("footer_legal")}</a><a href="/politique-confidentialite">{t("footer_privacy")}</a><a href="#accueil">{t("footer_sitemap")}</a></div><div id="contact"><h3>{t("footer_contact")}</h3><a href="mailto:contact@recrutement-prive.com">✉ &nbsp; contact@recrutement-prive.com</a><span>⌖ &nbsp; Saint-Amand-les-Eaux, France</span></div><div className="rp-copyright">© 2026 Recrutement Privé. {t("footer_rights")}</div></footer>
     </main>
   );
 }
