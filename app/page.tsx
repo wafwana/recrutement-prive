@@ -17,14 +17,41 @@ const reasons = [["⌯", "reason_matching_title", "reason_matching_text"], ["▣
 const assurances = [["assurance_ai_title", "assurance_ai_text"], ["assurance_human_title", "assurance_human_text"], ["assurance_private_title", "assurance_private_text"], ["assurance_global_title", "assurance_global_text"]] as const;
 const featureCards = [["feature_talents_eyebrow", images.talents, "feature_talents_title", "feature_talents_text", "feature_talents_cta", "#candidats"], ["feature_enterprise_eyebrow", images.enterprise, "feature_enterprise_title", "feature_enterprise_text", "feature_enterprise_cta", "#entreprises"], ["feature_ai_eyebrow", images.intelligence, "feature_ai_title", "feature_ai_text", "feature_ai_cta", "#technologie"], ["feature_confidence_eyebrow", images.confidence, "feature_confidence_title", "feature_confidence_text", "feature_confidence_cta", "#contact"]] as const;
 const testimonials = [["testimonial_1_name", "testimonial_1_role", "testimonial_1_quote", "MD"], ["testimonial_2_name", "testimonial_2_role", "testimonial_2_quote", "SL"], ["testimonial_3_name", "testimonial_3_role", "testimonial_3_quote", "JB"]] as const;
-function ArrowButton({ children, href, outline = false }: { children: React.ReactNode; href: string; outline?: boolean }) { return <a className={`rp-btn ${outline ? "rp-btn-outline" : ""}`} href={href}>{children}</a>; }
-function SectionHeading({ children }: { children: React.ReactNode }) { return <div className="rp-heading"><span className="rp-heading-line" />{children}</div>; }
+
+function ArrowButton({ children, href, outline = false }: { children: React.ReactNode; href: string; outline?: boolean }) {
+  return <a className={`rp-btn ${outline ? "rp-btn-outline" : ""}`} href={href}>{children}</a>;
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return <div className="rp-heading"><span className="rp-heading-line" />{children}</div>;
+}
 
 export default function HomePage() {
   const { t } = useI18n();
+
   return <main className="rp-home">
-    <header className="rp-header"><a href="#accueil" className="rp-brand" aria-label="Recrutement Privé - accueil"><span className="rp-logo">RP</span><span className="rp-brand-copy"><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></a><nav className="rp-nav" aria-label="Navigation principale">{nav.map(([key, href], index) => <a key={key} href={href} className={index === 0 ? "active" : ""}>{t(key)}</a>)}</nav><div className="rp-header-actions"><LanguageSelector /><a className="rp-login" href="/espace"><span aria-hidden="true">●</span> {t("nav_connected_space")}</a></div></header>
-    <section id="accueil" className="rp-hero"><div className="rp-hero-copy"><h1>Le recrutement d'excellence,<br />guidé par l'humain et renforcé<br /><span>par l'intelligence artificielle.</span></h1><p>Nous connectons les entreprises aux meilleurs profils et accompagnons<br className="desktop-only" /> les candidats vers le succès.</p><p className="rp-hero-privacy">Recrutement Privé ne vend pas les coordonnées des candidats,<br />Recrutement Privé organise des mises en relation qualifiées, après<br />validation de l'intéret de l'entreprise et du candidat.</p><div className="rp-actions"><ArrowButton href="#candidats">▣ &nbsp; {t("hero_cv_btn")} &nbsp; →</ArrowButton><ArrowButton href="#entreprises" outline>● &nbsp; {t("hero_recruit_btn")} &nbsp; →</ArrowButton></div></div><div className="rp-hero-image" role="img" aria-label={t("hero_image_alt")} style={{ backgroundImage: `url(${images.hero})` }} /></section>
+    <header className="rp-header">
+      <a href="#accueil" className="rp-brand" aria-label="Recrutement Privé - accueil"><span className="rp-logo">RP</span><span className="rp-brand-copy"><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></a>
+      <nav className="rp-nav" aria-label="Navigation principale">{nav.map(([key, href], index) => <a key={key} href={href} className={index === 0 ? "active" : ""}>{t(key)}</a>)}</nav>
+      <div className="rp-header-actions"><LanguageSelector /><a className="rp-login" href="/espace"><span aria-hidden="true">●</span> {t("nav_connected_space")}</a></div>
+    </header>
+
+    <section id="accueil" className="rp-hero">
+      <div className="rp-hero-copy">
+        <div className="rp-hero-kicker">CABINET DE RECRUTEMENT &amp; HEADHUNTING</div>
+        <h1>Le recrutement d'excellence,<br />guidé par l'humain et renforcé<br /><span>par l'intelligence artificielle.</span></h1>
+        <p>Nous connectons les entreprises aux meilleurs profils et accompagnons<br className="desktop-only" /> les candidats vers le succès.</p>
+        <p className="rp-hero-privacy">Recrutement Privé ne vend pas les coordonnées des candidats,<br />Recrutement Privé organise des mises en relation qualifiées, après<br />validation de l'intéret de l'entreprise et du candidat.</p>
+        <div className="rp-actions"><ArrowButton href="#candidats">▣ &nbsp; {t("hero_cv_btn")} &nbsp; →</ArrowButton><ArrowButton href="#entreprises" outline>● &nbsp; {t("hero_recruit_btn")} &nbsp; →</ArrowButton></div>
+        <div className="rp-hero-values" aria-label="Engagements clés">
+          <div><strong>☆</strong><span><b>Expertise</b><small>métiers et secteurs</small></span></div>
+          <div><strong>♧</strong><span><b>Accompagnement</b><small>sur-mesure</small></span></div>
+          <div><strong>⌁</strong><span><b>Résultats</b><small>durables</small></span></div>
+        </div>
+      </div>
+      <div className="rp-hero-image" role="img" aria-label={t("hero_image_alt")} style={{ backgroundImage: `url(${images.hero})` }} />
+    </section>
+
     <section className="rp-reasons"><SectionHeading><h2>{t("why_prefix")} <span>{t("why_emphasis")}</span> ?</h2></SectionHeading><div className="rp-reason-grid">{reasons.map(([icon, titleKey, textKey]) => <article className="rp-reason" key={titleKey}><div className="rp-reason-icon" aria-hidden="true">{icon}</div><h3>{t(titleKey)}</h3><p>{t(textKey)}</p></article>)}</div></section>
     <section className="rp-assurances" aria-label={t("assurances_label")}>{assurances.map(([titleKey, textKey]) => <div className="rp-assurance" key={titleKey}><span className="rp-assurance-ring" aria-hidden="true" /><div><strong>{t(titleKey)}</strong><small>{t(textKey)}</small></div></div>)}</section>
     <section className="rp-feature-grid" aria-label={t("features_label")}>{featureCards.map(([eyebrowKey, image, titleKey, textKey, ctaKey, href]) => <article className="rp-feature" key={eyebrowKey}><div className="rp-feature-image" style={{ backgroundImage: `url(${image})` }} role="img" aria-label={t(eyebrowKey)} /><div className="rp-feature-body"><span className="rp-feature-eyebrow">{t(eyebrowKey)}</span><h3>{t(titleKey)}</h3><p>{t(textKey)}</p><a href={href}>{t(ctaKey)}</a></div></article>)}</section>
