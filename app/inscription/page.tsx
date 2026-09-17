@@ -99,14 +99,14 @@ export default function InscriptionPage() {
               />
             </label>
 
-            <div>
+            <div className="min-w-0">
               <span className="block text-xs uppercase tracking-[0.18em] text-white/40">Téléphone</span>
-              <div className="mt-2 grid grid-cols-[1.2fr_1.8fr] gap-2">
+              <div className="mt-2 grid min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-2">
                 <select
                   name="phonePrefix"
                   defaultValue="+33"
                   aria-label="Préfixe téléphonique"
-                  className="border border-white/10 bg-[#111] px-2 py-3 text-xs text-white outline-none"
+                  className="min-w-0 w-full border border-white/10 bg-[#111] px-2 py-3 text-xs text-white outline-none"
                 >
                   {PHONE_COUNTRIES.map(([c, p]) => (
                     <option key={`${c}-${p}`} value={p}>
@@ -117,11 +117,17 @@ export default function InscriptionPage() {
                 <input
                   name="phone"
                   type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   maxLength={40}
                   placeholder="06 12 34 56 78"
-                  className="w-full border border-white/10 bg-transparent px-3 py-3 text-sm text-white outline-none"
+                  aria-label="Numéro de téléphone sans préfixe"
+                  className="min-w-0 w-full border border-white/10 bg-transparent px-3 py-3 text-sm text-white outline-none"
                 />
               </div>
+              <p className="mt-2 text-[10px] leading-5 text-white/35">
+                Sélectionnez le préfixe puis saisissez le reste du numéro dans le champ à droite.
+              </p>
             </div>
           </div>
 
