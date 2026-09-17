@@ -79,6 +79,7 @@ export default function HomePage() {
         <div className="rp-hero-copy">
           <h1>{t("hero_title_line_1")}<br />{t("hero_title_line_2")}<br /><span>{t("hero_title_line_3")}</span></h1>
           <p>{t("hero_desc_line_1")}<br className="desktop-only" /> {t("hero_desc_line_2")}</p>
+          <p className="rp-hero-privacy">{t("hero_privacy_line_1")}<br />{t("hero_privacy_line_2")}<br />{t("hero_privacy_line_3")}</p>
           <div className="rp-actions">
             <ArrowButton href="#candidats">▣ &nbsp; {t("hero_cv_btn")} &nbsp; →</ArrowButton>
             <ArrowButton href="#entreprises" outline>● &nbsp; {t("hero_recruit_btn")} &nbsp; →</ArrowButton>
@@ -126,7 +127,7 @@ export default function HomePage() {
       <section className="rp-numbers">
         <SectionHeading><h2>{t("numbers_title")}</h2></SectionHeading>
         <div className="rp-number-grid">
-          {[['♟', '+850', 'numbers_candidates'], ['▤', '120+', 'numbers_companies'], ['▣', '350+', 'numbers_recruitments'], ['◆', '200+', 'numbers_training']].map(([icon, value, labelKey]) => (
+          {[["♟", "+850", "numbers_candidates"], ["▤", "120+", "numbers_companies"], ["▣", "350+", "numbers_recruitments"], ["◆", "200+", "numbers_training"]].map(([icon, value, labelKey]) => (
             <div className="rp-number" key={labelKey}><span className="rp-number-icon">{icon}</span><strong>{value}</strong><small>{t(labelKey)}</small></div>
           ))}
         </div>
