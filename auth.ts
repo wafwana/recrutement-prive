@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authenticateCredentials } from "@/lib/auth-credentials";
 import { AsyncLocalStorage } from "node:async_hooks";
+import authConfig from "./auth.config";
 
 export type AuthSessionUser = { id?: string | null; role?: string | null; name?: string | null; email?: string | null };
 export type AuthSession = { user?: AuthSessionUser };
@@ -17,8 +18,8 @@ export function getActiveSessionContext(): AuthSession | null {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   session: { strategy: "jwt" },
-  pages: { signIn: "/connexion" },
   providers: [
     Credentials({
       name: "Identifiants",
@@ -32,6 +33,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    ...authConfig.callbacks,
     async jwt({ token, user }) {
       if (user) token.role = user.role;
       return token;
@@ -39,10 +41,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (session.user) session.user.role = token.role as string | undefined;
       return session;
-    },
-    authorized({ auth, request }) {
-      if (!request.nextUrl.pathname.startsWith("/espace")) return true;
-      return Boolean(auth?.user);
     },
   },
 });
