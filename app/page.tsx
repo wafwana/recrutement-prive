@@ -160,7 +160,7 @@ export default function HomePage() {
         </div>
         <div><h3>{t("footer_navigation")}</h3>{nav.map(([key, href]) => <a key={key} href={href}>{t(key)}</a>)}</div>
         <div><h3>{t("footer_useful_links")}</h3><a href="/offres">{t("footer_jobs")}</a><a href="#candidats">{t("footer_training")}</a><a href="/espace/entreprise">{t("footer_company_space")}</a><a href="/espace">{t("footer_candidate_space")}</a><a href="/mentions-legales">{t("footer_legal")}</a><a href="/politique-confidentialite">{t("footer_privacy")}</a><a href="#accueil">{t("footer_sitemap")}</a></div>
-        <div><h3>{t("footer_contact")}</h3><a href="mailto:contact@recrutement-prive.com">✉ &nbsp; contact@recrutement-prive.com</a><span>⌖ &nbsp; {t("footer_location")}</span></div>
+        <div id="contact"><h3>{t("footer_contact")}</h3><a href="mailto:contact@recrutement-prive.com">✉ &nbsp; contact@recrutement-prive.com</a><span>⌖ &nbsp; Saint-Amand-les-Eaux, France</span></div>
         <div className="rp-copyright">© 2026 Recrutement Privé. {t("footer_rights")}</div>
       </footer>
     </main>
