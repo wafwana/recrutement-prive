@@ -5,7 +5,7 @@ import LanguageSelector from "./components/LanguageSelector";
 import { useI18n } from "@/lib/i18n/context";
 
 const images = {
-  hero: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&fm=jpg&q=88&w=2200",
+  hero: "/visuals/hero-portrait.webp",
   talents: "https://images.unsplash.com/photo-1770992225308-154250075727?auto=format&fit=crop&fm=jpg&q=88&w=1400",
   enterprise: "https://images.unsplash.com/photo-1521790797524-b2497295b8a0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
   intelligence: "https://images.unsplash.com/photo-1677442135136-760c813028c0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
@@ -126,7 +126,7 @@ export default function HomePage() {
       <section className="rp-numbers">
         <SectionHeading><h2>{t("numbers_title")}</h2></SectionHeading>
         <div className="rp-number-grid">
-          {[["♟", "+850", "numbers_candidates"], ["▤", "120+", "numbers_companies"], ["▣", "350+", "numbers_recruitments"], ["◆", "200+", "numbers_training"]].map(([icon, value, labelKey]) => (
+          {[['♟', '+850', 'numbers_candidates'], ['▤', '120+', 'numbers_companies'], ['▣', '350+', 'numbers_recruitments'], ['◆', '200+', 'numbers_training']].map(([icon, value, labelKey]) => (
             <div className="rp-number" key={labelKey}><span className="rp-number-icon">{icon}</span><strong>{value}</strong><small>{t(labelKey)}</small></div>
           ))}
         </div>
