@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 
 const spaces = [
   { href: "/espace/owner", role: "OWNER", eyebrow: "Espace Owner", title: "Pilotez toute la plateforme.", text: "Cockpit global, utilisateurs, activité recrutement, sourcing, matching, paramètres et pilotage commercial." },
@@ -18,9 +19,14 @@ export default async function EspacePage() {
 
   return (
     <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-20 md:w-[min(1180px,calc(100%-72px))] md:py-28">
-      <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Accès métiers</p>
-      <h1 className="mt-5 max-w-3xl font-serif text-5xl leading-tight sm:text-6xl">Un espace pensé pour chaque acteur du recrutement.</h1>
-      <p className="mt-7 max-w-2xl text-base leading-8 text-white/55">Bienvenue{session.user.name ? ` ${session.user.name}` : ""}. Choisissez votre environnement.</p>
+      <div className="flex items-start justify-between gap-6">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Accès métiers</p>
+          <h1 className="mt-5 max-w-3xl font-serif text-5xl leading-tight sm:text-6xl">Un espace pensé pour chaque acteur du recrutement.</h1>
+          <p className="mt-7 max-w-2xl text-base leading-8 text-white/55">Bienvenue{session.user.name ? ` ${session.user.name}` : ""}. Choisissez votre environnement.</p>
+        </div>
+        <SignOutButton />
+      </div>
 
       <div className="mt-14 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
         {allowed.map((space) => (
