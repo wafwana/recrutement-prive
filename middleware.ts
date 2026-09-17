@@ -1,5 +1,6 @@
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
+import authConfig from "./auth.config";
 
 // Production remains in construction by default. The OWNER can explicitly authorize
 // the public launch by setting MAINTENANCE_MODE=false in the production environment.
@@ -12,6 +13,8 @@ const PUBLIC_PATHS = new Set([
   "/reinitialisation-mot-de-passe",
   "/owner/initialisation",
 ]);
+
+const { auth } = NextAuth(authConfig);
 
 export default auth((request) => {
   const { pathname } = request.nextUrl;
