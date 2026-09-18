@@ -39,7 +39,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (session.user) session.user.role = token.role as string | undefined;
+      if (session.user) {
+        // Preserve the authenticated database user id in the JWT-backed session.
+        // Protected candidate pages use it to load the user's own profile/data.
+        session.user.id = token.sub;
+        session.user.role = token.role as string | undefined;
+      }
       return session;
     },
   },
