@@ -34,7 +34,7 @@ export async function ingest(sourceUrl: string, actorUserId: string) {
         sourceUrl: item.sourceUrl, title: item.title, companyName: item.companyName, country: item.country, city: item.city,
         categoryCode: item.categoryCode, subCategoryCode: item.subCategoryCode, skills: item.skills,
         experienceYears: item.experienceYears, language: item.language, salary: item.salary, publishedAt, closingAt,
-        description: item.description, rawData: item.raw, updatedAt: new Date(),
+        description: item.description, rawData, updatedAt: new Date(),
       },
     });
     if (existing) updated++; else created++;
