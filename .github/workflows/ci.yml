@@ -55,6 +55,7 @@ jobs:
       - run: npm run test:candidate-flow
       - run: npm run test:company-flow
       - run: npm run test:taxonomy-cv-protection
+      - run: npm run test:global-sourcing
       - run: npx tsx tests/candidate-integration.ts
       - run: npx tsx tests/final-validation.ts
       - run: npx tsx tests/offer-attachment-validation.ts

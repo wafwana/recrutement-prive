@@ -242,8 +242,37 @@ model MissionPresentation {
   @@index([candidateId, companyId])
 }
 
+model ExternalJobOpportunity {
+  id String @id @default(cuid())
+  externalId String
+  source String
+  sourceUrl String?
+  title String
+  companyName String?
+  country String?
+  city String?
+  categoryCode String?
+  subCategoryCode String?
+  skills Json?
+  experienceYears Int?
+  language String?
+  salary String?
+  publishedAt DateTime?
+  closingAt DateTime?
+  description String?
+  rawData Json?
+  status String @default("DETECTED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([source, externalId], map: "external_job_source_external_id_key")
+  @@index([status, createdAt])
+  @@index([source])
+}
+
 model SourcedCandidate {
   id String @id @default(cuid())
+  externalId String?
   source String
   sourceProfileUrl String?
   name String?
@@ -262,6 +291,7 @@ model SourcedCandidate {
   updatedAt DateTime @updatedAt
   @@index([status, createdAt])
   @@index([source])
+  @@unique([source, externalId], map: "sourced_candidate_source_external_id_key")
 }
 
 model RecruitmentHistory {
