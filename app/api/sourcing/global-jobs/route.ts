@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { configuredSources, fetchGlobalJobs } from "@/lib/sourcing/global";
@@ -15,6 +16,7 @@ export async function ingest(sourceUrl: string, actorUserId: string) {
   let created = 0, updated = 0;
   for (const item of items) {
     const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
+    const rawData = item.raw === undefined ? undefined : JSON.parse(JSON.stringify(item.raw)) as Prisma.InputJsonValue;
     const closingAt = item.closingAt ? new Date(item.closingAt) : null;
     const existing = await prisma.externalJobOpportunity.findUnique({
       where: { source_externalId: { source: item.source, externalId: item.externalId } },
@@ -26,7 +28,7 @@ export async function ingest(sourceUrl: string, actorUserId: string) {
         externalId: item.externalId, source: item.source, sourceUrl: item.sourceUrl, title: item.title,
         companyName: item.companyName, country: item.country, city: item.city, categoryCode: item.categoryCode,
         subCategoryCode: item.subCategoryCode, skills: item.skills, experienceYears: item.experienceYears,
-        language: item.language, salary: item.salary, publishedAt, closingAt, description: item.description, rawData: item.raw,
+        language: item.language, salary: item.salary, publishedAt, closingAt, description: item.description, rawData,
       },
       update: {
         sourceUrl: item.sourceUrl, title: item.title, companyName: item.companyName, country: item.country, city: item.city,
