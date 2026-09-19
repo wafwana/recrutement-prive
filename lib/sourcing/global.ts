@@ -65,7 +65,7 @@ function parseXmlItems(xml: string, source: string): GlobalJobItem[] {
     };
     const link = block.match(/<link(?:[^>]*href=["']([^"']+)["'][^>]*)\/?\s*>/i)?.[1] ?? pick("link");
     return normalizeJob({ id: pick("guid") ?? pick("id"), title: pick("title"), description: pick("description") ?? pick("summary"), url: link, publishedAt: pick("pubDate") ?? pick("published") }, source, index);
-  });
+  }).filter((item): item is GlobalJobItem => Boolean(item));
 }
 
 export async function fetchGlobalJobs(sourceUrl: string): Promise<GlobalJobItem[]> {
