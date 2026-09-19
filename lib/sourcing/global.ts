@@ -1,5 +1,3 @@
-import "server-only";
-
 export type GlobalJobItem = {
   externalId: string; source: string; sourceUrl?: string; title: string; companyName?: string;
   country?: string; city?: string; categoryCode?: string; subCategoryCode?: string;
