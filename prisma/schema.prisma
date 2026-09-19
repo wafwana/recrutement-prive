@@ -292,6 +292,7 @@ model SourcedCandidate {
   updatedAt DateTime @updatedAt
   @@index([status, createdAt])
   @@index([source])
+  @@unique([source, externalId])
 }
 
 model RecruitmentHistory {
