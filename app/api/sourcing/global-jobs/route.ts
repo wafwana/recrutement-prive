@@ -10,7 +10,7 @@ async function requireStaff() {
   return session.user.id;
 }
 
-async function ingest(sourceUrl: string, actorUserId: string) {
+export async function ingest(sourceUrl: string, actorUserId: string) {
   const items = await fetchGlobalJobs(sourceUrl);
   let created = 0, updated = 0;
   for (const item of items) {
