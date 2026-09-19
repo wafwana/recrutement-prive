@@ -268,10 +268,12 @@ model ExternalJobOpportunity {
   @@unique([source, externalId])
   @@index([status, createdAt])
   @@index([source])
+  @@unique([source, externalId])
 }
 
 model SourcedCandidate {
   id String @id @default(cuid())
+  externalId String?
   source String
   sourceProfileUrl String?
   name String?
