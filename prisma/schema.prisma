@@ -242,6 +242,34 @@ model MissionPresentation {
   @@index([candidateId, companyId])
 }
 
+model ExternalJobOpportunity {
+  id String @id @default(cuid())
+  externalId String
+  source String
+  sourceUrl String?
+  title String
+  companyName String?
+  country String?
+  city String?
+  categoryCode String?
+  subCategoryCode String?
+  skills Json?
+  experienceYears Int?
+  language String?
+  salary String?
+  publishedAt DateTime?
+  closingAt DateTime?
+  description String?
+  rawData Json?
+  status String @default("DETECTED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([status, createdAt])
+  @@index([source])
+}
+
 model SourcedCandidate {
   id String @id @default(cuid())
   source String
