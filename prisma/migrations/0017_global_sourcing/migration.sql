@@ -23,9 +23,9 @@ CREATE TABLE "ExternalJobOpportunity" (
 
   CONSTRAINT "ExternalJobOpportunity_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX "ExternalJobOpportunity_source_externalId_key" ON "ExternalJobOpportunity"("source", "externalId");
+CREATE UNIQUE INDEX "external_job_source_external_id_key" ON "ExternalJobOpportunity"("source", "externalId");
 CREATE INDEX "ExternalJobOpportunity_status_createdAt_idx" ON "ExternalJobOpportunity"("status", "createdAt");
 CREATE INDEX "ExternalJobOpportunity_source_idx" ON "ExternalJobOpportunity"("source");
 
 ALTER TABLE "SourcedCandidate" ADD COLUMN "externalId" TEXT;
-CREATE UNIQUE INDEX "SourcedCandidate_source_externalId_key" ON "SourcedCandidate"("source", "externalId");
+CREATE UNIQUE INDEX "sourced_candidate_source_external_id_key" ON "SourcedCandidate"("source", "externalId");
