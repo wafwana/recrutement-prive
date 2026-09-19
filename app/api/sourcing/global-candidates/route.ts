@@ -36,10 +36,6 @@ export async function POST(request: Request) {
 
   let created = 0, updated = 0;
   for (const candidate of candidates) {
-    const existing = await prisma.sourcedCandidate.findFirst({
-      where: { source: candidate.source, sourceProfileUrl: candidate.sourceProfileUrl ?? undefined },
-      select: { id: true },
-    });
     const result = matchCandidateToJob({
       skills: candidate.skills, experienceYears: candidate.experienceYears, headline: candidate.headline,
       location: candidate.location, country: candidate.country,
@@ -57,9 +53,10 @@ export async function POST(request: Request) {
       createdByUserId: actor,
     };
 
-    if (existing) {
-      await prisma.sourcedCandidate.update({ where: { id: existing.id }, data });
-      updated++;
+    if (candidate.externalId) {
+      const existing = await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: candidate.source, externalId: candidate.externalId } }, select: { id: true } });
+      if (existing) { await prisma.sourcedCandidate.update({ where: { id: existing.id }, data }); updated++; }
+      else { await prisma.sourcedCandidate.create({ data: { ...data, externalId: candidate.externalId } }); created++; }
     } else {
       await prisma.sourcedCandidate.create({ data });
       created++;
