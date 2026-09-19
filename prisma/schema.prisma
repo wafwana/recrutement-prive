@@ -265,10 +265,9 @@ model ExternalJobOpportunity {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([source, externalId])
+  @@unique([source, externalId], map: "external_job_source_external_id_key")
   @@index([status, createdAt])
   @@index([source])
-  @@unique([source, externalId])
 }
 
 model SourcedCandidate {
