@@ -44,7 +44,8 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
     assert.equal(ownerPost.status, 201);
     const createdAdmin = await ownerPost.json();
     assert.equal(createdAdmin.user.role, "ADMIN");
-    const defaultPermissions = await prisma.systemSetting.findUnique({ where: { key: `permissions:${createdAdmin.user.id}` } });\n    assert.deepEqual(defaultPermissions?.value, []);
+    const defaultPermissions = await prisma.systemSetting.findUnique({ where: { key: `permissions:${createdAdmin.user.id}` } });
+    assert.deepEqual(defaultPermissions?.value, []);
 
     const permissionPatch = await runWithTestSession(ownerSession, () =>
       PATCH(new Request("http://localhost/api/owner/admins", {
@@ -61,7 +62,10 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
     assert.equal(permissionPatch.status, 200);
     assert.deepEqual((await permissionPatch.json()).permissions, ["CANDIDATES_VIEW", "DOCUMENTS", "CV_IMPORT"]);
     const storedPermissions = await prisma.systemSetting.findUnique({ where: { key: `permissions:${createdAdmin.user.id}` } });
-    assert.deepEqual(storedPermissions?.value, ["CANDIDATES_VIEW", "DOCUMENTS", "CV_IMPORT"]);\n    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_UPLOAD"), true);\n    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_ANALYZE"), true);\n    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_ARCHIVE"), true);
+    assert.deepEqual(storedPermissions?.value, ["CANDIDATES_VIEW", "DOCUMENTS", "CV_IMPORT"]);
+    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_UPLOAD"), true);
+    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_ANALYZE"), true);
+    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_ARCHIVE"), true);
 
     const archivedDocument = await prisma.archivedDocument.create({
       data: {
@@ -120,7 +124,8 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
       () => archiveGET(new Request("http://localhost/api/owner/archivage")),
     );
     assert.equal(deniedArchiveList.status, 403);
-\n    const consultantPost = await runWithTestSession(ownerSession, () => POST(createReq("CONSULTANT")));
+
+    const consultantPost = await runWithTestSession(ownerSession, () => POST(createReq("CONSULTANT")));
     assert.equal(consultantPost.status, 201);
     const createdConsultant = await consultantPost.json();
 
