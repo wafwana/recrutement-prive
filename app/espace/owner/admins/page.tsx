@@ -186,10 +186,6 @@ export default function OwnerAdminsPage() {
           </section>
         </>
       )}
-            </div>
-          </section>
-        </>
-      )}
     </section>
   );
 }
