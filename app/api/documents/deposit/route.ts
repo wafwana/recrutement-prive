@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { classifyDocument } from "@/lib/archiving/classifier";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { sendDepositConfirmation, sendOwnerAlert } from "@/lib/email/service";
+import { hasPermission } from "@/lib/auth/permissions";
 
 function escapeHtml(value: string) {
   return value
@@ -27,6 +28,12 @@ export async function POST(request: Request) {
   const userEmail = session.user.email || "";
 
   try {
+    if (userRole === "ADMIN" || userRole === "CONSULTANT") {
+      const allowed = await hasPermission(userId, userRole, "DOCUMENTS_UPLOAD");
+      if (!allowed) {
+        return NextResponse.json({ error: "Vous n'avez pas l'autorisation de déposer un document." }, { status: 403 });
+      }
+    }
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const docType = String(formData.get("docType") || "").trim();
