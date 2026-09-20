@@ -39,6 +39,7 @@ export default function PrestationsTarifsPage() {
   }
 
   if (loading) return <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-20"><p className="text-white/50">Chargement des prestations…</p></section>;
+      <OwnerNavigation />
 
   return (
     <section className="mx-auto w-[min(1280px,calc(100%-40px))] py-12 md:w-[min(1280px,calc(100%-72px))] md:py-20">
