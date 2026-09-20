@@ -21,11 +21,8 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
   const adminSession = { user: { id: admin.id, role: "ADMIN" } };
 
   try {
-    const adminGet = await runWithTestSession(adminSession, () => GET());
-    assert.equal(adminGet.status, 403);
-
-    const ownerGet = await runWithTestSession(ownerSession, () => GET());
-    assert.equal(ownerGet.status, 200);
+    assert.equal((await runWithTestSession(adminSession, () => GET())).status, 403);
+    assert.equal((await runWithTestSession(ownerSession, () => GET())).status, 200);
 
     const createReq = (role: "ADMIN" | "CONSULTANT") =>
       new Request("http://localhost/api/owner/admins", {
@@ -39,8 +36,7 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
         }),
       });
 
-    const adminPost = await runWithTestSession(adminSession, () => POST(createReq("ADMIN")));
-    assert.equal(adminPost.status, 403);
+    assert.equal((await runWithTestSession(adminSession, () => POST(createReq("ADMIN")))).status, 403);
 
     const ownerPost = await runWithTestSession(ownerSession, () => POST(createReq("ADMIN")));
     assert.equal(ownerPost.status, 201);
@@ -51,30 +47,53 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
     assert.equal(consultantPost.status, 201);
     const createdConsultant = await consultantPost.json();
 
-    const ownerPatchRequest = new Request("http://localhost/api/owner/admins", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId: owner.id, action: "SUSPEND", reason: "Attempt owner mutation" }),
-    });
-    const ownerPatch = await runWithTestSession(ownerSession, () => PATCH(ownerPatchRequest));
+    const ownerPatch = await runWithTestSession(ownerSession, () =>
+      PATCH(new Request("http://localhost/api/owner/admins", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId: owner.id, action: "SUSPEND", reason: "Attempt owner mutation" }),
+      })),
+    );
     assert.equal(ownerPatch.status, 403);
 
-    const adminPatchRequest = new Request("http://localhost/api/owner/admins", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId: admin.id, action: "REVOKE", reason: "Governance test" }),
-    });
-    const adminPatch = await runWithTestSession(adminSession, () => PATCH(adminPatchRequest));
+    const adminPatch = await runWithTestSession(adminSession, () =>
+      PATCH(new Request("http://localhost/api/owner/admins", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId: admin.id, action: "REVOKE", reason: "Governance test" }),
+      })),
+    );
     assert.equal(adminPatch.status, 403);
 
-    const revokeRequest = new Request("http://localhost/api/owner/admins", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId: createdAdmin.user.id, action: "REVOKE", reason: "Governance test" }),
-    });
-    const revokeResponse = await runWithTestSession(ownerSession, () => PATCH(revokeRequest));
-    assert.equal(revokeResponse.status, 200);
-    const revoked = await revokeResponse.json();
+    const suspend = await runWithTestSession(ownerSession, () =>
+      PATCH(new Request("http://localhost/api/owner/admins", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId: createdAdmin.user.id, action: "SUSPEND", reason: "Temporary suspension test" }),
+      })),
+    );
+    assert.equal(suspend.status, 200);
+    assert.equal((await suspend.json()).user.status, "SUSPENDED");
+
+    const reactivate = await runWithTestSession(ownerSession, () =>
+      PATCH(new Request("http://localhost/api/owner/admins", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId: createdAdmin.user.id, action: "REACTIVATE", reason: "Reactivation test" }),
+      })),
+    );
+    assert.equal(reactivate.status, 200);
+    assert.equal((await reactivate.json()).user.status, "ACTIVE");
+
+    const revoke = await runWithTestSession(ownerSession, () =>
+      PATCH(new Request("http://localhost/api/owner/admins", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId: createdAdmin.user.id, action: "REVOKE", reason: "Governance test" }),
+      })),
+    );
+    assert.equal(revoke.status, 200);
+    const revoked = await revoke.json();
     assert.equal(revoked.user.role, "CANDIDAT");
     assert.equal(revoked.user.status, "EXCLUDED");
 
@@ -84,6 +103,8 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
     });
     assert.ok(auditEntries.some((entry) => entry.action === "CREATE_ADMIN"));
     assert.ok(auditEntries.some((entry) => entry.action === "CREATE_CONSULTANT"));
+    assert.ok(auditEntries.some((entry) => entry.action === "SUSPEND_ADMIN"));
+    assert.ok(auditEntries.some((entry) => entry.action === "REACTIVATE_ADMIN"));
     assert.ok(auditEntries.some((entry) => entry.action === "REVOKE_ADMIN"));
   } finally {
     await prisma.auditLog.deleteMany({ where: { actorUserId: owner.id } });
