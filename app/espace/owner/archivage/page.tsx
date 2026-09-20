@@ -28,6 +28,7 @@ export default function OwnerArchivagePage() {
   const [newPath, setNewPath] = useState("");
   const [saving, setSaving] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
 
   async function loadDocuments() {
     setLoading(true);
@@ -57,6 +58,29 @@ export default function OwnerArchivagePage() {
   useEffect(() => {
     loadDocuments();
   }, [filterStatus]);
+
+  async function handleAnalyze(documentId: string) {
+    setAnalyzingId(documentId);
+    setActionMessage("");
+    try {
+      const res = await fetch("/api/owner/archivage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setActionMessage(data.error || "Analyse impossible.");
+      } else {
+        setActionMessage(`Document analysé : ${data.analysis?.detectedType || "type détecté"} · ${data.analysis?.categoryPath || "répertoire déterminé"}`);
+        loadDocuments();
+      }
+    } catch {
+      setActionMessage("Erreur réseau pendant l'analyse.");
+    } finally {
+      setAnalyzingId(null);
+    }
+  }
 
   async function handleReclassify() {
     if (!selectedDoc || !newPath) return;
@@ -104,7 +128,7 @@ export default function OwnerArchivagePage() {
     <div className="mx-auto max-w-7xl px-5 py-12 md:px-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">OWNER ONLY</p>
+          <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">DOCUMENTS · ACCÈS DÉLÉGUÉ</p>
           <h1 className="mt-2 font-serif text-3xl md:text-4xl text-white">Archive Centralisée & Classement</h1>
           <p className="mt-2 text-sm text-white/50">Consultez, recherchez et gérez l&apos;intégralité des documents archivés de la plateforme.</p>
         </div>
@@ -171,15 +195,24 @@ export default function OwnerArchivagePage() {
                 </div>
 
                 <div>
-                  <button
-                    onClick={() => {
-                      setSelectedDoc(doc);
-                      setNewPath(doc.categoryPath);
-                    }}
-                    className="border border-white/20 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/80 hover:border-[#c7a15a] hover:text-[#c7a15a]"
-                  >
-                    Valider / Reclasser
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleAnalyze(doc.id)}
+                      disabled={analyzingId === doc.id}
+                      className="border border-[#c7a15a]/60 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a] disabled:opacity-40"
+                    >
+                      {analyzingId === doc.id ? "Analyse…" : "Analyser / répertorier"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedDoc(doc);
+                        setNewPath(doc.categoryPath);
+                      }}
+                      className="border border-white/20 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/80 hover:border-[#c7a15a] hover:text-[#c7a15a]"
+                    >
+                      Valider / Reclasser
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
