@@ -44,6 +44,7 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
     assert.equal(ownerPost.status, 201);
     const createdAdmin = await ownerPost.json();
     assert.equal(createdAdmin.user.role, "ADMIN");
+    const defaultPermissions = await prisma.systemSetting.findUnique({ where: { key: `permissions:${createdAdmin.user.id}` } });\n    assert.deepEqual(defaultPermissions?.value, []);
 
     const permissionPatch = await runWithTestSession(ownerSession, () =>
       PATCH(new Request("http://localhost/api/owner/admins", {
