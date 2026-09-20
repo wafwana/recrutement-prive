@@ -7,7 +7,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   CANDIDATES_VIEW: "Voir candidats", CANDIDATES_MANAGE: "Gérer candidats", CV_IMPORT: "Importer CV",
   SOURCING: "Sourcing", MATCHING: "Matching", JOBS_MANAGE: "Gérer offres", PRESENTATIONS_MANAGE: "Présentations",
   COMPANIES_MANAGE: "Gérer entreprises", CRM: "CRM", MESSAGING: "Messagerie", REPORTING: "Reporting",
-  DOCUMENTS: "Documents", PLATFORM_SETTINGS: "Paramètres plateforme", FINANCE: "Finance", STAFF_MANAGE: "Gérer collaborateurs",
+  DOCUMENTS: "Documents (accès global)", DOCUMENTS_VIEW: "Documents · consulter", DOCUMENTS_UPLOAD: "Documents · mettre un document", DOCUMENTS_ANALYZE: "Documents · analyser", DOCUMENTS_ARCHIVE: "Documents · répertorier / classer", DOCUMENTS_DOWNLOAD: "Documents · télécharger", DOCUMENTS_SHARE: "Documents · partager", PLATFORM_SETTINGS: "Paramètres plateforme", FINANCE: "Finance", STAFF_MANAGE: "Gérer collaborateurs",
 };
 
 export default function OwnerAdminsPage() {
