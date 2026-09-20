@@ -38,18 +38,20 @@ export default function HomePage() {
 
     <section id="accueil" className="rp-hero">
       <div className="rp-hero-copy">
-        <div className="rp-hero-kicker">CABINET DE RECRUTEMENT &amp; HEADHUNTING</div>
-        <h1>Le recrutement d'excellence,<br />guidé par l'humain et renforcé<br /><span>par l'intelligence artificielle.</span></h1>
-        <p>Nous connectons les entreprises aux meilleurs profils et accompagnons<br className="desktop-only" /> les candidats vers le succès.</p>
-        <p className="rp-hero-privacy">Recrutement Privé ne vend pas les coordonnées des candidats,<br />Recrutement Privé organise des mises en relation qualifiées, après<br />validation de l'intéret de l'entreprise et du candidat.</p>
+        <div className="rp-hero-kicker">{t("hero_kicker")}</div>
+        <h1>{t("hero_title_line_1")}<br />{t("hero_title_line_2")}<br /><span>{t("hero_title_line_3")}</span></h1>
+        <p>{t("hero_desc_line_1")}<br className="desktop-only" /> {t("hero_desc_line_2")}</p>
+        <p className="rp-hero-privacy">{t("hero_privacy_line_1")}<br />{t("hero_privacy_line_2")}<br />{t("hero_privacy_line_3")}</p>
         <div className="rp-actions"><ArrowButton href="#candidats">▣ &nbsp; {t("hero_cv_btn")} &nbsp; →</ArrowButton><ArrowButton href="#entreprises" outline>● &nbsp; {t("hero_recruit_btn")} &nbsp; →</ArrowButton></div>
         <div className="rp-hero-values" aria-label="Engagements clés">
-          <div><strong>☆</strong><span><b>Expertise</b><small>métiers et secteurs</small></span></div>
-          <div><strong>♧</strong><span><b>Accompagnement</b><small>sur-mesure</small></span></div>
-          <div><strong>⌁</strong><span><b>Résultats</b><small>durables</small></span></div>
+          <div><strong>☆</strong><span><b>{t("hero_value_expertise")}</b><small>{t("hero_value_expertise_text")}</small></span></div>
+          <div><strong>♧</strong><span><b>{t("hero_value_support")}</b><small>{t("hero_value_support_text")}</small></span></div>
+          <div><strong>⌁</strong><span><b>{t("hero_value_results")}</b><small>{t("hero_value_results_text")}</small></span></div>
         </div>
       </div>
-      <div className="rp-hero-image" role="img" aria-label={t("hero_image_alt")} style={{ backgroundImage: `url(${images.hero})` }} />
+      <div className="rp-hero-image">
+        <img src={images.hero} alt={t("hero_image_alt")} loading="eager" fetchPriority="high" />
+      </div>
     </section>
 
     <section className="rp-reasons"><SectionHeading><h2>{t("why_prefix")} <span>{t("why_emphasis")}</span> ?</h2></SectionHeading><div className="rp-reason-grid">{reasons.map(([icon, titleKey, textKey]) => <article className="rp-reason" key={titleKey}><div className="rp-reason-icon" aria-hidden="true">{icon}</div><h3>{t(titleKey)}</h3><p>{t(textKey)}</p></article>)}</div></section>
