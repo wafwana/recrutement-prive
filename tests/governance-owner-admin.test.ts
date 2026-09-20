@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { runWithTestSession } from "../auth";
 import { GET, POST, PATCH } from "../app/api/owner/admins/route";
 import { hashPassword } from "../lib/password-crypto";
+import { hasPermission } from "../lib/auth/permissions";
 
 test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER cannot be altered", async () => {
   if (!process.env.DATABASE_URL) return;
@@ -58,7 +59,7 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
     assert.equal(permissionPatch.status, 200);
     assert.deepEqual((await permissionPatch.json()).permissions, ["CANDIDATES_VIEW", "DOCUMENTS", "CV_IMPORT"]);
     const storedPermissions = await prisma.systemSetting.findUnique({ where: { key: `permissions:${createdAdmin.user.id}` } });
-    assert.deepEqual(storedPermissions?.value, ["CANDIDATES_VIEW", "DOCUMENTS", "CV_IMPORT"]);
+    assert.deepEqual(storedPermissions?.value, ["CANDIDATES_VIEW", "DOCUMENTS", "CV_IMPORT"]);\n    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_UPLOAD"), true);\n    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_ANALYZE"), true);\n    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_ARCHIVE"), true);
 
     const consultantPost = await runWithTestSession(ownerSession, () => POST(createReq("CONSULTANT")));
     assert.equal(consultantPost.status, 201);
