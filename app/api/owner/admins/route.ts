@@ -94,6 +94,13 @@ export async function POST(request: Request) {
     select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
   });
 
+  await prisma.systemSetting.create({
+    data: {
+      key: `permissions:${newUser.id}`,
+      value: [],
+    },
+  });
+
   await prisma.auditLog.create({
     data: {
       actorUserId: ownerId,
