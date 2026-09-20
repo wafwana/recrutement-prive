@@ -2,6 +2,19 @@ import { NextResponse } from "next/server";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DocumentArchiveStatus } from "@prisma/client";
+import { hasPermission } from "@/lib/auth/permissions";
+
+async function getAuthorizedUser(permission: "DOCUMENTS_VIEW" | "DOCUMENTS_ANALYZE" | "DOCUMENTS_ARCHIVE") {
+  const activeSession = getActiveSessionContext();
+  const session = activeSession || (await auth());
+  if (!session?.user?.id) return null;
+  if (session.user.role === "OWNER") return session.user;
+  if ((session.user.role === "ADMIN" || session.user.role === "CONSULTANT") &&
+      await hasPermission(session.user.id, session.user.role, permission)) {
+    return session.user;
+  }
+  return null;
+}
 
 async function requireOwner() {
   const activeSession = getActiveSessionContext();
@@ -11,9 +24,9 @@ async function requireOwner() {
 }
 
 export async function GET(request: Request) {
-  const owner = await requireOwner();
+  const owner = await getAuthorizedUser("DOCUMENTS_VIEW");
   if (!owner) {
-    return NextResponse.json({ error: "Accès strictement réservé à l'Owner." }, { status: 403 });
+    return NextResponse.json({ error: "Vous n'avez pas l'autorisation de consulter les archives." }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -74,9 +87,9 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const owner = await requireOwner();
+  const owner = await getAuthorizedUser("DOCUMENTS_ARCHIVE");
   if (!owner) {
-    return NextResponse.json({ error: "Accès strictement réservé à l'Owner." }, { status: 403 });
+    return NextResponse.json({ error: "Vous n'avez pas l'autorisation de répertorier ou reclasser les documents." }, { status: 403 });
   }
 
   let body: {
@@ -175,8 +188,8 @@ function analyzeDocument(document: {
 }
 
 export async function POST(request: Request) {
-  const owner = await requireOwner();
-  if (!owner) return NextResponse.json({ error: "Accès strictement réservé à l'Owner." }, { status: 403 });
+  const owner = await getAuthorizedUser("DOCUMENTS_ANALYZE");
+  if (!owner) return NextResponse.json({ error: "Vous n'avez pas l'autorisation d'analyser les documents." }, { status: 403 });
 
   let body: { documentId?: string };
   try { body = await request.json(); } catch { return NextResponse.json({ error: "JSON invalide." }, { status: 400 }); }
