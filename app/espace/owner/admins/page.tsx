@@ -2,7 +2,13 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
-type StaffUser = { id: string; name: string | null; email: string; role: string; status: string; createdAt: string };
+type StaffUser = { id: string; name: string | null; email: string; role: string; status: string; createdAt: string; permissions: string[] };
+const PERMISSION_LABELS: Record<string, string> = {
+  CANDIDATES_VIEW: "Voir candidats", CANDIDATES_MANAGE: "Gérer candidats", CV_IMPORT: "Importer CV",
+  SOURCING: "Sourcing", MATCHING: "Matching", JOBS_MANAGE: "Gérer offres", PRESENTATIONS_MANAGE: "Présentations",
+  COMPANIES_MANAGE: "Gérer entreprises", CRM: "CRM", MESSAGING: "Messagerie", REPORTING: "Reporting",
+  DOCUMENTS: "Documents", PLATFORM_SETTINGS: "Paramètres plateforme", FINANCE: "Finance", STAFF_MANAGE: "Gérer collaborateurs",
+};
 
 export default function OwnerAdminsPage() {
   const [users, setUsers] = useState<StaffUser[]>([]);
@@ -48,6 +54,27 @@ export default function OwnerAdminsPage() {
       event.currentTarget.reset();
     }
     setSaving(false);
+  }
+
+  async function savePermissions(userId: string, permissions: string[]) {
+    setMessage("");
+    const reason = window.prompt("Motif obligatoire de modification des permissions :");
+    if (!reason || reason.trim().length < 5) {
+      setMessage("Modification annulée : un motif d'au moins 5 caractères est obligatoire.");
+      return;
+    }
+    const response = await fetch("/api/owner/admins", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, action: "SET_PERMISSIONS", reason: reason.trim(), permissions }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setMessage(data.error || "Impossible d'enregistrer les permissions.");
+      return;
+    }
+    setUsers((current) => current.map((user) => user.id === userId ? { ...user, permissions: data.permissions } : user));
+    setMessage("Permissions du collaborateur mises à jour.");
   }
 
   async function handleAction(userId: string, action: "SUSPEND" | "REACTIVATE" | "REVOKE") {
@@ -132,8 +159,33 @@ export default function OwnerAdminsPage() {
                     )}
                     <button type="button" onClick={() => handleAction(u.id, "REVOKE")} className="border border-red-500/40 px-3 py-1.5 text-[10px] uppercase text-red-300 hover:bg-red-500/20">Révoquer</button>
                   </div>
+                  <details className="mt-4 border-t border-white/10 pt-4">
+                    <summary className="cursor-pointer text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Autorisations du collaborateur</summary>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      {Object.entries(PERMISSION_LABELS).map(([permission, label]) => (
+                        <label key={permission} className="flex items-center gap-2 border border-white/10 px-3 py-2 text-xs text-white/65">
+                          <input
+                            type="checkbox"
+                            checked={u.permissions.includes(permission)}
+                            onChange={(event) => {
+                              const next = event.target.checked
+                                ? [...u.permissions, permission]
+                                : u.permissions.filter((item) => item !== permission);
+                              setUsers((current) => current.map((user) => user.id === u.id ? { ...user, permissions: next } : user));
+                            }}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => savePermissions(u.id, u.permissions)} className="mt-4 border border-[#c7a15a]/50 px-4 py-2 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a]">Enregistrer les autorisations</button>
+                  </details>
                 </div>
               ))}
+            </div>
+          </section>
+        </>
+      )}
             </div>
           </section>
         </>
