@@ -1,5 +1,7 @@
 "use client";
 
+import { OwnerNavigation } from "@/components/owner/owner-navigation";
+
 import { useEffect, useState } from "react";
 
 type MonthlySummary = {
