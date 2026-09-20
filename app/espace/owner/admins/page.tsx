@@ -74,6 +74,7 @@ export default function OwnerAdminsPage() {
 
   return (
     <section className="mx-auto w-[min(900px,calc(100%-40px))] py-12 md:w-[min(900px,calc(100%-72px))] md:py-20">
+      <OwnerNavigation />
       <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Gouvernance</p>
       <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Gouvernance ADMIN & CONSULTANT.</h1>
       <p className="mt-5 max-w-3xl text-sm leading-7 text-white/50">
