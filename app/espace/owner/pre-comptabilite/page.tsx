@@ -1,5 +1,7 @@
 "use client";
 
+import { OwnerNavigation } from "@/components/owner/owner-navigation";
+
 import { useEffect, useState } from "react";
 
 type MonthlySummary = {
@@ -96,6 +98,7 @@ export default function PreComptabilitePage() {
   if (error) {
     return (
       <div className="mx-auto max-w-4xl py-20 px-5 text-center">
+      <OwnerNavigation />
         <p className="text-xl text-red-400">{error}</p>
         <p className="mt-4 text-sm text-white/50">L&apos;accès à la pré-comptabilité est réservé à l&apos;Owner.</p>
       </div>

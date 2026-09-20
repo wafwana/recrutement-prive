@@ -1,5 +1,7 @@
 "use client";
 
+import { OwnerNavigation } from "@/components/owner/owner-navigation";
+
 import { useEffect, useState } from "react";
 
 type Item = {
@@ -38,10 +40,12 @@ export default function PrestationsTarifsPage() {
     if (res.ok) setItems(data.items || items);
   }
 
-  if (loading) return <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-20"><p className="text-white/50">Chargement des prestations…</p></section>;
+  if (loading) return <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-20"><OwnerNavigation /><p className="mt-6 text-white/50">Chargement des prestations…</p></section>;
 
   return (
+
     <section className="mx-auto w-[min(1280px,calc(100%-40px))] py-12 md:w-[min(1280px,calc(100%-72px))] md:py-20">
+      <OwnerNavigation />
       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Prestations & tarifs</p>

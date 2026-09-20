@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { validatePassword } from "@/lib/password-policy";
 import { z } from "zod";
+import { PERMISSIONS } from "@/lib/auth/permissions";
 
 const createStaffSchema = z.object({
   name: z.string().trim().min(2, "Nom trop court").max(120),
@@ -14,8 +15,9 @@ const createStaffSchema = z.object({
 
 const updateStaffSchema = z.object({
   userId: z.string().min(1),
-  action: z.enum(["SUSPEND", "REACTIVATE", "REVOKE"]),
+  action: z.enum(["SUSPEND", "REACTIVATE", "REVOKE", "SET_PERMISSIONS"]),
   reason: z.string().trim().min(5, "Le motif de modification est obligatoire (5 caractères minimum)."),
+  permissions: z.array(z.enum(PERMISSIONS)).optional(),
 });
 
 async function requireOwner() {
@@ -34,8 +36,18 @@ export async function GET() {
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
   });
-
-  return NextResponse.json({ users });
+  const permissionRecords = await prisma.systemSetting.findMany({
+    where: { key: { in: users.map((user) => `permissions:${user.id}`) } },
+    select: { key: true, value: true },
+  });
+  const permissionsByUser = new Map(permissionRecords.map((record) => [record.key.slice("permissions:".length), record.value]));
+  return NextResponse.json({
+    users: users.map((user) => ({
+      ...user,
+      permissions: Array.isArray(permissionsByUser.get(user.id)) ? permissionsByUser.get(user.id) : [],
+    })),
+    availablePermissions: PERMISSIONS,
+  });
 }
 
 export async function POST(request: Request) {
@@ -82,6 +94,13 @@ export async function POST(request: Request) {
     select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
   });
 
+  await prisma.systemSetting.create({
+    data: {
+      key: `permissions:${newUser.id}`,
+      value: [],
+    },
+  });
+
   await prisma.auditLog.create({
     data: {
       actorUserId: ownerId,
@@ -126,9 +145,33 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "L'Owner suprême ne peut pas être modifié." }, { status: 403 });
   }
 
+  if (parsed.data.action === "SET_PERMISSIONS") {
+    if (targetUser.role === "CANDIDAT") {
+      return NextResponse.json({ error: "Les permissions déléguées concernent uniquement ADMIN et CONSULTANT." }, { status: 400 });
+    }
+    if (!parsed.data.permissions) {
+      return NextResponse.json({ error: "La matrice de permissions est obligatoire." }, { status: 400 });
+    }
+    await prisma.systemSetting.upsert({
+      where: { key: `permissions:${targetUser.id}` },
+      update: { value: parsed.data.permissions },
+      create: { key: `permissions:${targetUser.id}`, value: parsed.data.permissions },
+    });
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: ownerId,
+        actorRole: "OWNER",
+        action: "SET_PERMISSIONS",
+        targetType: "USER",
+        targetId: targetUser.id,
+        details: { permissions: parsed.data.permissions, reason: parsed.data.reason },
+      },
+    });
+    return NextResponse.json({ ok: true, userId: targetUser.id, permissions: parsed.data.permissions });
+  }
+
   let newStatus = targetUser.status;
   let newRole = targetUser.role;
-
   if (parsed.data.action === "SUSPEND") {
     newStatus = "SUSPENDED";
   } else if (parsed.data.action === "REACTIVATE") {

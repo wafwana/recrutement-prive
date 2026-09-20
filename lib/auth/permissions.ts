@@ -14,6 +14,12 @@ export const PERMISSIONS = [
   "MESSAGING",
   "REPORTING",
   "DOCUMENTS",
+  "DOCUMENTS_VIEW",
+  "DOCUMENTS_UPLOAD",
+  "DOCUMENTS_ANALYZE",
+  "DOCUMENTS_ARCHIVE",
+  "DOCUMENTS_DOWNLOAD",
+  "DOCUMENTS_SHARE",
   "PLATFORM_SETTINGS",
   "FINANCE",
   "STAFF_MANAGE",
@@ -34,13 +40,25 @@ export async function getUserPermissions(userId: string): Promise<Permission[] |
   );
 }
 
+const DOCUMENT_CHILD_PERMISSIONS = [
+  "DOCUMENTS_VIEW",
+  "DOCUMENTS_UPLOAD",
+  "DOCUMENTS_ANALYZE",
+  "DOCUMENTS_ARCHIVE",
+  "DOCUMENTS_DOWNLOAD",
+  "DOCUMENTS_SHARE",
+] as const;
+
 export async function hasPermission(userId: string, role: Role | string | undefined, permission: Permission): Promise<boolean> {
   if (role === "OWNER") return true;
   const permissions = await getUserPermissions(userId);
   // Backward compatibility: users created before granular governance keep their
   // existing role access until the OWNER explicitly configures their matrix.
   if (permissions === null) return role === "ADMIN" || role === "CONSULTANT";
-  return permissions.includes(permission);
+  if (permissions.includes(permission)) return true;
+  // DOCUMENTS is the legacy/master switch: enabling it grants the document sub-actions.
+  if (DOCUMENT_CHILD_PERMISSIONS.includes(permission) && permissions.includes("DOCUMENTS")) return true;
+  return false;
 }
 
 export async function requirePermission(
