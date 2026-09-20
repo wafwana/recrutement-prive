@@ -43,6 +43,23 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
     const createdAdmin = await ownerPost.json();
     assert.equal(createdAdmin.user.role, "ADMIN");
 
+    const permissionPatch = await runWithTestSession(ownerSession, () =>
+      PATCH(new Request("http://localhost/api/owner/admins", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          userId: createdAdmin.user.id,
+          action: "SET_PERMISSIONS",
+          reason: "Delegation ciblée",
+          permissions: ["CANDIDATES_VIEW", "DOCUMENTS", "CV_IMPORT"],
+        }),
+      })),
+    );
+    assert.equal(permissionPatch.status, 200);
+    assert.deepEqual((await permissionPatch.json()).permissions, ["CANDIDATES_VIEW", "DOCUMENTS", "CV_IMPORT"]);
+    const storedPermissions = await prisma.systemSetting.findUnique({ where: { key: `permissions:${createdAdmin.user.id}` } });
+    assert.deepEqual(storedPermissions?.value, ["CANDIDATES_VIEW", "DOCUMENTS", "CV_IMPORT"]);
+
     const consultantPost = await runWithTestSession(ownerSession, () => POST(createReq("CONSULTANT")));
     assert.equal(consultantPost.status, 201);
     const createdConsultant = await consultantPost.json();
@@ -107,6 +124,7 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
     assert.ok(auditEntries.some((entry) => entry.action === "REACTIVATE_ADMIN"));
     assert.ok(auditEntries.some((entry) => entry.action === "REVOKE_ADMIN"));
   } finally {
+    await prisma.systemSetting.deleteMany({ where: { key: { in: [`permissions:${admin.id}`, `permissions:${owner.id}`] } } });
     await prisma.auditLog.deleteMany({ where: { actorUserId: owner.id } });
     await prisma.user.deleteMany({ where: { id: { in: [admin.id, owner.id] } } });
     await prisma.user.deleteMany({ where: { email: { in: [`admin.${suffix}@example.test`, `consultant.${suffix}@example.test`] } } });
