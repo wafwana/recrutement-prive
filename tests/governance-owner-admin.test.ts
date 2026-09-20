@@ -5,6 +5,7 @@ import { runWithTestSession } from "../auth";
 import { GET, POST, PATCH } from "../app/api/owner/admins/route";
 import { hashPassword } from "../lib/password-crypto";
 import { hasPermission } from "../lib/auth/permissions";
+import { GET as archiveGET, POST as archivePOST, PATCH as archivePATCH } from "../app/api/owner/archivage/route";
 
 test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER cannot be altered", async () => {
   if (!process.env.DATABASE_URL) return;
@@ -61,7 +62,64 @@ test("OWNER/ADMIN governance: only OWNER can manage delegated staff, OWNER canno
     const storedPermissions = await prisma.systemSetting.findUnique({ where: { key: `permissions:${createdAdmin.user.id}` } });
     assert.deepEqual(storedPermissions?.value, ["CANDIDATES_VIEW", "DOCUMENTS", "CV_IMPORT"]);\n    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_UPLOAD"), true);\n    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_ANALYZE"), true);\n    assert.equal(await hasPermission(createdAdmin.user.id, "ADMIN", "DOCUMENTS_ARCHIVE"), true);
 
-    const consultantPost = await runWithTestSession(ownerSession, () => POST(createReq("CONSULTANT")));
+    const archivedDocument = await prisma.archivedDocument.create({
+      data: {
+        name: `delegated-${suffix}.pdf`,
+        originalName: `delegated-${suffix}.pdf`,
+        mimeType: "application/pdf",
+        fileData: Buffer.from("%PDF-test"),
+        size: 9,
+        senderUserId: createdAdmin.user.id,
+        senderRole: "ADMIN",
+        senderEmail: createdAdmin.user.email,
+        categoryPath: "ARCHIVE / TEST",
+        status: "A_VERIFIER",
+      },
+    });
+
+    const archiveList = await runWithTestSession(ownerSession, () => archiveGET(new Request("http://localhost/api/owner/archivage")));
+    assert.equal(archiveList.status, 200);
+
+    const delegatedArchiveList = await runWithTestSession(
+      { user: { id: createdAdmin.user.id, role: "ADMIN" } },
+      () => archiveGET(new Request("http://localhost/api/owner/archivage")),
+    );
+    assert.equal(delegatedArchiveList.status, 200);
+
+    const analysis = await runWithTestSession(
+      { user: { id: createdAdmin.user.id, role: "ADMIN" } },
+      () => archivePOST(new Request("http://localhost/api/owner/archivage", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ documentId: archivedDocument.id }),
+      })),
+    );
+    assert.equal(analysis.status, 200);
+
+    const reclassify = await runWithTestSession(
+      { user: { id: createdAdmin.user.id, role: "ADMIN" } },
+      () => archivePATCH(new Request("http://localhost/api/owner/archivage", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          documentId: archivedDocument.id,
+          newCategoryPath: "ARCHIVE / TEST / VERIFIE",
+          status: "VERIFIE",
+        }),
+      })),
+    );
+    assert.equal(reclassify.status, 200);
+
+    await prisma.systemSetting.update({
+      where: { key: `permissions:${createdAdmin.user.id}` },
+      data: { value: ["CANDIDATES_VIEW"] },
+    });
+    const deniedArchiveList = await runWithTestSession(
+      { user: { id: createdAdmin.user.id, role: "ADMIN" } },
+      () => archiveGET(new Request("http://localhost/api/owner/archivage")),
+    );
+    assert.equal(deniedArchiveList.status, 403);
+\n    const consultantPost = await runWithTestSession(ownerSession, () => POST(createReq("CONSULTANT")));
     assert.equal(consultantPost.status, 201);
     const createdConsultant = await consultantPost.json();
 
