@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth, getActiveSessionContext } from "@/auth";
+import { auth, getActiveSessionContext, type AuthSession } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { PERMISSIONS, type Permission, getUserPermissions } from "@/lib/auth/permissions";
 import { z } from "zod";
@@ -9,8 +9,8 @@ const schema = z.object({
   permissions: z.array(z.string()).default([]),
 });
 
-function isOwner(session: Awaited<ReturnType<typeof auth>>) {
-  return session?.user?.id && session.user.role === "OWNER";
+function isOwner(session: AuthSession | null) {
+  return Boolean(session?.user?.id && session.user.role === "OWNER");
 }
 
 export async function GET() {
@@ -24,11 +24,10 @@ export async function GET() {
     select: { id: true, name: true, email: true, role: true, status: true },
   });
 
-  const result = await Promise.all(users.map(async (user) => ({
-    ...user,
-    permissions: await getUserPermissions(user.id),
-    configured: (await getUserPermissions(user.id)) !== null,
-  })));
+  const result = await Promise.all(users.map(async (user) => {
+    const permissions = await getUserPermissions(user.id);
+    return { ...user, permissions, configured: permissions !== null };
+  }));
 
   return NextResponse.json({ permissions: PERMISSIONS, users: result });
 }
@@ -37,6 +36,9 @@ export async function PUT(request: Request) {
   const active = getActiveSessionContext();
   const session = active || (await auth());
   if (!isOwner(session)) return NextResponse.json({ error: "Accès réservé à l'Owner." }, { status: 403 });
+
+  const ownerId = session?.user?.id;
+  if (!ownerId) return NextResponse.json({ error: "Session Owner invalide." }, { status: 403 });
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Données invalides." }, { status: 400 });
@@ -61,7 +63,7 @@ export async function PUT(request: Request) {
 
   await prisma.auditLog.create({
     data: {
-      actorUserId: session!.user!.id!,
+      actorUserId: ownerId,
       actorRole: "OWNER",
       action: "UPDATE_STAFF_PERMISSIONS",
       targetType: "USER",
