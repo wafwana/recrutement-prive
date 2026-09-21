@@ -7,9 +7,11 @@ import { hasPermission } from "@/lib/auth/permissions";
 async function requireStaffPermission() {
   const active = getActiveSessionContext();
   const session = active || (await auth());
-  if (!session?.user?.id || !["OWNER", "ADMIN", "CONSULTANT"].includes(session.user.role ?? "")) return null;
-  if (!(await hasPermission(session.user.id, session.user.role, "SOURCING"))) return null;
-  return session.user.id;
+  const userId = session?.user?.id;
+  const role = session?.user?.role;
+  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role ?? "")) return null;
+  if (!(await hasPermission(userId, role, "SOURCING"))) return null;
+  return userId;
 }
 export async function POST(request: Request) {
   const actor = await requireStaffPermission();
