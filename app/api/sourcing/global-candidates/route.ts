@@ -8,7 +8,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 async function requireStaffPermission() {
   const active = getActiveSessionContext();
   const session = active || (await auth());
-  const userId = session?.user?.id ?? undefined;
+  const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const role = session?.user?.role;
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role ?? "")) return null;
   if (!(await hasPermission(userId, role, "SOURCING"))) return null;
