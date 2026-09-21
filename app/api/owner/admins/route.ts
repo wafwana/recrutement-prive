@@ -22,11 +22,13 @@ async function requireOwner() {
   if (!session?.user?.id || session.user.role !== "OWNER") return null;
   return session.user.id;
 }
-export async function GET() {
+export async function GET(request: Request) {
   const ownerId = await requireOwner();
   if (!ownerId) return NextResponse.json({ error: "Accès réservé à l'Owner" }, { status: 403 });
+  const roleFilter = new URL(request.url).searchParams.get("role");
+  const role = roleFilter === "ADMIN" || roleFilter === "CONSULTANT" ? roleFilter : undefined;
   const users = await prisma.user.findMany({
-    where: { role: { in: ["ADMIN", "CONSULTANT"] } }, orderBy: { createdAt: "asc" },
+    where: role ? { role } : { role: { in: ["ADMIN", "CONSULTANT"] } }, orderBy: { createdAt: "asc" },
     select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
   });
   return NextResponse.json({ users });

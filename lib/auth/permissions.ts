@@ -11,12 +11,11 @@ export const PERMISSIONS = [
   "PRESENTATIONS_MANAGE",
   "COMPANIES_MANAGE",
   "CRM",
-  "MESSAGING",
   "REPORTING",
-  "DOCUMENTS",
+  "DOCUMENTS_DEPOSIT",
+  "DOCUMENTS_VIEW",
+  "MESSAGING_CLIENTS_ENTERPRISE",
   "PLATFORM_SETTINGS",
-  "FINANCE",
-  "STAFF_MANAGE",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -29,8 +28,19 @@ export async function getUserPermissions(userId: string): Promise<Permission[] |
   if (!record) return null;
   const value = record.value;
   if (!Array.isArray(value)) return [];
-  return value.filter((item): item is Permission =>
-    typeof item === "string" && (PERMISSIONS as readonly string[]).includes(item),
+  const normalized = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    if ((PERMISSIONS as readonly string[]).includes(item)) normalized.add(item);
+    // Preserve existing staff access created before the permission split.
+    if (item === "DOCUMENTS") {
+      normalized.add("DOCUMENTS_DEPOSIT");
+      normalized.add("DOCUMENTS_VIEW");
+    }
+    if (item === "MESSAGING") normalized.add("MESSAGING_CLIENTS_ENTERPRISE");
+  }
+  return [...normalized].filter((item): item is Permission =>
+    (PERMISSIONS as readonly string[]).includes(item),
   );
 }
 
