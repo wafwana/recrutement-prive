@@ -48,6 +48,7 @@ export default async function OwnerPage() {
           <Link href="/espace/owner/archivage" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Archive Centralisée</Link>
           <Link href="/espace/owner/pre-comptabilite" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Pré-comptabilité</Link>
           <Link href="/espace/owner/admins" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Gouvernance Staff</Link>
+          <Link href="/owner/permissions" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Gestion des permissions</Link>
           <Link href="/espace/owner/prestations-tarifs" className="border border-[#c7a15a]/50 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Prestations & tarifs</Link>
           <OwnerLogoutButton />
           <span className="border border-[#c7a15a]/30 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">{role}</span>

@@ -76,6 +76,8 @@ export default function OwnerAdminsPage() {
     <section className="mx-auto w-[min(900px,calc(100%-40px))] py-12 md:w-[min(900px,calc(100%-72px))] md:py-20">
       <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Gouvernance</p>
       <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Gouvernance ADMIN & CONSULTANT.</h1>
+      <div className="mt-6"><a href="/owner/permissions" className="inline-block border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Gestion des permissions</a></div>
+
       <p className="mt-5 max-w-3xl text-sm leading-7 text-white/50">
         Seul l&apos;Owner détient l&apos;autorité suprême. L&apos;Owner peut désigner, suspendre ou révoquer les administrateurs et consultants.
         Un Administrateur ne peut jamais se promouvoir Owner ni altérer l&apos;Owner.
