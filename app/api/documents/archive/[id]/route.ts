@@ -30,7 +30,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     return NextResponse.json({ error: "Document sensible réservé à l'Owner." }, { status: 403 });
   }
 
-  const body = new ArrayBuffer(doc.fileData.byteLength);\n  new Uint8Array(body).set(doc.fileData);\n\n  return new NextResponse(body, {
+  const body = new ArrayBuffer(doc.fileData.byteLength);
+  new Uint8Array(body).set(doc.fileData);
+
+  return new NextResponse(body, {
     headers: {
       "Content-Type": doc.mimeType || "application/octet-stream",
       "Content-Disposition": `inline; filename="${encodeURIComponent(doc.name)}"`,
