@@ -22,8 +22,6 @@ const labels: Record<string, string> = {
   DOCUMENTS_VIEW: "Consulter les documents (hors sensibles)",
   MESSAGING_CLIENTS_ENTERPRISE: "Messagerie clients / entreprises",
   PLATFORM_SETTINGS: "Configuration plateforme",
-  ADMIN_MANAGE: "Gérer les ADMIN",
-  CONSULTANT_MANAGE: "Gérer les CONSULTANTS",
 };
 
 export default function OwnerPermissionsPage() {
