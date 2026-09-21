@@ -11,7 +11,7 @@ export default function OwnerAdminsPage() {
   const [message, setMessage] = useState("");
 
   async function load() {
-    const response = await fetch("/api/owner/admins", { cache: "no-store" });
+    const response = await fetch("/api/owner/admins?role=ADMIN", { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) {
       setMessage(data.error || "Accès refusé.");
@@ -76,7 +76,11 @@ export default function OwnerAdminsPage() {
     <section className="mx-auto w-[min(900px,calc(100%-40px))] py-12 md:w-[min(900px,calc(100%-72px))] md:py-20">
       <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Gouvernance</p>
       <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Gouvernance ADMIN & CONSULTANT.</h1>
-      <div className="mt-6"><a href="/owner/permissions" className="inline-block border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Gestion des permissions</a></div>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <a href="/espace/owner/admins" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Gérer les ADMIN</a>
+        <a href="/espace/owner/consultants" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Gérer les CONSULTANTS</a>
+        <a href="/owner/permissions" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Gestion des permissions</a>
+      </div>
 
       <p className="mt-5 max-w-3xl text-sm leading-7 text-white/50">
         Seul l&apos;Owner détient l&apos;autorité suprême. L&apos;Owner peut désigner, suspendre ou révoquer les administrateurs et consultants.
