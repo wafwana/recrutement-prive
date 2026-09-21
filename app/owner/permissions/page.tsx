@@ -17,12 +17,13 @@ const labels: Record<string, string> = {
   PRESENTATIONS_MANAGE: "Présentations candidats",
   COMPANIES_MANAGE: "Gérer les entreprises",
   CRM: "CRM",
-  MESSAGING: "Messagerie",
   REPORTING: "Reporting",
-  DOCUMENTS: "Documents",
+  DOCUMENTS_DEPOSIT: "Déposer un document",
+  DOCUMENTS_VIEW: "Consulter les documents (hors sensibles)",
+  MESSAGING_CLIENTS_ENTERPRISE: "Messagerie clients / entreprises",
   PLATFORM_SETTINGS: "Configuration plateforme",
-  FINANCE: "Fonctions financières",
-  STAFF_MANAGE: "Gestion des ADMIN / CONSULTANT",
+  ADMIN_MANAGE: "Gérer les ADMIN",
+  CONSULTANT_MANAGE: "Gérer les CONSULTANTS",
 };
 
 export default function OwnerPermissionsPage() {
@@ -30,6 +31,7 @@ export default function OwnerPermissionsPage() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   async function load() {
     const res = await fetch("/api/owner/permissions", { cache: "no-store" });
@@ -53,7 +55,7 @@ export default function OwnerPermissionsPage() {
   }
 
   async function save(user: Staff) {
-    setSaving(user.id); setError(null);
+    setSaving(user.id); setError(null); setSuccess(null);
     const res = await fetch("/api/owner/permissions", {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: user.id, permissions: user.permissions || [] }),
@@ -62,6 +64,7 @@ export default function OwnerPermissionsPage() {
     setSaving(null);
     if (!res.ok) { setError(data.error || "Enregistrement impossible."); return; }
     await load();
+    setSuccess(`Permissions de ${user.name || user.email} enregistrées et vérifiées. La modification est journalisée.`);
   }
 
   return (
@@ -74,6 +77,7 @@ export default function OwnerPermissionsPage() {
           Les collaborateurs ne voient jamais cette matrice.
         </p>
         {error && <p className="mt-5 rounded border border-red-400/40 bg-red-400/10 p-3 text-sm">{error}</p>}
+        {success && <p aria-live="polite" className="mt-5 rounded border border-emerald-400/40 bg-emerald-400/10 p-3 text-sm text-emerald-300">{success}</p>}
         <div className="mt-8 space-y-6">
           {staff.map((user) => (
             <section key={user.id} className="rounded border border-white/10 bg-white/5 p-5">
