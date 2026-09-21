@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import OwnerLogoutButton from "./OwnerLogoutButton";
 
 const applicationLabels: Record<string, string> = {
   SUBMITTED: "Soumises",
@@ -48,6 +49,7 @@ export default async function OwnerPage() {
           <Link href="/espace/owner/pre-comptabilite" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Pré-comptabilité</Link>
           <Link href="/espace/owner/admins" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Gouvernance Staff</Link>
           <Link href="/espace/owner/prestations-tarifs" className="border border-[#c7a15a]/50 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Prestations & tarifs</Link>
+          <OwnerLogoutButton />
           <span className="border border-[#c7a15a]/30 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">{role}</span>
         </div>
       </div>
