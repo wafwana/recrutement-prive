@@ -40,8 +40,29 @@ export async function POST(request: Request) {
   const passVal = validatePassword(parsed.data.password);
   if (!passVal.isValid) return NextResponse.json({ error: `Le mot de passe ne respecte pas la politique de sécurité : ${passVal.errors.join(" ")}` }, { status: 400 });
   const email = parsed.data.email.toLowerCase();
-  const existingUser = await prisma.user.findUnique({ where: { email }, select: { id: true, role: true } });
-  if (existingUser) return NextResponse.json({ error: "Cette adresse email est déjà utilisée." }, { status: 409 });
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, name: true, email: true, role: true, status: true, candidat: { select: { id: true } } },
+  });
+
+  // OWNER-only staff creation may reuse an existing candidate account.
+  // Preserve the CandidateProfile, applications, documents and history.
+  if (existingUser) {
+    if (existingUser.role !== "CANDIDAT" || !existingUser.candidat) {
+      return NextResponse.json({ error: "Cette adresse email est déjà utilisée par un membre de l'équipe." }, { status: 409 });
+    }
+    const updatedUser = await prisma.user.update({
+      where: { id: existingUser.id },
+      data: { name: parsed.data.name, passwordHash: await hashPassword(parsed.data.password), role: parsed.data.role, status: "ACTIVE" },
+      select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
+    });
+    await prisma.$executeRaw`INSERT INTO "SystemSetting" ("id", "key", "value", "createdAt", "updatedAt") VALUES (${`perm_${updatedUser.id}`}, ${`permissions:${updatedUser.id}`}, ${JSON.stringify([])}::jsonb, NOW(), NOW()) ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value", "updatedAt" = NOW()`;
+    await prisma.auditLog.create({
+      data: { actorUserId: ownerId, actorRole: "OWNER", action: `PROMOTE_CANDIDAT_TO_${parsed.data.role}`, targetType: "USER", targetId: updatedUser.id,
+        details: { email: updatedUser.email, role: updatedUser.role, candidateProfilePreserved: true, permissionsInitialized: true } },
+    });
+    return NextResponse.json({ user: updatedUser, candidateProfilePreserved: true }, { status: 201 });
+  }
   const newUser = await prisma.user.create({
     data: { name: parsed.data.name, email, passwordHash: await hashPassword(parsed.data.password), role: parsed.data.role, status: "ACTIVE" },
     select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
