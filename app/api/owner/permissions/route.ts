@@ -29,7 +29,7 @@ export async function GET() {
     return { ...user, permissions, configured: permissions !== null };
   }));
 
-  return NextResponse.json({ permissions: PERMISSIONS, users: result });
+  const visiblePermissions = PERMISSIONS.filter((permission) => permission !== "DOCUMENTS");\n  return NextResponse.json({ permissions: visiblePermissions, users: result });
 }
 
 export async function PUT(request: Request) {
