@@ -3,6 +3,7 @@ import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { validatePassword } from "@/lib/password-policy";
+import { sendEmail } from "@/lib/email/service";
 import { z } from "zod";
 
 const createStaffSchema = z.object({
@@ -16,6 +17,33 @@ const updateStaffSchema = z.object({
   action: z.enum(["SUSPEND", "REACTIVATE", "REVOKE"]),
   reason: z.string().trim().min(5, "Le motif de modification est obligatoire (5 caractères minimum)."),
 });
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+async function sendStaffInvitation(params: { name: string; email: string; password: string; role: "ADMIN" | "CONSULTANT" }) {
+  const loginUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://www.recrutement-prive.com";
+  const roleLabel = params.role === "ADMIN" ? "ADMIN" : "CONSULTANT";
+  return sendEmail({
+    to: params.email,
+    subject: "Votre accès collaborateur — Recrutement Privé",
+    html: '<div style="font-family:Arial,sans-serif;color:#111;max-width:600px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;">' +
+      '<h2 style="color:#0b1b2b;margin-top:0;">Recrutement Privé — Accès collaborateur</h2>' +
+      '<p>Bonjour <strong>' + escapeHtml(params.name) + '</strong>,</p>' +
+      '<p>Votre accès <strong>' + roleLabel + '</strong> à la plateforme Recrutement Privé vient d\'être créé par l\'Owner.</p>' +
+      '<div style="background:#f8fafc;padding:16px;margin:20px 0;border-left:4px solid #f97316;">' +
+      '<p><strong>Identifiant :</strong> ' + escapeHtml(params.email) + '</p>' +
+      '<p><strong>Mot de passe :</strong> ' + escapeHtml(params.password) + '</p>' +
+      '<p><strong>Rôle :</strong> ' + roleLabel + '</p></div>' +
+      '<p><a href="' + escapeHtml(loginUrl) + '" style="display:inline-block;background:#0b1b2b;color:#fff;padding:12px 18px;text-decoration:none;border-radius:6px;">Accéder à la plateforme</a></p>' +
+      '<p style="font-size:13px;color:#666;">Vos permissions sont définies séparément par l\'Owner. Elles ne sont pas accordées automatiquement lors de la création du compte.</p>' +
+      '<p style="font-size:12px;color:#888;margin-top:28px;">Si vous n\'attendiez pas cet accès, contactez Recrutement Privé.</p></div>',
+  });
+}
 async function requireOwner() {
   const activeSession = getActiveSessionContext();
   const session = activeSession || (await auth());
@@ -59,11 +87,12 @@ export async function POST(request: Request) {
       select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
     });
     await prisma.$executeRaw`INSERT INTO "SystemSetting" ("id", "key", "value", "createdAt", "updatedAt") VALUES (${`perm_${updatedUser.id}`}, ${`permissions:${updatedUser.id}`}, ${JSON.stringify([])}::jsonb, NOW(), NOW()) ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value", "updatedAt" = NOW()`;
+    const emailResult = await sendStaffInvitation({ name: updatedUser.name || parsed.data.name, email: updatedUser.email, password: parsed.data.password, role: parsed.data.role });
     await prisma.auditLog.create({
       data: { actorUserId: ownerId, actorRole: "OWNER", action: `PROMOTE_CANDIDAT_TO_${parsed.data.role}`, targetType: "USER", targetId: updatedUser.id,
-        details: { email: updatedUser.email, role: updatedUser.role, candidateProfilePreserved: true, permissionsInitialized: true } },
+        details: { email: updatedUser.email, role: updatedUser.role, candidateProfilePreserved: true, permissionsInitialized: true, invitationEmailSent: emailResult.ok, invitationEmailId: emailResult.id || null } },
     });
-    return NextResponse.json({ user: updatedUser, candidateProfilePreserved: true }, { status: 201 });
+    return NextResponse.json({ user: updatedUser, candidateProfilePreserved: true, invitationEmailSent: emailResult.ok, emailError: emailResult.ok ? undefined : emailResult.error }, { status: 201 });
   }
   const newUser = await prisma.user.create({
     data: { name: parsed.data.name, email, passwordHash: await hashPassword(parsed.data.password), role: parsed.data.role, status: "ACTIVE" },
@@ -73,11 +102,12 @@ export async function POST(request: Request) {
   // Use the existing SystemSetting table directly so this remains compatible
   // with the generated Prisma client on the current platform baseline.
   await prisma.$executeRaw`INSERT INTO "SystemSetting" ("id", "key", "value", "createdAt", "updatedAt") VALUES (${`perm_${newUser.id}`}, ${`permissions:${newUser.id}`}, ${JSON.stringify([])}::jsonb, NOW(), NOW())`;
+  const emailResult = await sendStaffInvitation({ name: newUser.name || parsed.data.name, email: newUser.email, password: parsed.data.password, role: parsed.data.role });
   await prisma.auditLog.create({
     data: { actorUserId: ownerId, actorRole: "OWNER", action: `CREATE_${parsed.data.role}`, targetType: "USER", targetId: newUser.id,
-      details: { email: newUser.email, role: newUser.role, permissionsInitialized: true } },
+      details: { email: newUser.email, role: newUser.role, permissionsInitialized: true, invitationEmailSent: emailResult.ok, invitationEmailId: emailResult.id || null } },
   });
-  return NextResponse.json({ user: newUser }, { status: 201 });
+  return NextResponse.json({ user: newUser, invitationEmailSent: emailResult.ok, emailError: emailResult.ok ? undefined : emailResult.error }, { status: 201 });
 }
 export async function PATCH(request: Request) {
   const ownerId = await requireOwner();
