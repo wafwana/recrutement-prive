@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { hasPermission } from "@/lib/auth/permissions";
 
 const createMessageSchema = z.object({
   recipientId: z.string().trim().min(1).optional(),
@@ -21,6 +22,32 @@ async function isDirectCandidateCompanyConversation(conversationId: string) {
   });
   const roles = new Set(participants.map((participant) => participant.user.role));
   return roles.has("CANDIDAT") && roles.has("ENTREPRISE") && participants.length === 2;
+}
+
+async function assertStaffMessagingPermission(userId: string, role: string | undefined) {
+  if (role === "ADMIN" || role === "CONSULTANT") {
+    return hasPermission(userId, role, "MESSAGING_CLIENTS_ENTERPRISE");
+  }
+  return true;
+}
+
+async function assertStaffConversationScope(userId: string, role: string | undefined, recipientId?: string, conversationId?: string) {
+  if (role !== "ADMIN" && role !== "CONSULTANT") return;
+  const allowed = await assertStaffMessagingPermission(userId, role);
+  if (!allowed) throw new Error("Permission requise : messagerie clients / entreprises.");
+  if (conversationId) {
+    const participants = await prisma.conversationParticipant.findMany({
+      where: { conversationId },
+      include: { user: { select: { role: true } } },
+    });
+    if (participants.some((p) => p.user.role !== "ENTREPRISE" && p.user.role !== "ADMIN" && p.user.role !== "CONSULTANT" && p.user.role !== "OWNER")) {
+      throw new Error("Cette conversation n'est pas dans le périmètre clients / entreprises.");
+    }
+  }
+  if (recipientId) {
+    const recipient = await prisma.user.findUnique({ where: { id: recipientId }, select: { role: true } });
+    if (!recipient || recipient.role !== "ENTREPRISE") throw new Error("La messagerie staff est limitée aux entreprises clientes.");
+  }
 }
 
 async function assertNoDirectCandidateCompanyContact(userId: string, recipientId?: string, conversationId?: string) {
@@ -44,7 +71,14 @@ export async function GET(request: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
   const userId = session.user.id;
+  const userRole = session.user.role || undefined;
   const conversationId = new URL(request.url).searchParams.get("conversationId");
+
+  try {
+    await assertStaffConversationScope(userId, userRole, undefined, conversationId ?? undefined);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Accès refusé" }, { status: 403 });
+  }
 
   if (conversationId) {
     const participant = await prisma.conversationParticipant.findUnique({
@@ -93,7 +127,9 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Message invalide", issues: parsed.error.issues }, { status: 400 });
 
   const senderId = session.user.id;
+  const senderRole = session.user.role || undefined;
   try {
+    await assertStaffConversationScope(senderId, senderRole, parsed.data.recipientId, parsed.data.conversationId ?? undefined);
     await assertNoDirectCandidateCompanyContact(senderId, parsed.data.recipientId, parsed.data.conversationId ?? undefined);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Contact interdit" }, { status: 403 });
