@@ -130,7 +130,7 @@ export async function POST(request: Request) {
       date: new Date(),
     });
 
-    const isSensitiveDocument = /^(ARCHIVAGE\\/(FINANCE|COMPTABILITE|CONTRATS)(\\/|$))/i.test(classification.categoryPath);
+    const isSensitiveDocument = classification.categoryPath.toUpperCase().startsWith("ARCHIVAGE/FINANCE") || classification.categoryPath.toUpperCase().startsWith("ARCHIVAGE/COMPTABILITE") || classification.categoryPath.toUpperCase().startsWith("ARCHIVAGE/CONTRATS");
     if ((userRole === "ADMIN" || userRole === "CONSULTANT") && isSensitiveDocument) {
       return NextResponse.json({ error: "Les documents financiers, comptables, contractuels ou sensibles sont réservés à l'Owner." }, { status: 403 });
     }
