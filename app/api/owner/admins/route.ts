@@ -47,8 +47,9 @@ export async function POST(request: Request) {
     select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
   });
   // A newly created staff member starts with NO granular permissions.
-  // The OWNER must explicitly enable each required capability.
-  await prisma.systemSetting.create({ key: `permissions:${newUser.id}`, value: [] });
+  // Use the existing SystemSetting table directly so this remains compatible
+  // with the generated Prisma client on the current platform baseline.
+  await prisma.$executeRaw`INSERT INTO "SystemSetting" ("id", "key", "value", "createdAt", "updatedAt") VALUES (${`perm_${newUser.id}`}, ${`permissions:${newUser.id}`}, ${JSON.stringify([])}::jsonb, NOW(), NOW())`;
   await prisma.auditLog.create({
     data: { actorUserId: ownerId, actorRole: "OWNER", action: `CREATE_${parsed.data.role}`, targetType: "USER", targetId: newUser.id,
       details: { email: newUser.email, role: newUser.role, permissionsInitialized: true } },
