@@ -16,8 +16,6 @@ export const PERMISSIONS = [
   "DOCUMENTS_VIEW",
   "MESSAGING_CLIENTS_ENTERPRISE",
   "PLATFORM_SETTINGS",
-  "ADMIN_MANAGE",
-  "CONSULTANT_MANAGE",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -40,10 +38,6 @@ export async function getUserPermissions(userId: string): Promise<Permission[] |
       normalized.add("DOCUMENTS_VIEW");
     }
     if (item === "MESSAGING") normalized.add("MESSAGING_CLIENTS_ENTERPRISE");
-    if (item === "STAFF_MANAGE") {
-      normalized.add("ADMIN_MANAGE");
-      normalized.add("CONSULTANT_MANAGE");
-    }
   }
   return [...normalized].filter((item): item is Permission =>
     (PERMISSIONS as readonly string[]).includes(item),
