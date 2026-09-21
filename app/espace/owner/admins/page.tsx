@@ -18,7 +18,7 @@ export default function OwnerAdminsPage() {
       setLoading(false);
       return;
     }
-    setUsers(data.users || []);
+    setUsers((data.users || []).filter((user: StaffUser) => user.role === "ADMIN"));
     setLoading(false);
   }
 
@@ -36,7 +36,7 @@ export default function OwnerAdminsPage() {
         name: form.get("name"),
         email: form.get("email"),
         password: form.get("password"),
-        role: form.get("role"),
+        role: "ADMIN",
       }),
     });
     const data = await response.json();
@@ -75,8 +75,8 @@ export default function OwnerAdminsPage() {
   return (
     <section className="mx-auto w-[min(900px,calc(100%-40px))] py-12 md:w-[min(900px,calc(100%-72px))] md:py-20">
       <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Gouvernance</p>
-      <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Gouvernance ADMIN & CONSULTANT.</h1>
-      <div className="mt-6"><a href="/owner/permissions" className="inline-block border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Gestion des permissions</a></div>
+      <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Gestion des ADMINISTRATEURS.</h1>
+      <div className="mt-6 flex flex-wrap gap-3"><a href="/espace/owner/consultants" className="inline-block border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Gérer les consultants</a><a href="/owner/permissions" className="inline-block border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Gestion des permissions</a></div>
 
       <p className="mt-5 max-w-3xl text-sm leading-7 text-white/50">
         Seul l&apos;Owner détient l&apos;autorité suprême. L&apos;Owner peut désigner, suspendre ou révoquer les administrateurs et consultants.
@@ -90,7 +90,6 @@ export default function OwnerAdminsPage() {
               <label className="text-xs text-white/45">Rôle
                 <select name="role" required className="mt-2 w-full border border-white/10 bg-black px-4 py-3 text-sm text-white outline-none">
                   <option value="ADMIN">ADMINISTRATEUR</option>
-                  <option value="CONSULTANT">CONSULTANT</option>
                 </select>
               </label>
               <label className="text-xs text-white/45">Nom
@@ -112,7 +111,7 @@ export default function OwnerAdminsPage() {
           {message && <p aria-live="polite" className="mt-5 border border-white/10 p-5 text-sm text-white/60">{message}</p>}
 
           <section className="mt-10 border border-white/10 p-7">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Équipe d&apos;administration et consultants</p>
+            <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Administrateurs enregistrés</p>
             <div className="mt-6 space-y-3">
               {users.length === 0 && <p className="text-sm text-white/35">Aucun membre enregistré.</p>}
               {users.map((u) => (
