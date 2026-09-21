@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
 import { auth, getActiveSessionContext } from "@/auth";
+import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { DocumentArchiveStatus } from "@prisma/client";
+
+async function requireDocumentViewer() {
+  const activeSession = getActiveSessionContext();
+  const session = activeSession || (await auth());
+  if (!session?.user?.id) return null;
+  if (session.user.role === "OWNER") return session.user;
+  if (session.user.role !== "ADMIN" && session.user.role !== "CONSULTANT") return null;
+  const allowed = await hasPermission(session.user.id, session.user.role, "DOCUMENTS_VIEW_ALL");
+  return allowed ? session.user : null;
+}
 
 async function requireOwner() {
   const activeSession = getActiveSessionContext();
@@ -11,9 +22,9 @@ async function requireOwner() {
 }
 
 export async function GET(request: Request) {
-  const owner = await requireOwner();
-  if (!owner) {
-    return NextResponse.json({ error: "Accès strictement réservé à l'Owner." }, { status: 403 });
+  const viewer = await requireDocumentViewer();
+  if (!viewer) {
+    return NextResponse.json({ error: "Permission requise : consulter tous les documents." }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);
