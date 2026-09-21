@@ -19,7 +19,7 @@ const labels: Record<string, string> = {
   CRM: "CRM",
   MESSAGING: "Messagerie",
   REPORTING: "Reporting",
-  DOCUMENTS: "Documents",
+  DOCUMENTS_UPLOAD: "Entrer un document",\n  DOCUMENTS_VIEW_ALL: "Consulter tous les documents",
   PLATFORM_SETTINGS: "Configuration plateforme",
   FINANCE: "Fonctions financières",
   STAFF_MANAGE: "Gestion des ADMIN / CONSULTANT",
