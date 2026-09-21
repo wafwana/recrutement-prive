@@ -3,6 +3,7 @@ import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { classifyDocument } from "@/lib/archiving/classifier";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
+import { hasPermission } from "@/lib/auth/permissions";
 import { sendDepositConfirmation, sendOwnerAlert } from "@/lib/email/service";
 
 function escapeHtml(value: string) {
@@ -113,6 +114,10 @@ export async function POST(request: Request) {
     const trustedAmountTva = userRole === "OWNER" || userRole === "ADMIN" ? amountTva : undefined;
     const trustedAmountTtc = userRole === "OWNER" || userRole === "ADMIN" ? amountTtc : undefined;
 
+    if ((userRole === "ADMIN" || userRole === "CONSULTANT") && !(await hasPermission(userId, userRole, "DOCUMENTS_DEPOSIT"))) {
+      return NextResponse.json({ error: "Permission requise : dépôt de documents." }, { status: 403 });
+    }
+
     const classification = classifyDocument({
       fileName: file.name,
       docType,
@@ -124,6 +129,11 @@ export async function POST(request: Request) {
       amountTtc: trustedAmountTtc,
       date: new Date(),
     });
+
+    const isSensitiveDocument = /^(ARCHIVAGE\\/(FINANCE|COMPTABILITE|CONTRATS)(\\/|$))/i.test(classification.categoryPath);
+    if ((userRole === "ADMIN" || userRole === "CONSULTANT") && isSensitiveDocument) {
+      return NextResponse.json({ error: "Les documents financiers, comptables, contractuels ou sensibles sont réservés à l'Owner." }, { status: 403 });
+    }
 
     const transmissionRef = `DEP-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
