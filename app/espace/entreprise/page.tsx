@@ -48,12 +48,22 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
     orderBy: { updatedAt: "desc" },
   });
 
-  const categories = await prisma.jobCategory.findMany({\n    where: { isActive: true },\n    select: { id: true, code: true, name: true, parentId: true, sortOrder: true },\n    orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],\n  });\n\n  const rawApplications = await prisma.application.findMany({
+  const categories = await prisma.jobCategory.findMany({
+    where: { isActive: true },
+    select: { id: true, code: true, name: true, parentId: true, sortOrder: true },
+    orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
+  });
+
+  const rawApplications = await prisma.application.findMany({
     where: {
       job: { companyId: access.companyId },
       presentations: { some: { companyId: access.companyId } },
     },
-    include: {\n      job: { select: { id: true, title: true } },\n      presentations: { where: { companyId: access.companyId }, orderBy: { presentedAt: "desc" }, take: 1 },\n    },\n    orderBy: { updatedAt: "desc" },
+    include: {
+      job: { select: { id: true, title: true } },
+      presentations: { where: { companyId: access.companyId }, orderBy: { presentedAt: "desc" }, take: 1 },
+    },
+    orderBy: { updatedAt: "desc" },
   });
 
   const applications = rawApplications.map((app) => ({
