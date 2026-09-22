@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
 import { buildProfessionRoot } from "@/lib/cv/folders";
+import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -16,6 +17,7 @@ export default async function OwnerMetiersPage({ searchParams }: { searchParams:
   if (!session?.user?.id || session.user.role !== "OWNER") redirect("/connexion");
 
   const params = await searchParams;
+  await ensureTaxonomySynced();
   const selectedSector = one(params.sector) || "";
   const selectedProfession = one(params.profession) || "";
 
