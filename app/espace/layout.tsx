@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { CollaboratorActivityTracker } from "@/components/activity/CollaboratorActivityTracker";
 
 const navigation = [
   { href: "/espace/candidat", label: "Candidat", role: "CANDIDAT" },
@@ -35,6 +36,7 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
           </nav>
         </div>
       </header>
+      <CollaboratorActivityTracker />
       {children}
     </main>
   );
