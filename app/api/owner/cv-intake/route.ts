@@ -5,10 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { analyzeCvDocument } from "@/lib/cv/analyzer";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 
-function isOwner(session: Awaited<ReturnType<typeof auth>> | null) {
-  return Boolean(session?.user?.id && session.user.role === "OWNER");
-}
-
 function scoreJob(analysis: Awaited<ReturnType<typeof analyzeCvDocument>>, job: { id: string; title: string; requiredSkills: unknown; requiredExperienceYears: number | null; jobCategoryId: string | null; subCategoryId: string | null }) {
   if (!analysis) return 0;
   const candidateSkills = new Set(analysis.skills.map((skill) => skill.toLowerCase()));
@@ -26,7 +22,9 @@ function scoreJob(analysis: Awaited<ReturnType<typeof analyzeCvDocument>>, job: 
 
 export async function GET(request: Request) {
   const session = getActiveSessionContext() || (await auth());
-  if (!isOwner(session)) return NextResponse.json({ error: "Accès Owner requis." }, { status: 403 });
+  const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
+  const userEmail = typeof session?.user?.email === "string" ? session.user.email : "";
+  if (!userId || session?.user?.role !== "OWNER") return NextResponse.json({ error: "Accès Owner requis." }, { status: 403 });
 
   const q = new URL(request.url).searchParams.get("q")?.trim().toLowerCase();
   const items = await prisma.cvIntake.findMany({
@@ -56,7 +54,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const session = getActiveSessionContext() || (await auth());
-  if (!isOwner(session)) return NextResponse.json({ error: "Import de CV réservé à l'Owner." }, { status: 403 });
+  const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
+  const userEmail = typeof session?.user?.email === "string" ? session.user.email : "";
+  if (!userId || session?.user?.role !== "OWNER") return NextResponse.json({ error: "Import de CV réservé à l'Owner." }, { status: 403 });
 
   try {
     const formData = await request.formData();
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     const taxonomy = await prisma.jobCategory.findMany({
       where: { isActive: true },
       orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
-      select: { code: true, name: true, parentId: true },
+      select: { id: true, code: true, name: true, parentId: true },
     });
     const taxonomyItems = taxonomy.map((item) => ({
       code: item.code,
@@ -114,9 +114,9 @@ export async function POST(request: Request) {
         fileData: buffer,
         size: file.size,
         originalSha256: sha256,
-        senderUserId: session!.user!.id,
+        senderUserId: userId,
         senderRole: "OWNER",
-        senderEmail: session!.user!.email || "",
+        senderEmail: userEmail,
         candidateName: typeof formData.get("candidateName") === "string" ? String(formData.get("candidateName")).trim() || null : null,
         candidateEmail: typeof formData.get("candidateEmail") === "string" ? String(formData.get("candidateEmail")).trim() || null : null,
         docType: "CV",
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
 
     await prisma.auditLog.create({
       data: {
-        actorUserId: session!.user!.id,
+        actorUserId: userId,
         actorRole: "OWNER",
         action: "CV_REAL_IMPORT",
         targetType: "CV_INTAKE",
