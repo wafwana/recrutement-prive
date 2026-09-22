@@ -7,6 +7,7 @@ import authConfig from "./auth.config";
 const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
 const PUBLIC_PATHS = new Set([
   "/",
+  "/offres",
   "/connexion",
   "/maintenance",
   "/mot-de-passe-oublie",
