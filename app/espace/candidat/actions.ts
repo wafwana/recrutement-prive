@@ -9,6 +9,7 @@ import { requireFileScanInProduction, scanBufferWithClamAV } from "@/lib/securit
 import { applyCandidateToJob } from "@/lib/candidate-application";
 import { analyzeCvDocument } from "@/lib/cv/analyzer";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
+import { buildCandidateFolder } from "@/lib/cv/folders";
 
 const profileSchema = z.object({
   headline: z.string().trim().max(160).optional(),
@@ -300,7 +301,12 @@ export async function uploadCandidateDocument(formData: FormData) {
 
       const primaryCode = cvAnalysis.primaryCategoryCode || "A_CLASSER";
       const subCode = cvAnalysis.subCategoryCodes[0] || "GENERAL";
-      folderPath = `CANDIDATS/${primaryCode}/${subCode}/CV/${new Date().getFullYear()}`;
+      folderPath = buildCandidateFolder({
+        sectorCode: primaryCode,
+        professionCode: subCode,
+        year: new Date().getFullYear(),
+        documentKind: "CV",
+      });
       analyzedAt = new Date();
       isPrimaryCv = true;
     }
