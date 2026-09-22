@@ -5,13 +5,9 @@ import ProfileForm from "./ProfileForm";
 import DocumentManager from "./DocumentManager";
 import ApplicationsList from "./ApplicationsList";
 
-type Props = { searchParams: Promise<{ jobId?: string }> };
-
-export default async function CandidatPage({ searchParams }: Props) {
+export default async function CandidatPage() {
   const session = await auth();
 
-  // Never leave a protected candidate route blank. A missing/invalid session
-  // must return the user to the normal authentication entry point.
   if (!session?.user?.id) {
     redirect("/connexion");
   }
@@ -19,8 +15,6 @@ export default async function CandidatPage({ searchParams }: Props) {
   if (session.user.role !== "CANDIDAT") {
     redirect("/espace");
   }
-
-  const { jobId } = await searchParams;
 
   const [profile, categories] = await Promise.all([
     prisma.candidateProfile.findUnique({ where: { userId: session.user.id } }),
@@ -39,14 +33,6 @@ export default async function CandidatPage({ searchParams }: Props) {
           status: true,
           createdAt: true,
           updatedAt: true,
-          job: {
-            select: {
-              id: true,
-              title: true,
-              location: true,
-              company: { select: { name: true } },
-            },
-          },
         },
         orderBy: { updatedAt: "desc" },
       })
@@ -59,84 +45,10 @@ export default async function CandidatPage({ searchParams }: Props) {
         orderBy: { createdAt: "desc" },
       })
     : [];
-
-mport { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
-import ProfileForm from "./ProfileForm";
-import DocumentManager from "./DocumentManager";
-import ApplicationsList from "./ApplicationsList";
-
-type Props = { searchParams: Promise<{ jobId?: string }> };
-
-export default async function CandidatPage({ searchParams }: Props) {
-  const session = await auth();
-
-  // Never leave a protected candidate route blank. A missing/invalid session
-  // must return the user to the normal authentication entry point.
-  if (!session?.user?.id) {
-    redirect("/connexion");
-  }
-
-  if (session.user.role !== "CANDIDAT") {
-    redirect("/espace");
-  }
-
-  const { jobId } = await searchParams;
-
-  const [profile, categories] = await Promise.all([
-    prisma.candidateProfile.findUnique({ where: { userId: session.user.id } }),
-    prisma.jobCategory.findMany({
-      where: { isActive: true },
-      select: { id: true, code: true, name: true, parentId: true, sortOrder: true },
-      orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
-    }),
-  ]);
-
-  const applications = profile
-    ? await prisma.application.findMany({
-        where: { candidateId: profile.id, userId: session.user.id },
-        select: {
-          id: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-          job: {
-            select: {
-              id: true,
-              title: true,
-              location: true,
-              company: { select: { name: true } },
-            },
-          },
-        },
-        orderBy: { updatedAt: "desc" },
-      })
-    : [];
-
-  const documents = profile
-    ? await prisma.candidateDocument.findMany({
-        where: { candidateId: profile.id },
-        select: { id: true, name: true, createdAt: true },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
-
-  const targetJob = jobId
-    ? await prisma.job.findFirst({
-        where: { id: jobId, status: "OPEN" },
-        select: {
-          id: true,
-          title: true,
-          location: true,
-          company: { select: { name: true } },
-        },
-      })
-    : null;
 
   const stats = [
     ["Profil", profile?.headline ? "Complété" : "À compléter", "Votre présentation professionnelle"],
-    ["Candidatures", String(applications.length), "Suivi de vos opportunités"],
+    ["Dossiers", String(applications.length), "Suivi par Recrutement Privé"],
     ["Documents", String(documents.length), "CV et pièces utiles"],
   ];
 
@@ -174,7 +86,7 @@ export default async function CandidatPage({ searchParams }: Props) {
       <div className="mt-10 border border-white/10 p-8">
         <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Confidentialité & Anonymat</p>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">
-          Votre espace garantit la protection stricte de vos informations personnelles. Vos données de contact et documents ne sont transmis aux entreprises qu'une fois les conditions contractuelles de déblocage d'identité validées.
+          Votre espace garantit la protection stricte de vos informations personnelles. Vos données de contact et documents ne sont jamais exposés directement aux entreprises. Recrutement Privé qualifie les besoins, organise les présentations et maîtrise les conditions de mise en relation.
         </p>
       </div>
     </section>
