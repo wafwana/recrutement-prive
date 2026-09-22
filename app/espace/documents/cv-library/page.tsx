@@ -8,6 +8,7 @@ type CvDoc = {
   folderPath: string;
   analyzedAt: string | null;
   isPrimaryCv: boolean;
+  analysis: { primaryCategoryCode?: string | null; subCategoryCodes?: string[]; alternativeCategoryCodes?: string[]; suggestedMatches?: Array<{ jobId: string; title: string; categoryCode?: string | null; score: number }> } | null;
   createdAt: string;
   candidate: { id: string; user: { name: string | null; email: string } };
 };
@@ -75,6 +76,16 @@ export default function CvLibraryPage() {
                   </span>
                 </div>
                 <p className="mt-2 text-xs text-[#c7a15a] font-mono">{doc.folderPath}</p>
+                {doc.analysis?.alternativeCategoryCodes?.length ? (
+                  <p className="mt-2 text-xs text-white/50">
+                    Opportunités dans d’autres secteurs : <span className="text-white/75">{doc.analysis.alternativeCategoryCodes.join(" · ")}</span>
+                  </p>
+                ) : null}
+                {doc.analysis?.suggestedMatches?.length ? (
+                  <p className="mt-1 text-xs text-white/35">
+                    Matching : {doc.analysis.suggestedMatches.slice(0, 3).map((match) => `${match.title} (${match.score}/100)`).join(" · ")}
+                  </p>
+                ) : null}
                 <p className="mt-2 text-xs text-white/40">{doc.candidate.user.name || "Candidat sans nom"} · {doc.candidate.user.email}</p>
               </div>
               <a href={`/api/candidats/documents/${doc.id}`} target="_blank" rel="noreferrer" className="border border-white/15 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/65">Consulter le CV ↗</a>
