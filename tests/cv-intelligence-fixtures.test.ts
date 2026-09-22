@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import path from "node:path";
-import { analyzeCvDocument } from "../lib/cv/analyzer";
+import { analyzeCvDocument, type CvTaxonomyItem } from "../lib/cv/analyzer";
 
 // Fixtures synthétiques : aucune donnée personnelle réelle.
 const FIXTURES = [
@@ -13,7 +13,7 @@ const FIXTURES = [
   { file: "CV-05-profil-transversal-projet.txt", expected: "IT", keywords: ["gestion de projet", "API", "avant-vente"] },
 ] as const;
 
-const TAXONOMY = [
+const TAXONOMY: CvTaxonomyItem[] = [
   { code: "FINANCE", name: "Finance" },
   { code: "COMPTABILITE", name: "Comptabilité", parentCode: "FINANCE" },
   { code: "AUDIT", name: "Audit", parentCode: "FINANCE" },
