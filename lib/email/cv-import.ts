@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { classifyDocument } from "@/lib/archiving/classifier";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { sendOwnerAlert } from "@/lib/email/service";
+import { buildCandidateFolder } from "@/lib/cv/folders";
 
 export type InboundCvImportInput = {
   messageId: string;
@@ -60,6 +61,12 @@ export async function processInboundEmailCv(input: InboundCvImportInput): Promis
         email: { equals: input.senderEmail.trim().toLowerCase(), mode: "insensitive" },
       },
     },
+    select: {
+      id: true,
+      userId: true,
+      primaryCategory: { select: { code: true } },
+      subCategoryIds: true,
+    },
   });
 
   const candidateId = candidate?.id;
@@ -78,6 +85,20 @@ export async function processInboundEmailCv(input: InboundCvImportInput): Promis
 
   const categoryPath = candidateMatched ? classification.categoryPath : "ARCHIVAGE/A_CLASSER/A_VERIFIER";
   const status = candidateMatched ? "VERIFIE" : "A_VERIFIER";
+  const subCategoryIds = candidate?.subCategoryIds && Array.isArray(candidate.subCategoryIds)
+    ? candidate.subCategoryIds.filter((value): value is string => typeof value === "string")
+    : [];
+  const firstSubCategory = subCategoryIds.length
+    ? await prisma.jobCategory.findFirst({ where: { id: subCategoryIds[0] }, select: { code: true } })
+    : null;
+  const candidateFolder = candidateMatched
+    ? buildCandidateFolder({
+        sectorCode: candidate?.primaryCategory?.code,
+        professionCode: firstSubCategory?.code || "A_VERIFIER",
+        year: receivedDate.getFullYear(),
+        documentKind: "CV",
+      })
+    : "CANDIDATS/A_CLASSER/A_VERIFIER";
 
   const archivedDoc = await prisma.archivedDocument.create({
     data: {
@@ -99,6 +120,29 @@ export async function processInboundEmailCv(input: InboundCvImportInput): Promis
       createdAt: receivedDate,
     },
   });
+
+  if (candidate?.id) {
+    const existingCandidateDocument = await prisma.candidateDocument.findFirst({
+      where: { candidateId: candidate.id, name: input.fileName, docType: "CV" },
+      select: { id: true },
+    });
+
+    if (!existingCandidateDocument) {
+      await prisma.candidateDocument.create({
+        data: {
+          candidateId: candidate.id,
+          name: input.fileName,
+          fileData: input.fileBuffer,
+          type: input.mimeType || "application/pdf",
+          docType: "CV",
+          folderPath: candidateFolder,
+          analysis: { source: "EMAIL", messageId: input.messageId, sourceFactsOnly: true },
+          analyzedAt: receivedDate,
+          isPrimaryCv: true,
+        },
+      });
+    }
+  }
 
   // Owner notification
   await prisma.ownerNotification.create({
@@ -137,14 +181,15 @@ export async function processInboundEmailCv(input: InboundCvImportInput): Promis
      <p><strong>Expéditeur :</strong> ${input.senderEmail}</p>
      <p><strong>Date Réception :</strong> ${receivedDate.toLocaleString("fr-FR")}</p>
      <p><strong>Rattachement Candidat :</strong> ${candidateMatched ? `Oui (${candidateId})` : "Non (Placé dans A_CLASSER/A_VERIFIER)"}</p>
-     <p><strong>Emplacement :</strong> <code>${categoryPath}</code></p>`
+     <p><strong>Emplacement archive :</strong> <code>${categoryPath}</code></p>
+     <p><strong>Dossier candidat :</strong> <code>${candidateFolder}</code></p>`
   );
 
   return {
     ok: true,
     imported: true,
     documentId: archivedDoc.id,
-    categoryPath,
+    categoryPath: candidateFolder,
     candidateMatched,
     candidateId,
   };
