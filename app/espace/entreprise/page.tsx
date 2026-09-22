@@ -1,7 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
-import { isIdentityUnlocked } from "@/lib/mission-lock";
 import CompanyDashboard from "./CompanyDashboard";
 
 export default async function EntreprisePage({ searchParams }: { searchParams: Promise<{ companyId?: string }> }) {
