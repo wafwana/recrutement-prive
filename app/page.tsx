@@ -32,32 +32,32 @@ export default function HomePage() {
     {
       code: "INDUSTRIE",
       name: "Industrie",
-      jobs: ["Direction production", "Direction maintenance", "Direction qualité / QHSE", "Direction méthodes / industrialisation", "Direction supply chain industrielle"],
+      jobs: ["Responsable production", "Ingénieur méthodes senior", "Technicien maintenance industrielle", "Expert QHSE", "Chef de projet industrialisation"],
     },
     {
       code: "LOGISTIQUE",
       name: "Logistique & Supply Chain",
-      jobs: ["Direction logistique / transport", "Direction achats", "Direction supply chain", "Direction planification / ordonnancement", "Direction entrepôt / warehouse"],
+      jobs: ["Responsable logistique", "Acheteur stratégique", "Supply Chain Manager", "Planificateur industriel", "Chef d'équipe entrepôt"],
     },
     {
       code: "COMMERCE",
       name: "Commerce & Business",
-      jobs: ["Direction ventes B2B", "Direction grands comptes / Key Account", "Direction business development", "Direction commerciale", "Direction retail / réseau"],
+      jobs: ["Responsable commercial B2B", "Key Account Manager", "Business Developer senior", "Ingénieur commercial", "Manager retail / réseau"],
     },
     {
       code: "AGROALIMENTAIRE",
       name: "Agro-alimentaire",
-      jobs: ["Direction production / transformation", "Direction qualité / sécurité alimentaire", "Direction R&D / innovation", "Direction supply chain / approvisionnement", "Direction industrielle"],
+      jobs: ["Responsable production agroalimentaire", "Technicien qualité / sécurité alimentaire", "Ingénieur R&D / innovation", "Responsable approvisionnement", "Chef de projet industriel"],
     },
     {
       code: "IT",
       name: "Informatique & Tech",
-      jobs: ["Direction développement logiciel", "Direction Data / IA", "Direction cybersécurité", "Direction Cloud / DevOps / SRE", "Direction robotique / IoT"],
+      jobs: ["Tech Lead senior", "Data Scientist senior", "Ingénieur cybersécurité", "DevOps / SRE senior", "Machine Learning Engineer"],
     },
     {
       code: "AGRICULTURE",
       name: "Agriculture",
-      jobs: ["Direction production agricole", "Direction agronomie / conseil", "Direction agroéquipements", "Direction supply chain / distribution", "Direction d'exploitation"],
+      jobs: ["Responsable d'exploitation agricole", "Ingénieur agronome", "Expert agroéquipements", "Responsable approvisionnement / distribution", "Chef de culture / production"],
     },
   ] as const;
 
