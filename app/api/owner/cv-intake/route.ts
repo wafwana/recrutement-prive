@@ -4,6 +4,7 @@ import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { analyzeCvDocument } from "@/lib/cv/analyzer";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
+import { buildCandidateFolder } from "@/lib/cv/folders";
 
 function scoreJob(analysis: Awaited<ReturnType<typeof analyzeCvDocument>>, job: { id: string; title: string; requiredSkills: unknown; requiredExperienceYears: number | null; jobCategoryId: string | null; subCategoryId: string | null }) {
   if (!analysis) return 0;
@@ -101,10 +102,14 @@ export async function POST(request: Request) {
       .slice(0, 20);
 
     const year = new Date().getFullYear();
-    const suggestedFolder = analysis?.suggestedFolder
-      || (analysis?.primaryCategoryCode
-        ? `CANDIDATS/${analysis.primaryCategoryCode}/${analysis.subCategoryCodes[0] || "A_CLASSER"}/CV/${year}`
-        : `CANDIDATS/A_CLASSER/A_VERIFIER/CV/${year}`);
+    const suggestedFolder = analysis
+      ? buildCandidateFolder({
+          sectorCode: analysis.primaryCategoryCode,
+          professionCode: analysis.subCategoryCodes[0] || "A_VERIFIER",
+          year,
+          documentKind: "CV",
+        })
+      : buildCandidateFolder({ year, documentKind: "CV" });
 
     const record = await prisma.cvIntake.create({
       data: {
