@@ -95,6 +95,7 @@ model User {
   applications Application[]
   companyLinks CompanyMember[]
   auditEntries RecruitmentHistory[]
+  activitySessions CollaboratorActivitySession[]
   conversations ConversationParticipant[]
   sentMessages Message[]
   sourcedCandidates SourcedCandidate[]
@@ -501,6 +502,29 @@ model AuditLog {
 
   @@index([actorUserId, createdAt])
   @@index([action, createdAt])
+}
+
+
+model CollaboratorActivitySession {
+  id            String   @id @default(cuid())
+  userId        String
+  role          String
+  sessionKey    String   @unique
+  startedAt     DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+  endedAt       DateTime?
+  lastPath      String?
+  ipAddress     String?
+  country       String?
+  region        String?
+  city          String?
+  userAgent     String?
+  activeSeconds Int      @default(0)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, lastSeenAt])
+  @@index([role, lastSeenAt])
+  @@index([startedAt])
 }
 
 model AccountingPeriod {
