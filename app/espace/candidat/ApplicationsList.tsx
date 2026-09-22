@@ -1,9 +1,5 @@
 "use client";
 
-import { useTransition, useState } from "react";
-import { applyToJob } from "./actions";
-import Link from "next/link";
-
 const statusLabels: Record<string, { label: string; style: string }> = {
   SUBMITTED: { label: "Candidature envoyée", style: "border-blue-500/30 text-blue-400 bg-blue-500/10" },
   REVIEWING: { label: "En cours d'étude par le cabinet", style: "border-amber-500/30 text-amber-400 bg-amber-500/10" },
@@ -18,73 +14,17 @@ type Application = {
   status: string;
   createdAt: Date;
   updatedAt: Date;
-  job: {
-    id: string;
-    title: string;
-    location: string | null;
-    company: { name: string };
-  };
 };
 
-export default function ApplicationsList({
-  applications,
-  targetJob,
-}: {
-  applications: Application[];
-  targetJob?: Job | null;
-}) {
+export default function ApplicationsList({ applications }: { applications: Application[] }) {
   return (
     <div className="space-y-8">
-      {targetJob ? (
-        <section className="border border-[#c7a15a]/40 bg-[#161410] p-8">
-          <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Offre sélectionnée</p>
-          <h2 className="mt-2 font-serif text-2xl text-white">{targetJob.title}</h2>
-          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-white/50">{targetJob.company.name} {targetJob.location ? `· ${targetJob.location}` : ""}</p>
-
-          {alreadyApplied ? (
-            <div className="mt-5 border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-emerald-300">
-              Vous avez déjà postulé à cette offre d'emploi. Suivez son avancement dans la liste de vos candidatures ci-dessous.
-            </div>
-          ) : (
-            <div className="mt-6 border-t border-white/10 pt-5">
-              <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
-                Note de motivation (optionnel)
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Expliquez brièvement en quoi vos compétences correspondent à cette opportunité..."
-                  rows={3}
-                  maxLength={1000}
-                  className="mt-2 w-full resize-none border border-white/10 bg-transparent px-4 py-2 text-xs text-white outline-none"
-                />
-              </label>
-
-              {applyMessage ? (
-                <p aria-live="polite" className="mt-3 text-xs text-[#c7a15a]">{applyMessage}</p>
-              ) : null}
-
-              <div className="mt-4 flex items-center gap-4">
-                <button
-                  onClick={() => handleApply(targetJob.id)}
-                  disabled={isPending}
-                  className="border border-[#c7a15a] bg-[#c7a15a] px-6 py-3 text-[10px] uppercase tracking-[0.22em] text-black transition hover:bg-transparent hover:text-[#c7a15a] disabled:opacity-50"
-                >
-                  {isPending ? "Transmission en cours…" : "Confirmer ma candidature"}
-                </button>
-                <Link href="/offres" className="text-xs text-white/50 hover:text-white">
-                  Annuler
-                </Link>
-              </div>
-            </div>
-          )}
-        </section>
-      ) : null}
-
       <section className="border border-white/10 p-8">
         <div className="flex items-center justify-between">
           <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Dossiers suivis par Recrutement Privé ({applications.length})</p>
         </div>
         <p className="mt-3 text-xs leading-6 text-white/45">Les intitulés d'offres et les identités des entreprises ne sont pas affichés dans l'espace candidat. Recrutement Privé organise les mises en relation et vous informe des étapes utiles.</p>
+
         <div className="mt-6 space-y-4">
           {applications.length === 0 ? (
             <div className="py-6 text-center">
@@ -106,6 +46,7 @@ export default function ApplicationsList({
             );
           })}
         </div>
-      </section> </div>
+      </section>
+    </div>
   );
 }
