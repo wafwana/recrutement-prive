@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 
 function isSensitive(categoryPath: string) {
-  return /^(ARCHIVAGE\/(FINANCE|COMPTABILITE|CONTRATS)(\/|$))/i.test(categoryPath);
+  return /^(ARCHIVAGE\\/(FINANCE|COMPTABILITE|CONTRATS)(\\/|$))/i.test(categoryPath);
 }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -29,6 +29,21 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (role !== "OWNER" && isSensitive(doc.categoryPath)) {
     return NextResponse.json({ error: "Document sensible réservé à l'Owner." }, { status: 403 });
   }
+
+  await prisma.auditLog.create({
+    data: {
+      actorUserId: session.user.id,
+      actorRole: role,
+      action: "DOCUMENT_DOWNLOAD",
+      targetType: "ARCHIVED_DOCUMENT",
+      targetId: id,
+      details: {
+        fileName: doc.name,
+        categoryPath: doc.categoryPath,
+        access: "download",
+      },
+    },
+  });
 
   const body = new ArrayBuffer(doc.fileData.byteLength);
   new Uint8Array(body).set(doc.fileData);
