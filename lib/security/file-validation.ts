@@ -4,6 +4,7 @@ export const ALLOWED_DOCUMENT_TYPES = new Set([
   "application/pdf",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/jpeg",
 ]);
 
 function hasPrefix(bytes: Uint8Array, prefix: number[]) {
@@ -24,11 +25,13 @@ export async function validateUploadedDocument(file: File) {
   const isPdf = hasPrefix(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d]);
   const isOle = hasPrefix(bytes, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
   const isZip = hasPrefix(bytes, [0x50, 0x4b, 0x03, 0x04]);
+  const isJpeg = hasPrefix(bytes, [0xff, 0xd8, 0xff]);
 
   const signatureMatches =
     (file.type === "application/pdf" && isPdf) ||
     (file.type === "application/msword" && isOle) ||
-    (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" && isZip);
+    (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" && isZip) ||
+    (file.type === "image/jpeg" && isJpeg);
 
   if (!signatureMatches) {
     return { ok: false as const, error: "Le contenu réel du fichier ne correspond pas à son type déclaré." };
