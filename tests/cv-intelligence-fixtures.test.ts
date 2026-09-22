@@ -5,11 +5,11 @@ import path from "node:path";
 import { analyzeCvDocument } from "../lib/cv/analyzer";
 
 const FIXTURES = [
-  { file: "01-ingenieur-data-ia.txt", expected: "IT", keywords: ["Python", "machine learning", "SQL"] },
-  { file: "02-business-development-b2b.txt", expected: "COMMERCIAL", keywords: ["vente B2B", "CRM", "grands comptes"] },
-  { file: "03-recrutement-talent.txt", expected: "RH", keywords: ["recrutement", "sourcing", "Talent Acquisition"] },
-  { file: "04-audit-finance.txt", expected: "FINANCE", keywords: ["audit", "IFRS", "contrôle interne"] },
-  { file: "05-profil-transversal-projet.txt", expected: "IT", keywords: ["gestion de projet", "API", "avant-vente"] },
+  { file: "CV-01-ingenieur-data-ia.txt", expected: "IT", keywords: ["Python", "machine learning", "SQL"] },
+  { file: "CV-02-business-development-b2b.txt", expected: "COMMERCIAL", keywords: ["vente B2B", "CRM", "grands comptes"] },
+  { file: "CV-03-recrutement-talent.txt", expected: "RH", keywords: ["recrutement", "sourcing", "Talent Acquisition"] },
+  { file: "CV-04-audit-finance.txt", expected: "FINANCE", keywords: ["audit", "IFRS", "contrôle interne"] },
+  { file: "CV-05-profil-transversal-projet.txt", expected: "IT", keywords: ["gestion de projet", "API", "avant-vente"] },
 ] as const;
 
 const TAXONOMY = [
