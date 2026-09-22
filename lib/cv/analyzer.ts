@@ -100,6 +100,7 @@ export async function analyzeCvDocument(input: {
       ? {
           type: "input_image" as const,
           image_url: `data:image/jpeg;base64,${encodedFile}`,
+          detail: "auto",
         }
       : {
           type: "input_file" as const,
