@@ -1,14 +1,14 @@
 "use client";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { updateCompanyProfile } from "./actions";
+import { updateCompanyProfile, updateEnterpriseSourcingCountries } from "./actions";
 import { PHONE_COUNTRIES } from "@/lib/phone-countries";
 
 type Job = { id: string; title: string; location: string | null; status: string; attachmentName?: string | null; applications: { status: string }[] };
 type Application = { id: string; status: string; candidate: { headline: string | null; location: string | null; user: { name: string | null; email: string } }; job: { id: string; title: string } };
 const applicationStatuses = ["SUBMITTED", "REVIEWING", "INTERVIEW", "SHORTLISTED", "REJECTED", "HIRED"] as const;
 
-export default function CompanyDashboard({ jobs, applications, companyId }: { jobs: Job[]; applications: Application[]; companyId: string }) {
+export default function CompanyDashboard({ jobs, applications, companyId, sourcingCountries }: { jobs: Job[]; applications: Application[]; companyId: string; sourcingCountries: string[] }) {
   const [filter, setFilter] = useState("");
   const [creatingJob, setCreatingJob] = useState(false);
   const filteredApplications = applications.filter((application) => !filter || application.status === filter);
@@ -66,6 +66,26 @@ export default function CompanyDashboard({ jobs, applications, companyId }: { jo
         </div>
         <div className="sm:col-span-2 md:col-span-3 text-right">
           <button className="border border-[#c7a15a] px-5 py-2.5 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a] hover:bg-[#c7a15a] hover:text-black transition">Enregistrer le profil</button>
+        </div>
+      </form>
+    </section>
+    <section className="mt-10 border border-white/10 p-8">
+      <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Motorisation recrutement</p>
+      <h2 className="mt-3 font-serif text-2xl">Pays de recherche d'offres</h2>
+      <p className="mt-3 max-w-3xl text-sm leading-6 text-white/50">Sélectionnez les pays dans lesquels Recrutement Privé recherchera automatiquement des offres. Les offres seront ensuite analysées, filtrées selon la taxonomie de la plateforme puis matchées avec les profils disponibles.</p>
+      <form action={updateEnterpriseSourcingCountries} className="mt-6">
+        <input type="hidden" name="companyId" value={companyId} />
+        <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {PHONE_COUNTRIES.map(([country]) => (
+            <label key={country} className="flex items-center gap-2 border border-white/10 px-3 py-2 text-xs text-white/65">
+              <input type="checkbox" name="sourcingCountry" value={country} defaultChecked={sourcingCountries.includes(country)} />
+              <span>{country}</span>
+            </label>
+          ))}
+        </div>
+        <div className="mt-5 flex items-center justify-between gap-4">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-white/35">{sourcingCountries.length} pays sélectionné(s)</p>
+          <button className="border border-[#c7a15a] px-5 py-2.5 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a] hover:bg-[#c7a15a] hover:text-black transition">Enregistrer les pays</button>
         </div>
       </form>
     </section>
