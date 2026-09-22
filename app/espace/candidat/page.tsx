@@ -60,6 +60,68 @@ export default async function CandidatPage({ searchParams }: Props) {
       })
     : [];
 
+mport { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import ProfileForm from "./ProfileForm";
+import DocumentManager from "./DocumentManager";
+import ApplicationsList from "./ApplicationsList";
+
+type Props = { searchParams: Promise<{ jobId?: string }> };
+
+export default async function CandidatPage({ searchParams }: Props) {
+  const session = await auth();
+
+  // Never leave a protected candidate route blank. A missing/invalid session
+  // must return the user to the normal authentication entry point.
+  if (!session?.user?.id) {
+    redirect("/connexion");
+  }
+
+  if (session.user.role !== "CANDIDAT") {
+    redirect("/espace");
+  }
+
+  const { jobId } = await searchParams;
+
+  const [profile, categories] = await Promise.all([
+    prisma.candidateProfile.findUnique({ where: { userId: session.user.id } }),
+    prisma.jobCategory.findMany({
+      where: { isActive: true },
+      select: { id: true, code: true, name: true, parentId: true, sortOrder: true },
+      orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
+    }),
+  ]);
+
+  const applications = profile
+    ? await prisma.application.findMany({
+        where: { candidateId: profile.id, userId: session.user.id },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          job: {
+            select: {
+              id: true,
+              title: true,
+              location: true,
+              company: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+      })
+    : [];
+
+  const documents = profile
+    ? await prisma.candidateDocument.findMany({
+        where: { candidateId: profile.id },
+        select: { id: true, name: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
+
   const targetJob = jobId
     ? await prisma.job.findFirst({
         where: { id: jobId, status: "OPEN" },
@@ -105,7 +167,7 @@ export default async function CandidatPage({ searchParams }: Props) {
           <DocumentManager documents={documents} />
         </div>
         <aside>
-          <ApplicationsList applications={applications} targetJob={targetJob} />
+          <ApplicationsList applications={applications} />
         </aside>
       </div>
 
