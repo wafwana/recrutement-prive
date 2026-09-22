@@ -209,21 +209,19 @@ export async function uploadCandidateDocument(formData: FormData) {
       const primaryCategory = analysis.primaryCategoryCode
         ? taxonomyRows.find((row) => row.code === analysis!.primaryCategoryCode && !row.parent)
         : null;
-      const subCategoryIds = analysis.subCategoryCodes.length
-        ? taxonomyRows.filter((row) => analysis!.subCategoryCodes.includes(row.code) && row.parent).map((row) => row.code)
-        : [];
-
-      const resolvedSubCategoryIds = subCategoryIds.length
-        ? taxonomyRows.filter((row) => subCategoryIds.includes(row.code) && row.parentId === primaryCategory?.code).map((row) => row.code)
+      const resolvedSubCategoryCodes = analysis.subCategoryCodes.length
+        ? taxonomyRows
+            .filter((row) => analysis!.subCategoryCodes.includes(row.code) && row.parent?.code === analysis!.primaryCategoryCode)
+            .map((row) => row.code)
         : [];
 
       const primaryCategoryId = primaryCategory
         ? (await prisma.jobCategory.findUnique({ where: { code: primaryCategory.code }, select: { id: true } }))?.id ?? null
         : profile.primaryCategoryId;
 
-      const validSubIds = resolvedSubCategoryIds.length
+      const validSubIds = resolvedSubCategoryCodes.length
         ? (await prisma.jobCategory.findMany({
-            where: { code: { in: resolvedSubCategoryIds }, isActive: true },
+            where: { code: { in: resolvedSubCategoryCodes }, isActive: true },
             select: { id: true },
           })).map((row) => row.id)
         : Array.isArray(profile.subCategoryIds)
