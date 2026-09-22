@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/context";
+import BackButton from "@/components/navigation/BackButton";
 
 export const metadata: Metadata = {
   title: "Recrutement Privé | Cabinet de recrutement",
@@ -11,7 +12,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="fr">
       <body>
-        <I18nProvider>{children}</I18nProvider>
+        <I18nProvider>
+          <BackButton />
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );
