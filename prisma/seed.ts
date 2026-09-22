@@ -1,7 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
+import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
 
-const DEFAULT_CATEGORIES = [
+const DEFAULT_CATEGORIES = RP_TAXONOMY.map((category) => ({
+  code: category.code,
+  name: category.name,
+  subcategories: category.subcategories,
+}));
+
+/*
   {
     code: "FINANCE",
     name: { fr: "Finance", en: "Finance" },
@@ -40,7 +47,7 @@ const DEFAULT_CATEGORIES = [
       { code: "BUSINESS_DEV", name: { fr: "Business Development", en: "Business Development" } },
     ],
   },
-];
+];*/
 
 async function seedCategories() {
   for (const cat of DEFAULT_CATEGORIES) {
