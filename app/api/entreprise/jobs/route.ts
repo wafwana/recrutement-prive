@@ -5,6 +5,7 @@ import { requireCompanyAccess } from "@/lib/company-access";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { requireFileScanInProduction, scanBufferWithClamAV } from "@/lib/security/file-scan";
+import { analyzeOffer } from "@/lib/offer/analyzer";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = new Set(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
@@ -134,6 +135,11 @@ export async function POST(request: Request) {
       }
     }
 
+    const taxonomyRows = await prisma.jobCategory.findMany({ where: { isActive: true }, select: { code: true, name: true, parent: { select: { code: true } } }, orderBy: { sortOrder: "asc" } });
+    const taxonomy = taxonomyRows.map((row) => ({ code: row.code, name: typeof row.name === "string" ? row.name : JSON.stringify(row.name), parentCode: row.parent?.code ?? null }));
+    let analysis = null;
+    try { analysis = await analyzeOffer({ title: parsed.data.title, description: parsed.data.description, requiredSkills: csv(parsed.data.requiredSkills), requiredExperienceYears: parsed.data.requiredExperienceYears, location: parsed.data.location, missionType: parsed.data.missionType, taxonomy }); } catch (error) { console.error("[company-job] offer analysis failed", error); }
+    const folderPath = "ENTREPRISES/" + (analysis?.primaryCategoryCode || "A_CLASSER") + "/" + (analysis?.subCategoryCode || "GENERAL") + "/OFFRES";
     const job = await prisma.$transaction(async (tx) => {
       const created = await tx.job.create({
         data: {
@@ -146,11 +152,14 @@ export async function POST(request: Request) {
           requiredExperienceYears: parsed.data.requiredExperienceYears,
           jobCategoryId: parsed.data.jobCategoryId || null,
           subCategoryId: parsed.data.subCategoryId || null,
+          folderPath,
+          analysis: analysis ? { ...analysis } : undefined,
+          analyzedAt: analysis ? new Date() : undefined,
           ...(attachment ? { attachmentName: attachment.name.replace(/[\\/\r\n\0]/g, "_").slice(-180), attachmentMimeType: attachment.type || "application/octet-stream", attachmentData } : {}),
           status: parsed.data.status,
         },
       });
-      await tx.recruitmentHistory.create({ data: { jobId: created.id, actorUserId: access.userId, action: "JOB_CREATED", toStatus: created.status, details: attachment ? { attachmentName: attachment.name, attachmentSize: attachment.size } : undefined } });
+      await tx.recruitmentHistory.create({ data: { jobId: created.id, actorUserId: access.userId, action: "JOB_CREATED", toStatus: created.status, details: { ...(attachment ? { attachmentName: attachment.name, attachmentSize: attachment.size } : {}), ...(analysis ? { offerAnalyzed: true, folderPath } : {}) } } });
       return created;
     });
     return NextResponse.json(job, { status: 201 });
