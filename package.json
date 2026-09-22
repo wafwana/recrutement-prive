@@ -18,7 +18,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "test:global-sourcing": "node --import tsx --test tests/global-sourcing.test.ts"
+    "test:global-sourcing": "node --import tsx --test tests/global-sourcing.test.ts",
+    "test:cv-intelligence": "node --import tsx --test tests/cv-intelligence-fixtures.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

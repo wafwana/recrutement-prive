@@ -14,6 +14,7 @@ export type CvAnalysis = {
   languages: string[];
   primaryCategoryCode: string | null;
   subCategoryCodes: string[];
+  alternativeCategoryCodes: string[];
   suggestedFolder: string | null;
   confidence: number;
 };
@@ -29,6 +30,7 @@ const schema = {
     languages: { type: "array", items: { type: "string" } },
     primaryCategoryCode: { type: ["string", "null"] },
     subCategoryCodes: { type: "array", items: { type: "string" } },
+    alternativeCategoryCodes: { type: "array", items: { type: "string" } },
     suggestedFolder: { type: ["string", "null"] },
     confidence: { type: "number" },
   },
@@ -40,6 +42,7 @@ const schema = {
     "languages",
     "primaryCategoryCode",
     "subCategoryCodes",
+    "alternativeCategoryCodes",
     "suggestedFolder",
     "confidence",
   ],
@@ -74,6 +77,7 @@ export async function analyzeCvDocument(input: {
 Extrais uniquement des informations professionnelles utiles au recrutement.
 Ne déduis pas de données sensibles non nécessaires et ne crée aucune expérience ou compétence absente du document.
 Retourne les compétences normalisées, l'expérience totale approximative en années si elle est explicitement estimable, le métier principal et les sous-domaines.
+Retourne aussi jusqu’à 3 secteurs alternatifs réellement compatibles avec le parcours, uniquement s’ils sont suffisamment étayés par le CV et la taxonomie.
 Utilise uniquement les codes de la taxonomie fournie. Si aucune correspondance fiable n'existe, utilise null / [].
 Le CV doit pouvoir être rematché ensuite avec des offres différentes de celle qui aurait éventuellement conduit à son dépôt.
 
@@ -105,6 +109,7 @@ ${taxonomyText || "Aucune taxonomie fournie."}`,
     languages: Array.isArray(parsed.languages) ? parsed.languages.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter(Boolean) : [],
     primaryCategoryCode: typeof parsed.primaryCategoryCode === "string" ? parsed.primaryCategoryCode.trim() || null : null,
     subCategoryCodes: Array.isArray(parsed.subCategoryCodes) ? parsed.subCategoryCodes.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter(Boolean) : [],
+    alternativeCategoryCodes: Array.isArray(parsed.alternativeCategoryCodes) ? [...new Set(parsed.alternativeCategoryCodes.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter(Boolean))].slice(0, 3) : [],
     suggestedFolder: typeof parsed.suggestedFolder === "string" ? parsed.suggestedFolder.trim() || null : null,
     confidence: typeof parsed.confidence === "number" && Number.isFinite(parsed.confidence) ? Math.max(0, Math.min(1, parsed.confidence)) : 0,
   };

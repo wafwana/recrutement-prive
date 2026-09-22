@@ -256,6 +256,8 @@ export async function uploadCandidateDocument(formData: FormData) {
         .map((job) => ({
           jobId: job.id,
           title: job.title,
+          categoryCode: job.jobCategory?.code ?? null,
+          subCategoryCode: job.subCategory?.code ?? null,
           score: matchCandidateToJob(
             {
               skills: mergedSkills,
@@ -281,8 +283,17 @@ export async function uploadCandidateDocument(formData: FormData) {
         .sort((a, b) => b.score - a.score)
         .slice(0, 20);
 
+      const analysisPrimaryCode = cvAnalysis.primaryCategoryCode;
+      const alternativeCategoryCodes = cvAnalysis.alternativeCategoryCodes.filter((code) => code && code !== analysisPrimaryCode);
+      const matchedAlternativeCategoryCodes = [...new Set(
+        automaticMatches
+          .filter((match) => match.categoryCode && match.categoryCode !== analysisPrimaryCode)
+          .map((match) => match.categoryCode as string),
+      )].slice(0, 5);
+
       storedAnalysis = {
         ...analysis,
+        alternativeCategoryCodes: [...new Set([...alternativeCategoryCodes, ...matchedAlternativeCategoryCodes])].slice(0, 5),
         suggestedMatches: automaticMatches,
         analyzedAt: new Date().toISOString(),
       };

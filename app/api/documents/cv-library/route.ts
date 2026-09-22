@@ -36,6 +36,7 @@ export async function GET(request: Request) {
       folderPath: true,
       analyzedAt: true,
       isPrimaryCv: true,
+      analysis: true,
       createdAt: true,
       candidate: { select: { id: true, user: { select: { name: true, email: true } } } },
     },
