@@ -203,17 +203,18 @@ export async function uploadCandidateDocument(formData: FormData) {
     }
 
     if (analysis) {
+      const cvAnalysis = analysis;
       const currentSkills = Array.isArray(profile.skills)
         ? profile.skills.filter((value): value is string => typeof value === "string")
         : [];
-      const mergedSkills = [...new Set([...currentSkills, ...analysis.skills])];
+      const mergedSkills = [...new Set([...currentSkills, ...cvAnalysis.skills])];
 
-      const primaryCategory = analysis.primaryCategoryCode
-        ? taxonomyRows.find((row) => row.code === analysis!.primaryCategoryCode && !row.parent)
+      const primaryCategory = cvAnalysis.primaryCategoryCode
+        ? taxonomyRows.find((row) => row.code === cvAnalysis.primaryCategoryCode && !row.parent)
         : null;
-      const resolvedSubCategoryCodes = analysis.subCategoryCodes.length
+      const resolvedSubCategoryCodes = cvAnalysis.subCategoryCodes.length
         ? taxonomyRows
-            .filter((row) => analysis!.subCategoryCodes.includes(row.code) && row.parent?.code === analysis!.primaryCategoryCode)
+            .filter((row) => cvAnalysis.subCategoryCodes.includes(row.code) && row.parent?.code === cvAnalysis.primaryCategoryCode)
             .map((row) => row.code)
         : [];
 
@@ -234,9 +235,9 @@ export async function uploadCandidateDocument(formData: FormData) {
         where: { id: profile.id },
         data: {
           skills: mergedSkills,
-          headline: profile.headline || analysis.headline,
-          bio: profile.bio || analysis.summary,
-          experienceYears: profile.experienceYears ?? analysis.experienceYears,
+          headline: profile.headline || cvAnalysis.headline,
+          bio: profile.bio || cvAnalysis.summary,
+          experienceYears: profile.experienceYears ?? cvAnalysis.experienceYears,
           primaryCategoryId,
           subCategoryIds: validSubIds,
         },
@@ -258,12 +259,12 @@ export async function uploadCandidateDocument(formData: FormData) {
           score: matchCandidateToJob(
             {
               skills: mergedSkills,
-              experienceYears: profile.experienceYears ?? analysis.experienceYears,
-              headline: profile.headline || analysis.headline,
-              bio: profile.bio || analysis.summary,
+              experienceYears: profile.experienceYears ?? cvAnalysis.experienceYears,
+              headline: profile.headline || cvAnalysis.headline,
+              bio: profile.bio || cvAnalysis.summary,
               location: profile.location,
               country: profile.country,
-              primaryCategoryCode: primaryCategory?.code || analysis.primaryCategoryCode,
+              primaryCategoryCode: primaryCategory?.code || cvAnalysis.primaryCategoryCode,
               subCategoryCodes: resolvedSubCategoryCodes,
             },
             {
@@ -286,8 +287,8 @@ export async function uploadCandidateDocument(formData: FormData) {
         analyzedAt: new Date().toISOString(),
       };
 
-      const primaryCode = analysis.primaryCategoryCode || "A_CLASSER";
-      const subCode = analysis.subCategoryCodes[0] || "GENERAL";
+      const primaryCode = cvAnalysis.primaryCategoryCode || "A_CLASSER";
+      const subCode = cvAnalysis.subCategoryCodes[0] || "GENERAL";
       folderPath = `CANDIDATS/${primaryCode}/${subCode}/CV/${new Date().getFullYear()}`;
       analyzedAt = new Date();
       isPrimaryCv = true;
