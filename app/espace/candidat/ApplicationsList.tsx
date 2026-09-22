@@ -26,13 +26,6 @@ type Application = {
   };
 };
 
-type Job = {
-  id: string;
-  title: string;
-  location: string | null;
-  company: { name: string };
-};
-
 export default function ApplicationsList({
   applications,
   targetJob,
@@ -40,23 +33,6 @@ export default function ApplicationsList({
   applications: Application[];
   targetJob?: Job | null;
 }) {
-  const [isPending, startTransition] = useTransition();
-  const [applyMessage, setApplyMessage] = useState<string | null>(null);
-  const [notes, setNotes] = useState("");
-
-  const alreadyApplied = targetJob ? applications.some((app) => app.job.id === targetJob.id) : false;
-
-  const handleApply = (jobId: string) => {
-    startTransition(async () => {
-      try {
-        await applyToJob(jobId, notes);
-        setApplyMessage("Votre candidature a été envoyée avec succès !");
-      } catch (error) {
-        setApplyMessage(error instanceof Error ? error.message : "Erreur lors de l'envoi de la candidature.");
-      }
-    });
-  };
-
   return (
     <div className="space-y-8">
       {targetJob ? (
@@ -106,47 +82,30 @@ export default function ApplicationsList({
 
       <section className="border border-white/10 p-8">
         <div className="flex items-center justify-between">
-          <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Candidatures en cours ({applications.length})</p>
-          <Link href="/offres" className="text-xs text-[#c7a15a] hover:underline">
-            Voir les offres ouvertes ↗
-          </Link>
+          <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Dossiers suivis par Recrutement Privé ({applications.length})</p>
         </div>
-
+        <p className="mt-3 text-xs leading-6 text-white/45">Les intitulés d'offres et les identités des entreprises ne sont pas affichés dans l'espace candidat. Recrutement Privé organise les mises en relation et vous informe des étapes utiles.</p>
         <div className="mt-6 space-y-4">
           {applications.length === 0 ? (
             <div className="py-6 text-center">
-              <p className="text-sm text-white/45">Aucune candidature enregistrée pour le moment.</p>
-              <Link href="/offres" className="mt-4 inline-block border border-white/20 px-4 py-2 text-xs uppercase tracking-[0.18em] text-white hover:bg-white/10">
-                Explorer les opportunités
-              </Link>
+              <p className="text-sm text-white/45">Aucun dossier en cours pour le moment.</p>
             </div>
-          ) : (
-            applications.map((app) => {
-              const statusInfo = statusLabels[app.status] ?? { label: app.status, style: "border-white/20 text-white/70" };
-              return (
-                <div key={app.id} className="border-b border-white/10 pb-5 last:border-0 last:pb-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div>
-                      <Link href={`/offres/${app.job.id}`} className="font-serif text-lg text-white hover:text-[#c7a15a]">
-                        {app.job.title}
-                      </Link>
-                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-white/40">
-                        {app.job.company.name} {app.job.location ? `· ${app.job.location}` : ""}
-                      </p>
-                    </div>
-                    <span className={`inline-block border px-3 py-1 text-[10px] uppercase tracking-[0.15em] ${statusInfo.style}`}>
-                      {statusInfo.label}
-                    </span>
+          ) : applications.map((app) => {
+            const statusInfo = statusLabels[app.status] ?? { label: app.status, style: "border-white/20 text-white/70" };
+            return (
+              <div key={app.id} className="border-b border-white/10 pb-5 last:border-0 last:pb-0">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-serif text-lg text-white">Dossier Recrutement Privé</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-white/40">Référence interne · {app.id.slice(-8).toUpperCase()}</p>
                   </div>
-                  <p className="mt-3 text-[11px] text-white/35">
-                    Postulé le {new Date(app.createdAt).toLocaleDateString("fr-FR")} · Mis à jour le {new Date(app.updatedAt).toLocaleDateString("fr-FR")}
-                  </p>
+                  <span className={`inline-block border px-3 py-1 text-[10px] uppercase tracking-[0.15em] ${statusInfo.style}`}>{statusInfo.label}</span>
                 </div>
-              );
-            })
-          )}
+                <p className="mt-3 text-[11px] text-white/35">Dossier transmis le {new Date(app.createdAt).toLocaleDateString("fr-FR")} · Mis à jour le {new Date(app.updatedAt).toLocaleDateString("fr-FR")}</p>
+              </div>
+            );
+          })}
         </div>
-      </section>
-    </div>
+      </section> </div>
   );
 }
