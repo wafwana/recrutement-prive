@@ -163,6 +163,7 @@ model Company {
   status EntityStatus @default(ACTIVE)
   members CompanyMember[]
   jobs Job[]
+  enterpriseSourcedOffers EnterpriseSourcedOffer[]
   presentations MissionPresentation[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -250,6 +251,25 @@ model MissionPresentation {
   @@index([candidateId, companyId])
 }
 
+model EnterpriseSourcedOffer {
+  id String @id @default(cuid())
+  companyId String
+  externalJobId String
+  selectedCountry String
+  status String @default("QUALIFIED")
+  analysis Json?
+  matching Json?
+  analyzedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  externalJob ExternalJobOpportunity @relation(fields: [externalJobId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, externalJobId])
+  @@index([companyId, status])
+  @@index([selectedCountry])
+}
+
 model ExternalJobOpportunity {
   id String @id @default(cuid())
   externalId String
@@ -269,6 +289,7 @@ model ExternalJobOpportunity {
   closingAt DateTime?
   description String?
   rawData Json?
+  enterpriseMatches EnterpriseSourcedOffer[]
   status String @default("DETECTED")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -37,6 +37,11 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
   const membership = await prisma.companyMember.findUnique({ where: { companyId_userId: { companyId: access.companyId, userId: session.user.id } }, include: { company: true } });
   if (!membership) return null;
 
+  const sourcingSetting = await prisma.systemSetting.findUnique({ where: { key: `sourcing:countries:${access.companyId}` }, select: { value: true } });
+  const sourcingCountries = sourcingSetting?.value && Array.isArray(sourcingSetting.value)
+    ? sourcingSetting.value.filter((value): value is string => typeof value === "string")
+    : [];
+
   const jobs = await prisma.job.findMany({
     where: { companyId: access.companyId },
     select: { id: true, title: true, location: true, status: true, attachmentName: true, applications: { select: { status: true } } },
@@ -89,7 +94,7 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
           <p className="mt-3 text-xs leading-6 text-white/45">Les conditions financières sont présentées progressivement, au moment approprié du processus, après confirmation de l'intérêt réciproque.</p>
         </div>
       </section>
-      <CompanyDashboard jobs={jobs} applications={applications} companyId={access.companyId} />
+      <CompanyDashboard jobs={jobs} applications={applications} companyId={access.companyId} sourcingCountries={sourcingCountries} />
     </section>
   );
 }

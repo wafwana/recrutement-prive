@@ -150,3 +150,23 @@ export async function updateApplicationStatus(applicationId: string, status: str
   await prisma.$transaction(async (tx) => { await tx.application.update({ where: { id: applicationId }, data: { status: parsedStatus.data, ...(notes !== undefined ? { notes: notes.trim().slice(0, 5000) || null } : {}) } }); await tx.recruitmentHistory.create({ data: { applicationId, jobId: existing.jobId, actorUserId: access.userId, action: "APPLICATION_STATUS_CHANGED", fromStatus: existing.status, toStatus: parsedStatus.data } }); });
   revalidatePath("/espace/entreprise"); revalidatePath(`/espace/entreprise/offres/${existing.jobId}`);
 }
+
+export async function updateEnterpriseSourcingCountries(formData: FormData) {
+  const companyId = text(formData.get("companyId"));
+  const countries = formData
+    .getAll("sourcingCountry")
+    .map((value) => String(value).trim())
+    .filter(Boolean)
+    .slice(0, 50);
+
+  if (!companyId) throw new Error("Entreprise introuvable.");
+  const access = await requireCompanyAccess(companyId);
+
+  await prisma.systemSetting.upsert({
+    where: { key: `sourcing:countries:${access.companyId}` },
+    create: { key: `sourcing:countries:${access.companyId}`, value: countries },
+    update: { value: countries },
+  });
+
+  revalidatePath("/espace/entreprise");
+}

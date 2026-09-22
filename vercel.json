@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/cv-rematch",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/enterprise-offer-sourcing",
+      "schedule": "0 5 * * *"
     }
   ]
 }
