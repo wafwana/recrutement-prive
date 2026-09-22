@@ -195,6 +195,9 @@ model Job {
   missionType String?
   financialCondition Json?
   financialConditionStatus FinancialConditionStatus @default(PENDING)
+  folderPath String @default("ENTREPRISES/A_CLASSER/OFFRES")
+  analysis Json?
+  analyzedAt DateTime?
   jobCategoryId String?
   subCategoryId String?
   jobCategory JobCategory? @relation("JobCategoryJobs", fields: [jobCategoryId], references: [id], onDelete: SetNull)
@@ -208,6 +211,7 @@ model Job {
   @@index([companyId, status])
   @@index([jobCategoryId])
   @@index([subCategoryId])
+  @@index([folderPath])
 }
 
 model Application {
