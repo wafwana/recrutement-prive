@@ -4,7 +4,7 @@ import { test } from "node:test";
 import path from "node:path";
 import { analyzeCvDocument } from "../lib/cv/analyzer";
 
-const FIXTURES = [
+// Fixtures synthétiques : aucune donnée personnelle réelle.\nconst FIXTURES = [
   { file: "CV-01-ingenieur-data-ia.txt", expected: "IT", keywords: ["Python", "machine learning", "SQL"] },
   { file: "CV-02-business-development-b2b.txt", expected: "COMMERCIAL", keywords: ["vente B2B", "CRM", "grands comptes"] },
   { file: "CV-03-recrutement-talent.txt", expected: "RH", keywords: ["recrutement", "sourcing", "Talent Acquisition"] },
