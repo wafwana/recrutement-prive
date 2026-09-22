@@ -265,6 +265,8 @@ export const RP_TAXONOMY: TaxonomyNode[] = [
       positioning: RP_POSITIONING },
     { code: "RESTAURATION", name: { fr: "Restauration", en: "Food Service", es: "Restauración", de: "Gastronomie", it: "Ristorazione", nl: "Gastronomie / Food Service", ar: "المطاعم" },
       positioning: RP_POSITIONING },
+    { code: "CASINO", name: { fr: "Casino & Jeux", en: "Casino & Gaming", es: "Casino y Juegos", de: "Casino & Glücksspiel", it: "Casinò e Giochi", nl: "Casino & Gaming", ar: "الكازينو والألعاب" },
+      positioning: RP_POSITIONING },
     { code: "TOURISME", name: { fr: "Tourisme / Voyage", en: "Tourism / Travel", es: "Turismo / Viajes", de: "Tourismus / Reisen", it: "Turismo / Viaggi", nl: "Toerisme / Reizen", ar: "السياحة والسفر" },
       positioning: RP_POSITIONING },
   ]},
