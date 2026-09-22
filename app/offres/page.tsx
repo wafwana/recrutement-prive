@@ -1,9 +1,18 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { hasPermission } from "@/lib/auth/permissions";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function OffersPage() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/connexion");
+  const role = typeof session.user.role === "string" ? session.user.role : undefined;
+  if (!["OWNER", "ADMIN", "CONSULTANT"].includes(role ?? "")) redirect("/espace");
+  if (!(await hasPermission(session.user.id, role, "JOBS_MANAGE"))) redirect("/espace");
+
   let jobs: Array<{
     id: string;
     title: string;
