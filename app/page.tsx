@@ -3,7 +3,6 @@
 import React from "react";
 import LanguageSelector from "./components/LanguageSelector";
 import { useI18n } from "@/lib/i18n/context";
-import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
 
 const images = {
   hero: "/visuals/hero-final.webp?v=hero-final-20260917",
@@ -28,7 +27,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 }
 
 export default function HomePage() {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const publicSectorCards = [
     {
       code: "INDUSTRIE",
