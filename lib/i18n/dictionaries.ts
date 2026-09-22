@@ -8,7 +8,7 @@ const common = {
   nav_tech: "Notre technologie",
   nav_contact: "Contact",
   nav_connected_space: "ESPACE CONNECTÉ",
-  hero_kicker: "CABINET DE RECRUTEMENT & CHASSEUR DE TÊTE",
+  hero_kicker: "CABINET DE RECRUTEMENT · CHASSEUR DE TÊTE",
   hero_title_line_1: "Votre partenaire en",
   hero_title_line_2: "recrutement et",
   hero_title_line_3: "développement des talents",
