@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { analyzeCvDocument } from "@/lib/cv/analyzer";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { buildCandidateFolder } from "@/lib/cv/folders";
+import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
 
 function scoreJob(analysis: Awaited<ReturnType<typeof analyzeCvDocument>>, job: { id: string; title: string; requiredSkills: unknown; requiredExperienceYears: number | null; jobCategoryId: string | null; subCategoryId: string | null }) {
   if (!analysis) return 0;
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
   if (!userId || session?.user?.role !== "OWNER") return NextResponse.json({ error: "Import de CV réservé à l'Owner." }, { status: 403 });
 
   try {
+    await ensureTaxonomySynced();
     const formData = await request.formData();
     const file = formData.get("file");
     if (!file || typeof file === "string") return NextResponse.json({ error: "Aucun CV fourni." }, { status: 400 });
