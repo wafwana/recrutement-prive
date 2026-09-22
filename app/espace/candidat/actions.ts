@@ -8,6 +8,7 @@ import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { requireFileScanInProduction, scanBufferWithClamAV } from "@/lib/security/file-scan";
 import { applyCandidateToJob } from "@/lib/candidate-application";
 import { analyzeCvDocument } from "@/lib/cv/analyzer";
+import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 
 const profileSchema = z.object({
   headline: z.string().trim().max(160).optional(),
@@ -171,6 +172,7 @@ export async function uploadCandidateDocument(formData: FormData) {
   let analysis: Awaited<ReturnType<typeof analyzeCvDocument>> = null;
   let analyzedAt: Date | undefined;
   let isPrimaryCv = false;
+  let storedAnalysis: unknown = analysis;
 
   if (isCv) {
     const taxonomyRows = await prisma.jobCategory.findMany({
@@ -240,6 +242,50 @@ export async function uploadCandidateDocument(formData: FormData) {
         },
       });
 
+      const openJobs = await prisma.job.findMany({
+        where: { status: "OPEN" },
+        include: {
+          jobCategory: { select: { code: true } },
+          subCategory: { select: { code: true } },
+        },
+        take: 500,
+      });
+
+      const automaticMatches = openJobs
+        .map((job) => ({
+          jobId: job.id,
+          title: job.title,
+          score: matchCandidateToJob(
+            {
+              skills: mergedSkills,
+              experienceYears: profile.experienceYears ?? analysis.experienceYears,
+              headline: profile.headline || analysis.headline,
+              bio: profile.bio || analysis.summary,
+              location: profile.location,
+              country: profile.country,
+              primaryCategoryCode: primaryCategory?.code || analysis.primaryCategoryCode,
+              subCategoryCodes: resolvedSubCategoryCodes,
+            },
+            {
+              requiredSkills: job.requiredSkills,
+              requiredExperienceYears: job.requiredExperienceYears,
+              title: job.title,
+              description: job.description,
+              location: job.location,
+              categoryCode: job.jobCategory?.code,
+              subCategoryCode: job.subCategory?.code,
+            }
+          ).score,
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 20);
+
+      storedAnalysis = {
+        ...analysis,
+        suggestedMatches: automaticMatches,
+        analyzedAt: new Date().toISOString(),
+      };
+
       const primaryCode = analysis.primaryCategoryCode || "A_CLASSER";
       const subCode = analysis.subCategoryCodes[0] || "GENERAL";
       folderPath = `CANDIDATS/${primaryCode}/${subCode}/CV/${new Date().getFullYear()}`;
@@ -263,7 +309,7 @@ export async function uploadCandidateDocument(formData: FormData) {
       type: mimeType,
       docType,
       folderPath,
-      analysis: analysis ? JSON.parse(JSON.stringify(analysis)) : undefined,
+      analysis: storedAnalysis ? JSON.parse(JSON.stringify(storedAnalysis)) : undefined,
       analyzedAt,
       isPrimaryCv,
     },
