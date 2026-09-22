@@ -94,16 +94,25 @@ export async function analyzeCvDocument(input: {
     .map((item) => `${item.code} — ${item.name}${item.parentCode ? ` (parent: ${item.parentCode})` : ""}`)
     .join("\n");
 
+  const encodedFile = input.buffer.toString("base64");
+  const fileContent =
+    input.mimeType === "image/jpeg"
+      ? {
+          type: "input_image" as const,
+          image_url: `data:image/jpeg;base64,${encodedFile}`,
+        }
+      : {
+          type: "input_file" as const,
+          filename: input.fileName,
+          file_data: `data:${input.mimeType};base64,${encodedFile}`,
+        };
+
   const response = await client.responses.create({
     model: process.env.OPENAI_CV_MODEL || "gpt-4.1-mini",
     input: [{
       role: "user",
       content: [
-        {
-          type: "input_file",
-          filename: input.fileName,
-          file_data: input.buffer.toString("base64"),
-        },
+        fileContent,
         {
           type: "input_text",
           text: `Analyse ce CV pour le moteur de recrutement Recrutement Privé.
