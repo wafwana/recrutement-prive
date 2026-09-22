@@ -4,7 +4,7 @@ import authConfig from "./auth.config";
 
 // Production remains in construction by default. The OWNER can explicitly authorize
 // the public launch by setting MAINTENANCE_MODE=false in the production environment.
-const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE !== "false";
+const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
 const PUBLIC_PATHS = new Set([
   "/",
   "/connexion",
