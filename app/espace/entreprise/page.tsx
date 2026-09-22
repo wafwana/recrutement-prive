@@ -1,7 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
-import { isIdentityUnlocked } from "@/lib/mission-lock";
 import CompanyDashboard from "./CompanyDashboard";
 
 export default async function EntreprisePage({ searchParams }: { searchParams: Promise<{ companyId?: string }> }) {
@@ -48,6 +47,12 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
     orderBy: { updatedAt: "desc" },
   });
 
+  const categories = await prisma.jobCategory.findMany({
+    where: { isActive: true },
+    select: { id: true, code: true, name: true, parentId: true, sortOrder: true },
+    orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
+  });
+
   const rawApplications = await prisma.application.findMany({
     where: {
       job: { companyId: access.companyId },
@@ -55,46 +60,13 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
     },
     include: {
       job: { select: { id: true, title: true } },
-      candidate: { include: { user: { select: { name: true, email: true } } } },
       presentations: { where: { companyId: access.companyId }, orderBy: { presentedAt: "desc" }, take: 1 },
     },
     orderBy: { updatedAt: "desc" },
   });
 
-  const applications = rawApplications.map((app) => {
-    const presentation = app.presentations[0];
-    const unlocked = Boolean(presentation && isIdentityUnlocked(presentation.state, presentation.financialConditionStatus));
-    return {
-      id: app.id,
-      status: app.status,
-      job: app.job,
-      presentationState: presentation?.state ?? null,
-      financialConditionStatus: presentation?.financialConditionStatus ?? null,
-      unlocked,
-      candidate: {
-        id: app.candidate.id,
-        headline: app.candidate.headline,
-        location: app.candidate.location,
-        user: {
-          name: unlocked ? (app.candidate.user.name || app.candidate.user.email) : `Candidat #${app.candidate.id.slice(-6).toUpperCase()}`,
-          email: unlocked ? app.candidate.user.email : "",
-        },
-      },
-    };
-  });
-
-  return (
-    <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-24">
-      <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Espace entreprise</p>
-      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="font-serif text-5xl sm:text-6xl">Vos recrutements, clairement pilotés.</h1><p className="mt-5 max-w-2xl text-sm leading-7 text-white/50">{membership.company.name} · gérez vos offres, suivez les candidatures et pilotez votre pipeline.</p></div><p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Rôle {membership.role}</p></div>
-      <section className="mt-10 grid gap-6 border border-[#c7a15a]/20 bg-[#111] p-8 md:grid-cols-2">
-        <div className="md:col-span-2">
-          <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Notre engagement</p>
-          <p className="mt-4 text-sm leading-7 text-white/70">Recrutement Privé ne vend pas les coordonnées des candidats. Recrutement Privé organise des mises en relation qualifiées, après validation de l'intérêt de l'entreprise et du candidat.</p>
-          <p className="mt-3 text-xs leading-6 text-white/45">Les conditions financières sont présentées progressivement, au moment approprié du processus, après confirmation de l'intérêt réciproque.</p>
-        </div>
-      </section>
-      <CompanyDashboard jobs={jobs} applications={applications} companyId={access.companyId} sourcingCountries={sourcingCountries} />
-    </section>
-  );
-}
+  const applications = rawApplications.map((app) => ({
+    id: app.id,
+    status: app.status,
+    job: app.job,
+  }));
