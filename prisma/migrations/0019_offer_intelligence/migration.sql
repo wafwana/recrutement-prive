@@ -1,0 +1,6 @@
+ALTER TABLE "Job"
+  ADD COLUMN "folderPath" TEXT NOT NULL DEFAULT 'ENTREPRISES/A_CLASSER/OFFRES',
+  ADD COLUMN "analysis" JSONB,
+  ADD COLUMN "analyzedAt" TIMESTAMP(3);
+
+CREATE INDEX "Job_folderPath_idx" ON "Job"("folderPath");
