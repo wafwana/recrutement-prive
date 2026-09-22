@@ -70,3 +70,14 @@ export default async function EntreprisePage({ searchParams }: { searchParams: P
     status: app.status,
     job: app.job,
   }));
+
+
+  return (
+    <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-24">
+      <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Espace entreprise</p>
+      <h1 className="mt-5 font-serif text-5xl sm:text-6xl">Pilotage de vos recrutements.</h1>
+      <p className="mt-5 max-w-3xl text-sm leading-7 text-white/50">Les candidatures présentées et les informations sensibles restent médiatisées par Recrutement Privé.</p>
+      <CompanyDashboard jobs={jobs} applications={applications} categories={categories} companyId={access.companyId} sourcingCountries={sourcingCountries} />
+    </section>
+  );
+}

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 
 function isSensitive(categoryPath: string) {
-  return /^(ARCHIVAGE\\/(FINANCE|COMPTABILITE|CONTRATS)(\\/|$))/i.test(categoryPath);
+  return /^ARCHIVAGE\/(FINANCE|COMPTABILITE|CONTRATS)(\/|$)/i.test(categoryPath);
 }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
