@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 
 function isSensitive(categoryPath: string) {
-  return /^(ARCHIVAGE\\/(FINANCE|COMPTABILITE|CONTRATS)(\\/|$))/i.test(categoryPath);
+  return /^ARCHIVAGE\/(FINANCE|COMPTABILITE|CONTRATS)(\/|$)/i.test(categoryPath);
 }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -37,11 +37,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       action: "DOCUMENT_DOWNLOAD",
       targetType: "ARCHIVED_DOCUMENT",
       targetId: id,
-      details: {
-        fileName: doc.name,
-        categoryPath: doc.categoryPath,
-        access: "download",
-      },
+      details: { fileName: doc.name, categoryPath: doc.categoryPath, access: "download" },
     },
   });
 

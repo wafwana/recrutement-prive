@@ -6,7 +6,9 @@ export const dynamic = "force-static";
 const PUBLIC_SECTOR_CODES = ["INDUSTRIE", "LOGISTIQUE", "COMMERCE", "SERVICES", "IT", "BTP"] as const;
 
 export default function OffersPage() {
-  const sectors = PUBLIC_SECTOR_CODES.map((code) => RP_TAXONOMY.sectors.find((sector) => sector.code === code)).filter(Boolean);
+  const sectors = PUBLIC_SECTOR_CODES
+    .map((code) => RP_TAXONOMY.find((sector) => sector.code === code))
+    .filter((sector): sector is (typeof RP_TAXONOMY)[number] => Boolean(sector));
 
   return (
     <main className="rp-site min-h-screen">
@@ -34,7 +36,7 @@ export default function OffersPage() {
 
       <section className="rp-white" style={{ padding: "10px 5vw 70px" }}>
         <div className="rp-grid-3">
-          {sectors.map((sector) => sector ? (
+          {sectors.map((sector) => (
             <article className="rp-card" key={sector.code}>
               <div className="rp-eyebrow">CATÉGORIE</div>
               <h2 style={{ fontSize: "20px", margin: "8px 0 12px" }}>{sector.name.fr}</h2>
@@ -46,7 +48,7 @@ export default function OffersPage() {
                 ))}
               </div>
             </article>
-          ) : null)}
+          ))}
         </div>
 
         <div style={{ marginTop: "34px", border: "1px solid #e7e9ed", padding: "28px", textAlign: "center", background: "#f8fafc" }}>

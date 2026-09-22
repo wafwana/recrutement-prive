@@ -27,6 +27,12 @@ export default async function CompanyScopedPage({ params }: { params: Promise<{ 
     orderBy: { updatedAt: "desc" },
   });
 
+  const categories = await prisma.jobCategory.findMany({
+    where: { isActive: true },
+    select: { id: true, code: true, name: true, parentId: true, sortOrder: true },
+    orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
+  });
+
   const rawApplications = await prisma.application.findMany({
     where: {
       job: { companyId },
@@ -73,7 +79,7 @@ export default async function CompanyScopedPage({ params }: { params: Promise<{ 
         </div>
         <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Rôle {membership.role}</p>
       </div>
-      <CompanyDashboard jobs={jobs} applications={applications} companyId={companyId} sourcingCountries={sourcingCountries} />
+      <CompanyDashboard jobs={jobs} applications={applications} categories={categories} companyId={companyId} sourcingCountries={sourcingCountries} />
     </section>
   );
 }

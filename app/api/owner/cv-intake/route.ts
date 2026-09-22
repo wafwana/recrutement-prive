@@ -101,6 +101,18 @@ export async function POST(request: Request) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 20);
 
+    const candidateEmail = typeof formData.get("candidateEmail") === "string" ? String(formData.get("candidateEmail")).trim().toLowerCase() || null : null;
+    const requestedCandidateId = typeof formData.get("candidateId") === "string" ? String(formData.get("candidateId")).trim() || null : null;
+    const candidate = requestedCandidateId
+      ? await prisma.candidateProfile.findUnique({ where: { id: requestedCandidateId }, select: { id: true } })
+      : candidateEmail
+        ? await prisma.candidateProfile.findFirst({ where: { user: { email: { equals: candidateEmail, mode: "insensitive" } } }, select: { id: true } })
+        : null;
+
+    if (requestedCandidateId && !candidate) {
+      return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
+    }
+
     const year = new Date().getFullYear();
     const suggestedFolder = analysis
       ? buildCandidateFolder({
@@ -123,7 +135,8 @@ export async function POST(request: Request) {
         senderRole: "OWNER",
         senderEmail: userEmail,
         candidateName: typeof formData.get("candidateName") === "string" ? String(formData.get("candidateName")).trim() || null : null,
-        candidateEmail: typeof formData.get("candidateEmail") === "string" ? String(formData.get("candidateEmail")).trim() || null : null,
+        candidateEmail,
+        candidateId: candidate?.id || null,
         docType: "CV",
         folderPath: suggestedFolder,
         analysis: analysis ? { ...analysis, sourceFactsOnly: true, suggestedMatches } : { sourceFactsOnly: true, suggestedMatches },
@@ -133,6 +146,29 @@ export async function POST(request: Request) {
       },
       select: { id: true, name: true, folderPath: true, analyzedAt: true, createdAt: true },
     });
+
+    if (candidate?.id) {
+      const existingCandidateDocument = await prisma.candidateDocument.findFirst({
+        where: { candidateId: candidate.id, name: file.name, docType: "CV" },
+        select: { id: true },
+      });
+
+      if (!existingCandidateDocument) {
+        await prisma.candidateDocument.create({
+          data: {
+            candidateId: candidate.id,
+            name: file.name,
+            fileData: buffer,
+            type: file.type || "application/octet-stream",
+            docType: "CV",
+            folderPath: suggestedFolder,
+            analysis: analysis ? { ...analysis, sourceFactsOnly: true, suggestedMatches } : { sourceFactsOnly: true, suggestedMatches },
+            analyzedAt: analysis ? new Date() : null,
+            isPrimaryCv: true,
+          },
+        });
+      }
+    }
 
     await prisma.auditLog.create({
       data: {
