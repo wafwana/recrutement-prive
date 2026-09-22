@@ -5,13 +5,19 @@ import { updateCompanyProfile, updateEnterpriseSourcingCountries } from "./actio
 import { PHONE_COUNTRIES } from "@/lib/phone-countries";
 
 type Job = { id: string; title: string; location: string | null; status: string; attachmentName?: string | null; applications: { status: string }[] };
-type Category = { id: string; code: string; name: unknown; parentId: string | null; sortOrder: number };\ntype Application = { id: string; status: string; job: { id: string; title: string } };
+type Category = { id: string; code: string; name: unknown; parentId: string | null; sortOrder: number };
+type Application = { id: string; status: string; job: { id: string; title: string } };
 const applicationStatuses = ["SUBMITTED", "REVIEWING", "INTERVIEW", "SHORTLISTED", "REJECTED", "HIRED"] as const;
 
-function categoryName(name: unknown) { if (typeof name === "string") return name; if (name && typeof name === "object") { const value = name as Record<string, string>; return value.fr || value.en || Object.values(value)[0] || "Catégorie"; } return "Catégorie"; }\n\nexport default function CompanyDashboard({ jobs, applications, categories, companyId, sourcingCountries }: { jobs: Job[]; applications: Application[]; categories: Category[]; companyId: string; sourcingCountries: string[] }) {
+function categoryName(name: unknown) { if (typeof name === "string") return name; if (name && typeof name === "object") { const value = name as Record<string, string>; return value.fr || value.en || Object.values(value)[0] || "Catégorie"; } return "Catégorie"; }
+
+export default function CompanyDashboard({ jobs, applications, categories, companyId, sourcingCountries }: { jobs: Job[]; applications: Application[]; categories: Category[]; companyId: string; sourcingCountries: string[] }) {
   const [filter, setFilter] = useState("");
-  const [creatingJob, setCreatingJob] = useState(false);\n  const [selectedCategory, setSelectedCategory] = useState("");
-  const parentCategories = categories.filter((category) => !category.parentId);\n  const childCategories = categories.filter((category) => category.parentId === selectedCategory);\n  const filteredApplications = applications.filter((application) => !filter || application.status === filter);
+  const [creatingJob, setCreatingJob] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const parentCategories = categories.filter((category) => !category.parentId);
+  const childCategories = categories.filter((category) => category.parentId === selectedCategory);
+  const filteredApplications = applications.filter((application) => !filter || application.status === filter);
   const activeJobs = jobs.filter((job) => ["OPEN", "PAUSED"].includes(job.status)).length;
 
   async function handleCreateJob(event: FormEvent<HTMLFormElement>) {
