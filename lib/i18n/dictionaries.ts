@@ -8,6 +8,7 @@ const common = {
   nav_tech: "Notre technologie",
   nav_contact: "Contact",
   nav_connected_space: "ESPACE CONNECTÉ",
+  hero_kicker: "CABINET DE RECRUTEMENT & CHASSEUR DE TÊTE",
   hero_title_line_1: "Votre partenaire en",
   hero_title_line_2: "recrutement et",
   hero_title_line_3: "développement des talents",
@@ -92,7 +93,7 @@ export const DICTIONARIES: Record<Locale, Dictionary> = {
   fr: { ...common },
   en: {
     ...common,
-    nav_home: "Home", nav_cabinet: "The Firm", nav_enterprises: "Companies", nav_candidates: "Candidates", nav_tech: "Our Technology", nav_contact: "Contact", nav_connected_space: "CLIENT PORTAL",
+    hero_kicker: "RECRUITMENT FIRM & HEADHUNTING", nav_home: "Home", nav_cabinet: "The Firm", nav_enterprises: "Companies", nav_candidates: "Candidates", nav_tech: "Our Technology", nav_contact: "Contact", nav_connected_space: "CLIENT PORTAL",
     hero_title_line_1: "Your partner in", hero_title_line_2: "recruitment and", hero_title_line_3: "talent development", hero_desc_line_1: "We connect companies with the best profiles", hero_desc_line_2: "and help candidates move toward employment.", hero_cv_btn: "UPLOAD CV", hero_recruit_btn: "HIRE TALENT", hero_image_alt: "Recruitment professional",
     why_prefix: "WHY", why_emphasis: "choose us",
     reason_matching_title: "SKILLS-BASED MATCHING", reason_matching_text: "Demonstrated and transferable skills, potential and real needs - beyond the CV.", reason_project_title: "PROJECT-TO-PROJECT", reason_project_text: "Talent on Demand for short-, medium- or long-term assignments and projects.", reason_longterm_title: "LONG-TERM TALENT", reason_longterm_text: "Talents able to join your organization for the long term and grow with it.", reason_global_title: "TALENT WITHOUT BORDERS", reason_global_text: "Virtual mobility and cross-border collaboration, locally or internationally.",
@@ -104,7 +105,7 @@ export const DICTIONARIES: Record<Locale, Dictionary> = {
   },
   es: {
     ...common,
-    nav_home: "Inicio", nav_cabinet: "El Gabinete", nav_enterprises: "Empresas", nav_candidates: "Candidatos", nav_tech: "Nuestra tecnología", nav_contact: "Contacto", nav_connected_space: "ÁREA PRIVADA",
+    hero_kicker: "CONSULTORA DE SELECCIÓN & HEADHUNTING", nav_home: "Inicio", nav_cabinet: "El Gabinete", nav_enterprises: "Empresas", nav_candidates: "Candidatos", nav_tech: "Nuestra tecnología", nav_contact: "Contacto", nav_connected_space: "ÁREA PRIVADA",
     hero_title_line_1: "Su socio en", hero_title_line_2: "reclutamiento y", hero_title_line_3: "desarrollo del talento", hero_desc_line_1: "Conectamos empresas con los mejores perfiles", hero_desc_line_2: "y acompañamos a los candidatos hacia el empleo.", hero_cv_btn: "SUBIR CV", hero_recruit_btn: "CONTRATAR TALENTO", hero_image_alt: "Profesional de selección",
     why_prefix: "¿POR QUÉ", why_emphasis: "elegirnos", reason_matching_title: "MATCHING POR COMPETENCIAS", reason_matching_text: "Competencias demostradas y transferibles, potencial y necesidades reales, más allá del CV.", reason_project_title: "PROJECT-TO-PROJECT", reason_project_text: "Talent on Demand para misiones y proyectos de corta, media o larga duración.", reason_longterm_title: "TALENTO A LARGO PLAZO", reason_longterm_text: "Talentos capaces de incorporarse de forma duradera y evolucionar con su organización.", reason_global_title: "TALENTO SIN FRONTERAS", reason_global_text: "Movilidad virtual y colaboración internacional, local o transfronteriza.",
     assurances_label: "Nuestros compromisos", assurance_ai_title: "IA EXPLICABLE", assurance_ai_text: "Recomendaciones comprensibles", assurance_human_title: "VALIDACIÓN HUMANA", assurance_human_text: "La tecnología orienta, las personas deciden", assurance_private_title: "PERFILES CONFIDENCIALES", assurance_private_text: "Datos e identidades protegidos", assurance_global_title: "MATCHING INTERNACIONAL", assurance_global_text: "Francia, Europa y mercados internacionales",
@@ -115,7 +116,7 @@ export const DICTIONARIES: Record<Locale, Dictionary> = {
   },
   de: {
     ...common,
-    nav_home: "Startseite", nav_cabinet: "Die Kanzlei", nav_enterprises: "Unternehmen", nav_candidates: "Kandidaten", nav_tech: "Unsere Technologie", nav_contact: "Kontakt", nav_connected_space: "KUNDENPORTAL",
+    hero_kicker: "RECRUITING-KANZLEI & HEADHUNTING", nav_home: "Startseite", nav_cabinet: "Die Kanzlei", nav_enterprises: "Unternehmen", nav_candidates: "Kandidaten", nav_tech: "Unsere Technologie", nav_contact: "Kontakt", nav_connected_space: "KUNDENPORTAL",
     hero_title_line_1: "Ihr Partner für", hero_title_line_2: "Recruiting und", hero_title_line_3: "Talententwicklung", hero_desc_line_1: "Wir verbinden Unternehmen mit den besten Profilen", hero_desc_line_2: "und begleiten Kandidaten auf ihrem Weg in den Beruf.", hero_cv_btn: "LEBENSLAUF HOCHLADEN", hero_recruit_btn: "TALENTE EINSTELLEN", hero_image_alt: "Recruiting-Expertin",
     why_prefix: "WARUM", why_emphasis: "uns wählen", reason_matching_title: "SKILL-BASIERTES MATCHING", reason_matching_text: "Nachgewiesene und übertragbare Kompetenzen, Potenzial und echte Anforderungen - über den Lebenslauf hinaus.", reason_project_title: "PROJECT-TO-PROJECT", reason_project_text: "Talent on Demand für Projekte und Einsätze von kurzer bis langer Dauer.", reason_longterm_title: "LANGFRISTIGE TALENTE", reason_longterm_text: "Talente, die dauerhaft in Ihre Organisation passen und sich mit ihr entwickeln.", reason_global_title: "TALENTE OHNE GRENZEN", reason_global_text: "Virtuelle Mobilität und grenzüberschreitende Zusammenarbeit, lokal und international.",
     assurances_label: "Unsere Verpflichtungen", assurance_ai_title: "ERKLÄRBARE KI", assurance_ai_text: "Nachvollziehbare Empfehlungen", assurance_human_title: "MENSCHLICHE VALIDIERUNG", assurance_human_text: "Technologie unterstützt, Menschen entscheiden", assurance_private_title: "VERTRAULICHE PROFILE", assurance_private_text: "Geschützte Daten und Identitäten", assurance_global_title: "INTERNATIONALES MATCHING", assurance_global_text: "Frankreich, Europa und weltweit",
@@ -126,7 +127,7 @@ export const DICTIONARIES: Record<Locale, Dictionary> = {
   },
   it: {
     ...common,
-    nav_home: "Home", nav_cabinet: "Lo Studio", nav_enterprises: "Aziende", nav_candidates: "Candidati", nav_tech: "La nostra tecnologia", nav_contact: "Contatti", nav_connected_space: "AREA RISERVATA",
+    hero_kicker: "SOCIETÀ DI RECRUITING & HEADHUNTING", nav_home: "Home", nav_cabinet: "Lo Studio", nav_enterprises: "Aziende", nav_candidates: "Candidati", nav_tech: "La nostra tecnologia", nav_contact: "Contatti", nav_connected_space: "AREA RISERVATA",
     hero_title_line_1: "Il vostro partner nel", hero_title_line_2: "reclutamento e", hero_title_line_3: "sviluppo dei talenti", hero_desc_line_1: "Colleghiamo le aziende ai migliori profili", hero_desc_line_2: "e accompagniamo i candidati verso il lavoro.", hero_cv_btn: "CARICA CV", hero_recruit_btn: "ASSUMI TALENTI", hero_image_alt: "Professionista della selezione",
     why_prefix: "PERCHÉ", why_emphasis: "sceglierci", reason_matching_title: "MATCHING PER COMPETENZE", reason_matching_text: "Competenze dimostrate e trasferibili, potenziale e bisogni reali, oltre il CV.", reason_project_title: "PROJECT-TO-PROJECT", reason_project_text: "Talent on Demand per incarichi e progetti di breve, media o lunga durata.", reason_longterm_title: "TALENTI A LUNGO TERMINE", reason_longterm_text: "Talenti in grado di entrare stabilmente nella vostra organizzazione e crescere con essa.", reason_global_title: "TALENTI SENZA FRONTIERE", reason_global_text: "Mobilità virtuale e collaborazione transfrontaliera, locale o internazionale.",
     assurances_label: "I nostri impegni", assurance_ai_title: "IA SPIEGABILE", assurance_ai_text: "Raccomandazioni comprensibili", assurance_human_title: "VALIDAZIONE UMANA", assurance_human_text: "La tecnologia supporta, l’uomo decide", assurance_private_title: "PROFILI RISERVATI", assurance_private_text: "Dati e identità protetti", assurance_global_title: "MATCHING INTERNAZIONALE", assurance_global_text: "Francia, Europa e mondo",
@@ -137,7 +138,7 @@ export const DICTIONARIES: Record<Locale, Dictionary> = {
   },
   ar: {
     ...common,
-    nav_home: "الرئيسية", nav_cabinet: "المكتب", nav_enterprises: "الشركات", nav_candidates: "المرشحون", nav_tech: "تقنيتنا", nav_contact: "اتصل بنا", nav_connected_space: "البوابة الخاصة",
+    hero_kicker: "مكتب توظيف واستقطاب المواهب", nav_home: "الرئيسية", nav_cabinet: "المكتب", nav_enterprises: "الشركات", nav_candidates: "المرشحون", nav_tech: "تقنيتنا", nav_contact: "اتصل بنا", nav_connected_space: "البوابة الخاصة",
     hero_title_line_1: "شريككم في", hero_title_line_2: "التوظيف و", hero_title_line_3: "تطوير المواهب", hero_desc_line_1: "نصل الشركات بأفضل الكفاءات", hero_desc_line_2: "ونرافق المرشحين نحو فرص العمل.", hero_cv_btn: "إيداع السيرة الذاتية", hero_recruit_btn: "توظيف المواهب", hero_image_alt: "متخصصة في التوظيف",
     why_prefix: "لماذا", why_emphasis: "نختاركم", reason_matching_title: "مطابقة حسب المهارات", reason_matching_text: "مهارات مثبتة وقابلة للنقل، إمكانات واحتياجات حقيقية تتجاوز السيرة الذاتية.", reason_project_title: "مشروع بمشروع", reason_project_text: "مواهب عند الطلب لمهام ومشاريع قصيرة أو متوسطة أو طويلة المدى.", reason_longterm_title: "مواهب طويلة الأمد", reason_longterm_text: "مواهب قادرة على الانضمام المستدام إلى مؤسستكم والتطور معها.", reason_global_title: "مواهب بلا حدود", reason_global_text: "تنقل افتراضي وتعاون عابر للحدود، محلياً ودولياً.",
     assurances_label: "التزاماتنا", assurance_ai_title: "ذكاء اصطناعي قابل للتفسير", assurance_ai_text: "توصيات واضحة وقابلة للفهم", assurance_human_title: "تحقق بشري", assurance_human_text: "التقنية تساعد والإنسان يقرر", assurance_private_title: "ملفات سرية", assurance_private_text: "حماية البيانات والهويات", assurance_global_title: "مطابقة دولية", assurance_global_text: "فرنسا وأوروبا والعالم",
