@@ -1,4 +1,4 @@
-export const SUPPORTED_LOCALES = ["fr", "en", "es", "de", "it", "ar"] as const;
+export const SUPPORTED_LOCALES = ["fr", "en", "es", "de", "it", "ar", "nl"] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = "fr";
@@ -12,4 +12,5 @@ export const LOCALE_LABELS: Record<Locale, { name: string; flag: string }> = {
   de: { name: "Deutsch", flag: "🇩🇪" },
   it: { name: "Italiano", flag: "🇮🇹" },
   ar: { name: "العربية", flag: "🇸🇦" },
+  nl: { name: "Nederlands", flag: "🇳🇱" },
 };
