@@ -1,0 +1,8 @@
+CV TEST 01 — Ingénieur Data / IA
+Profil fictif de test — aucune donnée personnelle réelle.
+
+Expérience: 6 ans en ingénierie logicielle et data.
+Compétences: Python, SQL, machine learning, pandas, scikit-learn, APIs, Docker, AWS, CI/CD.
+Missions: pipelines de données, modèles prédictifs, industrialisation ML, automatisation.
+Langues: français, anglais.
+Objectif: poste Data Engineer / Machine Learning Engineer.
