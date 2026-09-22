@@ -83,12 +83,21 @@ export async function POST(request: Request) {
       parentCode: taxonomy.find((parent) => parent.id === item.parentId)?.code || null,
     }));
 
-    const analysis = await analyzeCvDocument({
-      fileName: file.name,
-      mimeType: file.type || "application/octet-stream",
-      buffer,
-      taxonomy: taxonomyItems,
-    });
+    let analysis: Awaited<ReturnType<typeof analyzeCvDocument>> = null;
+    let analysisError: string | null = null;
+    try {
+      analysis = await analyzeCvDocument({
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        buffer,
+        taxonomy: taxonomyItems,
+      });
+    } catch (error) {
+      // L'intégration du CV ne doit jamais échouer uniquement parce que
+      // l'analyse IA est momentanément indisponible ou rejette le format.
+      analysisError = error instanceof Error ? error.message : "Erreur d'analyse IA";
+      console.error("[owner cv analysis]", error);
+    }
 
     const jobs = await prisma.job.findMany({
       where: { status: "OPEN" },
@@ -182,6 +191,7 @@ export async function POST(request: Request) {
           originalSha256: sha256,
           folderPath: suggestedFolder,
           analysisGenerated: Boolean(analysis),
+          analysisDeferred: Boolean(analysisError),
           suggestedMatchCount: suggestedMatches.length,
           originalImmutable: true,
         },
