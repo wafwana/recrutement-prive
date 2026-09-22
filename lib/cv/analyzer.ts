@@ -66,7 +66,7 @@ export async function analyzeCvDocument(input: {
         {
           type: "input_file",
           filename: input.fileName,
-          file_data: `data:${input.mimeType};base64,${input.buffer.toString("base64")}`,
+          file_data: input.buffer.toString("base64"),
         },
         {
           type: "input_text",
