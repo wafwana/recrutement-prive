@@ -268,6 +268,14 @@ const COMMON: Record<string, StrongProfile[]> = {
     { title: "Expert optimisation des opérations", kind: "specialist" },
     { title: "Chef de projet transformation", kind: "project" },
   ],
+  RESTAURATION: [
+    { title: "Chef de cuisine", kind: "management" },
+    { title: "Aide chef de cuisine", kind: "operations" },
+    { title: "Sous-chef / Second de cuisine", kind: "management" },
+    { title: "Responsable de cuisine", kind: "management" },
+    { title: "Chef de partie", kind: "specialist" },
+    { title: "Expert cuisine / gastronomie", kind: "expert" },
+  ],
   SERVICES_GENERAUX: [
     { title: "Responsable services généraux", kind: "management" },
     { title: "Facility Manager", kind: "management" },
