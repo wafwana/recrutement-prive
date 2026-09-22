@@ -22,6 +22,7 @@ const labels: Record<string, string> = {
   DOCUMENTS_VIEW: "Consulter les documents (hors sensibles)",
   MESSAGING_CLIENTS_ENTERPRISE: "Messagerie clients / entreprises",
   PLATFORM_SETTINGS: "Configuration plateforme",
+  ENTERPRISE_OFFER_SOURCING: "Sourcing automatisé des offres entreprise",
 };
 
 export default function OwnerPermissionsPage() {
