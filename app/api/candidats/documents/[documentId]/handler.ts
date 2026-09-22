@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { isIdentityUnlocked } from "@/lib/mission-lock";
 import { NextResponse } from "next/server";
+import { hasPermission } from "@/lib/auth/permissions";
 
 export async function handleGetCandidateDocument(
   documentId: string,
@@ -12,11 +13,7 @@ export async function handleGetCandidateDocument(
 
   const document = await prisma.candidateDocument.findUnique({
     where: { id: documentId },
-    include: {
-      candidate: {
-        select: { id: true, userId: true },
-      },
-    },
+    select: { id: true, name: true, type: true, docType: true, fileData: true, candidateId: true, candidate: { select: { id: true, userId: true } } },
   });
 
   if (!document || !document.fileData) {
@@ -58,6 +55,13 @@ export async function handleGetCandidateDocument(
         { error: "L'accès aux documents personnels de ce candidat n'est pas autorisé avant déblocage de son identité." },
         { status: 403 }
       );
+    }
+  } else if (userRole === "CONSULTANT") {
+    if (document.docType !== "CV") {
+      return NextResponse.json({ error: "Document non accessible dans cet espace." }, { status: 403 });
+    }
+    if (!(await hasPermission(userId, userRole, "DOCUMENTS_VIEW"))) {
+      return NextResponse.json({ error: "Permission documentaire non accordée par l'Owner." }, { status: 403 });
     }
   } else if (!userRole || !["ADMIN", "OWNER"].includes(userRole)) {
     return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });

@@ -7,6 +7,8 @@ import { z } from "zod";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { requireFileScanInProduction, scanBufferWithClamAV } from "@/lib/security/file-scan";
 import { applyCandidateToJob } from "@/lib/candidate-application";
+import { analyzeCvDocument } from "@/lib/cv/analyzer";
+import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 
 const profileSchema = z.object({
   headline: z.string().trim().max(160).optional(),
@@ -163,6 +165,142 @@ export async function uploadCandidateDocument(formData: FormData) {
   }
 
   const mimeType = file.type || "application/pdf";
+  const isCv = /(^|[\\s_-])(cv|resume|curriculum|vitae)([\\s_.-]|$)/i.test(name) || /(^|[\\s_-])(cv|resume|curriculum|vitae)([\\s_.-]|$)/i.test(file.name);
+
+  let docType = isCv ? "CV" : "AUTRE";
+  let folderPath = isCv ? "CANDIDATS/A_CLASSER/A_VERIFIER/CV" : "CANDIDATS/A_CLASSER/A_VERIFIER";
+  let analysis: Awaited<ReturnType<typeof analyzeCvDocument>> = null;
+  let analyzedAt: Date | undefined;
+  let isPrimaryCv = false;
+  let storedAnalysis: unknown = analysis;
+
+  if (isCv) {
+    const taxonomyRows = await prisma.jobCategory.findMany({
+      where: { isActive: true },
+      select: { code: true, name: true, parent: { select: { code: true } } },
+      orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
+    });
+    const taxonomy = taxonomyRows.map((row) => {
+      const rawName = row.name;
+      const nameValue =
+        typeof rawName === "string"
+          ? rawName
+          : rawName && typeof rawName === "object" && "fr" in rawName && typeof (rawName as { fr?: unknown }).fr === "string"
+            ? String((rawName as { fr: string }).fr)
+            : row.code;
+      return { code: row.code, name: nameValue, parentCode: row.parent?.code ?? null };
+    });
+
+    try {
+      analysis = await analyzeCvDocument({
+        fileName: file.name,
+        mimeType,
+        buffer,
+        taxonomy,
+      });
+    } catch (error) {
+      console.error("[uploadCandidateDocument] CV analysis failed", error);
+    }
+
+    if (analysis) {
+      const cvAnalysis = analysis;
+      const currentSkills = Array.isArray(profile.skills)
+        ? profile.skills.filter((value): value is string => typeof value === "string")
+        : [];
+      const mergedSkills = [...new Set([...currentSkills, ...cvAnalysis.skills])];
+
+      const primaryCategory = cvAnalysis.primaryCategoryCode
+        ? taxonomyRows.find((row) => row.code === cvAnalysis.primaryCategoryCode && !row.parent)
+        : null;
+      const resolvedSubCategoryCodes = cvAnalysis.subCategoryCodes.length
+        ? taxonomyRows
+            .filter((row) => cvAnalysis.subCategoryCodes.includes(row.code) && row.parent?.code === cvAnalysis.primaryCategoryCode)
+            .map((row) => row.code)
+        : [];
+
+      const primaryCategoryId = primaryCategory
+        ? (await prisma.jobCategory.findUnique({ where: { code: primaryCategory.code }, select: { id: true } }))?.id ?? null
+        : profile.primaryCategoryId;
+
+      const validSubIds = resolvedSubCategoryCodes.length
+        ? (await prisma.jobCategory.findMany({
+            where: { code: { in: resolvedSubCategoryCodes }, isActive: true },
+            select: { id: true },
+          })).map((row) => row.id)
+        : Array.isArray(profile.subCategoryIds)
+          ? profile.subCategoryIds.filter((value): value is string => typeof value === "string")
+          : [];
+
+      await prisma.candidateProfile.update({
+        where: { id: profile.id },
+        data: {
+          skills: mergedSkills,
+          headline: profile.headline || cvAnalysis.headline,
+          bio: profile.bio || cvAnalysis.summary,
+          experienceYears: profile.experienceYears ?? cvAnalysis.experienceYears,
+          primaryCategoryId,
+          subCategoryIds: validSubIds,
+        },
+      });
+
+      const openJobs = await prisma.job.findMany({
+        where: { status: "OPEN" },
+        include: {
+          jobCategory: { select: { code: true } },
+          subCategory: { select: { code: true } },
+        },
+        take: 500,
+      });
+
+      const automaticMatches = openJobs
+        .map((job) => ({
+          jobId: job.id,
+          title: job.title,
+          score: matchCandidateToJob(
+            {
+              skills: mergedSkills,
+              experienceYears: profile.experienceYears ?? cvAnalysis.experienceYears,
+              headline: profile.headline || cvAnalysis.headline,
+              bio: profile.bio || cvAnalysis.summary,
+              location: profile.location,
+              country: profile.country,
+              primaryCategoryCode: primaryCategory?.code || cvAnalysis.primaryCategoryCode,
+              subCategoryCodes: resolvedSubCategoryCodes,
+            },
+            {
+              requiredSkills: job.requiredSkills,
+              requiredExperienceYears: job.requiredExperienceYears,
+              title: job.title,
+              description: job.description,
+              location: job.location,
+              categoryCode: job.jobCategory?.code,
+              subCategoryCode: job.subCategory?.code,
+            }
+          ).score,
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 20);
+
+      storedAnalysis = {
+        ...analysis,
+        suggestedMatches: automaticMatches,
+        analyzedAt: new Date().toISOString(),
+      };
+
+      const primaryCode = cvAnalysis.primaryCategoryCode || "A_CLASSER";
+      const subCode = cvAnalysis.subCategoryCodes[0] || "GENERAL";
+      folderPath = `CANDIDATS/${primaryCode}/${subCode}/CV/${new Date().getFullYear()}`;
+      analyzedAt = new Date();
+      isPrimaryCv = true;
+    }
+  }
+
+  if (isCv) {
+    await prisma.candidateDocument.updateMany({
+      where: { candidateId: profile.id, docType: "CV", isPrimaryCv: true },
+      data: { isPrimaryCv: false },
+    });
+  }
 
   await prisma.candidateDocument.create({
     data: {
@@ -170,6 +308,11 @@ export async function uploadCandidateDocument(formData: FormData) {
       name: name.slice(0, 180),
       fileData: buffer,
       type: mimeType,
+      docType,
+      folderPath,
+      analysis: storedAnalysis ? JSON.parse(JSON.stringify(storedAnalysis)) : undefined,
+      analyzedAt,
+      isPrimaryCv,
     },
   });
 

@@ -138,8 +138,16 @@ model CandidateDocument {
   url String?
   fileData Bytes?
   type String?
+  docType String @default("AUTRE")
+  folderPath String @default("CANDIDATS/A_CLASSER")
+  analysis Json?
+  analyzedAt DateTime?
+  isPrimaryCv Boolean @default(false)
   candidate CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+
+  @@index([candidateId, docType])
+  @@index([folderPath])
 }
 
 model Company {
