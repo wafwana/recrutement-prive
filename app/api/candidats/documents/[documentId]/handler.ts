@@ -23,13 +23,11 @@ export async function handleGetCandidateDocument(
   const userRole = session.user.role;
   const userId = session.user.id;
 
-  // 1. Candidate ownership check
   if (userRole === "CANDIDAT") {
     if (document.candidate.userId !== userId) {
       return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
   } else if (userRole === "ENTREPRISE") {
-    // 2. Company check: must have a mission presentation with unlocked identity
     const companyMember = await prisma.companyMember.findFirst({
       where: { userId },
       select: { companyId: true },
@@ -66,6 +64,22 @@ export async function handleGetCandidateDocument(
   } else if (!userRole || !["ADMIN", "OWNER"].includes(userRole)) {
     return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
   }
+
+  await prisma.auditLog.create({
+    data: {
+      actorUserId: userId,
+      actorRole: userRole || "UNKNOWN",
+      action: "DOCUMENT_DOWNLOAD",
+      targetType: "CANDIDATE_DOCUMENT",
+      targetId: document.id,
+      details: {
+        fileName: document.name,
+        docType: document.docType,
+        candidateId: document.candidateId,
+        access: "download",
+      },
+    },
+  });
 
   const headers = new Headers();
   headers.set("Content-Type", document.type || "application/pdf");
