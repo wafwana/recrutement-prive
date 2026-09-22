@@ -124,6 +124,7 @@ model CandidateProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   applications Application[]
   documents CandidateDocument[]
+  cvIntakes CvIntake[]
   presentations MissionPresentation[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -148,6 +149,37 @@ model CandidateDocument {
 
   @@index([candidateId, docType])
   @@index([folderPath])
+}
+
+
+model CvIntake {
+  id                String          @id @default(cuid())
+  name              String
+  originalName      String
+  mimeType          String
+  fileData          Bytes
+  size              Int
+  originalSha256    String
+  senderUserId      String
+  senderRole        String
+  senderEmail       String
+  candidateName     String?
+  candidateEmail    String?
+  docType           String          @default("CV")
+  folderPath        String          @default("CANDIDATS/A_CLASSER/CV")
+  analysis          Json?
+  matching          Json?
+  analyzedAt        DateTime?
+  status            String          @default("A_ANALYSER")
+  candidateId       String?
+  candidate         CandidateProfile? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([folderPath])
+  @@index([candidateId])
+  @@index([status, createdAt])
+  @@index([originalSha256])
 }
 
 model Company {
