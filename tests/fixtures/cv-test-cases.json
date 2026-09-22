@@ -1,0 +1,26 @@
+[
+  {
+    "file": "cv-test-01-tech.pdf",
+    "profile": "Développeur Full Stack",
+    "primaryCategoryCode": "IT",
+    "subCategoryCode": "DEV_LOGICIEL",
+    "skills": ["Python", "TypeScript", "React", "Next.js", "PostgreSQL"],
+    "expectedFolderPrefix": "CANDIDATS/IT/DEV_LOGICIEL/CV/"
+  },
+  {
+    "file": "cv-test-02-hr.pdf",
+    "profile": "Responsable RH",
+    "primaryCategoryCode": "RH",
+    "subCategoryCode": "RECRUTEMENT",
+    "skills": ["Recrutement", "SIRH", "droit social", "management"],
+    "expectedFolderPrefix": "CANDIDATS/RH/RECRUTEMENT/CV/"
+  },
+  {
+    "file": "cv-test-03-finance.pdf",
+    "profile": "Contrôleur de gestion",
+    "primaryCategoryCode": "FINANCE",
+    "subCategoryCode": "CONTROLE_DE_GESTION",
+    "skills": ["Budget", "Excel", "Power BI", "contrôle de gestion"],
+    "expectedFolderPrefix": "CANDIDATS/FINANCE/CONTROLE_DE_GESTION/CV/"
+  }
+]
