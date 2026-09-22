@@ -71,6 +71,7 @@ export default function OwnerPermissionsPage() {
       <div className="mx-auto max-w-6xl">
         <p className="text-xs uppercase tracking-[0.2em] text-[#F97316]">OWNER · Gouvernance</p>
         <h1 className="mt-2 text-3xl font-semibold">Permissions ADMIN / CONSULTANT</h1>
+        <div className="mt-4"><a href="/owner/supervision" className="inline-flex rounded border border-[#F97316] px-4 py-2 text-xs uppercase tracking-wider text-[#F97316]">Supervision des collaborateurs</a></div>
         <p className="mt-3 max-w-3xl text-sm text-white/70">
           L’OWNER décide individuellement de ce que chaque collaborateur peut utiliser.
           Les collaborateurs ne voient jamais cette matrice.
