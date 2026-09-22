@@ -3,6 +3,7 @@
 import React from "react";
 import LanguageSelector from "./components/LanguageSelector";
 import { useI18n } from "@/lib/i18n/context";
+import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
 
 const images = {
   hero: "/visuals/hero-final.webp?v=hero-final-20260917",
@@ -27,7 +28,8 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 }
 
 export default function HomePage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const publicSectors = RP_TAXONOMY.slice(0, 6);
 
   return <main className="rp-home">
     <header className="rp-header">
@@ -55,6 +57,27 @@ export default function HomePage() {
     <section className="rp-reasons"><SectionHeading><h2>{t("why_prefix")} <span>{t("why_emphasis")}</span> ?</h2></SectionHeading><div className="rp-reason-grid">{reasons.map(([icon, titleKey, textKey]) => <article className="rp-reason" key={titleKey}><div className="rp-reason-icon" aria-hidden="true">{icon}</div><h3>{t(titleKey)}</h3><p>{t(textKey)}</p></article>)}</div></section>
     <section className="rp-assurances" aria-label={t("assurances_label")}>{assurances.map(([titleKey, textKey]) => <div className="rp-assurance" key={titleKey}><span className="rp-assurance-ring" aria-hidden="true" /><div><strong>{t(titleKey)}</strong><small>{t(textKey)}</small></div></div>)}</section>
     <section className="rp-feature-grid" aria-label={t("features_label")}>{featureCards.map(([eyebrowKey, image, titleKey, textKey, ctaKey, href]) => <article className="rp-feature" key={eyebrowKey}><div className="rp-feature-image" style={{ backgroundImage: `url(${image})` }} role="img" aria-label={t(eyebrowKey)} /><div className="rp-feature-body"><span className="rp-feature-eyebrow">{t(eyebrowKey)}</span><h3>{t(titleKey)}</h3><p>{t(textKey)}</p><a href={href}>{t(ctaKey)}</a></div></article>)}</section>
+    <section id="secteurs" className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-20">
+      <SectionHeading><h2>Secteurs d’activité <span>&amp; métiers</span></h2></SectionHeading>
+      <p className="mx-auto mt-4 max-w-3xl text-center text-sm leading-7 text-white/50">Une taxonomie structurée pour retrouver les talents par secteur, métier et spécialité, puis élargir le matching vers les compétences transférables.</p>
+      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {publicSectors.map((sector) => (
+          <article key={sector.code} className="border border-white/10 bg-[#111] p-6 transition hover:border-[#F97316]/50">
+            <h3 className="font-serif text-xl text-white">{sector.name[locale] || sector.name.fr}</h3>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {sector.subcategories.slice(0, 5).map((job) => (
+                <span key={job.code} className="border border-white/10 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.08em] text-white/50">
+                  {job.name[locale] || job.name.fr}
+                </span>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="mt-8 text-center">
+        <a href="/offres" className="inline-flex border border-[#F97316] px-6 py-3 text-[10px] uppercase tracking-[0.2em] text-[#F97316]">Voir les offres &amp; métiers →</a>
+      </div>
+    </section>
     <section className="rp-numbers"><SectionHeading><h2>{t("numbers_title")}</h2></SectionHeading><div className="rp-number-grid">{[["♟", "+850", "numbers_candidates"], ["▤", "120+", "numbers_companies"], ["▣", "350+", "numbers_recruitments"], ["◆", "200+", "numbers_training"]].map(([icon, value, labelKey]) => <div className="rp-number" key={labelKey}><span className="rp-number-icon">{icon}</span><strong>{value}</strong><small>{t(labelKey)}</small></div>)}</div></section>
     <section className="rp-trust"><SectionHeading><h2>{t("testimonials_title")}</h2></SectionHeading><div className="rp-testimonial-grid">{testimonials.map(([nameKey, roleKey, quoteKey, initials], index) => <article className="rp-testimonial" key={nameKey}><span className="rp-quote-mark">“</span><p>{t(quoteKey)}</p><div className="rp-person"><span className="rp-avatar">{index === 1 ? "SL" : index === 2 ? "JB" : initials}</span><div><strong>{t(nameKey)}</strong><small>{t(roleKey)}</small></div></div></article>)}</div><div className="rp-dots" aria-hidden="true"><span className="selected" /><span /><span /></div></section>
     <section className="rp-final-cta"><div className="rp-final-icon" aria-hidden="true">●●●</div><div><strong>{t("final_cta_title")}</strong><span>{t("final_cta_text")}</span></div><ArrowButton href="#contact" outline>{t("final_cta_button")} &nbsp; →</ArrowButton></section>
