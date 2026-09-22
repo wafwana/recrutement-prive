@@ -3,7 +3,6 @@
 import React from "react";
 import LanguageSelector from "./components/LanguageSelector";
 import { useI18n } from "@/lib/i18n/context";
-import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
 
 const images = {
   hero: "/visuals/hero-final.webp?v=hero-final-20260917",
@@ -28,8 +27,39 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 }
 
 export default function HomePage() {
-  const { t, locale } = useI18n();
-  const publicSectors = RP_TAXONOMY.slice(0, 6);
+  const { t } = useI18n();
+  const publicSectorCards = [
+    {
+      code: "INDUSTRIE",
+      name: "Industrie",
+      jobs: ["Direction production", "Direction maintenance", "Direction qualité / QHSE", "Direction méthodes / industrialisation", "Direction supply chain industrielle"],
+    },
+    {
+      code: "LOGISTIQUE",
+      name: "Logistique & Supply Chain",
+      jobs: ["Direction logistique / transport", "Direction achats", "Direction supply chain", "Direction planification / ordonnancement", "Direction entrepôt / warehouse"],
+    },
+    {
+      code: "COMMERCE",
+      name: "Commerce & Business",
+      jobs: ["Direction ventes B2B", "Direction grands comptes / Key Account", "Direction business development", "Direction commerciale", "Direction retail / réseau"],
+    },
+    {
+      code: "AGROALIMENTAIRE",
+      name: "Agro-alimentaire",
+      jobs: ["Direction production / transformation", "Direction qualité / sécurité alimentaire", "Direction R&D / innovation", "Direction supply chain / approvisionnement", "Direction industrielle"],
+    },
+    {
+      code: "IT",
+      name: "Informatique & Tech",
+      jobs: ["Direction développement logiciel", "Direction Data / IA", "Direction cybersécurité", "Direction Cloud / DevOps / SRE", "Direction robotique / IoT"],
+    },
+    {
+      code: "AGRICULTURE",
+      name: "Agriculture",
+      jobs: ["Direction production agricole", "Direction agronomie / conseil", "Direction agroéquipements", "Direction supply chain / distribution", "Direction d'exploitation"],
+    },
+  ] as const;
 
   return <main className="rp-home">
     <header className="rp-header">
@@ -58,13 +88,14 @@ export default function HomePage() {
       <SectionHeading><h2>Secteurs d’activité <span>&amp; métiers</span></h2></SectionHeading>
       <p className="mx-auto mt-4 max-w-3xl text-center text-sm leading-7 text-white/50">Aperçu public des principaux secteurs. L’accès aux métiers, sous-métiers et fonctionnalités complètes est réservé aux utilisateurs inscrits.</p>
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {publicSectors.map((sector) => (
+        {publicSectorCards.map((sector) => (
           <article key={sector.code} className="border border-white/10 bg-[#111] p-6 transition hover:border-[#F97316]/50">
-            <h3 className="font-serif text-xl text-white">{sector.name[locale] || sector.name.fr}</h3>
+            <h3 className="font-serif text-xl text-white">{sector.name}</h3>
+            <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-[#F97316]/80">Recherche de cadres supérieurs &amp; profils rares</div>
             <div className="mt-4 flex flex-wrap gap-2">
-              {sector.subcategories.slice(0, 5).map((job) => (
-                <span key={job.code} className="border border-white/10 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.08em] text-white/50">
-                  {job.name[locale] || job.name.fr}
+              {sector.jobs.map((job) => (
+                <span key={job} className="border border-white/10 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.08em] text-white/50">
+                  {job}
                 </span>
               ))}
             </div>
