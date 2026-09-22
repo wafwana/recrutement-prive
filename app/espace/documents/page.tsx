@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 
 type Doc = {
   id: string;
@@ -47,7 +48,7 @@ export default function DocumentsPage() {
 
   useEffect(() => { loadDocuments(); }, []);
 
-  async function submitDocument(event: React.FormEvent<HTMLFormElement>) {
+  async function submitDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file) {
       setError("Sélectionnez un document avant de valider.");
