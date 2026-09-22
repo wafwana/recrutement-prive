@@ -16,6 +16,11 @@ export default async function CompanyScopedPage({ params }: { params: Promise<{ 
   });
   if (!membership) notFound();
 
+  const sourcingSetting = await prisma.systemSetting.findUnique({ where: { key: `sourcing:countries:${companyId}` }, select: { value: true } });
+  const sourcingCountries = sourcingSetting?.value && Array.isArray(sourcingSetting.value)
+    ? sourcingSetting.value.filter((value): value is string => typeof value === "string")
+    : [];
+
   const jobs = await prisma.job.findMany({
     where: { companyId },
     include: { applications: { select: { status: true } } },
@@ -68,7 +73,7 @@ export default async function CompanyScopedPage({ params }: { params: Promise<{ 
         </div>
         <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Rôle {membership.role}</p>
       </div>
-      <CompanyDashboard jobs={jobs} applications={applications} companyId={companyId} />
+      <CompanyDashboard jobs={jobs} applications={applications} companyId={companyId} sourcingCountries={sourcingCountries} />
     </section>
   );
 }
