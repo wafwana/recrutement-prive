@@ -1,3 +1,4 @@
+import BackButton from "@/components/navigation/BackButton";
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
@@ -68,6 +69,7 @@ export default function OwnerConsultantsPage() {
 
   return (
     <section className="mx-auto w-[min(900px,calc(100%-40px))] py-12 md:w-[min(900px,calc(100%-72px))] md:py-20">
+      <BackButton />
       <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Gouvernance</p>
       <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Gérer les CONSULTANTS.</h1>
       <div className="mt-6 flex flex-wrap gap-3">
