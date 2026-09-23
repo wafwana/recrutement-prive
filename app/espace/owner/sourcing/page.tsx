@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import BackButton from "@/components/navigation/BackButton";
+import SourcingRunButton from "@/components/owner/SourcingRunButton";
 
 export default async function OwnerSourcingPage() {
   const session = await auth();
@@ -39,9 +40,12 @@ export default async function OwnerSourcingPage() {
             Les offres externes sont conservées dans le vivier de sourcing pour qualification et matching. Elles ne sont pas exposées publiquement.
           </p>
         </div>
-        <div className="border border-[#c7a15a]/30 px-5 py-4 text-right">
+        <div className="flex flex-col items-end gap-3">
+          <SourcingRunButton />
+          <div className="border border-[#c7a15a]/30 px-5 py-4 text-right">
           <p className="text-[10px] uppercase tracking-[0.18em] text-white/35">Offres détectées</p>
           <p className="mt-2 font-serif text-3xl text-[#c7a15a]">{offers.length}</p>
+          </div>
         </div>
       </div>
 
