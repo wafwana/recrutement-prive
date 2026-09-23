@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import BackButton from "@/components/navigation/BackButton";
 
 export default async function OwnerSourcingPage() {
   const session = await auth();
@@ -27,6 +28,7 @@ export default async function OwnerSourcingPage() {
 
   return (
     <section className="mx-auto w-[min(1280px,calc(100%-40px))] py-12 md:w-[min(1280px,calc(100%-72px))] md:py-20">
+      <BackButton />
       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Sourcing automatique</p>
