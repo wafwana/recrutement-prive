@@ -60,7 +60,8 @@ export async function POST(request: Request) {
   const session = getActiveSessionContext() || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const userEmail = typeof session?.user?.email === "string" ? session.user.email : "";
-  if (!userId || session?.user?.role !== "OWNER") return NextResponse.json({ error: "Import de CV réservé à l'Owner." }, { status: 403 });
+  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(session?.user?.role || "")) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  if (!(await hasPermission(userId, session?.user?.role, "CV_IMPORT"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
 
   try {
     await ensureTaxonomySynced();
