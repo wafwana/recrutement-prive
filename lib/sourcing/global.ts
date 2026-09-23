@@ -37,10 +37,10 @@ function normalizeJob(value: unknown, source: string, index: number): GlobalJobI
   return {
     externalId: text(r.externalId ?? r.id ?? r.guid) ?? `${source}:${index}:${title}`,
     source, sourceUrl: text(r.sourceUrl ?? r.url ?? r.link), title,
-    companyName: text(r.companyName ?? r.company ?? r.employer), country: text(r.country), city: text(r.city),
+    companyName: text(r.companyName ?? r.company ?? r.employer ?? r.company_name), country: text(r.country), city: text(r.city),
     categoryCode: text(r.categoryCode ?? r.category), subCategoryCode: text(r.subCategoryCode ?? r.subCategory),
-    skills: skills(r.skills ?? r.requiredSkills), experienceYears: number(r.experienceYears ?? r.requiredExperienceYears),
-    language: text(r.language), salary: text(r.salary), publishedAt: text(r.publishedAt ?? r.published ?? r.datePublished),
+    skills: skills(r.skills ?? r.requiredSkills ?? r.tags), experienceYears: number(r.experienceYears ?? r.requiredExperienceYears),
+    language: text(r.language), salary: text(r.salary), publishedAt: text(r.publishedAt ?? r.published ?? r.datePublished ?? r.createdAt ?? r.created_at),
     closingAt: text(r.closingAt ?? r.deadline ?? r.dateClosing), description: text(r.description ?? r.summary), raw: value,
   };
 }
@@ -76,7 +76,7 @@ export async function fetchGlobalJobs(sourceUrl: string): Promise<GlobalJobItem[
   if (contentType.includes("json") || /^[\s]*[\[{]/.test(body)) {
     const parsed = JSON.parse(body) as unknown;
     const root = asRecord(parsed);
-    const items = Array.isArray(parsed) ? parsed : (root?.items ?? root?.jobs ?? []);
+    const items = Array.isArray(parsed) ? parsed : (root?.items ?? root?.jobs ?? root?.data ?? []);
     return Array.isArray(items) ? items.map((item, i) => normalizeJob(item, sourceUrl, i)).filter((x): x is GlobalJobItem => Boolean(x)) : [];
   }
   return parseXmlItems(body, sourceUrl);
