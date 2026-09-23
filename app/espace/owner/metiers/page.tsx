@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/auth/permissions";
 import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
 import { buildProfessionRoot } from "@/lib/cv/folders";
 import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
