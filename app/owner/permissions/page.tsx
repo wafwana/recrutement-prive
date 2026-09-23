@@ -16,6 +16,7 @@ const labels: Record<string, string> = {
   CV_MATCHING: "CV_MATCHING — CV & Matching",
   METIERS_DOSSIERS: "METIERS_DOSSIERS — Métiers & dossiers",
   SOURCING: "SOURCING — Sourcing automatique",
+  OFFRES_VIVIER: "OFFRES_VIVIER — Vivier des offres",
   ARCHIVAGE: "ARCHIVAGE — Archivage",
   PRE_COMPTABILITE: "PRE_COMPTABILITE — Pré-comptabilité",
   PRESTATIONS_TARIFS: "PRESTATIONS_TARIFS — Prestations & tarifs",
