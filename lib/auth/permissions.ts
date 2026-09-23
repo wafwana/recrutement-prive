@@ -32,13 +32,9 @@ export async function getUserPermissions(userId: string): Promise<Permission[] |
   const normalized = new Set<string>();
   for (const item of value) {
     if (typeof item !== "string") continue;
+    // A granted permission is atomic: it never expands into another
+    // business function or access level by association.
     if ((PERMISSIONS as readonly string[]).includes(item)) normalized.add(item);
-    // Preserve existing staff access created before the permission split.
-    if (item === "DOCUMENTS") {
-      normalized.add("DOCUMENTS_DEPOSIT");
-      normalized.add("DOCUMENTS_VIEW");
-    }
-    if (item === "MESSAGING") normalized.add("MESSAGING_CLIENTS_ENTERPRISE");
   }
   return [...normalized].filter((item): item is Permission =>
     (PERMISSIONS as readonly string[]).includes(item),
@@ -48,9 +44,9 @@ export async function getUserPermissions(userId: string): Promise<Permission[] |
 export async function hasPermission(userId: string, role: Role | string | undefined, permission: Permission): Promise<boolean> {
   if (role === "OWNER") return true;
   const permissions = await getUserPermissions(userId);
-  // Backward compatibility: users created before granular governance keep their
-  // existing role access until the OWNER explicitly configures their matrix.
-  if (permissions === null) return role === "ADMIN" || role === "CONSULTANT";
+  // Granular governance is explicit for every non-OWNER account.
+  // Having a staff role, or having another permission, never grants this one.
+  if (permissions === null) return false;
   return permissions.includes(permission);
 }
 
