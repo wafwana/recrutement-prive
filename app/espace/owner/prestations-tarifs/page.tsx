@@ -1,3 +1,4 @@
+import BackButton from "@/components/navigation/BackButton";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -42,6 +43,7 @@ export default function PrestationsTarifsPage() {
 
   return (
     <section className="mx-auto w-[min(1280px,calc(100%-40px))] py-12 md:w-[min(1280px,calc(100%-72px))] md:py-20">
+      <BackButton />
       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Prestations & tarifs</p>
