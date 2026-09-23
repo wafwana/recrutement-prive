@@ -56,6 +56,7 @@ export default async function OwnerPage() {
           <Link href="/espace/owner/consultants" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Gérer les CONSULTANTS</Link>
           <Link href="/owner/permissions" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Gestion des permissions</Link>
           <Link href="/espace/owner/prestations-tarifs" className="border border-[#c7a15a]/50 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Prestations & tarifs</Link>
+          <Link href="/espace/owner/facturation" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Honoraires & facturation</Link>
           <OwnerLogoutButton />
           <span className="border border-[#c7a15a]/30 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">{role}</span>
         </div>
