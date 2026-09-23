@@ -10,16 +10,11 @@ function parseNumericToken(raw: string): number | null {
   const base = compact.replace(/[km]$/, "");
   let normalized = base;
 
-  // Handle common French/European thousands and decimal separators without
-  // silently turning 100.000 into 100 or 1,2M into 12M.
   if (normalized.includes(",") && normalized.includes(".")) {
     const lastComma = normalized.lastIndexOf(",");
     const lastDot = normalized.lastIndexOf(".");
-    if (lastComma > lastDot) {
-      normalized = normalized.replace(/\./g, "").replace(",", ".");
-    } else {
-      normalized = normalized.replace(/,/g, "");
-    }
+    if (lastComma > lastDot) normalized = normalized.replace(/\./g, "").replace(",", ".");
+    else normalized = normalized.replace(/,/g, "");
   } else if (normalized.includes(",")) {
     const parts = normalized.split(",");
     normalized = parts[parts.length - 1].length === 1 || parts[parts.length - 1].length === 2
@@ -27,20 +22,13 @@ function parseNumericToken(raw: string): number | null {
       : normalized.replace(/,/g, "");
   } else if (normalized.includes(".")) {
     const parts = normalized.split(".");
-    normalized = parts[parts.length - 1].length === 3
-      ? normalized.replace(/\./g, "")
-      : normalized;
+    normalized = parts[parts.length - 1].length === 3 ? normalized.replace(/\./g, "") : normalized;
   }
 
   const n = Number(normalized.replace(/[^0-9.]/g, ""));
   return Number.isFinite(n) && n > 0 ? n * suffix : null;
 }
 
-/**
- * Converts a disclosed salary into a comparable annual figure when the source
- * gives enough information. Unknown salaries remain null and are deliberately
- * ranked after disclosed salaries.
- */
 export function parseSalary(salary: string | null | undefined): ParsedSalary {
   if (!salary) return { value: null, currency: null, annualized: false };
 
@@ -86,4 +74,52 @@ export function compareSalaryPriority(a: string | null | undefined, b: string | 
   if (pa.value === null) return 1;
   if (pb.value === null) return -1;
   return pb.value - pa.value;
+}
+
+export type FinancialStatus = "VERIFIED_STRONG" | "VERIFIED_WATCH" | "VERIFIED_DIFFICULTY" | "UNKNOWN";
+
+function rawRecord(rawData: unknown): Record<string, unknown> {
+  return rawData && typeof rawData === "object" && !Array.isArray(rawData)
+    ? rawData as Record<string, unknown>
+    : {};
+}
+
+/**
+ * Uses only explicit financial signals already supplied by a trusted source.
+ * It never infers financial health from the offered salary.
+ */
+export function getFinancialStatus(rawData: unknown): FinancialStatus {
+  const raw = rawRecord(rawData);
+  const nested = rawRecord(raw.companyFinancials ?? raw.financials ?? raw.company_financials);
+  const source = { ...raw, ...nested };
+  const status = String(source.financialStatus ?? source.financial_status ?? source.companyStatus ?? "").toUpperCase();
+
+  if (/LIQUIDATION|BANKRUPT|INSOLV|REDRESSEMENT|DEFAULT|DIFFICULT/.test(status)) return "VERIFIED_DIFFICULTY";
+  if (/WATCH|SURVEILL|RESTRUCT|RISK/.test(status)) return "VERIFIED_WATCH";
+  if (/ACTIVE|HEALTHY|SOLID|GOOD|STABLE|PROFIT|PROFITABLE/.test(status)) return "VERIFIED_STRONG";
+
+  const hasPositiveSignal = ["revenue", "turnover", "profit", "netIncome", "ebitda", "chiffreAffaires", "resultatNet", "benefit"]
+    .some((key) => {
+      const value = source[key];
+      return typeof value === "number" ? value > 0 : typeof value === "string" && /\d/.test(value);
+    });
+
+  return hasPositiveSignal ? "VERIFIED_STRONG" : "UNKNOWN";
+}
+
+export function compareOfferPriority(
+  a: { salary?: string | null; rawData?: unknown },
+  b: { salary?: string | null; rawData?: unknown },
+): number {
+  const salaryOrder = compareSalaryPriority(a.salary, b.salary);
+  if (salaryOrder !== 0) return salaryOrder;
+
+  const financialRank: Record<FinancialStatus, number> = {
+    VERIFIED_STRONG: 0,
+    VERIFIED_WATCH: 1,
+    UNKNOWN: 2,
+    VERIFIED_DIFFICULTY: 3,
+  };
+
+  return financialRank[getFinancialStatus(a.rawData)] - financialRank[getFinancialStatus(b.rawData)];
 }
