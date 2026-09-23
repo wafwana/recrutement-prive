@@ -127,6 +127,7 @@ model CandidateProfile {
   documents CandidateDocument[]
   cvIntakes CvIntake[]
   presentations MissionPresentation[]
+  recruitmentInvoices RecruitmentInvoice[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -237,6 +238,8 @@ model Job {
   applications Application[]
   presentations MissionPresentation[]
   history RecruitmentHistory[]
+  recruitmentBillingRules RecruitmentBillingRule[]
+  recruitmentInvoices RecruitmentInvoice[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([companyId, status])
@@ -567,4 +570,66 @@ model FinancialPayoutRequest {
 
   @@index([status, createdAt])
   @@index([beneficiaryEmail])
+}
+
+
+model RecruitmentBillingRule {
+  id             String   @id @default(cuid())
+  jobId          String
+  billingType    String   @default("PERCENTAGE_SALARY")
+  fixedAmountHt  Float?
+  percentage     Float?
+  vatRate        Float    @default(20)
+  currency       String   @default("EUR")
+  paymentTerms   Json?
+  active         Boolean  @default(true)
+  job            Job      @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  invoices       RecruitmentInvoice[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([jobId, active])
+}
+
+model RecruitmentInvoice {
+  id                String   @id @default(cuid())
+  invoiceNumber     String   @unique
+  companyId         String
+  jobId             String?
+  presentationId    String?
+  billingRuleId     String?
+  description       String
+  status            String   @default("DRAFT")
+  amountHt          Float
+  vatRate           Float    @default(20)
+  amountTva         Float
+  amountTtc         Float
+  currency          String   @default("EUR")
+  issuedAt          DateTime?
+  dueAt             DateTime?
+  paidAt            DateTime?
+  notes             String?
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  job               Job?     @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  presentation      MissionPresentation? @relation(fields: [presentationId], references: [id], onDelete: Restrict)
+  billingRule       RecruitmentBillingRule? @relation(fields: [billingRuleId], references: [id], onDelete: SetNull)
+  payments          RecruitmentInvoicePayment[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  @@index([companyId, status])
+  @@index([jobId, status])
+  @@index([presentationId])
+  @@index([dueAt, status])
+}
+
+model RecruitmentInvoicePayment {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  amount      Float
+  paidAt      DateTime @default(now())
+  method      String
+  reference   String?
+  notes       String?
+  invoice     RecruitmentInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  @@index([invoiceId, paidAt])
 }
