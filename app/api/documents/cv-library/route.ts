@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const session = active || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
-  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role ?? "") || !(await hasPermission(userId, role, "DOCUMENTS_VIEW"))) {
+  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role ?? "") || !(await hasPermission(userId, role, "CV_LIBRARY"))) {
     return NextResponse.json({ error: "Permission de consultation documentaire non accordée par l'Owner." }, { status: 403 });
   }
 
