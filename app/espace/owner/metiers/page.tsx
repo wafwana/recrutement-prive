@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/auth/permissions";
 import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
 import { buildProfessionRoot } from "@/lib/cv/folders";
 import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
@@ -26,7 +27,8 @@ function keepQuery(sector: string, profession: string, q: string, dossier: strin
 
 export default async function OwnerMetiersPage({ searchParams }: { searchParams: SearchParams }) {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== "OWNER") redirect("/connexion");
+  if (!session?.user?.id || !["OWNER", "ADMIN", "CONSULTANT"].includes(session.user.role || "")) redirect("/connexion");
+  if (!(await hasPermission(session.user.id, session.user.role, "METIERS_DOSSIERS"))) redirect("/espace/owner");
 
   const params = await searchParams;
   await ensureTaxonomySynced();
