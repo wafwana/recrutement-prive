@@ -4,10 +4,42 @@ export type ParsedSalary = {
   annualized: boolean;
 };
 
+function parseNumericToken(raw: string): number | null {
+  const compact = raw.replace(/\s/g, "").toLowerCase();
+  const suffix = compact.endsWith("m") ? 1_000_000 : compact.endsWith("k") ? 1_000 : 1;
+  const base = compact.replace(/[km]$/, "");
+  let normalized = base;
+
+  // Handle common French/European thousands and decimal separators without
+  // silently turning 100.000 into 100 or 1,2M into 12M.
+  if (normalized.includes(",") && normalized.includes(".")) {
+    const lastComma = normalized.lastIndexOf(",");
+    const lastDot = normalized.lastIndexOf(".");
+    if (lastComma > lastDot) {
+      normalized = normalized.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = normalized.replace(/,/g, "");
+    }
+  } else if (normalized.includes(",")) {
+    const parts = normalized.split(",");
+    normalized = parts[parts.length - 1].length === 1 || parts[parts.length - 1].length === 2
+      ? normalized.replace(",", ".")
+      : normalized.replace(/,/g, "");
+  } else if (normalized.includes(".")) {
+    const parts = normalized.split(".");
+    normalized = parts[parts.length - 1].length === 3
+      ? normalized.replace(/\./g, "")
+      : normalized;
+  }
+
+  const n = Number(normalized.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) && n > 0 ? n * suffix : null;
+}
+
 /**
- * Converts a salary string into a comparable annual figure when the source
- * provides enough information. Unknown/undetermined salaries remain null and
- * are always placed after disclosed salaries in the offer pool.
+ * Converts a disclosed salary into a comparable annual figure when the source
+ * gives enough information. Unknown salaries remain null and are deliberately
+ * ranked after disclosed salaries.
  */
 export function parseSalary(salary: string | null | undefined): ParsedSalary {
   if (!salary) return { value: null, currency: null, annualized: false };
@@ -25,16 +57,8 @@ export function parseSalary(salary: string | null | undefined): ParsedSalary {
     upper.includes("AUD") ? "AUD" : null;
 
   const values = [...text.matchAll(/(?:\d[\d\s.,]*)(?:\s*[kKmM])?/g)]
-    .map((m) => m[0].trim())
-    .map((raw) => {
-      const compact = raw.replace(/\s/g, "").toLowerCase();
-      const suffix = compact.endsWith("m") ? 1_000_000 : compact.endsWith("k") ? 1_000 : 1;
-      const base = compact.replace(/[km]$/, "").replace(/,/g, "");
-      const normalized = base.includes(".") ? base : base.replace(/\./g, "");
-      const n = Number(normalized.replace(/[^0-9.]/g, ""));
-      return Number.isFinite(n) && n > 0 ? n * suffix : null;
-    })
-    .filter((n): n is number => n !== null);
+    .map((match) => parseNumericToken(match[0].trim()))
+    .filter((value): value is number => value !== null);
 
   if (!values.length) return { value: null, currency, annualized: false };
 
