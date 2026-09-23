@@ -10,7 +10,9 @@ type CvDoc = {
   isPrimaryCv: boolean;
   analysis: { primaryCategoryCode?: string | null; subCategoryCodes?: string[]; alternativeCategoryCodes?: string[]; suggestedMatches?: Array<{ jobId: string; title: string; categoryCode?: string | null; score: number }> } | null;
   createdAt: string;
-  candidate: { id: string; user: { name: string | null; email: string } };
+  candidate: { id: string | null; user: { name: string | null; email: string | null } } | null;
+  source?: "CANDIDATE_DOCUMENT" | "CV_INTAKE";
+  status?: string;
 };
 
 export default function CvLibraryPage() {
@@ -86,9 +88,25 @@ export default function CvLibraryPage() {
                     Matching : {doc.analysis.suggestedMatches.slice(0, 3).map((match) => `${match.title} (${match.score}/100)`).join(" · ")}
                   </p>
                 ) : null}
-                <p className="mt-2 text-xs text-white/40">{doc.candidate.user.name || "Candidat sans nom"} · {doc.candidate.user.email}</p>
+                <p className="mt-2 text-xs text-white/40">
+                  {doc.candidate?.user.name || "Candidat sans nom"} · {doc.candidate?.user.email || "Email non renseigné"}
+                </p>
+                {doc.source === "CV_INTAKE" ? (
+                  <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-[#F97316]">
+                    Source : Intégrer un CV · {doc.status || "conservé"}
+                  </p>
+                ) : null}
               </div>
-              <a href={`/api/candidats/documents/${doc.id}`} target="_blank" rel="noreferrer" className="border border-white/15 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/65">Consulter le CV ↗</a>
+              <a
+                href={doc.source === "CV_INTAKE"
+                  ? `/api/owner/cv-intake/${doc.id}/original`
+                  : `/api/candidats/documents/${doc.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="border border-white/15 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/65"
+              >
+                Consulter le CV ↗
+              </a>
             </div>
           </article>
         ))}
