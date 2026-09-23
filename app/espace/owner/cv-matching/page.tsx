@@ -1,3 +1,4 @@
+import BackButton from "@/components/navigation/BackButton";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -60,6 +61,7 @@ export default function CvMatchingPage() {
 
   return (
     <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-12 md:py-20">
+      <BackButton />
       <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">CV · IA · Matching transversal</p>
       <h1 className="mt-3 font-serif text-4xl text-white">Analyser et rematcher les CV</h1>
       <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">
