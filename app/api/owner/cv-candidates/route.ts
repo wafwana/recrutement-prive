@@ -8,7 +8,7 @@ export async function GET() {
   const session = active || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
-  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role ?? "") || !(await hasPermission(userId, role, "MATCHING"))) {
+  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role ?? "") || !(await hasPermission(userId, role, "CV_MATCHING"))) {
     return NextResponse.json({ error: "Permission de matching non accordée par l'Owner." }, { status: 403 });
   }
 
