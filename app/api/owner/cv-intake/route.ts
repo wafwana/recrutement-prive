@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const userEmail = typeof session?.user?.email === "string" ? session.user.email : "";
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(session?.user?.role || "")) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
-  if (!(await hasPermission(userId, session?.user?.role, "CV_IMPORT"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
+  if (!(await hasPermission(userId, session?.user?.role, "CV_INTAKE"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
 
   const q = new URL(request.url).searchParams.get("q")?.trim().toLowerCase();
   const items = await prisma.cvIntake.findMany({
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const userEmail = typeof session?.user?.email === "string" ? session.user.email : "";
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(session?.user?.role || "")) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
-  if (!(await hasPermission(userId, session?.user?.role, "CV_IMPORT"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
+  if (!(await hasPermission(userId, session?.user?.role, "CV_INTAKE"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
 
   try {
     await ensureTaxonomySynced();
