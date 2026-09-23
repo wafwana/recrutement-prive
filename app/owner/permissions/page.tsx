@@ -1,3 +1,4 @@
+import BackButton from "@/components/navigation/BackButton";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -68,6 +69,7 @@ export default function OwnerPermissionsPage() {
 
   return (
     <main className="min-h-screen bg-[#081625] px-6 py-10 text-[#F8FAFC]">
+      <BackButton fallback="/espace/owner" />
       <div className="mx-auto max-w-6xl">
         <p className="text-xs uppercase tracking-[0.2em] text-[#F97316]">OWNER · Gouvernance</p>
         <h1 className="mt-2 text-3xl font-semibold">Permissions ADMIN / CONSULTANT</h1>
