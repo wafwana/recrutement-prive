@@ -127,7 +127,6 @@ model CandidateProfile {
   documents CandidateDocument[]
   cvIntakes CvIntake[]
   presentations MissionPresentation[]
-  recruitmentInvoices RecruitmentInvoice[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -199,6 +198,7 @@ model Company {
   jobs Job[]
   enterpriseSourcedOffers EnterpriseSourcedOffer[]
   presentations MissionPresentation[]
+  recruitmentInvoices RecruitmentInvoice[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
