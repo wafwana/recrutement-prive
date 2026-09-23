@@ -1,3 +1,4 @@
+import BackButton from "@/components/navigation/BackButton";
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -91,6 +92,7 @@ export default function RealCvRegistryPage() {
 
   return (
     <section className="mx-auto w-[min(1280px,calc(100%-40px))] py-12 md:py-20">
+      <BackButton />
       <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">OWNER · CV réels</p>
       <h1 className="mt-3 font-serif text-4xl text-white">Registre des CV intégrés</h1>
       <p className="mt-4 max-w-4xl text-sm leading-7 text-white/50">
