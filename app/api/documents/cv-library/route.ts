@@ -42,6 +42,41 @@ export async function GET(request: Request) {
     },
   });
 
-  const folders = [...new Set(docs.map((doc) => doc.folderPath))].sort();
-  return NextResponse.json({ documents: docs, folders });
+  const intakeDocs = await prisma.cvIntake.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 5000,
+    select: {
+      id: true, name: true, folderPath: true, analyzedAt: true, analysis: true,
+      createdAt: true, candidateId: true, candidateName: true, candidateEmail: true, status: true,
+    },
+  });
+
+  const candidateDocKeys = new Set(
+    docs.map((doc) => `${doc.candidate?.id || ""}::${doc.name}::${doc.folderPath}`),
+  );
+
+  const intakeOnly = intakeDocs
+    .filter((doc) => !candidateDocKeys.has(`${doc.candidateId || ""}::${doc.name}::${doc.folderPath}`))
+    .map((doc) => ({
+      id: doc.id,
+      name: doc.name,
+      folderPath: doc.folderPath,
+      analyzedAt: doc.analyzedAt,
+      isPrimaryCv: true,
+      analysis: doc.analysis,
+      createdAt: doc.createdAt,
+      candidate: doc.candidateId || doc.candidateName || doc.candidateEmail
+        ? { id: doc.candidateId, user: { name: doc.candidateName, email: doc.candidateEmail } }
+        : null,
+      source: "CV_INTAKE",
+      status: doc.status,
+    }));
+
+  const documents = [
+    ...docs.map((doc) => ({ ...doc, source: "CANDIDATE_DOCUMENT" })),
+    ...intakeOnly,
+  ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  const folders = [...new Set(documents.map((doc) => doc.folderPath))].sort();
+  return NextResponse.json({ documents: documents.slice(0, 5000), folders });
 }
