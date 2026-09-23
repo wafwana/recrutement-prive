@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/auth/permissions";
 
 const SETTING_KEY = "recrutement_prive_pricing_catalog";
 
@@ -17,13 +18,16 @@ const defaultCatalog = [
 async function requireOwner() {
   const activeSession = getActiveSessionContext();
   const session = activeSession || (await auth());
-  if (!session?.user?.id || session.user.role !== "OWNER") return null;
+  const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
+  const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
+  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role || "")) return null;
+  if (!(await hasPermission(userId, role, "PRICING_MANAGEMENT"))) return null;
   return session.user;
 }
 
 export async function GET() {
   const owner = await requireOwner();
-  if (!owner) return NextResponse.json({ error: "Accès réservé à l'Owner" }, { status: 403 });
+  if (!owner) return NextResponse.json({ error: "Permission prestations et tarifs non accordée par l’Owner" }, { status: 403 });
 
   const setting = await prisma.systemSetting.findUnique({ where: { key: SETTING_KEY } });
   if (!setting) {
