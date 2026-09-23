@@ -1,5 +1,7 @@
-import BackButton from "@/components/navigation/BackButton";
 "use client";
+
+import BackButton from "@/components/navigation/BackButton";
+
 
 import { useEffect, useState } from "react";
 
