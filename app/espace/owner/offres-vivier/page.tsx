@@ -3,7 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
-import { compareSalaryPriority, parseSalary } from "@/lib/offers/salary";
+import { compareOfferPriority, getFinancialStatus, parseSalary } from "@/lib/offers/salary";
 import BackButton from "@/components/navigation/BackButton";
 
 const statusLabels: Record<string, string> = {
@@ -40,7 +40,7 @@ export default async function OfferPoolPage({
       select: {
         id: true, title: true, companyName: true, country: true, city: true,
         categoryCode: true, subCategoryCode: true, source: true, sourceUrl: true,
-        publishedAt: true, salary: true, status: true,
+        publishedAt: true, salary: true, status: true, rawData: true,
       },
     }),
     prisma.externalJobOpportunity.count(),
@@ -58,7 +58,7 @@ export default async function OfferPoolPage({
   });
 
   filtered.sort((a, b) => {
-    const salaryOrder = compareSalaryPriority(a.salary, b.salary);
+    const salaryOrder = compareOfferPriority(a, b);
     if (salaryOrder !== 0) return salaryOrder;
     return 0;
   });
@@ -100,7 +100,8 @@ export default async function OfferPoolPage({
         <p className="text-xs uppercase tracking-[0.16em] text-[#F97316]">Priorité automatique</p>
         <p className="mt-2 text-sm text-white/75">
           Les rémunérations lisibles sont annualisées lorsque la fréquence est connue puis classées du montant le plus élevé au plus faible.
-          Les offres sans salaire lisible passent après celles dont la rémunération est exploitable.
+          Une offre sans salaire n'est pas considérée comme faible : les signaux financiers explicitement fournis par la source sont contrôlés.
+          Si aucun salaire n'est publié, elle reste en « rémunération à négocier » et aucun montant n'est inventé.
         </p>
       </div>
 
@@ -133,6 +134,16 @@ export default async function OfferPoolPage({
                   <p className="mt-1 text-xs text-white/30">Salaire non communiqué</p>
                 )}
                 {salary.value !== null && <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-white/30">Priorité salaire · {Math.round(salary.value).toLocaleString("fr-FR")} / an</p>}
+                {salary.value === null && (
+                  <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-[#c7a15a]">
+                    Rémunération à négocier · statut financier : {{
+                      VERIFIED_STRONG: "signal positif",
+                      VERIFIED_WATCH: "à surveiller",
+                      VERIFIED_DIFFICULTY: "difficulté signalée",
+                      UNKNOWN: "à vérifier",
+                    }[getFinancialStatus(offer.rawData)]}
+                  </p>
+                )}
               </div>
               <p className="text-xs text-white/55">{offer.companyName || "Entreprise non renseignée"}</p>
               <p className="text-xs text-white/55">{[offer.city, offer.country].filter(Boolean).join(", ") || "—"}</p>
