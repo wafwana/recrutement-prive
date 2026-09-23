@@ -41,7 +41,7 @@ export default async function OwnerSourcingPage() {
           </p>
         </div>
         <div className="flex flex-col items-end gap-3">
-          <SourcingRunButton />
+          <div className="flex flex-wrap justify-end gap-2"><SourcingRunButton /><a href="/espace/owner/offres-vivier" className="border border-[#c7a15a] px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Vivier des offres</a></div>
           <div className="border border-[#c7a15a]/30 px-5 py-4 text-right">
           <p className="text-[10px] uppercase tracking-[0.18em] text-white/35">Offres détectées</p>
           <p className="mt-2 font-serif text-3xl text-[#c7a15a]">{offers.length}</p>
