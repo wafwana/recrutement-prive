@@ -6,6 +6,7 @@ import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
 import { buildProfessionRoot } from "@/lib/cv/folders";
 import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
 import { getStrongProfilesForProfession } from "@/lib/taxonomy/strong-profiles";
+import BackButton from "@/components/navigation/BackButton";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -111,6 +112,7 @@ export default async function OwnerMetiersPage({ searchParams }: { searchParams:
 
   return (
     <section className="mx-auto w-[min(1380px,calc(100%-32px))] py-10 md:w-[min(1380px,calc(100%-72px))] md:py-16">
+      <BackButton />
       <div className="flex flex-col gap-5 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">
