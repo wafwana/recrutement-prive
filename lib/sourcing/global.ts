@@ -91,13 +91,23 @@ export async function fetchGlobalCandidates(sourceUrl: string): Promise<GlobalCa
   return Array.isArray(items) ? items.map((item, i) => normalizeCandidate(item, sourceUrl, i)).filter((x): x is GlobalCandidateItem => Boolean(x)) : [];
 }
 
+const DEFAULT_FREE_JOB_SOURCES = [
+  "https://www.arbeitnow.com/api/job-board-api",
+  "https://www.arbeitnow.co.uk/api/job-board-api",
+] as const;
+
 export function configuredSources(envName: string): string[] {
   const raw = process.env[envName];
-  if (!raw) return [];
+  if (!raw) return envName === "RP_GLOBAL_JOB_SOURCES" ? [...DEFAULT_FREE_JOB_SOURCES] : [];
   try {
     const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string" && /^https:\/\//i.test(v)) : [];
+    const configured = Array.isArray(parsed)
+      ? parsed.filter((v): v is string => typeof v === "string" && /^https:\/\//i.test(v))
+      : [];
+    return configured.length || envName !== "RP_GLOBAL_JOB_SOURCES"
+      ? configured
+      : [...DEFAULT_FREE_JOB_SOURCES];
   } catch {
-    return [];
+    return envName === "RP_GLOBAL_JOB_SOURCES" ? [...DEFAULT_FREE_JOB_SOURCES] : [];
   }
 }
