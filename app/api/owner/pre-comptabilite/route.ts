@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/auth/permissions";
 import { generateMonthlySummary, generateQuarterlyDossier } from "@/lib/accounting/pre-accounting";
 
 async function requireOwner() {
   const activeSession = getActiveSessionContext();
   const session = activeSession || (await auth());
-  if (!session?.user?.id || session.user.role !== "OWNER") return null;
+  const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
+  const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
+  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role || "")) return null;
+  if (!(await hasPermission(userId, role, "PRE_ACCOUNTING"))) return null;
   return session.user;
 }
 
 export async function GET(request: Request) {
   const owner = await requireOwner();
   if (!owner) {
-    return NextResponse.json({ error: "Accès strictement réservé à l'Owner." }, { status: 403 });
+    return NextResponse.json({ error: "Permission pre-comptabilité non accordée par l’Owner." }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);
