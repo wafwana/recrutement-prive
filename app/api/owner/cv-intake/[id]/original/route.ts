@@ -7,7 +7,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const session = getActiveSessionContext() || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(session?.user?.role || "")) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
-  if (!(await hasPermission(userId, session?.user?.role, "CV_IMPORT"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
+  if (!(await hasPermission(userId, session?.user?.role, "CV_INTAKE"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
   const { id } = await context.params;
   const doc = await prisma.cvIntake.findUnique({ where: { id }, select: { name: true, mimeType: true, fileData: true, originalSha256: true } });
   if (!doc) return NextResponse.json({ error: "CV introuvable." }, { status: 404 });
