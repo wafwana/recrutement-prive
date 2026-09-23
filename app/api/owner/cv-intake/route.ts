@@ -6,6 +6,7 @@ import { analyzeCvDocument } from "@/lib/cv/analyzer";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { buildCandidateFolder } from "@/lib/cv/folders";
 import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
+import { hasPermission } from "@/lib/auth/permissions";
 
 function scoreJob(analysis: Awaited<ReturnType<typeof analyzeCvDocument>>, job: { id: string; title: string; requiredSkills: unknown; requiredExperienceYears: number | null; jobCategoryId: string | null; subCategoryId: string | null }) {
   if (!analysis) return 0;
@@ -26,7 +27,8 @@ export async function GET(request: Request) {
   const session = getActiveSessionContext() || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const userEmail = typeof session?.user?.email === "string" ? session.user.email : "";
-  if (!userId || session?.user?.role !== "OWNER") return NextResponse.json({ error: "Accès Owner requis." }, { status: 403 });
+  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(session?.user?.role || "")) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  if (!(await hasPermission(userId, session?.user?.role, "CV_IMPORT"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
 
   const q = new URL(request.url).searchParams.get("q")?.trim().toLowerCase();
   const items = await prisma.cvIntake.findMany({
