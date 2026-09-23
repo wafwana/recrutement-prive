@@ -19,6 +19,7 @@ const labels: Record<string, string> = {
   ARCHIVAGE: "ARCHIVAGE — Archivage",
   PRE_COMPTABILITE: "PRE_COMPTABILITE — Pré-comptabilité",
   PRESTATIONS_TARIFS: "PRESTATIONS_TARIFS — Prestations & tarifs",
+  FACTURATION: "FACTURATION — Honoraires & facturation",
   JOBS_MANAGE: "JOBS_MANAGE — Offres / missions",
   PRESENTATIONS_MANAGE: "PRESENTATIONS_MANAGE — Présentations candidats",
   COMPANIES_MANAGE: "COMPANIES_MANAGE — Entreprises",
