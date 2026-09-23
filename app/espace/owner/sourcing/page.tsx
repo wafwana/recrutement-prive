@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/auth/permissions";
 import BackButton from "@/components/navigation/BackButton";
 
 export default async function OwnerSourcingPage() {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== "OWNER") redirect("/connexion");
+  if (!session?.user?.id || !["OWNER", "ADMIN", "CONSULTANT"].includes(session.user.role || "")) redirect("/connexion");
+  if (!(await hasPermission(session.user.id, session.user.role, "SOURCING"))) redirect("/espace/owner");
 
   const offers = await prisma.externalJobOpportunity.findMany({
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
