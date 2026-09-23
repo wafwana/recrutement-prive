@@ -24,6 +24,11 @@ const labels: Record<string, string> = {
   MESSAGING_CLIENTS_ENTERPRISE: "Messagerie clients / entreprises",
   PLATFORM_SETTINGS: "Configuration plateforme",
   ENTERPRISE_OFFER_SOURCING: "Sourcing automatisé des offres entreprise",
+  CV_LIBRARY: "Bibliothèque CV",
+  METIERS_DOSSIERS: "Métiers & dossiers",
+  ARCHIVING: "Archivage",
+  PRE_ACCOUNTING: "Pré-comptabilité",
+  PRICING_MANAGEMENT: "Prestations & tarifs",
 };
 
 export default function OwnerPermissionsPage() {
