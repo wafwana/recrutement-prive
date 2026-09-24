@@ -102,6 +102,7 @@ export default async function OfferPoolPage({
           Les rémunérations lisibles sont annualisées lorsque la fréquence est connue puis classées du montant le plus élevé au plus faible.
           Une offre sans salaire n'est pas considérée comme faible : les signaux financiers explicitement fournis par la source sont contrôlés.
           Si aucun salaire n'est publié, elle reste en « rémunération à négocier » et aucun montant n'est inventé.
+          Lorsque deux devises différentes sont détectées, elles ne sont pas comparées artificiellement sans taux de change fiable.
         </p>
       </div>
 
@@ -133,13 +134,13 @@ export default async function OfferPoolPage({
                 ) : (
                   <p className="mt-1 text-xs text-white/30">Salaire non communiqué</p>
                 )}
-                {salary.value !== null && <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-white/30">Priorité salaire · {Math.round(salary.value).toLocaleString("fr-FR")} / an</p>}
+                {salary.value !== null && <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-white/30">Priorité salaire · {Math.round(salary.value).toLocaleString("fr-FR")} / an{salary.currency ? ` · ${salary.currency}` : ""}</p>}
                 {salary.value === null && (
                   <p className="mt-1 text-[9px] uppercase tracking-[0.12em] text-[#c7a15a]">
-                    Rémunération à négocier · statut financier : {{
-                      VERIFIED_STRONG: "signal positif",
-                      VERIFIED_WATCH: "à surveiller",
-                      VERIFIED_DIFFICULTY: "difficulté signalée",
+                    Rémunération à négocier · signal financier source : {{
+                      SOURCE_POSITIVE: "signal positif",
+                      SOURCE_WATCH: "à surveiller",
+                      SOURCE_DIFFICULTY: "difficulté signalée",
                       UNKNOWN: "à vérifier",
                     }[getFinancialStatus(offer.rawData)]}
                   </p>
