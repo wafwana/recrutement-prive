@@ -73,10 +73,11 @@ export function compareSalaryPriority(a: string | null | undefined, b: string | 
   if (pa.value === null && pb.value === null) return 0;
   if (pa.value === null) return 1;
   if (pb.value === null) return -1;
+  if (pa.currency && pb.currency && pa.currency !== pb.currency) return 0;
   return pb.value - pa.value;
 }
 
-export type FinancialStatus = "VERIFIED_STRONG" | "VERIFIED_WATCH" | "VERIFIED_DIFFICULTY" | "UNKNOWN";
+export type FinancialStatus = "SOURCE_POSITIVE" | "SOURCE_WATCH" | "SOURCE_DIFFICULTY" | "UNKNOWN";
 
 function rawRecord(rawData: unknown): Record<string, unknown> {
   return rawData && typeof rawData === "object" && !Array.isArray(rawData)
@@ -85,7 +86,8 @@ function rawRecord(rawData: unknown): Record<string, unknown> {
 }
 
 /**
- * Uses only explicit financial signals already supplied by a trusted source.
+ * Reads only explicit financial signals supplied by the source payload.
+ * This is a source signal, not an independent financial verification.
  * It never infers financial health from the offered salary.
  */
 export function getFinancialStatus(rawData: unknown): FinancialStatus {
@@ -94,9 +96,9 @@ export function getFinancialStatus(rawData: unknown): FinancialStatus {
   const source = { ...raw, ...nested };
   const status = String(source.financialStatus ?? source.financial_status ?? source.companyStatus ?? "").toUpperCase();
 
-  if (/LIQUIDATION|BANKRUPT|INSOLV|REDRESSEMENT|DEFAULT|DIFFICULT/.test(status)) return "VERIFIED_DIFFICULTY";
-  if (/WATCH|SURVEILL|RESTRUCT|RISK/.test(status)) return "VERIFIED_WATCH";
-  if (/ACTIVE|HEALTHY|SOLID|GOOD|STABLE|PROFIT|PROFITABLE/.test(status)) return "VERIFIED_STRONG";
+  if (/LIQUIDATION|BANKRUPT|INSOLV|REDRESSEMENT|DEFAULT|DIFFICULT/.test(status)) return "SOURCE_DIFFICULTY";
+  if (/WATCH|SURVEILL|RESTRUCT|RISK/.test(status)) return "SOURCE_WATCH";
+  if (/ACTIVE|HEALTHY|SOLID|GOOD|STABLE|PROFIT|PROFITABLE/.test(status)) return "SOURCE_POSITIVE";
 
   const hasPositiveSignal = ["revenue", "turnover", "profit", "netIncome", "ebitda", "chiffreAffaires", "resultatNet", "benefit"]
     .some((key) => {
@@ -104,7 +106,7 @@ export function getFinancialStatus(rawData: unknown): FinancialStatus {
       return typeof value === "number" ? value > 0 : typeof value === "string" && /\d/.test(value);
     });
 
-  return hasPositiveSignal ? "VERIFIED_STRONG" : "UNKNOWN";
+  return hasPositiveSignal ? "SOURCE_POSITIVE" : "UNKNOWN";
 }
 
 export function compareOfferPriority(
@@ -115,10 +117,10 @@ export function compareOfferPriority(
   if (salaryOrder !== 0) return salaryOrder;
 
   const financialRank: Record<FinancialStatus, number> = {
-    VERIFIED_STRONG: 0,
-    VERIFIED_WATCH: 1,
+    SOURCE_POSITIVE: 0,
+    SOURCE_WATCH: 1,
     UNKNOWN: 2,
-    VERIFIED_DIFFICULTY: 3,
+    SOURCE_DIFFICULTY: 3,
   };
 
   return financialRank[getFinancialStatus(a.rawData)] - financialRank[getFinancialStatus(b.rawData)];
