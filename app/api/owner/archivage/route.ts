@@ -9,7 +9,7 @@ async function requireOwner() {
   const session = activeSession || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
-  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role || "")) return null;
+  if (!session?.user || !userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role || "")) return null;
   if (!(await hasPermission(userId, role, "ARCHIVAGE"))) return null;
   return session.user;
 }
