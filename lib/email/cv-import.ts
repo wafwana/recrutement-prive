@@ -3,6 +3,7 @@ import { classifyDocument } from "@/lib/archiving/classifier";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { sendOwnerAlert } from "@/lib/email/service";
 import { buildCandidateFolder } from "@/lib/cv/folders";
+import { createHash } from "node:crypto";
 
 export type InboundCvImportInput = {
   messageId: string;
@@ -73,6 +74,7 @@ export async function processInboundEmailCv(input: InboundCvImportInput): Promis
   const candidateMatched = Boolean(candidateId);
 
   const receivedDate = input.receivedAt || new Date();
+  const originalSha256 = createHash("sha256").update(input.fileBuffer).digest("hex");
 
   // Classification: if matched, ARCHIVAGE/CANDIDATS/DOSSIER_CANDIDAT. If ambiguous, ARCHIVAGE/A_CLASSER/A_VERIFIER
   const classification = classifyDocument({
@@ -99,6 +101,26 @@ export async function processInboundEmailCv(input: InboundCvImportInput): Promis
         documentKind: "CV",
       })
     : "CANDIDATS/A_CLASSER/A_VERIFIER";
+
+  const intake = await prisma.cvIntake.create({
+    data: {
+      name: input.fileName,
+      originalName: input.fileName,
+      mimeType: input.mimeType || "application/pdf",
+      fileData: input.fileBuffer,
+      size: input.fileBuffer.length,
+      originalSha256,
+      senderUserId: candidate?.userId || "EMAIL_INGEST",
+      senderRole: "CANDIDAT_EMAIL",
+      senderEmail: input.senderEmail.toLowerCase(),
+      candidateName: input.senderName || null,
+      candidateEmail: input.senderEmail.toLowerCase(),
+      docType: "CV",
+      folderPath: candidateFolder,
+      status: "A_ANALYSER",
+      candidateId: candidateId || null,
+    },
+  });
 
   const archivedDoc = await prisma.archivedDocument.create({
     data: {
