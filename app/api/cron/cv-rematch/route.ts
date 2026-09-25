@@ -76,7 +76,6 @@ export async function GET(request: Request) {
 
       const primary = taxonomy.find((row) => row.code === analysis.primaryCategoryCode && row.parentId === null);
       const subCategories = taxonomy.filter((row) => analysis.subCategoryCodes.includes(row.code) && row.parentId);
-      const categoryMap = new Map(taxonomy.map((row) => [row.code, row.id]));
       const candidateMatches = [
         ...jobs.map((job) => {
           const result = matchCandidateToJob(
@@ -196,8 +195,8 @@ export async function GET(request: Request) {
           .map((value) => categoryCodes.get(value) || value)
       : [];
 
-    const matches = jobs
-      .map((job) => {
+    const matches = [
+      ...jobs.map((job) => {
         const result = matchCandidateToJob(
           {
             skills: candidate.skills,
@@ -228,7 +227,40 @@ export async function GET(request: Request) {
           missingSkills: result.missingSkills,
           categoryMatchLevel: result.categoryMatchLevel,
         };
-      })
+      }),
+      ...externalOffers.map((offer) => {
+        const result = matchCandidateToJob(
+          {
+            skills: candidate.skills,
+            experienceYears: candidate.experienceYears,
+            headline: candidate.headline,
+            bio: candidate.bio,
+            location: candidate.location,
+            country: candidate.country,
+            primaryCategoryCode: candidate.primaryCategory?.code,
+            subCategoryCodes,
+          },
+          {
+            requiredSkills: offer.skills,
+            requiredExperienceYears: offer.experienceYears,
+            title: offer.title,
+            description: offer.description,
+            location: [offer.city, offer.country].filter(Boolean).join(", ") || null,
+            categoryCode: offer.categoryCode,
+            subCategoryCode: offer.subCategoryCode,
+          },
+        );
+        return {
+          externalJobId: offer.id,
+          title: offer.title,
+          score: result.score,
+          matchedSkills: result.matchedSkills,
+          missingSkills: result.missingSkills,
+          categoryMatchLevel: result.categoryMatchLevel,
+          source: offer.source,
+        };
+      }),
+    ]
       .sort((a, b) => b.score - a.score)
       .slice(0, 20);
 
