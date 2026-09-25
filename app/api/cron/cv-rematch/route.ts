@@ -33,6 +33,8 @@ export async function GET(request: Request) {
     take: 1000,
   });
 
+  const externalOffers = await prisma.externalJobOpportunity.findMany({ where: { status: { not: "REJECTED" } }, take: 5000 });
+
   const categoryRows = await prisma.jobCategory.findMany({ select: { id: true, code: true } });
   const categoryCodes = new Map(categoryRows.map((row) => [row.id, row.code]));
 
@@ -111,10 +113,10 @@ export async function GET(request: Request) {
         actorRole: "SYSTEM",
         action: "CV_AUTOMATIC_REMATCH",
         targetType: "CV_LIBRARY",
-        details: { candidatesChecked: candidates.length, openJobs: jobs.length, documentsUpdated: updated },
+        details: { candidatesChecked: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated },
       },
     });
   }
 
-  return NextResponse.json({ ok: true, candidatesChecked: candidates.length, openJobs: jobs.length, documentsUpdated: updated });
+  return NextResponse.json({ ok: true, candidatesChecked: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated });
 }
