@@ -31,4 +31,4 @@ test("OWNER access gate: critical OWNER routes remain server-protected", () => {
   assert.equal(fs.existsSync(ownerDir), true);
   const files = fs.readdirSync(ownerDir, { recursive: true }).map(String);
   assert.ok(files.some((file) => file.endsWith("page.tsx")));
-});\n
+});
