@@ -11,7 +11,7 @@ async function requireOwner() {
   const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role || "")) return null;
   if (!(await hasPermission(userId, role, "PRE_COMPTABILITE"))) return null;
-  return session.user;
+  return { id: userId };
 }
 
 export async function GET(request: Request) {

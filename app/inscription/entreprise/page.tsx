@@ -6,13 +6,39 @@ import { registerCompany } from "./actions";
 import { PHONE_COUNTRIES } from "@/lib/phone-countries";
 import { PASSWORD_REQUIREMENTS, validatePassword } from "@/lib/password-policy";
 import { signIn } from "next-auth/react";
+import { CompanySiretLookup, type CompanyLookupResult } from "@/app/components/CompanySiretLookup";
 
 export default function InscriptionEntreprisePage() {
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
+  const [siret, setSiret] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [website, setWebsite] = useState("");
+  const [country, setCountry] = useState("France");
+  const [address, setAddress] = useState("");
+  const [legalForm, setLegalForm] = useState("");
+  const [apeCode, setApeCode] = useState("");
+  const [siren, setSiren] = useState("");
+  const [sourceType, setSourceType] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [sourceCollectedAt, setSourceCollectedAt] = useState("");
 
   const passwordVal = validatePassword(password);
+
+  function applyCompanyLookup(data: CompanyLookupResult) {
+    setSiret(data.siret || "");
+    setSiren(data.siren || "");
+    setCompanyName(data.name || "");
+    setWebsite(data.website || "");
+    setCountry(data.country || "France");
+    setAddress([data.address, [data.postalCode, data.city].filter(Boolean).join(" ")].filter(Boolean).join(", "));
+    setLegalForm(data.legalForm || "");
+    setApeCode(data.apeCode || "");
+    setSourceType(data.sourceType || "");
+    setSourceUrl(data.sourceUrl || "");
+    setSourceCollectedAt(data.collectedAt || "");
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,6 +88,15 @@ export default function InscriptionEntreprisePage() {
         </p>
 
         <form className="mt-10 space-y-6" onSubmit={handleSubmit}>
+          <CompanySiretLookup value={siret} onChange={setSiret} onFound={applyCompanyLookup} />
+          <input type="hidden" name="siren" value={siren} />
+          <input type="hidden" name="siret" value={siret} />
+          <input type="hidden" name="legalForm" value={legalForm} />
+          <input type="hidden" name="apeCode" value={apeCode} />
+          <input type="hidden" name="address" value={address} />
+          <input type="hidden" name="sourceType" value={sourceType} />
+          <input type="hidden" name="sourceUrl" value={sourceUrl} />
+          <input type="hidden" name="sourceCollectedAt" value={sourceCollectedAt} />
           <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
             Nom de l&apos;entreprise *
             <input
@@ -203,6 +238,8 @@ export default function InscriptionEntreprisePage() {
             {pending ? "Création du compte…" : "Créer le compte entreprise"}
           </button>
         </form>
+
+        <p className="mt-5 text-[11px] leading-5 text-white/35">Les informations préremplies à partir du SIRET proviennent d’une source publique et doivent être vérifiées avant validation.</p>
 
         <div className="mt-8 flex flex-col gap-3 text-[10px] uppercase tracking-[0.2em] text-white/35 sm:flex-row sm:justify-between">
           <Link href="/inscription" className="hover:text-white">

@@ -79,7 +79,7 @@ export default async function CompanyScopedPage({ params }: { params: Promise<{ 
         </div>
         <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Rôle {membership.role}</p>
       </div>
-      <CompanyDashboard jobs={jobs} applications={applications} categories={categories} companyId={companyId} sourcingCountries={sourcingCountries} />
+      <CompanyDashboard jobs={jobs} applications={applications} categories={categories} companyId={companyId} sourcingCountries={sourcingCountries} company={{ name: membership.company.name, siren: membership.company.siren, siret: membership.company.siret, legalForm: membership.company.legalForm, apeCode: membership.company.apeCode, address: membership.company.address, website: membership.company.website, country: membership.company.country, phonePrefix: membership.company.phonePrefix, phone: membership.company.phone, description: membership.company.description }} />
     </section>
   );
 }

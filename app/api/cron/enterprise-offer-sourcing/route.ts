@@ -72,6 +72,7 @@ export async function GET(request: Request) {
           offers++;
 
           const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
+          const sourceCollectedAt = new Date();
           const closingAt = item.closingAt ? new Date(item.closingAt) : null;
           const externalJob = await prisma.externalJobOpportunity.upsert({
             where: { source_externalId: { source: item.source, externalId: item.externalId } },
@@ -79,6 +80,8 @@ export async function GET(request: Request) {
               externalId: item.externalId,
               source: item.source,
               sourceUrl: item.sourceUrl,
+              sourceType: "PUBLIC_JOB_SOURCE",
+              sourceCollectedAt,
               title: item.title,
               companyName: item.companyName,
               country: item.country,
@@ -96,6 +99,8 @@ export async function GET(request: Request) {
             },
             update: {
               sourceUrl: item.sourceUrl,
+              sourceType: "PUBLIC_JOB_SOURCE",
+              sourceCollectedAt,
               title: item.title,
               companyName: item.companyName,
               country: item.country,
