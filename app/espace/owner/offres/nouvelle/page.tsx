@@ -4,7 +4,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createOwnerJob } from "./actions";
 
-async function submitOwnerJob(formData: FormData) {\n  "use server";\n  await createOwnerJob(formData);\n}\n\nexport default async function NewOwnerJobPage() {
+async function submitOwnerJob(formData: FormData) {
+  "use server";
+  await createOwnerJob(formData);
+}
+
+export default async function NewOwnerJobPage() {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== "OWNER") redirect("/connexion");
 
