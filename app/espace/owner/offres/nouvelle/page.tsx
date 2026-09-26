@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createOwnerJob } from "./actions";
 
-export default async function NewOwnerJobPage() {
+async function submitOwnerJob(formData: FormData) {\n  "use server";\n  await createOwnerJob(formData);\n}\n\nexport default async function NewOwnerJobPage() {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== "OWNER") redirect("/connexion");
 
@@ -35,7 +35,7 @@ export default async function NewOwnerJobPage() {
           <Link href="/espace/owner/entreprises/nouvelle" className="mt-5 inline-block border border-[#c7a15a] px-5 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Rentrer une entreprise</Link>
         </div>
       ) : (
-        <form action={createOwnerJob} className="mt-10 grid gap-5 border border-white/10 bg-[#111] p-7">
+        <form action={submitOwnerJob} className="mt-10 grid gap-5 border border-white/10 bg-[#111] p-7">
           <label className="text-xs text-white/50">Entreprise *
             <select name="companyId" required className="mt-2 w-full border border-white/10 bg-[#111] px-4 py-3 text-sm text-white outline-none">
               <option value="">Sélectionner l'entreprise</option>
