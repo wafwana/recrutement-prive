@@ -6,13 +6,25 @@ import { registerCompany } from "./actions";
 import { PHONE_COUNTRIES } from "@/lib/phone-countries";
 import { PASSWORD_REQUIREMENTS, validatePassword } from "@/lib/password-policy";
 import { signIn } from "next-auth/react";
+import { CompanySiretLookup, type CompanyLookupResult } from "@/app/components/CompanySiretLookup";
 
 export default function InscriptionEntreprisePage() {
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
+  const [siret, setSiret] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [website, setWebsite] = useState("");
+  const [country, setCountry] = useState("France");
+  const [address, setAddress] = useState("");
+  const [legalForm, setLegalForm] = useState("");
+  const [apeCode, setApeCode] = useState("");
+  const [siren, setSiren] = useState("");
+  const [sourceType, setSourceType] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [sourceCollectedAt, setSourceCollectedAt] = useState("");
 
-  const passwordVal = validatePassword(password);
+  const passwordVal = validatePassword(password);\n\n  function applyCompanyLookup(data: CompanyLookupResult) {\n    setSiret(data.siret || "");\n    setSiren(data.siren || "");\n    setCompanyName(data.name || "");\n    setWebsite(data.website || "");\n    setCountry(data.country || "France");\n    setAddress([data.address, [data.postalCode, data.city].filter(Boolean).join(" ")].filter(Boolean).join(", "));\n    setLegalForm(data.legalForm || "");\n    setApeCode(data.apeCode || "");\n    setSourceType(data.sourceType || "");\n    setSourceUrl(data.sourceUrl || "");\n    setSourceCollectedAt(data.collectedAt || "");\n  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,7 +73,7 @@ export default function InscriptionEntreprisePage() {
           Inscrivez votre entreprise pour mandater des missions de recrutement et consulter les profils qualifiés.
         </p>
 
-        <form className="mt-10 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-10 space-y-6" onSubmit={handleSubmit}>\n          <CompanySiretLookup value={siret} onChange={setSiret} onFound={applyCompanyLookup} />\n          <input type="hidden" name="siren" value={siren} />\n          <input type="hidden" name="siret" value={siret} />\n          <input type="hidden" name="legalForm" value={legalForm} />\n          <input type="hidden" name="apeCode" value={apeCode} />\n          <input type="hidden" name="address" value={address} />\n          <input type="hidden" name="sourceType" value={sourceType} />\n          <input type="hidden" name="sourceUrl" value={sourceUrl} />\n          <input type="hidden" name="sourceCollectedAt" value={sourceCollectedAt} />
           <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
             Nom de l&apos;entreprise *
             <input
@@ -204,7 +216,7 @@ export default function InscriptionEntreprisePage() {
           </button>
         </form>
 
-        <div className="mt-8 flex flex-col gap-3 text-[10px] uppercase tracking-[0.2em] text-white/35 sm:flex-row sm:justify-between">
+        <p className="mt-5 text-[11px] leading-5 text-white/35">Les informations préremplies à partir du SIRET proviennent d’une source publique et doivent être vérifiées avant validation.</p>\n\n        <div className="mt-8 flex flex-col gap-3 text-[10px] uppercase tracking-[0.2em] text-white/35 sm:flex-row sm:justify-between">
           <Link href="/inscription" className="hover:text-white">
             Inscription candidat
           </Link>
