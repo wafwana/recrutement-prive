@@ -1,0 +1,57 @@
+name: OWNER Compatibility Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: owner-compatibility-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  owner-compatibility:
+    name: OWNER compatibility — mandatory first gate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: recrutement_prive
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d recrutement_prive"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/recrutement_prive
+      AUTH_SECRET: ci-owner-gate-secret
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply migrations and generate Prisma Client
+        run: |
+          npx prisma migrate deploy
+          npx prisma generate
+      - name: Verify OWNER compatibility FIRST
+        run: npm run test:owner-compatibility
+      - name: Verify core non-regression
+        run: |
+          npm run test:mission-lock
+          npm run test:candidate-auth
+          npm run test:candidate-flow
+          npm run test:company-flow
+          npm run test:taxonomy-cv-protection
+          npm run typecheck
+      - name: Build after OWNER gate
+        run: npm run build
