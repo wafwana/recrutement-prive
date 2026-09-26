@@ -48,6 +48,8 @@ jobs:
           node-version: 20
           cache: ''
       - run: npm ci
+      - name: OWNER compatibility gate — FIRST verification
+        run: npm run test:owner-compatibility
       - run: npx prisma generate
       - run: npx prisma migrate deploy
       - run: npm run test:mission-lock
