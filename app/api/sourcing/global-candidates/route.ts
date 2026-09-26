@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   for (const candidate of candidates) {
     const result = matchCandidateToJob({ skills: candidate.skills, experienceYears: candidate.experienceYears, headline: candidate.headline, location: candidate.location, country: candidate.country },
       { requiredSkills: job.requiredSkills, requiredExperienceYears: job.requiredExperienceYears, title: job.title, description: job.description, location: job.location, categoryCode: job.jobCategory?.code, subCategoryCode: job.subCategory?.code });
-    const data = { source: candidate.source, sourceProfileUrl: candidate.sourceProfileUrl, sourceCollectedAt, candidate.sourceProfileUrl, name: candidate.name, headline: candidate.headline, location: candidate.location, skills: candidate.skills,
+    const data = { source: candidate.source, sourceProfileUrl: candidate.sourceProfileUrl, sourceCollectedAt, name: candidate.name, headline: candidate.headline, location: candidate.location, skills: candidate.skills,
       experienceYears: candidate.experienceYears, status: "MATCHED" as const, matchingScore: result.score,
       matchingDetails: { jobId: job.id, externalId: candidate.externalId, match: result }, notes: candidate.country ? `Pays source : ${candidate.country}` : undefined, createdByUserId: actor };
     if (candidate.externalId) {
