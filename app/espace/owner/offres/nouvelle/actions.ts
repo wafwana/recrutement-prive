@@ -26,6 +26,7 @@ async function requireOwner() {
 
 export async function createOwnerJob(formData: FormData) {
   const actorUserId = await requireOwner();
+  const experienceRaw = String(formData.get("requiredExperienceYears") ?? "").trim();
   const parsed = schema.safeParse({
     companyId: String(formData.get("companyId") ?? ""),
     title: String(formData.get("title") ?? ""),
@@ -33,7 +34,7 @@ export async function createOwnerJob(formData: FormData) {
     description: String(formData.get("description") ?? ""),
     missionType: String(formData.get("missionType") ?? ""),
     requiredSkills: String(formData.get("requiredSkills") ?? ""),
-    requiredExperienceYears: String(formData.get("requiredExperienceYears") ?? ""),
+    requiredExperienceYears: experienceRaw ? experienceRaw : undefined,
     jobCategoryId: String(formData.get("jobCategoryId") ?? ""),
     subCategoryId: String(formData.get("subCategoryId") ?? ""),
     status: String(formData.get("status") ?? "DRAFT"),
