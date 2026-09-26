@@ -186,6 +186,17 @@ model CvIntake {
 model Company {
   id String @id @default(cuid())
   name String
+  siren String? @unique
+  siret String? @unique
+  legalForm String?
+  apeCode String?
+  address String?
+  sourceType String?
+  sourceUrl String?
+  sourceCollectedAt DateTime?
+  contactEmail String?
+  contactEmailSourceUrl String?
+  contactEmailCollectedAt DateTime?
   description String?
   website String?
   country String?
@@ -312,6 +323,8 @@ model ExternalJobOpportunity {
   externalId String
   source String
   sourceUrl String?
+  sourceType String?
+  sourceCollectedAt DateTime?
   title String
   companyName String?
   country String?
@@ -341,6 +354,7 @@ model SourcedCandidate {
   externalId String?
   source String
   sourceProfileUrl String?
+  sourceCollectedAt DateTime?
   name String?
   headline String?
   location String?
