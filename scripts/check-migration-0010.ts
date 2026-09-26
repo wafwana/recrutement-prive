@@ -1,13 +1,14 @@
 import { PrismaClient } from "@prisma/client";
 
-export type MigrationCheckResult = {
+export type DetailedMigrationCheckResult = {
   status: "COMPLETE" | "ABSENT" | "PARTIAL" | "ERROR";
-  migrationRecordExists: boolean;
-  migrationFailed: boolean;
-  enumTypesFound: number;
-  jobColumnsFound: number;
-  tableExists: boolean;
-  ownerColumnsExist: boolean;
+  migrationRecordStatus: "COMPLETE" | "FAILED" | "ABSENT";
+  enumsValid: boolean;
+  jobColumnsValid: boolean;
+  tableValid: boolean;
+  indexesValid: boolean;
+  foreignKeysValid: boolean;
+  ownerColumnsValid: boolean;
   hasErrors: boolean;
   details: string[];
 };
@@ -15,13 +16,12 @@ export type MigrationCheckResult = {
 export async function checkMigration0010Status(
   prisma: PrismaClient,
   schema: string = "public"
-): Promise<MigrationCheckResult> {
+): Promise<DetailedMigrationCheckResult> {
   const details: string[] = [];
   let hasErrors = false;
 
   // 1. Check _prisma_migrations record
-  let migrationRecordExists = false;
-  let migrationFailed = false;
+  let migrationRecordStatus: "COMPLETE" | "FAILED" | "ABSENT" = "ABSENT";
   try {
     const records: Array<{ migration_name: string; finished_at: Date | null; rolled_back_at: Date | null }> =
       await prisma.$queryRaw`
@@ -32,10 +32,10 @@ export async function checkMigration0010Status(
     if (records.length > 0) {
       const rec = records[0];
       if (rec.finished_at && !rec.rolled_back_at) {
-        migrationRecordExists = true;
+        migrationRecordStatus = "COMPLETE";
         details.push("Found completed migration record in _prisma_migrations.");
       } else {
-        migrationFailed = true;
+        migrationRecordStatus = "FAILED";
         details.push(`Found FAILED or incomplete migration record in _prisma_migrations (finished_at: ${rec.finished_at}, rolled_back_at: ${rec.rolled_back_at}).`);
       }
     } else {
@@ -47,110 +47,246 @@ export async function checkMigration0010Status(
     details.push(`SQL ERROR querying _prisma_migrations: ${msg}`);
   }
 
-  // 2. Check ENUMs in target schema
+  // 2. Check ENUMs and exact values
+  let enumsValid = false;
   let enumTypesFound = 0;
   try {
-    const enumTypes: Array<{ typname: string }> = await prisma.$queryRaw`
-      SELECT t.typname
+    const expectedEnums: Record<string, string[]> = {
+      MissionPresentationState: [
+        "MISSION_ACTIVE",
+        "CANDIDAT_ANONYME",
+        "CONDITION_FINANCIERE_EN_ATTENTE",
+        "PAIEMENT_OU_CONDITION_CONFIRME",
+        "IDENTITE_DEBLOQUEE",
+        "MISSION_TERMINEE",
+      ],
+      FinancialConditionStatus: ["PENDING", "CONFIRMED", "FAILED", "EXPIRED"],
+    };
+
+    const enumRows: Array<{ typname: string; enumlabel: string }> = await prisma.$queryRaw`
+      SELECT t.typname, e.enumlabel
       FROM pg_type t
+      JOIN pg_enum e ON t.oid = e.enumtypid
       JOIN pg_namespace n ON n.oid = t.typnamespace
       WHERE n.nspname = ${schema}
         AND t.typname IN ('MissionPresentationState', 'FinancialConditionStatus')
     `;
-    enumTypesFound = enumTypes.length;
-    details.push(`ENUM types found in schema '${schema}': ${enumTypesFound}/2.`);
+
+    const foundEnums: Record<string, string[]> = {};
+    enumRows.forEach((r) => {
+      if (!foundEnums[r.typname]) foundEnums[r.typname] = [];
+      foundEnums[r.typname].push(r.enumlabel);
+    });
+
+    enumTypesFound = Object.keys(foundEnums).length;
+
+    let valid = true;
+    for (const [enumName, expectedValues] of Object.entries(expectedEnums)) {
+      const labels = foundEnums[enumName] || [];
+      const match = expectedValues.every((val) => labels.includes(val)) && labels.length === expectedValues.length;
+      if (!match) {
+        valid = false;
+        details.push(`ENUM '${enumName}' mismatch in schema '${schema}'. Expected: [${expectedValues.join(", ")}], Found: [${labels.join(", ")}].`);
+      } else {
+        details.push(`ENUM '${enumName}' verified in schema '${schema}' with all ${expectedValues.length} values.`);
+      }
+    }
+    enumsValid = valid;
   } catch (err: unknown) {
     hasErrors = true;
     const msg = err instanceof Error ? err.message : String(err);
-    details.push(`SQL ERROR checking pg_type in schema '${schema}': ${msg}`);
+    details.push(`SQL ERROR checking pg_enum in schema '${schema}': ${msg}`);
   }
 
-  // 3. Check Job columns in target schema
+  // 3. Check Job columns and exact types
+  let jobColumnsValid = false;
   let jobColumnsFound = 0;
   try {
-    const cols: Array<{ column_name: string }> = await prisma.$queryRaw`
-      SELECT column_name
+    const jobCols: Array<{ column_name: string; data_type: string; udt_name: string; is_nullable: string; column_default: string | null }> = await prisma.$queryRaw`
+      SELECT column_name, data_type, udt_name, is_nullable, column_default
       FROM information_schema.columns
       WHERE table_schema = ${schema}
         AND table_name = 'Job'
         AND column_name IN ('missionType', 'financialCondition', 'financialConditionStatus')
     `;
-    jobColumnsFound = cols.length;
-    details.push(`Job columns found in schema '${schema}': ${jobColumnsFound}/3.`);
+
+    jobColumnsFound = jobCols.length;
+    const colMap = new Map(jobCols.map((c) => [c.column_name, c]));
+    const missionTypeCol = colMap.get("missionType");
+    const financialCondCol = colMap.get("financialCondition");
+    const financialCondStatusCol = colMap.get("financialConditionStatus");
+
+    const matchMissionType = missionTypeCol && (missionTypeCol.data_type === "text" || missionTypeCol.udt_name === "text");
+    const matchFinancialCond = financialCondCol && (financialCondCol.data_type === "jsonb" || financialCondCol.udt_name === "jsonb");
+    const matchFinancialCondStatus =
+      financialCondStatusCol &&
+      financialCondStatusCol.udt_name === "FinancialConditionStatus" &&
+      financialCondStatusCol.is_nullable === "NO";
+
+    if (matchMissionType && matchFinancialCond && matchFinancialCondStatus) {
+      jobColumnsValid = true;
+      details.push(`Job columns ('missionType', 'financialCondition', 'financialConditionStatus') verified in schema '${schema}'.`);
+    } else {
+      details.push(`Job columns mismatch in schema '${schema}'. Found: ${jobCols.length}/3 matching expected definitions.`);
+    }
   } catch (err: unknown) {
     hasErrors = true;
     const msg = err instanceof Error ? err.message : String(err);
     details.push(`SQL ERROR checking Job columns in schema '${schema}': ${msg}`);
   }
 
-  // 4. Check Table MissionPresentation in target schema
-  let tableExists = false;
+  // 4. Check Table MissionPresentation and 12 columns
+  let tableValid = false;
+  let mpColumnsFound = 0;
   try {
-    const tables: Array<{ table_name: string }> = await prisma.$queryRaw`
-      SELECT table_name
-      FROM information_schema.tables
+    const expectedCols = [
+      "id",
+      "missionId",
+      "applicationId",
+      "candidateId",
+      "companyId",
+      "state",
+      "financialConditionStatus",
+      "presentedAt",
+      "conditionConfirmedAt",
+      "unlockedAt",
+      "completedAt",
+      "securityDetails",
+    ];
+
+    const mpCols: Array<{ column_name: string }> = await prisma.$queryRaw`
+      SELECT column_name
+      FROM information_schema.columns
       WHERE table_schema = ${schema}
         AND table_name = 'MissionPresentation'
     `;
-    tableExists = tables.length === 1;
-    details.push(`MissionPresentation table found in schema '${schema}': ${tables.length}/1.`);
+
+    mpColumnsFound = mpCols.length;
+    const foundColNames = mpCols.map((c) => c.column_name);
+    const matchCols = expectedCols.every((col) => foundColNames.includes(col)) && foundColNames.length === expectedCols.length;
+
+    if (matchCols) {
+      tableValid = true;
+      details.push(`MissionPresentation table verified in schema '${schema}' with all 12 expected columns.`);
+    } else {
+      details.push(`MissionPresentation table mismatch in schema '${schema}'. Expected 12 columns, found ${foundColNames.length}.`);
+    }
   } catch (err: unknown) {
     hasErrors = true;
     const msg = err instanceof Error ? err.message : String(err);
     details.push(`SQL ERROR checking MissionPresentation table in schema '${schema}': ${msg}`);
   }
 
-  // 5. Check OWNER critical columns in target schema
-  let sirenFound = false;
-  let attachFound = false;
-  let folderFound = false;
+  // 5. Check Indexes
+  let indexesValid = false;
+  try {
+    const expectedIndexes = [
+      "MissionPresentation_pkey",
+      "MissionPresentation_applicationId_companyId_key",
+      "MissionPresentation_missionId_companyId_state_idx",
+      "MissionPresentation_candidateId_companyId_idx",
+    ];
+
+    const idxRows: Array<{ indexname: string }> = await prisma.$queryRaw`
+      SELECT indexname
+      FROM pg_indexes
+      WHERE schemaname = ${schema}
+        AND tablename = 'MissionPresentation'
+    `;
+
+    const foundIdxNames = idxRows.map((i) => i.indexname);
+    const matchIdx = expectedIndexes.every((idx) => foundIdxNames.includes(idx));
+
+    if (matchIdx) {
+      indexesValid = true;
+      details.push(`MissionPresentation indexes (${expectedIndexes.length}) verified in schema '${schema}'.`);
+    } else {
+      details.push(`MissionPresentation indexes mismatch in schema '${schema}'. Found: [${foundIdxNames.join(", ")}].`);
+    }
+  } catch (err: unknown) {
+    hasErrors = true;
+    const msg = err instanceof Error ? err.message : String(err);
+    details.push(`SQL ERROR checking pg_indexes in schema '${schema}': ${msg}`);
+  }
+
+  // 6. Check Foreign Keys
+  let foreignKeysValid = false;
+  try {
+    const expectedFKs = [
+      "MissionPresentation_missionId_fkey",
+      "MissionPresentation_applicationId_fkey",
+      "MissionPresentation_candidateId_fkey",
+      "MissionPresentation_companyId_fkey",
+    ];
+
+    const fkRows: Array<{ conname: string }> = await prisma.$queryRaw`
+      SELECT conname
+      FROM pg_constraint c
+      JOIN pg_namespace n ON n.oid = c.connamespace
+      WHERE n.nspname = ${schema}
+        AND c.contype = 'f'
+        AND c.conrelid = 'MissionPresentation'::regclass
+    `;
+
+    const foundFKNames = fkRows.map((f) => f.conname);
+    const matchFK = expectedFKs.every((fk) => foundFKNames.includes(fk));
+
+    if (matchFK) {
+      foreignKeysValid = true;
+      details.push(`MissionPresentation foreign keys (${expectedFKs.length}) verified in schema '${schema}'.`);
+    } else {
+      details.push(`MissionPresentation foreign keys mismatch in schema '${schema}'. Found: [${foundFKNames.join(", ")}].`);
+    }
+  } catch (err: unknown) {
+    hasErrors = true;
+    const msg = err instanceof Error ? err.message : String(err);
+    details.push(`SQL ERROR checking pg_constraint in schema '${schema}': ${msg}`);
+  }
+
+  // 7. Check OWNER critical columns
+  let ownerColumnsValid = false;
   try {
     const sirenCols: Array<{ column_name: string }> = await prisma.$queryRaw`
       SELECT column_name FROM information_schema.columns WHERE table_schema = ${schema} AND table_name = 'Company' AND column_name = 'siren'
     `;
-    sirenFound = sirenCols.length === 1;
-
     const attachCols: Array<{ column_name: string }> = await prisma.$queryRaw`
       SELECT column_name FROM information_schema.columns WHERE table_schema = ${schema} AND table_name = 'Job' AND column_name = 'attachmentName'
     `;
-    attachFound = attachCols.length === 1;
-
     const folderCols: Array<{ column_name: string }> = await prisma.$queryRaw`
       SELECT column_name FROM information_schema.columns WHERE table_schema = ${schema} AND table_name = 'CandidateDocument' AND column_name = 'folderPath'
     `;
-    folderFound = folderCols.length === 1;
 
-    details.push(`OWNER columns found in schema '${schema}' -> Company.siren: ${sirenCols.length}, Job.attachmentName: ${attachCols.length}, CandidateDocument.folderPath: ${folderCols.length}.`);
+    ownerColumnsValid = sirenCols.length === 1 && attachCols.length === 1 && folderCols.length === 1;
+    details.push(`OWNER columns -> Company.siren: ${sirenCols.length}, Job.attachmentName: ${attachCols.length}, CandidateDocument.folderPath: ${folderCols.length}.`);
   } catch (err: unknown) {
     hasErrors = true;
     const msg = err instanceof Error ? err.message : String(err);
     details.push(`SQL ERROR checking OWNER columns in schema '${schema}': ${msg}`);
   }
 
-  const ownerColumnsExist = sirenFound && attachFound && folderFound;
-
-  // Classify Status
+  // Status Classification
   if (hasErrors) {
     return {
       status: "ERROR",
-      migrationRecordExists,
-      migrationFailed,
-      enumTypesFound,
-      jobColumnsFound,
-      tableExists,
-      ownerColumnsExist,
+      migrationRecordStatus,
+      enumsValid,
+      jobColumnsValid,
+      tableValid,
+      indexesValid,
+      foreignKeysValid,
+      ownerColumnsValid,
       hasErrors: true,
       details,
     };
   }
 
-  const allObjectsExist = enumTypesFound === 2 && jobColumnsFound === 3 && tableExists;
-  const noObjectsExist = enumTypesFound === 0 && jobColumnsFound === 0 && !tableExists;
+  const all0010Valid = enumsValid && jobColumnsValid && tableValid && indexesValid && foreignKeysValid;
+  const no0010ObjectsExist = enumTypesFound === 0 && jobColumnsFound === 0 && mpColumnsFound === 0;
 
   let status: "COMPLETE" | "ABSENT" | "PARTIAL";
-  if (allObjectsExist) {
+  if (all0010Valid) {
     status = "COMPLETE";
-  } else if (noObjectsExist) {
+  } else if (no0010ObjectsExist) {
     status = "ABSENT";
   } else {
     status = "PARTIAL";
@@ -158,12 +294,13 @@ export async function checkMigration0010Status(
 
   return {
     status,
-    migrationRecordExists,
-    migrationFailed,
-    enumTypesFound,
-    jobColumnsFound,
-    tableExists,
-    ownerColumnsExist,
+    migrationRecordStatus,
+    enumsValid,
+    jobColumnsValid,
+    tableValid,
+    indexesValid,
+    foreignKeysValid,
+    ownerColumnsValid,
     hasErrors: false,
     details,
   };
@@ -191,7 +328,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`=== Pre-Migration Schema Inspection for 0010_mission_presentation_lock (Requested Mode: ${requestedMode}) ===`);
+  console.log(`=== Fail-Closed Schema Inspection for 0010_mission_presentation_lock (Requested Mode: ${requestedMode}) ===`);
 
   const prisma = new PrismaClient();
   try {
@@ -207,20 +344,20 @@ async function main() {
 
     if (requestedMode === "applied") {
       if (result.status !== "COMPLETE") {
-        console.error(`CRITICAL BLOCK: Mode 'applied' was requested, but database state is ${result.status}. You CANNOT resolve as 'applied' unless all schema objects of 0010 exist in schema 'public'.`);
+        console.error(`CRITICAL BLOCK: Mode 'applied' was requested, but database state is ${result.status}. You CANNOT resolve as 'applied' unless ALL 0010 schema definitions (enums, columns, table, indexes, foreign keys) match 100% in schema 'public'.`);
         process.exit(1);
       }
-      console.log("SAFE TO PROCEED: Mode 'applied' is valid because all 0010 schema objects exist in schema 'public'.");
+      console.log("SAFE TO PROCEED: Mode 'applied' is valid because ALL 0010 schema definitions match 100% in schema 'public'.");
     } else if (requestedMode === "rolled_back") {
       if (result.status !== "ABSENT") {
-        console.error(`CRITICAL BLOCK: Mode 'rolled_back' was requested, but database state is ${result.status}. You CANNOT resolve as 'rolled_back' if any 0010 objects exist, as re-running migration SQL will fail on duplicate creation.`);
+        console.error(`CRITICAL BLOCK: Mode 'rolled_back' was requested, but database state is ${result.status}. You CANNOT resolve as 'rolled_back' if any 0010 schema objects exist, as re-running migration SQL will fail on duplicate creation.`);
         process.exit(1);
       }
-      if (!result.migrationFailed) {
-        console.error("CRITICAL BLOCK: Mode 'rolled_back' was requested, but no failed migration 0010 record exists in _prisma_migrations.");
+      if (result.migrationRecordStatus !== "FAILED") {
+        console.error(`CRITICAL BLOCK: Mode 'rolled_back' was requested, but migration 0010 status in _prisma_migrations is '${result.migrationRecordStatus}' (expected 'FAILED').`);
         process.exit(1);
       }
-      console.log("SAFE TO PROCEED: Mode 'rolled_back' is valid because migration 0010 is recorded as failed and no 0010 schema objects exist.");
+      console.log("SAFE TO PROCEED: Mode 'rolled_back' is valid because migration 0010 is recorded as FAILED and no 0010 schema objects exist.");
     } else if (requestedMode === "none") {
       if (result.status === "PARTIAL") {
         console.error("CRITICAL BLOCK: Database schema is in a PARTIAL state for migration 0010. Manual DBA inspection is required before running migrations.");
