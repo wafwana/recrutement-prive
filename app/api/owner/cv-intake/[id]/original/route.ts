@@ -6,8 +6,9 @@ import { hasPermission } from "@/lib/auth/permissions";
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const session = getActiveSessionContext() || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
-  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(session?.user?.role || "")) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
-  if (!(await hasPermission(userId, session?.user?.role, "CV_INTAKE"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
+  const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
+  if (!userId || !role || !["OWNER", "ADMIN", "CONSULTANT"].includes(role)) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  if (!(await hasPermission(userId, role, "CV_INTAKE"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
   const { id } = await context.params;
   const doc = await prisma.cvIntake.findUnique({ where: { id }, select: { name: true, mimeType: true, fileData: true, originalSha256: true } });
   if (!doc) return NextResponse.json({ error: "CV introuvable." }, { status: 404 });
