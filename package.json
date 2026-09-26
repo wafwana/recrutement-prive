@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma migrate deploy && prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -46,6 +46,6 @@
     "@tailwindcss/postcss": "4.1.14",
     "@types/node": "24.5.2",
     "@types/react": "19.1.13",
-    "@types/react-dom": "19.1.9"
+    "@types/react-dom": "19.1.13"
   }
 }
