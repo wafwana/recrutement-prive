@@ -68,6 +68,3 @@ Le système Auth.js utilise une session JWT et le modèle Prisma `User` comprend
 
 ### Intelligence artificielle
 L'IA assiste les consultants sans prendre les décisions de recrutement.
-
-
-<!-- Production deployment guard: Prisma migrations are applied during the Vercel build before Prisma Client generation. -->
