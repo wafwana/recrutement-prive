@@ -7,11 +7,12 @@ import { PHONE_COUNTRIES } from "@/lib/phone-countries";
 type Job = { id: string; title: string; location: string | null; status: string; attachmentName?: string | null; applications: { status: string }[] };
 type Category = { id: string; code: string; name: unknown; parentId: string | null; sortOrder: number };
 type Application = { id: string; status: string; job: { id: string; title: string } };
+type CompanyIdentity = { name: string; siren: string | null; siret: string | null; legalForm: string | null; apeCode: string | null; address: string | null; website: string | null; country: string | null; phonePrefix: string | null; phone: string | null; description: string | null };
 const applicationStatuses = ["SUBMITTED", "REVIEWING", "INTERVIEW", "SHORTLISTED", "REJECTED", "HIRED"] as const;
 
 function categoryName(name: unknown) { if (typeof name === "string") return name; if (name && typeof name === "object") { const value = name as Record<string, string>; return value.fr || value.en || Object.values(value)[0] || "Catégorie"; } return "Catégorie"; }
 
-export default function CompanyDashboard({ jobs, applications, categories, companyId, sourcingCountries }: { jobs: Job[]; applications: Application[]; categories: Category[]; companyId: string; sourcingCountries: string[] }) {
+export default function CompanyDashboard({ jobs, applications, categories, companyId, sourcingCountries, company }: { jobs: Job[]; applications: Application[]; categories: Category[]; companyId: string; sourcingCountries: string[]; company: CompanyIdentity }) {
   const [filter, setFilter] = useState("");
   const [creatingJob, setCreatingJob] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -39,36 +40,41 @@ export default function CompanyDashboard({ jobs, applications, categories, compa
     <section className="mt-10 border border-white/10 p-8"><p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Recrutement Privé</p><h2 className="mt-3 font-serif text-2xl">Votre contact recrutement</h2><p className="mt-3 text-sm leading-6 text-white/50">Pour vos besoins de recrutement ou pour échanger sur une candidature, notre équipe reste directement joignable.</p><a href="tel:+33626909231" className="mt-5 inline-block border border-[#c7a15a] px-5 py-3 text-sm text-[#c7a15a]">+33 6 26 90 92 31</a></section>
     <section className="mt-10 border border-white/10 p-8">
       <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Profil entreprise</p>
-      <h2 className="mt-3 font-serif text-2xl">Informations & Coordonnées</h2>
+      <h2 className="mt-3 font-serif text-2xl">Informations & Coordonnées</h2><p className="mt-2 text-xs text-white/35">Les données issues du SIRET sont préremplies pour vous éviter de ressaisir les informations déjà disponibles.</p>
       <form action={updateCompanyProfile} className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
         <input type="hidden" name="companyId" value={companyId} />
         <div className="sm:col-span-2 md:col-span-1">
           <label className="mb-1 block text-[10px] uppercase tracking-[0.16em] text-white/40">Nom entreprise</label>
-          <input name="name" placeholder="Nom de l'entreprise" className="w-full border border-white/10 bg-transparent px-3 py-2 text-xs outline-none" />
+          <input name="name" defaultValue={company.name} placeholder="Nom de l'entreprise" className="w-full border border-white/10 bg-transparent px-3 py-2 text-xs outline-none" />
         </div>
         <div>
           <label className="mb-1 block text-[10px] uppercase tracking-[0.16em] text-white/40">Site web</label>
-          <input name="website" placeholder="https://..." className="w-full border border-white/10 bg-transparent px-3 py-2 text-xs outline-none" />
+          <input name="website" defaultValue={company.website ?? ""} placeholder="https://..." className="w-full border border-white/10 bg-transparent px-3 py-2 text-xs outline-none" />
         </div>
         <div>
           <label className="mb-1 block text-[10px] uppercase tracking-[0.16em] text-white/40">Pays</label>
-          <select name="country" required defaultValue="France" className="w-full border border-white/10 bg-[#111] px-3 py-2 text-xs outline-none">
+          <select name="country" required defaultValue={company.country ?? "France"} className="w-full border border-white/10 bg-[#111] px-3 py-2 text-xs outline-none">
             {PHONE_COUNTRIES.map(([country]) => <option key={country} value={country}>{country}</option>)}
           </select>
         </div>
         <div>
           <label className="mb-1 block text-[10px] uppercase tracking-[0.16em] text-white/40">Préfixe</label>
-          <select name="phonePrefix" defaultValue="+33" aria-label="Préfixe téléphonique" className="w-full border border-white/10 bg-[#111] px-3 py-2 text-xs outline-none">
+          <select name="phonePrefix" defaultValue={company.phonePrefix ?? "+33"} aria-label="Préfixe téléphonique" className="w-full border border-white/10 bg-[#111] px-3 py-2 text-xs outline-none">
             {PHONE_COUNTRIES.map(([country, prefix]) => <option key={`${country}-${prefix}`} value={prefix}>{prefix} · {country}</option>)}
           </select>
         </div>
         <div className="sm:col-span-2 md:col-span-1">
           <label className="mb-1 block text-[10px] uppercase tracking-[0.16em] text-white/40">Téléphone</label>
-          <input name="phone" placeholder="Numéro direct" className="w-full border border-white/10 bg-transparent px-3 py-2 text-xs outline-none" />
+          <input name="phone" defaultValue={company.phone ?? ""} placeholder="Numéro direct" className="w-full border border-white/10 bg-transparent px-3 py-2 text-xs outline-none" />
         </div>
         <div className="sm:col-span-2 md:col-span-3">
           <label className="mb-1 block text-[10px] uppercase tracking-[0.16em] text-white/40">Présentation / Description</label>
-          <textarea name="description" rows={2} placeholder="Secteur d'activité, valeurs, brief rapide..." className="w-full border border-white/10 bg-transparent px-3 py-2 text-xs outline-none" />
+          <input name="siren" value={company.siren ?? ""} readOnly aria-label="SIREN" className="w-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60 outline-none" />
+        <input name="siret" value={company.siret ?? ""} readOnly aria-label="SIRET" className="w-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60 outline-none" />
+        <input name="legalForm" defaultValue={company.legalForm ?? ""} placeholder="Forme juridique" className="w-full border border-white/10 bg-transparent px-3 py-2 text-xs outline-none" />
+        <input name="apeCode" defaultValue={company.apeCode ?? ""} placeholder="Code APE / NAF" className="w-full border border-white/10 bg-transparent px-3 py-2 text-xs outline-none" />
+        <input name="address" defaultValue={company.address ?? ""} placeholder="Adresse de l’établissement" className="w-full border border-white/10 bg-transparent px-3 py-2 text-xs outline-none sm:col-span-2 md:col-span-3" />
+        <textarea name="description" rows={2} defaultValue={company.description ?? ""} placeholder="Secteur d'activité, valeurs, brief rapide..." className="w-full border border-white/10 bg-transparent px-3 py-2 text-xs outline-none" />
         </div>
         <div className="sm:col-span-2 md:col-span-3 text-right">
           <button className="border border-[#c7a15a] px-5 py-2.5 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a] hover:bg-[#c7a15a] hover:text-black transition">Enregistrer le profil</button>
