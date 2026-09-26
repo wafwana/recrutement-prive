@@ -57,7 +57,7 @@ Contexte: titre=${input.source.title||"(non précisé)"}; entreprise=${input.sou
 OFFRE:
 ${input.rawText.slice(0,30000)}
 TAXONOMIE:
-${taxonomy||"(aucune)"}`}]}}],text:{format:{type:"json_schema",name:"raw_offer_analysis",strict:true,schema}}});
+${taxonomy||"(aucune)"}`}] }],text:{format:{type:"json_schema",name:"raw_offer_analysis",strict:true,schema}}});
  if(!r.output_text)return null;const p=JSON.parse(r.output_text) as RawOfferAnalysis;
  return {title:clean(p.title)||input.source.title||"Offre à qualifier",companyName:clean(p.companyName)||clean(input.source.companyName),
  companySiret:siret(clean(p.companySiret)),country:clean(p.country)||clean(input.source.country),city:clean(p.city)||clean(input.source.city),
