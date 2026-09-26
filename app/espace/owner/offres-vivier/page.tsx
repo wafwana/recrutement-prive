@@ -7,6 +7,8 @@ import { compareOfferPriority, getFinancialStatus, parseSalary } from "@/lib/off
 import BackButton from "@/components/navigation/BackButton";
 import { processOwnerRawOffer } from "@/app/espace/owner/offres/nouvelle/raw-actions";
 
+async function submitRawOffer(formData: FormData) { "use server"; await processOwnerRawOffer(formData); }
+
 const statusLabels: Record<string, string> = {
   DETECTED: "Nouvelle",
   A_QUALIFIER: "À qualifier",
@@ -154,7 +156,7 @@ export default async function OfferPoolPage({
                 <p className="text-xs text-[#c7a15a]">{statusLabels[offer.status] || offer.status}</p>
                 <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/30">{offer.source}</p>
                 {offer.sourceUrl && <a href={offer.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[10px] text-[#F97316] hover:underline">Source</a>}
-                <form action={processOwnerRawOffer} className="mt-2"><input type="hidden" name="externalJobId" value={offer.id}/><button className="border border-[#c7a15a]/70 px-3 py-2 text-[9px] uppercase tracking-[0.12em] text-[#c7a15a]">Rentrer une offre</button></form>
+                <form action={submitRawOffer} className="mt-2"><input type="hidden" name="externalJobId" value={offer.id}/><button className="border border-[#c7a15a]/70 px-3 py-2 text-[9px] uppercase tracking-[0.12em] text-[#c7a15a]">Rentrer une offre</button></form>
               </div>
             </article>
           );
