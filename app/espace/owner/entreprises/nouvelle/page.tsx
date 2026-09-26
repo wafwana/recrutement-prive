@@ -4,7 +4,12 @@ import { auth } from "@/auth";
 import { createOwnerCompany } from "./actions";
 import OwnerCompanyForm from "./OwnerCompanyForm";
 
-async function submitOwnerCompany(formData: FormData) {\n  "use server";\n  await createOwnerCompany(formData);\n}\n\nexport default async function NewOwnerCompanyPage() {
+async function submitOwnerCompany(formData: FormData) {
+  "use server";
+  await createOwnerCompany(formData);
+}
+
+export default async function NewOwnerCompanyPage() {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== "OWNER") redirect("/connexion");
 
