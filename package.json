@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && prisma generate && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -17,7 +17,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "prisma db seed",
+    "db:seed": "tsx prisma/seed.ts",
     "test:global-sourcing": "node --import tsx --test tests/global-sourcing.test.ts",
     "test:cv-intelligence": "node --import tsx --test tests/cv-intelligence-fixtures.test.ts",
     "test:owner-compatibility": "node --import tsx --test tests/owner-compatibility.test.ts"
@@ -26,7 +26,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "next": "15.5.24",
+    "next": "^15.5.24",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "next-auth": "5.0.0-beta.29",
