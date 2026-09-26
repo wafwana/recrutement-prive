@@ -6,6 +6,16 @@ const authConfig = {
   providers: [],
   pages: { signIn: "/connexion" },
   callbacks: {
+    async jwt({ token, user }) {
+      if (user?.role) token.role = user.role;
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.role = token.role as string | undefined;
+      }
+      return session;
+    },
     authorized({ auth, request }) {
       if (!request.nextUrl.pathname.startsWith("/espace")) return true;
       return Boolean(auth?.user);
