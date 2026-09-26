@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { createOwnerCompany } from "./actions";
 import OwnerCompanyForm from "./OwnerCompanyForm";
 
-export default async function NewOwnerCompanyPage() {
+async function submitOwnerCompany(formData: FormData) {\n  "use server";\n  await createOwnerCompany(formData);\n}\n\nexport default async function NewOwnerCompanyPage() {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== "OWNER") redirect("/connexion");
 
@@ -19,7 +19,7 @@ export default async function NewOwnerCompanyPage() {
         <Link href="/espace/owner" className="border border-white/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/55">Retour OWNER</Link>
       </div>
 
-      <OwnerCompanyForm action={createOwnerCompany} />
+      <OwnerCompanyForm action={submitOwnerCompany} />
     </main>
   );
 }
