@@ -1,0 +1,60 @@
+name: Deploy Production Database Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: 'Type "CONFIRM_MIGRATE_PRODUCTION" to execute migrations on Neon Production'
+        required: true
+        default: ''
+
+jobs:
+  migrate-production:
+    name: Execute Prisma Migrations on Neon Production
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify Production Confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_production }}" != "CONFIRM_MIGRATE_PRODUCTION" ]; then
+            echo "Error: You must type 'CONFIRM_MIGRATE_PRODUCTION' to trigger this workflow."
+            exit 1
+          fi
+          echo "Production migration confirmation verified."
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Verify DATABASE_URL_PRODUCTION Secret Presence
+        env:
+          DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: |
+          if [ -z "$DATABASE_URL_PRODUCTION" ]; then
+            echo "Error: DATABASE_URL_PRODUCTION secret is missing or empty in GitHub Repository Secrets."
+            echo "Please set DATABASE_URL_PRODUCTION in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "DATABASE_URL_PRODUCTION secret is present and verified."
+
+      - name: Run Prisma Migrate Deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: |
+          echo "Running 'npx prisma migrate deploy' on Neon Production..."
+          npx prisma migrate deploy
+
+      - name: Verify Prisma Migration Status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: |
+          echo "Checking migration status on Neon Production..."
+          npx prisma migrate status
