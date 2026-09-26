@@ -1,6 +1,6 @@
-# Guide d'Exécution des Migrations Neon Production
+# Guide d'Exécution des Migrations Neon Production & Résolution P3009
 
-Ce document décrit la procédure sécurisée pour exécuter les migrations Prisma additives sur la base de données de production **Neon Postgres**, sans risquer d'échec de build Vercel ni exposer de chaîne de connexion secrète.
+Ce document décrit la procédure sécurisée pour exécuter les migrations Prisma additives sur la base de données de production **Neon Postgres** et résoudre le blocage de migration **Prisma P3009** (`0010_mission_presentation_lock`).
 
 ---
 
@@ -16,45 +16,49 @@ Afin de permettre l'exécution automatisée des migrations hors du build Vercel 
    - **Secret :** Coller la chaîne de connexion PostgreSQL de production Neon (`postgresql://...`).
 5. Cliquer sur **Add secret**.
 
-*Note : La valeur du secret est masquée et ne sera jamais affichée dans les logs d'exécution des workflows GitHub Actions.*
+---
+
+## 2. Procédure de Résolution du Blocage P3009 (`0010_mission_presentation_lock`)
+
+La migration `0010_mission_presentation_lock` a été interrompue précédemment sur la base de production et présente le statut **P3009** (*Failed migration*).
+
+### Étape 1 : Choisir le Mode de Résolution selon l'État PostgreSQL Real
+- **Si les tables `MissionPresentation` et les colonnes `Job.financialConditionStatus` existent déjà dans PostgreSQL :**
+  Sélectionner le mode **`applied`**. Cela exécutera `npx prisma migrate resolve --applied "0010_mission_presentation_lock"`, enregistrant la migration 0010 comme complétée sans altérer les tables existantes.
+- **Si les tables/colonnes de la migration 0010 n'existent pas encore dans PostgreSQL :**
+  Sélectionner le mode **`rolled_back`**. Cela exécutera `npx prisma migrate resolve --rolled-back "0010_mission_presentation_lock"`, permettant à `prisma migrate deploy` de rejouer la migration 0010.
 
 ---
 
-## 2. Déclenchement Manuel de la Migration Production
-
-Une fois le secret configuré :
+## 3. Déclenchement du Workflow de Migration sur GitHub
 
 1. Sur GitHub, aller dans l'onglet **Actions**.
-2. Dans le menu de gauche, sélectionner le workflow **Deploy Production Database Migrations**.
-3. Cliquer sur le bouton **Run workflow** (à droite).
-4. Dans le champ de confirmation `confirm_production`, saisir exactement :
-   ```text
-   CONFIRM_MIGRATE_PRODUCTION
-   ```
-5. Valider en cliquant sur **Run workflow**.
+2. Dans le menu de gauche, sélectionner **Deploy Production Database Migrations**.
+3. Cliquer sur **Run workflow** (bouton à droite).
+4. Saisir les paramètres :
+   - **`confirm_production` :**
+     ```text
+     CONFIRM_MIGRATE_PRODUCTION
+     ```
+   - **`resolve_migration_mode` :** `applied` (ou `rolled_back` selon votre diagnostic PostgreSQL).
+5. Cliquer sur **Run workflow**.
 
 ---
 
-## 3. Ce que Fait le Workflow de Migration
+## 4. Déroulement Automatique du Workflow
 
 Le workflow exécute la séquence sécurisée suivante :
-1. Vérification de la confirmation textuelle `CONFIRM_MIGRATE_PRODUCTION`.
-2. Vérification de la présence de la variable secrète `DATABASE_URL_PRODUCTION`.
-3. Exécution de `npx prisma migrate deploy` :
-   - Applique les migrations additives en attente (`0006_job_attachment`, `0018_cv_intelligence`, `0020_cv_intake_registry`, `0024_company_identity_and_sourcing_provenance`, `0025_external_offer_outreach`).
-   - Crée les colonnes requises : `Job.attachmentName`, `CandidateDocument.folderPath`, `Company.siren`.
-4. Exécution de `npx prisma migrate status` pour confirmer qu'aucun décalage de schéma ne persiste.
+1. Résolution de la migration 0010 selon le mode sélectionné (`npx prisma migrate resolve`).
+2. Exécution de `npx prisma migrate deploy` pour appliquer toutes les migrations additives ultérieures (`0011` à `0025`), créant ainsi les colonnes manquantes `Company.siren`, `Job.attachmentName` et `CandidateDocument.folderPath`.
+3. Exécution de `npx prisma migrate status` pour vérifier l'alignement à 100% du schéma.
 
 ---
 
-## 4. Recette Post-Migration & Confirmation OWNER
+## 5. Recette Post-Migration & Confirmation OWNER
 
-Une fois le workflow terminé au vert (icône coche verte) :
+Une fois le workflow validé au vert (coche verte) :
 
-1. Se rendre sur **https://recrutement-prive.com/connexion**.
-2. Connecter le compte `OWNER`.
-3. Charger l'espace `/espace/owner` et vérifier le fonctionnement :
-   - Fiches entreprises (champ `Company.siren`).
-   - Fiches offres et pièces jointes (`Job.attachmentName`).
-   - CVthèque et classification (`CandidateDocument.folderPath`).
-4. Consulter l'onglet *Logs* Vercel Production pour confirmer la disparition totale des erreurs `P2022`.
+1. Aller sur **https://recrutement-prive.com/connexion**.
+2. S'authentifier avec le compte `OWNER`.
+3. Accéder à l'espace `/espace/owner` et vérifier le chargement des sections entreprises, offres et CVthèque.
+4. Consulter l'onglet *Logs* Vercel Production pour confirmer la disparition de l'erreur `P2022`.

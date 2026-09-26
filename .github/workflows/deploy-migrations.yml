@@ -7,6 +7,10 @@ on:
         description: 'Type "CONFIRM_MIGRATE_PRODUCTION" to execute migrations on Neon Production'
         required: true
         default: ''
+      resolve_migration_mode:
+        description: 'P3009 resolution mode for 0010_mission_presentation_lock: "none", "applied", or "rolled_back"'
+        required: false
+        default: 'none'
 
 jobs:
   migrate-production:
@@ -44,6 +48,21 @@ jobs:
             exit 1
           fi
           echo "DATABASE_URL_PRODUCTION secret is present and verified."
+
+      - name: Resolve P3009 Migration Lock (If Requested)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+          RESOLVE_MODE: ${{ github.event.inputs.resolve_migration_mode }}
+        run: |
+          if [ "$RESOLVE_MODE" = "applied" ]; then
+            echo "Resolving 0010_mission_presentation_lock as APPLIED..."
+            npx prisma migrate resolve --applied "0010_mission_presentation_lock"
+          elif [ "$RESOLVE_MODE" = "rolled_back" ]; then
+            echo "Resolving 0010_mission_presentation_lock as ROLLED BACK..."
+            npx prisma migrate resolve --rolled-back "0010_mission_presentation_lock"
+          else
+            echo "No migration lock resolution requested (mode: $RESOLVE_MODE)."
+          fi
 
       - name: Run Prisma Migrate Deploy
         env:
