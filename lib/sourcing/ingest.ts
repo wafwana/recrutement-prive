@@ -9,6 +9,7 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
     const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
     const closingAt = item.closingAt ? new Date(item.closingAt) : null;
     const rawData = item.raw === undefined ? undefined : JSON.parse(JSON.stringify(item.raw)) as Prisma.InputJsonValue;
+    const sourceCollectedAt = new Date();
     const existing = await prisma.externalJobOpportunity.findUnique({
       where: { source_externalId: { source: item.source, externalId: item.externalId } },
       select: { id: true },
@@ -16,13 +17,13 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
     await prisma.externalJobOpportunity.upsert({
       where: { source_externalId: { source: item.source, externalId: item.externalId } },
       create: {
-        externalId: item.externalId, source: item.source, sourceUrl: item.sourceUrl, title: item.title,
+        externalId: item.externalId, source: item.source, sourceUrl: item.sourceUrl, sourceType: "PUBLIC_JOB_SOURCE", sourceCollectedAt, title: item.title,
         companyName: item.companyName, country: item.country, city: item.city, categoryCode: item.categoryCode,
         subCategoryCode: item.subCategoryCode, skills: item.skills, experienceYears: item.experienceYears,
         language: item.language, salary: item.salary, publishedAt, closingAt, description: item.description, rawData,
       },
       update: {
-        sourceUrl: item.sourceUrl, title: item.title, companyName: item.companyName, country: item.country, city: item.city,
+        sourceUrl: item.sourceUrl, sourceType: "PUBLIC_JOB_SOURCE", sourceCollectedAt, title: item.title, companyName: item.companyName, country: item.country, city: item.city,
         categoryCode: item.categoryCode, subCategoryCode: item.subCategoryCode, skills: item.skills,
         experienceYears: item.experienceYears, language: item.language, salary: item.salary, publishedAt, closingAt,
         description: item.description, rawData, updatedAt: new Date(),
