@@ -49,15 +49,15 @@ jobs:
           fi
           echo "DATABASE_URL_PRODUCTION secret is present and verified."
 
-      - name: Run Schema & Migration Pre-Check Script
+      - name: Run Schema & Migration Pre-Check Script (Schema Isolation)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
           RESOLVE_MODE: ${{ github.event.inputs.resolve_migration_mode }}
         run: |
-          echo "Running pre-check inspection on Neon Production..."
+          echo "Running pre-check inspection on Neon Production in schema 'public'..."
           npx tsx scripts/check-migration-0010.ts
 
-      - name: Resolve P3009 Migration Lock (If Safe & Requested)
+      - name: Resolve P3009 Migration Lock (If Safe & Validated)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
           RESOLVE_MODE: ${{ github.event.inputs.resolve_migration_mode }}
@@ -86,10 +86,10 @@ jobs:
           echo "Checking migration status on Neon Production..."
           npx prisma migrate status
 
-      - name: Post-Migration OWNER Columns Verification
+      - name: Post-Migration OWNER Columns & Schema Strict Check
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
           RESOLVE_MODE: "none"
         run: |
-          echo "Checking that all OWNER columns (Company.siren, Job.attachmentName, CandidateDocument.folderPath) exist..."
+          echo "Verifying that all OWNER columns (Company.siren, Job.attachmentName, CandidateDocument.folderPath) exist..."
           npx tsx scripts/check-migration-0010.ts

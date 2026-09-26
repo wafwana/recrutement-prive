@@ -4,9 +4,9 @@ Ce document décrit la procédure sécurisée pour exécuter les migrations Pris
 
 ---
 
-## 1. Garde-fous et Précontrôle Automatique (`scripts/check-migration-0010.ts`)
+## 1. Garde-fous et Précontrôle Automatique d'Isolation (`scripts/check-migration-0010.ts`)
 
-Le workflow intègre une étape de précontrôle automatique d'introspection de la base de données PostgreSQL (`information_schema`, `pg_type`) qui analyse :
+Le workflow intègre un script de précontrôle automatique d'introspection de la base de données PostgreSQL (`information_schema`, `pg_type`) restreint au schéma `public` qui analyse :
 - L'existence de l'enregistrement dans `_prisma_migrations`.
 - La présence des 2 types ENUM (`MissionPresentationState`, `FinancialConditionStatus`).
 - La présence des 3 colonnes de `Job` (`missionType`, `financialCondition`, `financialConditionStatus`).
@@ -14,9 +14,12 @@ Le workflow intègre une étape de précontrôle automatique d'introspection de 
 - La présence des 3 colonnes de déblocage OWNER (`Company.siren`, `Job.attachmentName`, `CandidateDocument.folderPath`).
 
 ### Classification et Blocage Sécurisé :
-- **Si l'état est `PARTIAL`** (seuls certains objets existent), le script interrompt immédiatement le workflow avec un message d'erreur clair sans modifier la base de données.
+- **Si une erreur SQL survient** lors de la lecture d'une table d'introspection, le script échoue immédiatement (`ERROR`) pour empêcher toute fausse interprétation.
+- **Si l'état est `PARTIAL`** (seuls certains objets existent), le script interrompt le workflow sans modifier la base.
 - **Si `resolve_migration_mode = applied` est demandé mais que l'état n'est pas `COMPLETE`**, le script bloque l'exécution.
-- **Si `resolve_migration_mode = rolled_back` est demandé mais que des objets existent déjà**, le script bloque l'exécution pour éviter un échec SQL lors de la réexécution.
+- **Si `resolve_migration_mode = rolled_back` est demandé mais que des objets existent ou que la migration n'a pas échoué**, le script bloque l'exécution.
+
+*Avertissement : Les tests unitaires sandbox valident le fonctionnement du script et des garde-fous sur des mocks PostgreSQL. Ils ne constituent pas une preuve de réparation de la base de production réelle tant que le workflow n'est pas exécuté avec `DATABASE_URL_PRODUCTION`.*
 
 ---
 
@@ -43,8 +46,8 @@ Le workflow intègre une étape de précontrôle automatique d'introspection de 
      CONFIRM_MIGRATE_PRODUCTION
      ```
    - **`resolve_migration_mode` :**
-     - Choisir **`applied`** si la table `MissionPresentation` et les ENUMs existent déjà dans la base.
-     - Choisir **`rolled_back`** si aucun objet de la migration 0010 n'existe dans la base.
+     - Choisir **`applied`** si la table `MissionPresentation` et les ENUMs existent déjà dans le schéma `public`.
+     - Choisir **`rolled_back`** si aucun objet de la migration 0010 n'existe dans le schéma `public` et que l'enregistrement `0010` est en échec.
      - Choisir **`none`** si aucune résolution P3009 n'est requise.
 5. Cliquer sur **Run workflow**.
 
@@ -53,7 +56,7 @@ Le workflow intègre une étape de précontrôle automatique d'introspection de 
 ## 4. Déroulement et Post-Vérification
 
 Le workflow s'exécute de façon séquentielle :
-1. **Script de précontrôle** : Valide l'état de la base PostgreSQL.
+1. **Script de précontrôle** : Valide l'état du schéma `public`.
 2. **Résolution P3009** : Exécute `prisma migrate resolve` uniquement si les conditions de sécurité sont remplies.
 3. **Déploiement des migrations** : Exécute `prisma migrate deploy` pour appliquer les migrations additives ultérieures (`0011` à `0025`).
 4. **Post-vérification** : Contrôle la présence effective de `Company.siren`, `Job.attachmentName` et `CandidateDocument.folderPath`.
@@ -62,7 +65,7 @@ Le workflow s'exécute de façon séquentielle :
 
 ## 5. Recette Post-Migration & Confirmation OWNER
 
-Une fois le workflow terminé au vert (coche verte) :
+Une fois le workflow validé au vert (coche verte) :
 1. Aller sur **https://recrutement-prive.com/connexion**.
 2. S'authentifier avec le compte `OWNER`.
 3. Accéder à l'espace `/espace/owner` et vérifier le chargement des sections entreprises, offres et CVthèque.
