@@ -13,7 +13,7 @@ async function requireAccess() {
   const userId = typeof session?.user?.id === "string" ? session.user.id : null;
   const role = typeof session?.user?.role === "string" ? session.user.role : null;
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role || "")) return null;
-  if (!(await hasPermission(userId, role, "OFFRES_VIVIER"))) return null;
+  if (!(await hasPermission(userId, role || undefined, "OFFRES_VIVIER"))) return null;
   return { userId, role };
 }
 
