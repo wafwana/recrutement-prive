@@ -20,7 +20,7 @@ export default async function OwnerPage() {
 
   const [users, candidates, documents, companies, jobs, applications, sourcedCandidates, settings, owner] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, email: true, role: true, createdAt: true } }),
-    prisma.candidateProfile.count(),
+    prisma.user.count({ where: { role: "CANDIDAT", status: "ACTIVE" } }),
     prisma.candidateDocument.count(),
     prisma.company.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { _count: { select: { members: true, jobs: true } } } }),
     prisma.job.findMany({ orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, title: true, status: true, company: { select: { name: true } }, updatedAt: true } }),
@@ -69,7 +69,15 @@ export default async function OwnerPage() {
 
       <div className="mt-10 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
         {[["Candidats", candidates],["CV / documents", documents],["Entreprises", companies.length],["Offres ouvertes", openJobs],["Candidatures", applications.length],["Profils sourcés", sourcedCandidates.length],["Matching ≥ 80", highMatches],["Paramètres système", settings]].map(([label, value]) => (
-          <div key={String(label)} className="bg-[#111] p-6"><span className="text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</span><p className="mt-4 font-serif text-3xl text-[#c7a15a]">{value}</p></div>
+          label === "Candidats" ? (
+            <Link key={String(label)} href="/espace/owner/candidats" className="group bg-[#111] p-6 transition hover:bg-[#151515]">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</span>
+              <p className="mt-4 font-serif text-3xl text-[#c7a15a]">{value}</p>
+              <span className="mt-3 inline-block text-[10px] uppercase tracking-[0.16em] text-white/35 transition group-hover:text-[#c7a15a]">Voir les candidats →</span>
+            </Link>
+          ) : (
+            <div key={String(label)} className="bg-[#111] p-6"><span className="text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</span><p className="mt-4 font-serif text-3xl text-[#c7a15a]">{value}</p></div>
+          )
         ))}
       </div>
 
