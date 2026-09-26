@@ -4,6 +4,9 @@ import { auth } from "@/auth";
 import { processOwnerRawOffer } from "./raw-actions";
 import { createOwnerJob } from "./actions";
 
+async function submitRaw(formData: FormData) { "use server"; await processOwnerRawOffer(formData); }
+async function submitManual(formData: FormData) { "use server"; await createOwnerJob(formData); }
+
 export default async function NewOwnerJobPage({searchParams}:{searchParams:Promise<{externalJobId?:string;sourceUrl?:string}>}) {
  const session=await auth();if(!session?.user?.id||session.user.role!=="OWNER")redirect("/connexion");
  const params=await searchParams;
@@ -14,7 +17,7 @@ export default async function NewOwnerJobPage({searchParams}:{searchParams:Promi
    <p className="mt-3 max-w-3xl text-sm leading-7 text-white/50">Vous trouvez une offre, vous la donnez à Recrutement Privé. L'IA structure l'offre, identifie l'entreprise, enrichit les données publiques disponibles, classe le besoin, analyse les postes difficiles, lance le matching et prépare le premier contact.</p></div>
    <Link href="/espace/owner/offres-vivier" className="border border-white/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/55">Retour au vivier</Link>
   </div>
-  <form action={processOwnerRawOffer} className="mt-10 grid gap-5 border border-[#F97316]/30 bg-[#111] p-7">
+  <form action={submitRaw} className="mt-10 grid gap-5 border border-[#F97316]/30 bg-[#111] p-7">
    {params.externalJobId&&<input type="hidden" name="externalJobId" value={params.externalJobId}/>}
    <div className="border border-[#F97316]/20 bg-[#F97316]/5 p-5"><p className="text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Chaîne automatique</p>
    <p className="mt-3 text-sm leading-6 text-white/65">Offre brute → analyse IA → entreprise → classification → postes difficiles → candidats compatibles → courrier personnalisé → contact, uniquement si une adresse exploitable existe et si l'envoi automatique est activé.</p></div>
@@ -35,7 +38,7 @@ export default async function NewOwnerJobPage({searchParams}:{searchParams:Promi
   </form>
   <details className="mt-8 border border-white/10 bg-[#111] p-6">
    <summary className="cursor-pointer text-[10px] uppercase tracking-[0.18em] text-white/45">Saisie manuelle classique</summary>
-   <form action={createOwnerJob} className="mt-6 grid gap-4">
+   <form action={submitManual} className="mt-6 grid gap-4">
     <input name="companyId" placeholder="ID entreprise existante" required className="border border-white/10 bg-transparent px-4 py-3 text-sm"/>
     <input name="title" placeholder="Intitulé du poste" required className="border border-white/10 bg-transparent px-4 py-3 text-sm"/>
     <textarea name="description" rows={8} placeholder="Contenu de l'offre" required className="border border-white/10 bg-transparent px-4 py-3 text-sm"/>
