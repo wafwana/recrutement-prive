@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { analyzeAndMatchJob } from "@/lib/jobs/automation";
 
 const schema = z.object({
   companyId: z.string().min(1),
@@ -12,7 +13,7 @@ const schema = z.object({
   missionType: z.string().trim().max(100).optional(),
   requiredSkills: z.string().trim().max(1500).optional(),
   requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(),
-  jobCategoryId: z.string().min(1),
+  jobCategoryId: z.string().optional(),
   subCategoryId: z.string().optional(),
   status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]).default("DRAFT"),
 });
@@ -42,19 +43,24 @@ export async function createOwnerJob(formData: FormData) {
   const company = await prisma.company.findUnique({ where: { id: parsed.data.companyId }, select: { id: true, name: true } });
   if (!company) throw new Error("Entreprise introuvable.");
 
-  const category = await prisma.jobCategory.findUnique({
-    where: { id: parsed.data.jobCategoryId },
-    select: { id: true, parentId: true, isActive: true },
-  });
-  if (!category || !category.isActive || category.parentId !== null) throw new Error("La catégorie métier principale est invalide.");
-
+  let categoryId = parsed.data.jobCategoryId || null;
   const subCategoryId = parsed.data.subCategoryId || null;
+
+  if (categoryId) {
+    const category = await prisma.jobCategory.findUnique({
+      where: { id: categoryId },
+      select: { id: true, parentId: true, isActive: true },
+    });
+    if (!category || !category.isActive || category.parentId !== null) throw new Error("La catégorie métier principale est invalide.");
+  }
+
   if (subCategoryId) {
+    if (!categoryId) throw new Error("Une sous-catégorie requiert une catégorie métier principale.");
     const subCategory = await prisma.jobCategory.findUnique({
       where: { id: subCategoryId },
       select: { id: true, parentId: true, isActive: true },
     });
-    if (!subCategory || !subCategory.isActive || subCategory.parentId !== category.id) throw new Error("La sous-catégorie métier est invalide.");
+    if (!subCategory || !subCategory.isActive || subCategory.parentId !== categoryId) throw new Error("La sous-catégorie métier est invalide.");
   }
 
   const skills = (parsed.data.requiredSkills || "").split(",").map((value) => value.trim()).filter(Boolean);
@@ -69,7 +75,7 @@ export async function createOwnerJob(formData: FormData) {
         missionType: parsed.data.missionType || null,
         requiredSkills: skills,
         requiredExperienceYears: parsed.data.requiredExperienceYears,
-        jobCategoryId: category.id,
+        jobCategoryId: categoryId,
         subCategoryId,
         status: parsed.data.status,
       },
@@ -97,5 +103,17 @@ export async function createOwnerJob(formData: FormData) {
     },
   });
 
-  return { ok: true, jobId: job.id, companyName: company.name };
+  const automation = await analyzeAndMatchJob({
+    jobId: job.id,
+    actorUserId,
+    actorRole: "OWNER",
+  });
+
+  return {
+    ok: true,
+    jobId: job.id,
+    companyName: company.name,
+    aiEnabled: automation.aiEnabled,
+    matchCount: automation.matchCount,
+  };
 }
