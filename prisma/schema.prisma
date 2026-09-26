@@ -308,6 +308,12 @@ model EnterpriseSourcedOffer {
   analysis Json?
   matching Json?
   analyzedAt DateTime?
+  outreachRecipient String?
+  outreachSubject String?
+  outreachBody String?
+  outreachStatus String @default("NOT_PREPARED")
+  outreachSentAt DateTime?
+  outreachMessageId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)

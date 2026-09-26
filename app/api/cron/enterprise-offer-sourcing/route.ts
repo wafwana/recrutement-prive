@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { configuredSources, fetchGlobalJobs } from "@/lib/sourcing/global";
 import { analyzeExternalOffer } from "@/lib/sourcing/offer-analyzer";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
+import { extractOfferContactEmail, generateExternalOfferOutreach, sendExternalOfferOutreach } from "@/lib/sourcing/outreach";
 
 const normalize = (value: string) =>
   value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -152,6 +153,21 @@ export async function GET(request: Request) {
                 confidence: categoryCode ? 0.5 : 0,
               };
 
+          const outreach = inScope
+            ? await generateExternalOfferOutreach({
+                companyName: item.companyName,
+                title: safeAnalysis.title,
+                country: item.country,
+                city: item.city,
+                skills: safeAnalysis.skills,
+                experienceYears: safeAnalysis.experienceYears,
+                language: safeAnalysis.language,
+                summary: safeAnalysis.summary,
+                recipientEmail: extractOfferContactEmail(externalJob.rawData),
+                sourceUrl: item.sourceUrl,
+              })
+            : null;
+
           const activeCandidates = candidates;
           const candidateMatches = inScope
             ? activeCandidates
@@ -210,6 +226,10 @@ export async function GET(request: Request) {
               analysis: safeAnalysis,
               matching: candidateMatches,
               analyzedAt: new Date(),
+              outreachRecipient: outreach?.recipientEmail ?? null,
+              outreachSubject: outreach?.subject ?? null,
+              outreachBody: outreach?.text ?? null,
+              outreachStatus: outreach ? (outreach.recipientEmail ? "READY" : "NO_EMAIL") : "NOT_PREPARED",
             },
             update: {
               selectedCountry: item.country,
@@ -217,8 +237,33 @@ export async function GET(request: Request) {
               analysis: safeAnalysis,
               matching: candidateMatches,
               analyzedAt: new Date(),
+              outreachRecipient: outreach?.recipientEmail ?? null,
+              outreachSubject: outreach?.subject ?? null,
+              outreachBody: outreach?.text ?? null,
+              outreachStatus: outreach ? (outreach.recipientEmail ? "READY" : "NO_EMAIL") : "NOT_PREPARED",
             },
           });
+
+          if (
+            outreach?.recipientEmail &&
+            process.env.RP_AUTO_OUTREACH_ENABLED === "true"
+          ) {
+            const existingOutreach = await prisma.enterpriseSourcedOffer.findUnique({
+              where: { companyId_externalJobId: { companyId: company.companyId, externalJobId: externalJob.id } },
+              select: { outreachSentAt: true },
+            });
+            if (!existingOutreach?.outreachSentAt) {
+              const delivery = await sendExternalOfferOutreach(outreach);
+              await prisma.enterpriseSourcedOffer.update({
+                where: { companyId_externalJobId: { companyId: company.companyId, externalJobId: externalJob.id } },
+                data: {
+                  outreachStatus: delivery.ok ? "SENT" : "FAILED",
+                  outreachSentAt: delivery.ok ? new Date() : null,
+                  outreachMessageId: delivery.id ?? null,
+                },
+              });
+            }
+          }
         }
       } catch (error) {
         errors.push({
