@@ -15,7 +15,7 @@ const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([".pdf", ".doc", ".docx"]);
 
 const jobSchema = z.object({ companyId: z.string().optional(), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), missionType: z.string().trim().max(100).optional(), requiredSkills: z.string().trim().max(1500).optional(), requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]).default("DRAFT") });
 const updateJobSchema = z.object({ companyId: z.string().optional(), jobId: z.string().min(1), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), missionType: z.string().trim().max(100).optional(), requiredSkills: z.string().trim().max(1500).optional(), requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]) });
-const companyProfileSchema = z.object({ companyId: z.string().optional(), name: z.string().trim().min(2).max(180).optional(), description: z.string().trim().max(2000).optional(), website: z.string().trim().url().or(z.literal("")).optional(), country: z.string().trim().min(2).max(120).optional(), phonePrefix: z.string().trim().max(12).optional(), phone: z.string().trim().max(40).optional() });
+const companyProfileSchema = z.object({ companyId: z.string().optional(), name: z.string().trim().min(2).max(180).optional(), siren: z.string().regex(/^\d{9}$/).optional(), siret: z.string().regex(/^\d{14}$/).optional(), legalForm: z.string().trim().max(120).optional(), apeCode: z.string().trim().max(20).optional(), address: z.string().trim().max(300).optional(), description: z.string().trim().max(2000).optional(), website: z.string().trim().url().or(z.literal("")).optional(), country: z.string().trim().min(2).max(120).optional(), phonePrefix: z.string().trim().max(12).optional(), phone: z.string().trim().max(40).optional() });
 function text(value: FormDataEntryValue | null) { const result = String(value ?? "").trim(); return result || undefined; }
 function csv(value: string | undefined) { return value ? value.split(",").map((item) => item.trim()).filter(Boolean) : []; }
 
@@ -35,6 +35,11 @@ export async function updateCompanyProfile(formData: FormData) {
   const parsed = companyProfileSchema.safeParse({
     companyId: text(formData.get("companyId")),
     name: text(formData.get("name")),
+    siren: text(formData.get("siren")),
+    siret: text(formData.get("siret")),
+    legalForm: text(formData.get("legalForm")),
+    apeCode: text(formData.get("apeCode")),
+    address: text(formData.get("address")),
     description: text(formData.get("description")),
     website: text(formData.get("website")),
     country: text(formData.get("country")),
@@ -47,6 +52,11 @@ export async function updateCompanyProfile(formData: FormData) {
     where: { id: access.companyId },
     data: {
       ...(parsed.data.name ? { name: parsed.data.name } : {}),
+      ...(parsed.data.siren ? { siren: parsed.data.siren } : {}),
+      ...(parsed.data.siret ? { siret: parsed.data.siret } : {}),
+      ...(parsed.data.legalForm !== undefined ? { legalForm: parsed.data.legalForm || null } : {}),
+      ...(parsed.data.apeCode !== undefined ? { apeCode: parsed.data.apeCode || null } : {}),
+      ...(parsed.data.address !== undefined ? { address: parsed.data.address || null } : {}),
       ...(parsed.data.description !== undefined ? { description: parsed.data.description || null } : {}),
       ...(parsed.data.website !== undefined ? { website: parsed.data.website || null } : {}),
       ...(parsed.data.country ? { country: parsed.data.country } : {}),
