@@ -6,8 +6,8 @@ import { z } from "zod";
 
 const schema = z.object({
   name: z.string().trim().min(2).max(180),
-  siren: z.string().regex(/^\\d{9}$/).optional(),
-  siret: z.string().regex(/^\\d{14}$/).optional(),
+  siren: z.string().regex(/^\d{9}$/).optional(),
+  siret: z.string().regex(/^\d{14}$/).optional(),
   legalForm: z.string().trim().max(120).optional(),
   apeCode: z.string().trim().max(20).optional(),
   address: z.string().trim().max(300).optional(),
