@@ -4,7 +4,7 @@ import { useState } from "react";
 import { PHONE_COUNTRIES } from "@/lib/phone-countries";
 import { CompanySiretLookup, type CompanyLookupResult } from "@/app/components/CompanySiretLookup";
 
-type Action = (formData: FormData) => Promise<unknown>;
+type Action = (formData: FormData) => Promise<void>;
 
 export default function OwnerCompanyForm({ action }: { action: Action }) {
   const [siret, setSiret] = useState("");
