@@ -93,5 +93,8 @@ test("production workflow is manual, serialized and guarded", () => {
   assert.match(source, /CONFIRM_MIGRATE_PRODUCTION/);
   assert.match(source, /CONFIRM_RESOLVE_0010_APPLIED/);
   assert.match(source, /needs: precheck/);
+  assert.match(source, /permissions:\\s+contents: read/);
+  assert.match(source, /scripts\\/recover-migration-0010\\.ts/);
+  assert.doesNotMatch(source, /npx prisma migrate resolve --applied/);
   assert.doesNotMatch(source, /migrate reset|db push|resolve --rolled-back/);
 });
