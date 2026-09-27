@@ -27,15 +27,14 @@ const TAXONOMY: CvTaxonomyItem[] = [
   { code: "BUSINESS_DEV", name: "Business Development", parentCode: "COMMERCIAL" },
 ] as const;
 
-test("OpenAI CV file inputs use raw base64 while JPEG images use a data URL", () => {
+test("OpenAI CV file and JPEG inputs use MIME-qualified base64 data URLs", () => {
   const bytes = Buffer.from("synthetic CV bytes");
   const pdf = buildCvFileContent({ fileName: "cv.pdf", mimeType: "application/pdf", buffer: bytes });
   assert.deepEqual(pdf, {
     type: "input_file",
     filename: "cv.pdf",
-    file_data: bytes.toString("base64"),
+    file_data: `data:application/pdf;base64,${bytes.toString("base64")}`,
   });
-  assert.ok(pdf.type === "input_file" && !pdf.file_data.startsWith("data:"));
 
   const jpeg = buildCvFileContent({ fileName: "cv.jpg", mimeType: "image/jpeg", buffer: bytes });
   assert.deepEqual(jpeg, {
