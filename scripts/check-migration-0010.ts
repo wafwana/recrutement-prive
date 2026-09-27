@@ -1,4 +1,4 @@
-import { Client } from "pg";
+import { PrismaClient, Prisma } from "@prisma/client";
 
 export type Migration0010Expected = {
   enums: Record<string, string[]>;
@@ -106,7 +106,7 @@ function assertEqual(actual: unknown, expected: unknown, label: string): void {
   if (a !== e) throw new Error(`Migration 0010 validation failed for ${label}: expected ${e}, got ${a}`);
 }
 
-export async function validateMigration0010(client: Client): Promise<void> {
+export async function validateMigration0010(client: { query: <T>(query: TemplateStringsArray, ...values: unknown[]) => Promise<{ rows: T[] }> }): Promise<void> {
   const enumRows = await client.query<{
     typname: string;
     enumlabel: string;
@@ -246,17 +246,19 @@ export async function validateMigration0010(client: Client): Promise<void> {
 }
 
 export async function main(): Promise<void> {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is required");
-  const client = new Client({ connectionString: url });
-  await client.connect();
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
+  const prisma = new PrismaClient();
   try {
-    await client.query("BEGIN READ ONLY");
-    await validateMigration0010(client);
-    await client.query("ROLLBACK");
-    console.log("Migration 0010 schema validation: OK (read-only, no writes).");
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
+      await validateMigration0010({
+        query: async <T>(strings: TemplateStringsArray, ...values: unknown[]) =>
+          ({ rows: await tx.$queryRaw<T>(Prisma.sql(strings, ...values as any[])) }),
+      });
+    });
+    console.log("Migration 0010 schema validation: OK (read-only transaction, no writes).");
   } finally {
-    await client.end();
+    await prisma.$disconnect();
   }
 }
 
