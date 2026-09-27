@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   precheck:
-    if: ${{ github.event.inputs.confirmation == 'CONFIRM_RECONCILE_0011_0014_PRODUCTION' }}
+    if: ${{ github.ref == 'refs/heads/main' && github.event.inputs.confirmation == 'CONFIRM_RECONCILE_0011_0014_PRODUCTION' }}
     name: Read-only schema validation for 0011-0014
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -45,7 +45,7 @@ jobs:
         run: npx tsx scripts/check-migrations-0011-0014.ts
 
   reconcile:
-    if: ${{ github.event.inputs.confirmation == 'CONFIRM_RECONCILE_0011_0014_PRODUCTION' }}
+    if: ${{ github.ref == 'refs/heads/main' && github.event.inputs.confirmation == 'CONFIRM_RECONCILE_0011_0014_PRODUCTION' }}
     name: Reconcile only the four verified migration ledger rows
     needs: precheck
     runs-on: ubuntu-latest
