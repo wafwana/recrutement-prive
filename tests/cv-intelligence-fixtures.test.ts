@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import path from "node:path";
-import { analyzeCvDocument, type CvTaxonomyItem } from "../lib/cv/analyzer";
+import { analyzeCvDocument, buildCvFileContent, type CvTaxonomyItem } from "../lib/cv/analyzer";
 
 // Fixtures synthétiques : aucune donnée personnelle réelle.
 const FIXTURES = [
@@ -26,6 +26,24 @@ const TAXONOMY: CvTaxonomyItem[] = [
   { code: "VENTE_B2B", name: "Vente B2B", parentCode: "COMMERCIAL" },
   { code: "BUSINESS_DEV", name: "Business Development", parentCode: "COMMERCIAL" },
 ] as const;
+
+test("OpenAI CV file inputs use raw base64 while JPEG images use a data URL", () => {
+  const bytes = Buffer.from("synthetic CV bytes");
+  const pdf = buildCvFileContent({ fileName: "cv.pdf", mimeType: "application/pdf", buffer: bytes });
+  assert.deepEqual(pdf, {
+    type: "input_file",
+    filename: "cv.pdf",
+    file_data: bytes.toString("base64"),
+  });
+  assert.ok(pdf.type === "input_file" && !pdf.file_data.startsWith("data:"));
+
+  const jpeg = buildCvFileContent({ fileName: "cv.jpg", mimeType: "image/jpeg", buffer: bytes });
+  assert.deepEqual(jpeg, {
+    type: "input_image",
+    image_url: `data:image/jpeg;base64,${bytes.toString("base64")}`,
+    detail: "auto",
+  });
+});
 
 test("CV fixtures: contenu professionnel et secteurs attendus", async () => {
   for (const fixture of FIXTURES) {
