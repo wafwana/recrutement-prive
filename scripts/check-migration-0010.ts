@@ -145,7 +145,11 @@ export async function validateMigration0010(client: { query: <T>(query: string) 
   `);
   const enums: Record<string, string[]> = {};
   for (const row of enumRows.rows) (enums[row.typname] ??= []).push(row.enumlabel);
-  assertEqual(enums, EXPECTED.enums, "enum values");
+  assertEqual(
+    Object.fromEntries(Object.entries(enums).sort(([a], [b]) => a.localeCompare(b))),
+    Object.fromEntries(Object.entries(EXPECTED.enums).sort(([a], [b]) => a.localeCompare(b))),
+    "enum values",
+  );
 
   const jobRows = await client.query<{
     column_name: string; data_type: string; udt_name: string; is_nullable: string; column_default: string | null;
