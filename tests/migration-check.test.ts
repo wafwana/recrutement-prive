@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { classifyMigration0010Ledger, normalizeDefault } from "../scripts/check-migration-0010";
+import { assertPriorMigrationLedgerApplied, classifyMigration0010Ledger, normalizeDefault } from "../scripts/check-migration-0010";
 
 test("0010 validator is fail-closed and checks exact schema", () => {
   const source = fs.readFileSync(path.resolve("scripts/check-migration-0010.ts"), "utf8");
@@ -33,6 +33,37 @@ test("0010 ledger classification refuses ambiguous or rolled-back history", () =
       { finished_at: null, rolled_back_at: null },
     ]),
     /exactly one Prisma ledger row/,
+  );
+});
+
+test("recovery refuses to deploy while prerequisite migration ledger rows are missing or unsafe", () => {
+  const names = [
+    "0011_password_reset_token",
+    "0012_job_category",
+    "0013_connect_job_category",
+    "0014_candidate_subcategories",
+  ];
+  const applied = names.map((migration_name) => ({
+    migration_name,
+    finished_at: "2026-09-27T00:00:00Z",
+    rolled_back_at: null,
+  }));
+  assert.doesNotThrow(() => assertPriorMigrationLedgerApplied(applied));
+  assert.throws(
+    () => assertPriorMigrationLedgerApplied(applied.slice(1)),
+    /prerequisite 0011_password_reset_token must have exactly one successful/,
+  );
+  assert.throws(
+    () => assertPriorMigrationLedgerApplied(applied.map((row, i) => i === 2 ? { ...row, finished_at: null } : row)),
+    /prerequisite 0013_connect_job_category must have exactly one successful/,
+  );
+  assert.throws(
+    () => assertPriorMigrationLedgerApplied(applied.map((row, i) => i === 0 ? { ...row, rolled_back_at: "2026-09-27T00:00:00Z" } : row)),
+    /prerequisite 0011_password_reset_token must have exactly one successful/,
+  );
+  assert.throws(
+    () => assertPriorMigrationLedgerApplied([...applied, applied[0]]),
+    /prerequisite 0011_password_reset_token must have exactly one successful/,
   );
 });
 
