@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { assertPriorMigrationLedgerApplied, classifyMigration0010Ledger, migration0010RecoveryAction, normalizeDefault } from "../scripts/check-migration-0010";\nimport { classifyPriorMigrationLedger, MIGRATIONS_0011_0014 } from "../scripts/check-migrations-0011-0014";
+import { assertPriorMigrationLedgerApplied, classifyMigration0010Ledger, migration0010RecoveryAction, normalizeDefault } from "../scripts/check-migration-0010";
+import { classifyPriorMigrationLedger, MIGRATIONS_0011_0014 } from "../scripts/check-migrations-0011-0014";
 
 test("0010 validator is fail-closed and checks exact schema", () => {
   const source = fs.readFileSync(path.resolve("scripts/check-migration-0010.ts"), "utf8");
