@@ -1,0 +1,78 @@
+name: Reconcile Prisma migration history 0011-0014 (Production - Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type exactly CONFIRM_RECONCILE_0011_0014_PRODUCTION to reconcile only these migration ledger rows'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-prisma-recovery
+  cancel-in-progress: false
+
+jobs:
+  precheck:
+    if: ${{ github.event.inputs.confirmation == 'CONFIRM_RECONCILE_0011_0014_PRODUCTION' }}
+    name: Read-only schema validation for 0011-0014
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Require production secret without exposing it
+        env:
+          DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${DATABASE_URL_PRODUCTION:-}" ]]; then
+            echo "::error::DATABASE_URL_PRODUCTION is missing or empty."
+            exit 1
+          fi
+          echo "DATABASE_URL_PRODUCTION is present. Its value is not displayed."
+      - name: Validate exact 0011-0014 schema (read-only)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx tsx scripts/check-migrations-0011-0014.ts
+
+  reconcile:
+    if: ${{ github.event.inputs.confirmation == 'CONFIRM_RECONCILE_0011_0014_PRODUCTION' }}
+    name: Reconcile only the four verified migration ledger rows
+    needs: precheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Verify explicit reconciliation confirmation
+        env:
+          CONFIRMATION: ${{ github.event.inputs.confirmation }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIRMATION" != "CONFIRM_RECONCILE_0011_0014_PRODUCTION" ]]; then
+            echo "::error::Confirmation mismatch. No database command was run."
+            exit 1
+          fi
+          echo "Explicit migration-history reconciliation confirmation accepted."
+      - name: Revalidate exact schema immediately before reconciliation
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx tsx scripts/check-migrations-0011-0014.ts
+      - name: Mark only verified existing migrations as applied
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx tsx scripts/reconcile-migrations-0011-0014.ts
