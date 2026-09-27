@@ -118,6 +118,10 @@ export function classifyMigration0010Ledger(rows: Array<{ finished_at: string | 
   return row.finished_at === null ? "FAILED" : "APPLIED";
 }
 
+export function migration0010RecoveryAction(state: MigrationLedgerState): "RESOLVE" | "SKIP" {
+  return state === "FAILED" ? "RESOLVE" : "SKIP";
+}
+
 const REQUIRED_PRIOR_MIGRATIONS = [
   "0011_password_reset_token",
   "0012_job_category",
