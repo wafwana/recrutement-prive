@@ -37,7 +37,7 @@ test("governance: ADMIN management route refuses OWNER targets and only creates 
   const source = read("app/api/owner/admins/route.ts");
   assert.match(source, /z\.enum\(\[["']ADMIN["'],\s*["']CONSULTANT["']\]\)/);
   assert.match(source, /targetUser\.role === ["']OWNER["']/);
-  assert.match(source, /L['"]Owner suprême ne peut pas être modifié/);
+  assert.match(source, /Owner suprême ne peut pas être modifié/);
 });
 
 test("governance: granular permissions are OWNER-controlled and ADMINs do not inherit them", () => {
