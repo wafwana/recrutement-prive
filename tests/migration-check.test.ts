@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { assertPriorMigrationLedgerApplied, classifyMigration0010Ledger, normalizeDefault } from "../scripts/check-migration-0010";
+import { assertPriorMigrationLedgerApplied, classifyMigration0010Ledger, migration0010RecoveryAction, normalizeDefault } from "../scripts/check-migration-0010";
 
 test("0010 validator is fail-closed and checks exact schema", () => {
   const source = fs.readFileSync(path.resolve("scripts/check-migration-0010.ts"), "utf8");
@@ -17,6 +17,16 @@ test("0010 validator is fail-closed and checks exact schema", () => {
   assert.match(source, /LEFT JOIN pg_constraint/);
   assert.match(source, /Object\.keys\(foreignKeys\)\.sort\(\), Object\.keys\(EXPECTED\.foreignKeys\)\.sort\(\)/);
   assert.match(source, /Object\.keys\(indexes\)\.sort\(\), Object\.keys\(EXPECTED\.indexes\)\.sort\(\)/);
+});
+
+test("0010 recovery is state-aware and only resolves a failed migration", () => {
+  assert.equal(migration0010RecoveryAction("FAILED"), "RESOLVE");
+  assert.equal(migration0010RecoveryAction("APPLIED"), "SKIP");
+  const recovery = fs.readFileSync(path.resolve("scripts/recover-migration-0010.ts"), "utf8");
+  assert.match(recovery, /\["prisma", "migrate", "resolve", "--applied", MIGRATION\]/);
+  assert.match(recovery, /const MIGRATION = "0010_mission_presentation_lock"/);
+  assert.match(recovery, /validateMigration0010/);
+  assert.doesNotMatch(recovery, /migrate reset|db push|resolve --rolled-back/);
 });
 
 test("0010 ledger classification refuses ambiguous or rolled-back history", () => {
