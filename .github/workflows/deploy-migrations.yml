@@ -12,6 +12,9 @@ on:
         required: true
         default: 'NO'
 
+permissions:
+  contents: read
+
 concurrency:
   group: production-prisma-recovery
   cancel-in-progress: false
@@ -53,11 +56,11 @@ jobs:
       - name: Require explicit resolve authorization
         if: ${{ github.event.inputs.resolve_0010 == 'CONFIRM_RESOLVE_0010_APPLIED' }}
         run: echo "Explicit 0010 resolve authorization accepted."
-      - name: Resolve 0010 only after independent precheck
+      - name: Resolve only 0010 after independent precheck (idempotent)
         if: ${{ github.event.inputs.resolve_0010 == 'CONFIRM_RESOLVE_0010_APPLIED' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
-        run: npx prisma migrate resolve --applied 0010_mission_presentation_lock
+        run: npx tsx scripts/recover-migration-0010.ts
       - name: Deploy remaining migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
