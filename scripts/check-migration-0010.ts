@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
+export type MigrationLedgerState = "FAILED" | "APPLIED";
+
 export type Migration0010Expected = {
   enums: Record<string, string[]>;
   jobColumns: Record<string, { dataType: string; udtName: string; isNullable: string; columnDefault: string | null }>;
@@ -100,6 +102,17 @@ const EXPECTED: Migration0010Expected = {
 
 export const normalizeDefault = (v: string | null) => (v ?? "").replace(/\s+/g, " ").trim();
 
+export function classifyMigration0010Ledger(rows: Array<{ finished_at: string | null; rolled_back_at: string | null }>): MigrationLedgerState {
+  if (rows.length !== 1) {
+    throw new Error(`Migration 0010 validation failed: expected exactly one Prisma ledger row, found ${rows.length}`);
+  }
+  const row = rows[0];
+  if (row.rolled_back_at !== null) {
+    throw new Error("Migration 0010 validation failed: ledger row is marked rolled back; refusing automatic recovery.");
+  }
+  return row.finished_at === null ? "FAILED" : "APPLIED";
+}
+
 function assertEqual(actual: unknown, expected: unknown, label: string): void {
   const a = JSON.stringify(actual);
   const e = JSON.stringify(expected);
@@ -116,18 +129,8 @@ export async function validateMigration0010(client: { query: <T>(query: string) 
     FROM "_prisma_migrations"
     WHERE migration_name = '0010_mission_presentation_lock'
   `);
-  if (migrationRows.rows.length !== 1) {
-    throw new Error(`Migration 0010 validation failed: expected exactly one Prisma ledger row, found ${migrationRows.rows.length}`);
-  }
-  const ledger = migrationRows.rows[0];
-  if (ledger.rolled_back_at !== null) {
-    throw new Error("Migration 0010 validation failed: ledger row is marked rolled back; refusing automatic recovery.");
-  }
-  if (ledger.finished_at !== null) {
-    console.log("Migration 0010 ledger status: APPLIED");
-  } else {
-    console.log("Migration 0010 ledger status: FAILED/PENDING; schema validation is required before any resolve.");
-  }
+  const ledgerState = classifyMigration0010Ledger(migrationRows.rows);
+  console.log(`Migration 0010 ledger status: ${ledgerState}`);
 
   const enumRows = await client.query<{
     typname: string;
