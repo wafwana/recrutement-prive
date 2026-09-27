@@ -1,6 +1,6 @@
 # Migrations Prisma — production Neon
 
-Le build Vercel ne lance pas de migration de production. Les migrations production sont exécutées uniquement par un workflow GitHub Actions manuel dédié.
+Le build Vercel ne lance pas de migration de production. Les migrations production sont exécutées uniquement par des workflows GitHub Actions manuels, limités à la branche `main`, avec confirmations exactes et concurrence sérialisée.
 
 ## Récupération P3009 — 0010_mission_presentation_lock
 
