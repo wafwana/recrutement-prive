@@ -115,6 +115,7 @@ test("0011-0014 reconciliation is manual, schema-validated, allowlisted, and led
   assert.match(workflow, /workflow_dispatch/);
   assert.match(workflow, /CONFIRM_RECONCILE_0011_0014_PRODUCTION/);
   assert.match(workflow, /concurrency:/);
+  assert.ok(workflow.includes("github.ref == 'refs/heads/main'"));
   assert.ok(validator.includes("SET TRANSACTION READ ONLY"));
   assert.match(validator, /PasswordResetToken_tokenHash_key/);
   assert.match(validator, /JobCategory_parentId_fkey/);
@@ -139,6 +140,7 @@ test("production workflow is manual, serialized and guarded", () => {
   assert.match(source, /CONFIRM_MIGRATE_PRODUCTION/);
   assert.match(source, /CONFIRM_RESOLVE_0010_APPLIED/);
   assert.match(source, /needs: precheck/);
+  assert.ok(source.includes("github.ref == 'refs/heads/main'"));
   assert.ok(source.includes("permissions:"));
   assert.ok(source.includes("contents: read"));
   assert.ok(source.includes("scripts/recover-migration-0010.ts"));
