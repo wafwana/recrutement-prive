@@ -12,9 +12,10 @@ Ne pas lancer automatiquement cette procédure après fusion. La sauvegarde Neon
 
 1. Déclencher manuellement **Verify & Recover Prisma Production Migrations**.
 2. Choisir `CONFIRM_MIGRATE_PRODUCTION`.
-3. La première étape exécute uniquement le validateur read-only.
-4. Si et seulement si cette étape est verte, une résolution `0010` peut être autorisée avec `CONFIRM_RESOLVE_0010_APPLIED`.
-5. Le workflow exécute ensuite `prisma migrate deploy`, puis `prisma migrate status`.
+3. La première étape exécute le validateur read-only du schéma 0010 et exige que les migrations préalables 0011 à 0014 soient déjà enregistrées comme appliquées, sans état ambigu.
+4. Si les migrations 0011 à 0014 sont absentes de `_prisma_migrations`, le workflow s'arrête avant toute écriture. Leur schéma doit être vérifié séparément et leur historique réconcilié par une procédure distincte explicitement autorisée. Ne pas laisser `migrate deploy` les rejouer, car elles peuvent recréer des tables ou colonnes déjà présentes.
+5. Après précontrôle vert et confirmation `CONFIRM_RESOLVE_0010_APPLIED`, le workflow utilise `scripts/recover-migration-0010.ts` : il revalide les préconditions, résout uniquement 0010 si elle est en échec et saute la résolution si elle est déjà appliquée.
+6. Le workflow exécute ensuite `prisma migrate deploy`, puis `prisma migrate status`.
 6. Après succès, effectuer la recette réelle de connexion OWNER sur production et vérifier `/espace/owner`.
 
 ## Retour arrière
