@@ -227,8 +227,10 @@ export async function validateMigration0010(client: { query: <T>(query: string) 
     JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = ord.attnum
     WHERE ns.nspname = 'public'
       AND tbl.relname = 'MissionPresentation'
-      AND NOT EXISTS (
-        SELECT 1 FROM pg_constraint c WHERE c.conindid = i.indexrelid
+      AND (
+        idx.relname IN ('MissionPresentation_applicationId_companyId_key',
+                        'MissionPresentation_missionId_companyId_state_idx',
+                        'MissionPresentation_candidateId_companyId_idx')
       )
     GROUP BY idx.relname, i.indisunique
     ORDER BY idx.relname
