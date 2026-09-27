@@ -1,0 +1,81 @@
+name: Recover Prisma 0010 P3009 (Production - Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type exactly CONFIRM_RESOLVE_0010_PRODUCTION to continue'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prisma-0010-production-recovery
+  cancel-in-progress: false
+
+jobs:
+  recover-0010:
+    name: Resolve only migration 0010 as applied
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify explicit confirmation
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIRMATION" != "CONFIRM_RESOLVE_0010_PRODUCTION" ]]; then
+            echo "::error::Confirmation mismatch. No database command was run."
+            exit 1
+          fi
+          echo "Explicit confirmation accepted."
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify production secret is present
+        env:
+          DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${DATABASE_URL_PRODUCTION:-}" ]]; then
+            echo "::error::DATABASE_URL_PRODUCTION is missing or empty. No database command was run."
+            exit 1
+          fi
+          echo "DATABASE_URL_PRODUCTION is present. Its value is not displayed."
+
+      - name: Show Prisma migration status before recovery
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx prisma migrate status
+
+      - name: Resolve only migration 0010 as applied
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          MIGRATION="0010_mission_presentation_lock"
+          if [[ "$MIGRATION" != "0010_mission_presentation_lock" ]]; then
+            echo "::error::Blocked: recovery target is not the approved migration."
+            exit 1
+          fi
+          npx prisma migrate resolve --applied 0010_mission_presentation_lock
+
+      - name: Show Prisma migration status after recovery
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx prisma migrate status
