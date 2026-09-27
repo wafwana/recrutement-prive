@@ -81,6 +81,31 @@ const schema = {
   ],
 } as const;
 
+export type CvFileContent =
+  | { type: "input_image"; image_url: string; detail: "auto" }
+  | { type: "input_file"; filename: string; file_data: string };
+
+/** Build Responses API content with MIME-qualified base64 data URLs for file and image inputs. */
+export function buildCvFileContent(input: {
+  fileName: string;
+  mimeType: string;
+  buffer: Buffer;
+}): CvFileContent {
+  const encodedFile = input.buffer.toString("base64");
+  if (input.mimeType === "image/jpeg") {
+    return {
+      type: "input_image",
+      image_url: `data:image/jpeg;base64,${encodedFile}`,
+      detail: "auto",
+    };
+  }
+  return {
+    type: "input_file",
+    filename: input.fileName,
+    file_data: `data:${input.mimeType};base64,${encodedFile}`,
+  };
+}
+
 export async function analyzeCvDocument(input: {
   fileName: string;
   mimeType: string;
@@ -94,19 +119,7 @@ export async function analyzeCvDocument(input: {
     .map((item) => `${item.code} — ${item.name}${item.parentCode ? ` (parent: ${item.parentCode})` : ""}`)
     .join("\n");
 
-  const encodedFile = input.buffer.toString("base64");
-  const fileContent =
-    input.mimeType === "image/jpeg"
-      ? {
-          type: "input_image" as const,
-          image_url: `data:image/jpeg;base64,${encodedFile}`,
-          detail: "auto" as const,
-        }
-      : {
-          type: "input_file" as const,
-          filename: input.fileName,
-          file_data: `data:${input.mimeType};base64,${encodedFile}`,
-        };
+  const fileContent = buildCvFileContent(input);
 
   const response = await client.responses.create({
     model: process.env.OPENAI_CV_MODEL || "gpt-4.1-mini",

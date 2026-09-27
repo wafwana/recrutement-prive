@@ -1,60 +1,75 @@
-name: Deploy Production Database Migrations
+name: Verify & Recover Prisma Production Migrations
 
 on:
   workflow_dispatch:
     inputs:
       confirm_production:
-        description: 'Type "CONFIRM_MIGRATE_PRODUCTION" to execute migrations on Neon Production'
+        description: 'Type "CONFIRM_MIGRATE_PRODUCTION" only for an explicitly authorized production recovery'
         required: true
         default: ''
+      resolve_0010:
+        description: 'Type "CONFIRM_RESOLVE_0010_APPLIED" only after the read-only validator has passed'
+        required: true
+        default: 'NO'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-prisma-recovery
+  cancel-in-progress: false
 
 jobs:
-  migrate-production:
-    name: Execute Prisma Migrations on Neon Production
+  precheck:
+    if: ${{ github.ref == 'refs/heads/main' && github.event.inputs.confirm_production == 'CONFIRM_MIGRATE_PRODUCTION' && github.event.inputs.resolve_0010 == 'CONFIRM_RESOLVE_0010_APPLIED' }}
+    name: Read-only 0010 schema precheck
     runs-on: ubuntu-latest
-
     steps:
-      - name: Verify Production Confirmation
-        run: |
-          if [ "${{ github.event.inputs.confirm_production }}" != "CONFIRM_MIGRATE_PRODUCTION" ]; then
-            echo "Error: You must type 'CONFIRM_MIGRATE_PRODUCTION' to trigger this workflow."
-            exit 1
-          fi
-          echo "Production migration confirmation verified."
-
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
-
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Verify DATABASE_URL_PRODUCTION Secret Presence
+      - run: npm ci
+      - name: Require production secret without exposing it
         env:
           DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
         run: |
-          if [ -z "$DATABASE_URL_PRODUCTION" ]; then
-            echo "Error: DATABASE_URL_PRODUCTION secret is missing or empty in GitHub Repository Secrets."
-            echo "Please set DATABASE_URL_PRODUCTION in Settings > Secrets and variables > Actions."
-            exit 1
-          fi
-          echo "DATABASE_URL_PRODUCTION secret is present and verified."
-
-      - name: Run Prisma Migrate Deploy
+          test -n "$DATABASE_URL_PRODUCTION" || { echo "DATABASE_URL_PRODUCTION is missing"; exit 1; }
+      - name: Validate migration 0010 schema (read-only)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
-        run: |
-          echo "Running 'npx prisma migrate deploy' on Neon Production..."
-          npx prisma migrate deploy
+        run: npx tsx scripts/check-migration-0010.ts
 
-      - name: Verify Prisma Migration Status
+  recovery:
+    name: Controlled Prisma recovery
+    needs: precheck
+    if: ${{ github.ref == 'refs/heads/main' && github.event.inputs.confirm_production == 'CONFIRM_MIGRATE_PRODUCTION' && github.event.inputs.resolve_0010 == 'CONFIRM_RESOLVE_0010_APPLIED' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - name: Require explicit resolve authorization
+        if: ${{ github.event.inputs.resolve_0010 == 'CONFIRM_RESOLVE_0010_APPLIED' }}
+        run: echo "Explicit 0010 resolve authorization accepted."
+      - name: Resolve only 0010 after independent precheck (idempotent)
+        if: ${{ github.event.inputs.resolve_0010 == 'CONFIRM_RESOLVE_0010_APPLIED' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
-        run: |
-          echo "Checking migration status on Neon Production..."
-          npx prisma migrate status
+        run: npx tsx scripts/recover-migration-0010.ts
+      - name: Deploy remaining migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx prisma migrate deploy
+      - name: Final migration status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx prisma migrate status
+      - name: Schema validator after deploy (read-only)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx tsx scripts/check-migration-0010.ts

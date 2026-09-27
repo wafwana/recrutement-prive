@@ -32,3 +32,19 @@ test("OWNER access gate: critical OWNER routes remain server-protected", () => {
   const files = fs.readdirSync(ownerDir, { recursive: true }).map(String);
   assert.ok(files.some((file) => file.endsWith("page.tsx")));
 });
+
+test("governance: ADMIN management route refuses OWNER targets and only creates ADMIN/CONSULTANT", () => {
+  const source = read("app/api/owner/admins/route.ts");
+  assert.match(source, /z\.enum\(\[["']ADMIN["'],\s*["']CONSULTANT["']\]\)/);
+  assert.match(source, /targetUser\.role === ["']OWNER["']/);
+  assert.match(source, /Owner suprême ne peut pas être modifié/);
+});
+
+test("governance: granular permissions are OWNER-controlled and ADMINs do not inherit them", () => {
+  const permissions = read("lib/auth/permissions.ts");
+  assert.match(permissions, /if \(role === ["']OWNER["']\) return true/);
+  assert.match(permissions, /if \(permissions === null\) return false/);
+  const route = read("app/api/owner/permissions/route.ts");
+  assert.match(route, /session\.user\.role === ["']OWNER["']/);
+  assert.match(route, /\["ADMIN", "CONSULTANT"\]/);
+});
