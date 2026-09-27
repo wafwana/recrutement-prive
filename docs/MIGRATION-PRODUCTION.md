@@ -23,6 +23,16 @@ Le précontrôle vérifie exactement :
 
 Une divergence, une absence ou une ambiguïté provoque un échec sans modification automatique du schéma.
 
+Le précontrôle exige également que les migrations préalables
+`0011_password_reset_token`, `0012_job_category`,
+`0013_connect_job_category` et `0014_candidate_subcategories`
+possèdent chacune une unique ligne réussie et non annulée dans
+`_prisma_migrations`. Si leur historique est absent ou ambigu, le workflow
+s'arrête avant toute résolution ou déploiement. Il faut alors contrôler
+séparément leur schéma réel et réconcilier leur historique par une procédure
+explicitement autorisée ; ne pas laisser `migrate deploy` les rejouer à
+l'aveugle, car certaines créent des tables ou colonnes déjà existantes.
+
 Seulement après succès du précontrôle, le workflow peut exécuter :
 1. `npx prisma migrate resolve --applied 0010_mission_presentation_lock`
 2. `npx prisma migrate deploy`
