@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 export type Migration0010Expected = {
   enums: Record<string, string[]>;
@@ -98,7 +98,7 @@ const EXPECTED: Migration0010Expected = {
   },
 };
 
-const normalizeDefault = (v: string | null) => (v ?? "").replace(/\s+/g, " ").trim();
+export const normalizeDefault = (v: string | null) => (v ?? "").replace(/\s+/g, " ").trim();
 
 function assertEqual(actual: unknown, expected: unknown, label: string): void {
   const a = JSON.stringify(actual);
