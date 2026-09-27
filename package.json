@@ -20,7 +20,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "test:global-sourcing": "node --import tsx --test tests/global-sourcing.test.ts",
     "test:cv-intelligence": "node --import tsx --test tests/cv-intelligence-fixtures.test.ts",
-    "test:owner-compatibility": "node --import tsx --test tests/owner-compatibility.test.ts"
+    "test:owner-compatibility": "node --import tsx --test tests/owner-compatibility.test.ts",
+    "test:migration-check": "node --import tsx --test tests/migration-check.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
