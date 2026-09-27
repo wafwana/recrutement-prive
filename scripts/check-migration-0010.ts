@@ -225,12 +225,13 @@ export async function validateMigration0010(client: { query: <T>(query: string) 
     JOIN pg_class idx ON idx.oid = i.indexrelid
     CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS ord(attnum, ordinality)
     JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = ord.attnum
+    LEFT JOIN pg_constraint c ON c.conindid = i.indexrelid
     WHERE ns.nspname = 'public'
       AND tbl.relname = 'MissionPresentation'
-      AND (
-        idx.relname IN ('MissionPresentation_applicationId_companyId_key',
-                        'MissionPresentation_missionId_companyId_state_idx',
-                        'MissionPresentation_candidateId_companyId_idx')
+      AND idx.relname IN (
+        'MissionPresentation_applicationId_companyId_key',
+        'MissionPresentation_missionId_companyId_state_idx',
+        'MissionPresentation_candidateId_companyId_idx'
       )
     GROUP BY idx.relname, i.indisunique
     ORDER BY idx.relname
