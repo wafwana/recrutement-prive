@@ -186,24 +186,34 @@ export async function validateMigration0010(client: { query: <T>(query: Template
   `);
   assertEqual(pkRows.rows.map(r => r.column_name), EXPECTED.primaryKey, "primary key");
 
-  const indexRows = await client.query<{ indexname: string; indexdef: string }>(`
-    SELECT indexname, indexdef
-    FROM pg_indexes
-    WHERE schemaname='public' AND tablename='MissionPresentation'
-    ORDER BY indexname
+  const indexRows = await client.query<{ indexname: string; is_unique: boolean; columns: string[] }>(`
+    SELECT idx.relname AS indexname,
+           i.indisunique AS is_unique,
+           ARRAY_AGG(att.attname ORDER BY ord.ordinality) AS columns
+    FROM pg_class tbl
+    JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+    JOIN pg_index i ON i.indrelid = tbl.oid
+    JOIN pg_class idx ON idx.oid = i.indexrelid
+    CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS ord(attnum, ordinality)
+    JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = ord.attnum
+    WHERE ns.nspname = 'public'
+      AND tbl.relname = 'MissionPresentation'
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_constraint c WHERE c.conindid = i.indexrelid
+      )
+    GROUP BY idx.relname, i.indisunique
+    ORDER BY idx.relname
   `);
   const indexes: Record<string, { unique: boolean; columns: string[] }> = {};
   for (const row of indexRows.rows) {
-    const match = row.indexdef.match(/CREATE (UNIQUE )?INDEX\s+[^ ]+\s+ON\s+[^ ]+\.?"?MissionPresentation"?\s*\((.*)\)/i);
-    if (!match) continue;
-    const cols = match[2].split(",").map(c => c.trim().replace(/"/g, ""));
-    indexes[row.indexname] = { unique: Boolean(match[1]), columns: cols };
+    indexes[row.indexname] = { unique: row.is_unique, columns: row.columns };
   }
   for (const [name, expected] of Object.entries(EXPECTED.indexes)) {
     if (!indexes[name]) throw new Error(`Migration 0010 validation failed: missing index ${name}`);
     assertEqual(indexes[name], expected, `index ${name}`);
   }
-  assertEqual(Object.keys(indexes).sort(), Object.keys(EXPECTED.indexes).sort(), "MissionPresentation index set");
+  assertEqual(Object.keys(indexes).sort(), Object.keys(EXPECTED.indexes).sort(), "MissionPresentation migration-defined index set");
+
 
   const fkRows = await client.query<{
     constraint_name: string;
