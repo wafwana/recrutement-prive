@@ -114,7 +114,7 @@ test("0011-0014 reconciliation is manual, schema-validated, allowlisted, and led
   assert.match(workflow, /workflow_dispatch/);
   assert.match(workflow, /CONFIRM_RECONCILE_0011_0014_PRODUCTION/);
   assert.match(workflow, /concurrency:/);
-  assert.ok(validator.includes("SET TRANSACTION READ ONLY") === false); // The CLI wraps validation in a read-only transaction.
+  assert.ok(validator.includes("SET TRANSACTION READ ONLY"));
   assert.match(validator, /PasswordResetToken_tokenHash_key/);
   assert.match(validator, /JobCategory_parentId_fkey/);
   assert.match(reconcile, /MIGRATIONS_0011_0014/);
