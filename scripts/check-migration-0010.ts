@@ -118,6 +118,31 @@ export function classifyMigration0010Ledger(rows: Array<{ finished_at: string | 
   return row.finished_at === null ? "FAILED" : "APPLIED";
 }
 
+const REQUIRED_PRIOR_MIGRATIONS = [
+  "0011_password_reset_token",
+  "0012_job_category",
+  "0013_connect_job_category",
+  "0014_candidate_subcategories",
+] as const;
+
+export function assertPriorMigrationLedgerApplied(
+  rows: Array<{ migration_name: string; finished_at: string | null; rolled_back_at: string | null }>,
+): void {
+  const byName = new Map<string, typeof rows>();
+  for (const row of rows) byName.set(row.migration_name, [...(byName.get(row.migration_name) ?? []), row]);
+  for (const migrationName of REQUIRED_PRIOR_MIGRATIONS) {
+    const matches = byName.get(migrationName) ?? [];
+    if (matches.length !== 1 || matches[0].finished_at === null || matches[0].rolled_back_at !== null) {
+      throw new Error(
+        `Migration recovery blocked: prerequisite ${migrationName} must have exactly one successful, non-rolled-back ledger row; reconcile its history separately before resolving 0010 or deploying later migrations.`,
+      );
+    }
+  }
+  if (rows.length !== REQUIRED_PRIOR_MIGRATIONS.length) {
+    throw new Error("Migration recovery blocked: unexpected or duplicate prerequisite migration ledger rows.");
+  }
+}
+
 function assertEqual(actual: unknown, expected: unknown, label: string): void {
   const a = JSON.stringify(actual);
   const e = JSON.stringify(expected);
@@ -136,6 +161,22 @@ export async function validateMigration0010(client: { query: <T>(query: string) 
   `);
   const ledgerState = classifyMigration0010Ledger(migrationRows.rows);
   console.log(`Migration 0010 ledger status: ${ledgerState}`);
+
+  const priorMigrationRows = await client.query<{
+    migration_name: string;
+    finished_at: string | null;
+    rolled_back_at: string | null;
+  }>(`
+    SELECT migration_name, finished_at, rolled_back_at
+    FROM "_prisma_migrations"
+    WHERE migration_name IN (
+      '0011_password_reset_token',
+      '0012_job_category',
+      '0013_connect_job_category',
+      '0014_candidate_subcategories'
+    )
+  `);
+  assertPriorMigrationLedgerApplied(priorMigrationRows.rows);
 
   const enumRows = await client.query<{
     typname: string;
