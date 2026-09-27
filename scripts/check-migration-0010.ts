@@ -107,6 +107,28 @@ function assertEqual(actual: unknown, expected: unknown, label: string): void {
 }
 
 export async function validateMigration0010(client: { query: <T>(query: string) => Promise<{ rows: T[] }> }): Promise<void> {
+  const migrationRows = await client.query<{
+    migration_name: string;
+    finished_at: string | null;
+    rolled_back_at: string | null;
+  }>(`
+    SELECT migration_name, finished_at, rolled_back_at
+    FROM "_prisma_migrations"
+    WHERE migration_name = '0010_mission_presentation_lock'
+  `);
+  if (migrationRows.rows.length !== 1) {
+    throw new Error(`Migration 0010 validation failed: expected exactly one Prisma ledger row, found ${migrationRows.rows.length}`);
+  }
+  const ledger = migrationRows.rows[0];
+  if (ledger.rolled_back_at !== null) {
+    throw new Error("Migration 0010 validation failed: ledger row is marked rolled back; refusing automatic recovery.");
+  }
+  if (ledger.finished_at !== null) {
+    console.log("Migration 0010 ledger status: APPLIED");
+  } else {
+    console.log("Migration 0010 ledger status: FAILED/PENDING; schema validation is required before any resolve.");
+  }
+
   const enumRows = await client.query<{
     typname: string;
     enumlabel: string;
