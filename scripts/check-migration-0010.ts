@@ -100,7 +100,12 @@ const EXPECTED: Migration0010Expected = {
   },
 };
 
-export const normalizeDefault = (v: string | null) => (v ?? "").replace(/\s+/g, " ").trim();
+// PostgreSQL may render mixed-case enum casts with quoted identifiers in information_schema defaults.
+export const normalizeDefault = (v: string | null) =>
+  (v ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/::"([A-Za-z_][A-Za-z0-9_]*)"/g, "::$1");
 
 export function classifyMigration0010Ledger(rows: Array<{ finished_at: string | null; rolled_back_at: string | null }>): MigrationLedgerState {
   if (rows.length !== 1) {
