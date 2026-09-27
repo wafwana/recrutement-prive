@@ -28,12 +28,20 @@ Le précontrôle exige également que les migrations préalables
 `0013_connect_job_category` et `0014_candidate_subcategories`
 possèdent chacune une unique ligne réussie et non annulée dans
 `_prisma_migrations`. Si leur historique est absent ou ambigu, le workflow
-s'arrête avant toute résolution ou déploiement. Il faut alors contrôler
-séparément leur schéma réel et réconcilier leur historique par une procédure
-explicitement autorisée ; ne pas laisser `migrate deploy` les rejouer à
-l'aveugle, car certaines créent des tables ou colonnes déjà existantes.
+s'arrête avant toute résolution ou déploiement. Il faut alors utiliser d'abord le workflow manuel
+`Reconcile Prisma migration history 0011-0014 (Production - Manual)`, avec
+la confirmation exacte `CONFIRM_RECONCILE_0011_0014_PRODUCTION`. Il valide en
+lecture seule les colonnes, types, nullabilité, défauts, clés, index et clés
+étrangères des objets créés par ces quatre migrations. Si tout correspond, il
+marque uniquement les migrations manquantes comme appliquées dans
+`_prisma_migrations`; il ne lance aucune migration SQL et ne modifie aucune
+donnée métier. Il est idempotent et vérifie l'état final. Une divergence ou un
+état d'échec/annulation bloque l'opération.
 
-Seulement après succès du précontrôle, le workflow peut exécuter :
+Ne pas laisser `migrate deploy` rejouer ces migrations à l'aveugle, car
+certaines créent des tables ou colonnes déjà existantes. Après réussite de la
+réconciliation 0011-0014, relancer le workflow de récupération 0010 avec ses
+deux confirmations explicites.
 1. `npx tsx scripts/recover-migration-0010.ts` (vérifie à nouveau le schéma et l'historique, résout uniquement 0010 si elle est en échec, et saute la résolution si elle est déjà appliquée).
 2. `npx prisma migrate deploy`
 3. `npx prisma migrate status`
