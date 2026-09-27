@@ -40,7 +40,7 @@ jobs:
   recovery:
     name: Controlled Prisma recovery
     needs: precheck
-    if: ${{ github.event.inputs.confirm_production == 'CONFIRM_MIGRATE_PRODUCTION' }}
+    if: ${{ github.event.inputs.confirm_production == 'CONFIRM_MIGRATE_PRODUCTION' && github.event.inputs.resolve_0010 == 'CONFIRM_RESOLVE_0010_APPLIED' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
