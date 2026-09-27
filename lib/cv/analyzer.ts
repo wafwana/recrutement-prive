@@ -85,7 +85,7 @@ export type CvFileContent =
   | { type: "input_image"; image_url: string; detail: "auto" }
   | { type: "input_file"; filename: string; file_data: string };
 
-/** Build Responses API content using raw base64 for input_file and a data URL for input_image. */
+/** Build Responses API content with MIME-qualified base64 data URLs for file and image inputs. */
 export function buildCvFileContent(input: {
   fileName: string;
   mimeType: string;
@@ -102,7 +102,7 @@ export function buildCvFileContent(input: {
   return {
     type: "input_file",
     filename: input.fileName,
-    file_data: encodedFile,
+    file_data: `data:${input.mimeType};base64,${encodedFile}`,
   };
 }
 
