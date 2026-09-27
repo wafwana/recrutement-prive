@@ -36,8 +36,10 @@ test("0010 ledger classification refuses ambiguous or rolled-back history", () =
   );
 });
 
-test("validator default normalization is deterministic", () => {
+test("validator default normalization handles PostgreSQL quoted enum casts", () => {
   assert.equal(normalizeDefault("  'PENDING'::FinancialConditionStatus  "), "'PENDING'::FinancialConditionStatus");
+  assert.equal(normalizeDefault("'PENDING'::\"FinancialConditionStatus\""), "'PENDING'::FinancialConditionStatus");
+  assert.equal(normalizeDefault("'MISSION_ACTIVE'::\"MissionPresentationState\""), "'MISSION_ACTIVE'::MissionPresentationState");
   assert.equal(normalizeDefault(null), "");
 });
 
