@@ -52,6 +52,9 @@ jobs:
         run: npm run test:owner-compatibility
       - run: npx prisma generate
       - run: npx prisma migrate deploy
+      - name: Validate migration 0010 schema after local deploy
+        run: npx tsx scripts/check-migration-0010.ts
+      - run: npm run test:migration-check
       - run: npm run test:mission-lock
       - run: npm run test:candidate-auth
       - run: npm run test:candidate-flow
