@@ -43,6 +43,7 @@ jobs:
         run: |
           npx prisma migrate deploy
           npx prisma generate
+          npx tsx scripts/check-migration-0010.ts
       - name: Verify OWNER compatibility FIRST
         run: npm run test:owner-compatibility
       - name: Verify core non-regression
