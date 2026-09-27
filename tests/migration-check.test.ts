@@ -13,7 +13,7 @@ test("0010 validator is fail-closed and checks exact schema", () => {
   assert.match(source, /referential_constraints/);
   assert.match(source, /delete_rule/);
   assert.match(source, /update_rule/);
-  assert.match(source, /pg_constraint/);
+  assert.match(source, /idx\.relname IN/);
   assert.match(source, /Object\.keys\(foreignKeys\)\.sort\(\), Object\.keys\(EXPECTED\.foreignKeys\)\.sort\(\)/);
   assert.match(source, /Object\.keys\(indexes\)\.sort\(\), Object\.keys\(EXPECTED\.indexes\)\.sort\(\)/);
 });
