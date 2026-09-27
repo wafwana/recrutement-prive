@@ -160,7 +160,7 @@ export async function validateMigrations0011To0014(client: QueryClient): Promise
   );
   const primaryKeys: Record<string, string[]> = {};
   for (const row of pkRows.rows) (primaryKeys[row.table_name] ??= []).push(row.column_name);
-  assertEqual(primaryKeys, { PasswordResetToken: ["id"], JobCategory: ["id"] }, "primary keys");
+  assertEqual(primaryKeys, { JobCategory: ["id"], PasswordResetToken: ["id"] }, "primary keys");
 
   const indexRows = await client.query<{ indexname: string; is_unique: boolean; columns: string[] }>(
     "SELECT idx.relname AS indexname, i.indisunique AS is_unique, " +
