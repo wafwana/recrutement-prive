@@ -34,7 +34,7 @@ explicitement autorisée ; ne pas laisser `migrate deploy` les rejouer à
 l'aveugle, car certaines créent des tables ou colonnes déjà existantes.
 
 Seulement après succès du précontrôle, le workflow peut exécuter :
-1. `npx prisma migrate resolve --applied 0010_mission_presentation_lock`
+1. `npx tsx scripts/recover-migration-0010.ts` (vérifie à nouveau le schéma et l'historique, résout uniquement 0010 si elle est en échec, et saute la résolution si elle est déjà appliquée).
 2. `npx prisma migrate deploy`
 3. `npx prisma migrate status`
 4. une seconde validation lecture seule de 0010.
