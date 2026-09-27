@@ -13,7 +13,7 @@ export async function recoverMigration0010(): Promise<void> {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
 
   const prisma = new PrismaClient();
-  let state: MigrationLedgerState;
+  let state: MigrationLedgerState | null = null;
   try {
     await prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
@@ -37,7 +37,8 @@ export async function recoverMigration0010(): Promise<void> {
       );
     });
 
-    if (migration0010RecoveryAction(state!) === "RESOLVE") {
+    if (state === null) throw new Error("Migration 0010 ledger state was not read.");
+    if (migration0010RecoveryAction(state) === "RESOLVE") {
       // Fixed argv: no shell interpolation and no user-selectable migration target.
       execFileSync(
         "npx",
