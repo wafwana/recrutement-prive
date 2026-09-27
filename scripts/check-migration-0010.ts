@@ -106,7 +106,7 @@ function assertEqual(actual: unknown, expected: unknown, label: string): void {
   if (a !== e) throw new Error(`Migration 0010 validation failed for ${label}: expected ${e}, got ${a}`);
 }
 
-export async function validateMigration0010(client: { query: <T>(query: TemplateStringsArray, ...values: unknown[]) => Promise<{ rows: T[] }> }): Promise<void> {
+export async function validateMigration0010(client: { query: <T>(query: string) => Promise<{ rows: T[] }> }): Promise<void> {
   const enumRows = await client.query<{
     typname: string;
     enumlabel: string;
@@ -262,8 +262,7 @@ export async function main(): Promise<void> {
     await prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
       await validateMigration0010({
-        query: async <T>(strings: TemplateStringsArray, ...values: unknown[]) =>
-          ({ rows: await tx.$queryRaw<T>(Prisma.sql(strings, ...values as any[])) }),
+        query: async <T>(query: string) => ({ rows: await tx.$queryRawUnsafe<T[]>(query) }),
       });
     });
     console.log("Migration 0010 schema validation: OK (read-only transaction, no writes).");
