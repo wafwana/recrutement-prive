@@ -1,0 +1,59 @@
+name: Controlled production deploy migrations 0023-0025
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type exactly CONFIRM_APPLY_0023_0025_PRODUCTION'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-prisma-migrations
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirmation == 'CONFIRM_APPLY_0023_0025_PRODUCTION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Guard migration scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          dirs="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)"
+          if echo "$dirs" | grep -Eq '^(0026|0027|0028|0029|003[0-9])'; then
+            echo "Unexpected migration newer than approved 0025; stopping."
+            exit 1
+          fi
+          for expected in 0023_recruitment_billing 0024_company_identity_and_sourcing_provenance 0025_external_offer_outreach; do
+            test -f "prisma/migrations/$expected/migration.sql" || { echo "Missing $expected"; exit 1; }
+          done
+      - name: Require production database secret
+        env:
+          DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: test -n "$DATABASE_URL_PRODUCTION" || { echo "DATABASE_URL_PRODUCTION missing"; exit 1; }
+      - name: Show migration status before deployment
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx prisma migrate status
+      - name: Apply pending Prisma migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx prisma migrate deploy
+      - name: Verify final migration status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx prisma migrate status
