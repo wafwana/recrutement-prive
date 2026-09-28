@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          dirs="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)"
+          dirs="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d -printf '%f\\n' | sort)"
           if echo "$dirs" | grep -Eq '^(0026|0027|0028|0029|003[0-9])'; then
             echo "Unexpected migration newer than approved 0025; stopping."
             exit 1
@@ -48,7 +48,34 @@ jobs:
       - name: Show migration status before deployment
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
-        run: npx prisma migrate status
+        shell: bash
+        run: |
+          set -uo pipefail
+          log="$(mktemp)"
+          set +e
+          npx prisma migrate status 2>&1 | tee "$log"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Pre-deploy migration status is clean."
+            exit 0
+          fi
+          if ! grep -Fq "Following migrations have not yet been applied:" "$log"; then
+            echo "Prisma status failed for a reason other than pending migrations; stopping."
+            exit "$status"
+          fi
+          for expected in 0023_recruitment_billing 0024_company_identity_and_sourcing_provenance 0025_external_offer_outreach; do
+            if ! grep -Fxq "$expected" "$log"; then
+              echo "Expected pending migration $expected was not reported; stopping."
+              exit 1
+            fi
+          done
+          pending_count="$(grep -Ec '^00[0-9][0-9]_' "$log" || true)"
+          if [ "$pending_count" -ne 3 ]; then
+            echo "Unexpected pending migration set ($pending_count entries); stopping."
+            exit 1
+          fi
+          echo "Exactly the three approved migrations are pending; proceeding."
       - name: Apply pending Prisma migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
