@@ -4,13 +4,25 @@ Ce document décrit la procédure sécurisée pour exécuter les migrations Pris
 
 ---
 
-## 1. Garde-fous et Précontrôle Automatique d'Isolation (`scripts/check-migration-0010.ts`)
+## 1. Principes d'Isolation Vercel & Non-Exécution dans le Build
 
-Le workflow intègre un script de précontrôle automatique d'introspection de la base de données PostgreSQL (`information_schema`, `pg_type`) restreint au schéma `public` qui analyse :
+Afin de garantir que la compilation statique et les Previews Vercel ne dépendent pas d'une chaîne `DATABASE_URL` active lors du build :
+- Le script `npm run build` dans `package.json` est strictement restreint à :
+  ```json
+  "build": "prisma generate && next build"
+  ```
+- Les migrations de production sont complètement découplées du build Vercel et s'exécutent hors-bande via le workflow GitHub Actions dédié `.github/workflows/deploy-migrations.yml`.
+
+---
+
+## 2. Garde-fous et Précontrôle Automatique d'Isolation (`scripts/check-migration-0010.ts`)
+
+Le workflow intègre un script de précontrôle automatique d'introspection de la base de données PostgreSQL (`information_schema`, `pg_type`, `pg_enum`, `pg_indexes`, `pg_constraint`) restreint au schéma `public` qui analyse :
 - L'existence de l'enregistrement dans `_prisma_migrations`.
 - La présence des 2 types ENUM (`MissionPresentationState`, `FinancialConditionStatus`).
 - La présence des 3 colonnes de `Job` (`missionType`, `financialCondition`, `financialConditionStatus`).
-- La présence de la table `MissionPresentation`.
+- La présence de la table `MissionPresentation` (12 colonnes, types, nullabilité).
+- La présence des 4 index et 4 contraintes de clés étrangères.
 - La présence des 3 colonnes de déblocage OWNER (`Company.siren`, `Job.attachmentName`, `CandidateDocument.folderPath`).
 
 ### Classification et Blocage Sécurisé :
@@ -23,7 +35,7 @@ Le workflow intègre un script de précontrôle automatique d'introspection de l
 
 ---
 
-## 2. Préalable Obligatoire : Configuration du Secret GitHub
+## 3. Préalable Obligatoire : Configuration du Secret GitHub
 
 1. Se rendre sur le dépôt GitHub `wafwana/recrutement-prive`.
 2. Aller dans **Settings** > **Secrets and variables** > **Actions**.
@@ -35,7 +47,7 @@ Le workflow intègre un script de précontrôle automatique d'introspection de l
 
 ---
 
-## 3. Déclenchement du Workflow de Migration sur GitHub
+## 4. Déclenchement du Workflow de Migration sur GitHub
 
 1. Sur GitHub, aller dans l'onglet **Actions**.
 2. Dans le menu de gauche, sélectionner **Deploy Production Database Migrations**.
@@ -53,7 +65,7 @@ Le workflow intègre un script de précontrôle automatique d'introspection de l
 
 ---
 
-## 4. Déroulement et Post-Vérification
+## 5. Déroulement et Post-Vérification
 
 Le workflow s'exécute de façon séquentielle :
 1. **Script de précontrôle** : Valide l'état du schéma `public`.
@@ -63,7 +75,7 @@ Le workflow s'exécute de façon séquentielle :
 
 ---
 
-## 5. Recette Post-Migration & Confirmation OWNER
+## 6. Recette Post-Migration & Confirmation OWNER
 
 Une fois le workflow validé au vert (coche verte) :
 1. Aller sur **https://recrutement-prive.com/connexion**.
