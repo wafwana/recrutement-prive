@@ -57,10 +57,18 @@ jobs:
           fi
           echo "DATABASE_URL_PRODUCTION is present. Its value is not displayed."
 
-      - name: Show Prisma migration status before recovery
+      - name: Show Prisma migration status before recovery (informational)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
-        run: npx prisma migrate status
+        shell: bash
+        run: |
+          set +e
+          npx prisma migrate status
+          status_exit=$?
+          if [[ "$status_exit" -ne 0 ]]; then
+            echo "::warning::Prisma status returned exit code $status_exit. This may indicate pending migrations; the status command does not apply migrations. Continuing to the explicitly approved 0010 resolve step."
+          fi
+          exit 0
 
       - name: Resolve only migration 0010 as applied
         env:
@@ -75,7 +83,15 @@ jobs:
           fi
           npx prisma migrate resolve --applied 0010_mission_presentation_lock
 
-      - name: Show Prisma migration status after recovery
+      - name: Show Prisma migration status after recovery (informational)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
-        run: npx prisma migrate status
+        shell: bash
+        run: |
+          set +e
+          npx prisma migrate status
+          status_exit=$?
+          if [[ "$status_exit" -ne 0 ]]; then
+            echo "::warning::Prisma status returned exit code $status_exit. Pending migrations may remain; this workflow does not apply them."
+          fi
+          exit 0
