@@ -108,13 +108,13 @@ export const normalizeDefault = (v: string | null) =>
     .replace(/::"([A-Za-z_][A-Za-z0-9_]*)"/g, "::$1");
 
 export function classifyMigration0010Ledger(rows: Array<{ finished_at: string | null; rolled_back_at: string | null }>): MigrationLedgerState {
-  if (rows.length !== 1) {
-    throw new Error(`Migration 0010 validation failed: expected exactly one Prisma ledger row, found ${rows.length}`);
+  const activeRows = rows.filter((row) => row.rolled_back_at === null);
+  if (activeRows.length !== 1) {
+    throw new Error(
+      `Migration 0010 validation failed: expected exactly one active Prisma ledger row (rolled_back_at IS NULL), found ${activeRows.length} among ${rows.length} total rows`,
+    );
   }
-  const row = rows[0];
-  if (row.rolled_back_at !== null) {
-    throw new Error("Migration 0010 validation failed: ledger row is marked rolled back; refusing automatic recovery.");
-  }
+  const row = activeRows[0];
   return row.finished_at === null ? "FAILED" : "APPLIED";
 }
 
