@@ -30,20 +30,27 @@ test("0010 recovery is state-aware and only resolves a failed migration", () => 
   assert.doesNotMatch(recovery, /migrate reset|db push|resolve --rolled-back/);
 });
 
-test("0010 ledger classification refuses ambiguous or rolled-back history", () => {
+test("0010 ledger classification ignores rolled-back history but rejects ambiguous active rows", () => {
   assert.equal(classifyMigration0010Ledger([{ finished_at: null, rolled_back_at: null }]), "FAILED");
   assert.equal(classifyMigration0010Ledger([{ finished_at: "2026-09-27T00:00:00Z", rolled_back_at: null }]), "APPLIED");
-  assert.throws(() => classifyMigration0010Ledger([]), /exactly one Prisma ledger row/);
+  assert.equal(
+    classifyMigration0010Ledger([
+      { finished_at: null, rolled_back_at: "2026-09-26T03:23:35.530Z" },
+      { finished_at: "2026-09-28T12:56:05.839Z", rolled_back_at: null },
+    ]),
+    "APPLIED",
+  );
+  assert.throws(() => classifyMigration0010Ledger([]), /exactly one active Prisma ledger row/);
   assert.throws(
     () => classifyMigration0010Ledger([{ finished_at: null, rolled_back_at: "2026-09-27T00:00:00Z" }]),
-    /marked rolled back/,
+    /exactly one active Prisma ledger row/,
   );
   assert.throws(
     () => classifyMigration0010Ledger([
       { finished_at: null, rolled_back_at: null },
       { finished_at: null, rolled_back_at: null },
     ]),
-    /exactly one Prisma ledger row/,
+    /exactly one active Prisma ledger row/,
   );
 });
 
