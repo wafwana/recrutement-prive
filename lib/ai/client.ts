@@ -101,8 +101,9 @@ export async function executeAiStructuredTask<T>(
 
   // Combine system prompt and user prompt for deep content inspection
   const fullPayloadText = [request.systemPrompt, request.userPrompt].filter(Boolean).join("\n");
+  const hasFileInput = Boolean(request.fileInput);
 
-  const guardrailCheck = evaluatePrivacyGuardrails(provider, request.context, fullPayloadText);
+  const guardrailCheck = evaluatePrivacyGuardrails(provider, request.context, fullPayloadText, hasFileInput);
   if (!guardrailCheck.allowed) {
     safeLogError(
       "PRIVACY_GUARDRAIL",

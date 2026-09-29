@@ -6,6 +6,7 @@ import { safeLogError, safeLogInfo } from "./privacy";
  * and returns structured JSON output strictly adhering to the requested JSON schema.
  *
  * Security & Privacy:
+ * - Passes GEMINI_API_KEY via `x-goog-api-key` HTTP header (NEVER in URL query parameters).
  * - Does NOT log raw request payloads, prompts, CV/offer text, or raw API response bodies.
  * - Uses generic error messages with minimal technical status codes.
  */
@@ -19,7 +20,8 @@ export async function callGeminiStructured<T>(
   }
 
   const model = request.modelOverride || process.env.GEMINI_MODEL || "gemini-1.5-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  // Use endpoint WITHOUT key query parameter to protect against URL log leaks
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   const parts: Array<Record<string, unknown>> = [];
 
@@ -50,7 +52,10 @@ export async function callGeminiStructured<T>(
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       body: JSON.stringify(payload),
     });
 

@@ -5,13 +5,14 @@ export type PrivacyGuardrailResult =
   | { allowed: false; reason: string };
 
 /**
- * Scans raw text / prompt for PII, candidate identity markers, confidential keywords, and pseudonymization markers.
+ * Scans raw text / prompt for PII, candidate identity markers, confidential keywords, pseudonymization markers, and internal IDs.
  */
 export function inspectContentForPrivacyRisks(text: string): {
   containsPii: boolean;
   containsCandidateMarkers: boolean;
   containsConfidentialEnterprise: boolean;
   containsPseudonymizationMarkers: boolean;
+  containsInternalIdentifiers: boolean;
   detectedIssues: string[];
 } {
   const detectedIssues: string[] = [];
@@ -21,21 +22,20 @@ export function inspectContentForPrivacyRisks(text: string): {
       containsCandidateMarkers: false,
       containsConfidentialEnterprise: false,
       containsPseudonymizationMarkers: false,
+      containsInternalIdentifiers: false,
       detectedIssues: [],
     };
   }
 
   // 1. Email detection
   const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
-  const containsEmail = emailRegex.test(text);
-  if (containsEmail) {
+  if (emailRegex.test(text)) {
     detectedIssues.push("Adresse email détectée");
   }
 
   // 2. Phone number detection (FR, international, formatted numbers)
   const phoneRegex = /(?:(?:\+|00)\d{1,3}[\s.-]?)?(?:0|\(0\))[1-9](?:[\s.-]?\d{2}){4}|\+\d{10,13}/;
-  const containsPhone = phoneRegex.test(text);
-  if (containsPhone) {
+  if (phoneRegex.test(text)) {
     detectedIssues.push("Numéro de téléphone détecté");
   }
 
@@ -60,13 +60,21 @@ export function inspectContentForPrivacyRisks(text: string): {
     detectedIssues.push("Indicateurs de pseudonymisation détectés");
   }
 
-  const containsPii = containsEmail || containsPhone;
+  // 6. Internal platform IDs (UUIDs, CUIDs, prefixes like usr_, cand_, job_, comp_)
+  const internalIdRegex = /\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|c[a-z0-9]{24}|(usr_|cand_|job_|comp_|pres_)[a-zA-Z0-9_-]+)\b/i;
+  const containsInternalIdentifiers = internalIdRegex.test(text);
+  if (containsInternalIdentifiers) {
+    detectedIssues.push("Identifiants internes de plateforme détectés");
+  }
+
+  const containsPii = emailRegex.test(text) || phoneRegex.test(text);
 
   return {
     containsPii,
     containsCandidateMarkers,
     containsConfidentialEnterprise,
     containsPseudonymizationMarkers,
+    containsInternalIdentifiers,
     detectedIssues,
   };
 }
@@ -75,17 +83,20 @@ export function inspectContentForPrivacyRisks(text: string): {
  * Evaluates whether an AI request is permitted for a given AI provider.
  *
  * Rules for FREE GEMINI provider:
+ * - ANY attached file (fileInput) is STRICTLY REFUSED prior to network call. `isMockData: true` does NOT override file blocking.
  * - Real candidate CVs (`REAL_CV`) are STRICTLY BLOCKED before network call.
  * - Candidate private data (`CANDIDATE_DATA`) including PII is STRICTLY BLOCKED before network call.
  * - Confidential enterprise data (`CONFIDENTIAL_ENTERPRISE`) is STRICTLY BLOCKED before network call.
  * - Pseudonymized candidate data is NOT considered sufficient anonymization and is STILL BLOCKED.
- * - Declarative classification alone is NOT trusted: content is inspected.
- * - Only PUBLIC_OFFER or explicitly verified MOCK_DATA (fictional non-confidential data) without PII / confidential content are allowed.
+ * - Internal platform identifiers (CUIDs, UUIDs) are STRICTLY BLOCKED.
+ * - Declarative classification alone is NOT trusted: content is dynamically inspected.
+ * - Only PUBLIC_OFFER or explicitly verified MOCK_DATA (fictional non-confidential text) without files/PII/confidential content are allowed.
  */
 export function evaluatePrivacyGuardrails(
   provider: AiProvider,
   context: AiAnalysisContext,
-  payloadText?: string
+  payloadText?: string,
+  hasFileInput?: boolean
 ): PrivacyGuardrailResult {
   // OpenAI provider preserves existing operations for real candidate data
   if (provider === "openai") {
@@ -93,6 +104,14 @@ export function evaluatePrivacyGuardrails(
   }
 
   if (provider === "gemini") {
+    // 0. STRICT FILE BLOCKING: Refuse any binary/file input regardless of mock flags
+    if (hasFileInput) {
+      return {
+        allowed: false,
+        reason: "Le mode Gemini gratuit interdit strictement tout fichier joint ou pièce jointe (CV, PDF, images). Seul le texte brut public est autorisé.",
+      };
+    }
+
     // 1. Declarative check on classification
     if (context.classification === "REAL_CV") {
       return {
@@ -151,6 +170,13 @@ export function evaluatePrivacyGuardrails(
         return {
           allowed: false,
           reason: "Marqueurs de confidentialité d'entreprise détectés dans le contenu. Blocage pré-réseau Gemini.",
+        };
+      }
+
+      if (inspection.containsInternalIdentifiers) {
+        return {
+          allowed: false,
+          reason: "Identifiants internes de plateforme détectés dans le contenu. Blocage pré-réseau Gemini.",
         };
       }
     }

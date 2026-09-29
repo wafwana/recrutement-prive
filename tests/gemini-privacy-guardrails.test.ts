@@ -5,14 +5,54 @@ import { executeAiStructuredTask } from "../lib/ai/client";
 import { analyzeCvDocument } from "../lib/cv/analyzer";
 import { analyzeJobOffer } from "../lib/jobs/analyzer";
 
+test("Network Interception Test: File attachments (fileInput) trigger 0 network calls even with isMockData: true", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+
+  let fetchCallCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCallCount++;
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof globalThis.fetch;
+
+  try {
+    process.env.AI_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+
+    fetchCallCount = 0;
+    const fileRes = await executeAiStructuredTask({
+      context: { classification: "MOCK_DATA", isMockData: true },
+      jsonSchemaName: "test_file_schema",
+      jsonSchema: { type: "object" },
+      fileInput: {
+        fileName: "mock_cv.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from("Contenu Fichier Synthetique"),
+      },
+      userPrompt: "Analyse ce fichier mocké",
+    });
+
+    assert.equal(fileRes.data, null);
+    assert.match(fileRes.blockedReason || "", /interdit strictement tout fichier joint/i);
+    assert.equal(fetchCallCount, 0, "Network call was initiated for a fileInput! Must be exactly 0.");
+  } finally {
+    process.env.AI_PROVIDER = originalProvider;
+    process.env.GEMINI_API_KEY = originalGeminiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Network Interception Test: Forbidden Gemini requests trigger 0 network calls (0 fetch invocations)", async () => {
   const originalProvider = process.env.AI_PROVIDER;
   const originalGeminiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
 
   let fetchCallCount = 0;
-  // Mock network client
-  globalThis.fetch = (async (url: string | URL | Request) => {
+  globalThis.fetch = (async () => {
     fetchCallCount++;
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }), {
       status: 200,
@@ -67,6 +107,17 @@ test("Network Interception Test: Forbidden Gemini requests trigger 0 network cal
     });
     assert.equal(confRes, null);
     assert.equal(fetchCallCount, 0, "Network call was made for confidential enterprise offer! Must be 0.");
+
+    // 5. Text containing internal platform CUID / UUID
+    fetchCallCount = 0;
+    const internalIdRes = await executeAiStructuredTask({
+      context: { classification: "PUBLIC_OFFER" },
+      jsonSchemaName: "test_schema",
+      jsonSchema: { type: "object" },
+      userPrompt: "Offre associee a usr_1234567890abcdef et job_99887766554433221100",
+    });
+    assert.equal(internalIdRes.data, null);
+    assert.equal(fetchCallCount, 0, "Network call was made for text containing internal platform IDs! Must be 0.");
   } finally {
     process.env.AI_PROVIDER = originalProvider;
     process.env.GEMINI_API_KEY = originalGeminiKey;
@@ -74,14 +125,19 @@ test("Network Interception Test: Forbidden Gemini requests trigger 0 network cal
   }
 });
 
-test("Network Interception Test: Authorized mock/public offer reaches network client", async () => {
+test("Network Interception Test: Authorized mock/public offer uses x-goog-api-key header (0 key in URL)", async () => {
   const originalProvider = process.env.AI_PROVIDER;
   const originalGeminiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
 
+  let requestedUrl = "";
+  let requestHeaders: HeadersInit | undefined;
   let fetchCallCount = 0;
-  globalThis.fetch = (async (url: string | URL | Request) => {
+
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     fetchCallCount++;
+    requestedUrl = String(url);
+    requestHeaders = init?.headers;
     return new Response(
       JSON.stringify({
         candidates: [
@@ -115,7 +171,7 @@ test("Network Interception Test: Authorized mock/public offer reaches network cl
 
   try {
     process.env.AI_PROVIDER = "gemini";
-    process.env.GEMINI_API_KEY = "test-gemini-key";
+    process.env.GEMINI_API_KEY = "test-secret-gemini-key-12345";
 
     const res = await analyzeJobOffer({
       title: "Développeur Senior Fullstack",
@@ -129,6 +185,14 @@ test("Network Interception Test: Authorized mock/public offer reaches network cl
     assert.notEqual(res, null);
     assert.equal(res?.location, "Paris");
     assert.equal(fetchCallCount, 1, "Authorized public job offer should reach network fetch exactly once.");
+
+    // Assert API Key is NOT in the requested URL
+    assert.doesNotMatch(requestedUrl, /test-secret-gemini-key-12345/);
+    assert.doesNotMatch(requestedUrl, /key=/);
+
+    // Assert API Key IS supplied via x-goog-api-key header
+    const headersObj = requestHeaders as Record<string, string>;
+    assert.equal(headersObj["x-goog-api-key"], "test-secret-gemini-key-12345");
   } finally {
     process.env.AI_PROVIDER = originalProvider;
     process.env.GEMINI_API_KEY = originalGeminiKey;
@@ -136,7 +200,7 @@ test("Network Interception Test: Authorized mock/public offer reaches network cl
   }
 });
 
-test("Privacy Guardrails: Deep content inspection detects hidden PII & CV markers", () => {
+test("Privacy Guardrails: Deep content inspection detects hidden PII, CV markers, and internal IDs", () => {
   const inspection1 = inspectContentForPrivacyRisks("Coordonnées: contact@domaine.com / 06 12 34 56 78");
   assert.equal(inspection1.containsPii, true);
 
@@ -148,6 +212,9 @@ test("Privacy Guardrails: Deep content inspection detects hidden PII & CV marker
 
   const inspection4 = inspectContentForPrivacyRisks("Fiche Candidat A masqué");
   assert.equal(inspection4.containsPseudonymizationMarkers, true);
+
+  const inspection5 = inspectContentForPrivacyRisks("Candidature référencée usr_a1b2c3d4e5f6g7h8");
+  assert.equal(inspection5.containsInternalIdentifiers, true);
 });
 
 test("Sanitization & Logging: Redacts sensitive fields, keys, emails, and phone numbers", () => {
