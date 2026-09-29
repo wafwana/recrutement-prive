@@ -1,8 +1,22 @@
 import { AiAnalysisContext, AiProvider } from "./types";
 
 export type PrivacyGuardrailResult =
-  | { allowed: true }
+  | { allowed: true; sanitizedPrompt?: string }
   | { allowed: false; reason: string };
+
+/**
+ * List of explicitly allowed minimal fields permitted to be sent to Gemini Free.
+ * Any other field (companyName, contactEmail, sourceUrl, companySiret, rawText, internal IDs, metadata)
+ * is strictly forbidden and stripped/rejected prior to calling Gemini.
+ */
+export type AllowedGeminiPayloadFields = {
+  title?: string | null;
+  location?: string | null; // Generic city or country only
+  missionType?: string | null;
+  skills?: string[] | null;
+  experienceYears?: number | null;
+  descriptionSummary?: string | null; // Sanitized generic text summary without company names or PII
+};
 
 /**
  * Scans raw text / prompt for PII, candidate identity markers, confidential keywords, pseudonymization markers, and internal IDs.
@@ -13,6 +27,7 @@ export function inspectContentForPrivacyRisks(text: string): {
   containsConfidentialEnterprise: boolean;
   containsPseudonymizationMarkers: boolean;
   containsInternalIdentifiers: boolean;
+  containsForbiddenFields: boolean;
   detectedIssues: string[];
 } {
   const detectedIssues: string[] = [];
@@ -23,6 +38,7 @@ export function inspectContentForPrivacyRisks(text: string): {
       containsConfidentialEnterprise: false,
       containsPseudonymizationMarkers: false,
       containsInternalIdentifiers: false,
+      containsForbiddenFields: false,
       detectedIssues: [],
     };
   }
@@ -67,6 +83,13 @@ export function inspectContentForPrivacyRisks(text: string): {
     detectedIssues.push("Identifiants internes de plateforme détectés");
   }
 
+  // 7. Explicit forbidden field keywords or URLs in Gemini payload
+  const forbiddenKeywordsRegex = /\b(companyName|contactEmail|sourceUrl|companySiret|rawText|siret|siren|website|url)\s*[:=]/i;
+  const containsForbiddenFields = forbiddenKeywordsRegex.test(text) || /https?:\/\/[^\s]+/i.test(text);
+  if (containsForbiddenFields) {
+    detectedIssues.push("Champs interdits ou URLs détectés dans la charge Gemini");
+  }
+
   const containsPii = emailRegex.test(text) || phoneRegex.test(text);
 
   return {
@@ -75,36 +98,103 @@ export function inspectContentForPrivacyRisks(text: string): {
     containsConfidentialEnterprise,
     containsPseudonymizationMarkers,
     containsInternalIdentifiers,
+    containsForbiddenFields,
     detectedIssues,
   };
+}
+
+/**
+ * Centralized Gemini Payload Sanitizer and Validator.
+ * Reconstructs the prompt sending ONLY explicitly approved minimal fields:
+ * - title
+ * - location (generic city / country)
+ * - missionType
+ * - skills (string array)
+ * - experienceYears (number)
+ * - descriptionSummary (generic text without company names, PII, URLs, or internal IDs)
+ *
+ * Strips and rejects:
+ * - companyName, contactEmail, sourceUrl, website, companySiret, rawText, internal IDs, tracking metadata.
+ */
+export function sanitizeAndValidateGeminiPayload(
+  fields?: AllowedGeminiPayloadFields | null,
+  rawPrompt?: string
+): { allowed: boolean; sanitizedPrompt?: string; reason?: string } {
+  // If structured minimal fields are provided, format strictly from allowed fields only
+  if (fields) {
+    const title = fields.title?.trim() || "";
+    const location = fields.location?.trim() || "";
+    const missionType = fields.missionType?.trim() || "";
+    const skills = Array.isArray(fields.skills) ? fields.skills.map((s) => s.trim()).filter(Boolean) : [];
+    const experienceYears = typeof fields.experienceYears === "number" && Number.isFinite(fields.experienceYears) ? fields.experienceYears : null;
+    const descriptionSummary = fields.descriptionSummary?.trim() || "";
+
+    // Construct minimal text strictly from allowed fields
+    const minimalText = [
+      title ? `Titre: ${title}` : "",
+      location ? `Localisation: ${location}` : "",
+      missionType ? `Type de mission: ${missionType}` : "",
+      skills.length ? `Compétences: ${skills.join(", ")}` : "",
+      experienceYears !== null ? `Années d'expérience: ${experienceYears}` : "",
+      descriptionSummary ? `Description générique: ${descriptionSummary}` : "",
+    ].filter(Boolean).join("\n");
+
+    if (!minimalText || minimalText.length < 10) {
+      return {
+        allowed: false,
+        reason: "La charge minimale autorisée pour Gemini est insuffisante ou vide après filtrage des champs autorisés.",
+      };
+    }
+
+    // Pass constructed minimal text through dynamic content inspection
+    const inspection = inspectContentForPrivacyRisks(minimalText);
+    if (inspection.containsPii || inspection.containsCandidateMarkers || inspection.containsPseudonymizationMarkers || inspection.containsConfidentialEnterprise || inspection.containsInternalIdentifiers || inspection.containsForbiddenFields) {
+      return {
+        allowed: false,
+        reason: `Données interdites détectées dans la charge minimale Gemini (${inspection.detectedIssues.join(", ")}). Blocage pré-réseau.`,
+      };
+    }
+
+    return { allowed: true, sanitizedPrompt: minimalText };
+  }
+
+  // If no structured fields provided, inspect raw prompt
+  if (rawPrompt) {
+    const inspection = inspectContentForPrivacyRisks(rawPrompt);
+    if (inspection.containsPii || inspection.containsCandidateMarkers || inspection.containsPseudonymizationMarkers || inspection.containsConfidentialEnterprise || inspection.containsInternalIdentifiers || inspection.containsForbiddenFields) {
+      return {
+        allowed: false,
+        reason: `Contenu non autorisé détecté pour le mode Gemini gratuit (${inspection.detectedIssues.join(", ")}). Blocage pré-réseau.`,
+      };
+    }
+    return { allowed: true, sanitizedPrompt: rawPrompt };
+  }
+
+  return { allowed: false, reason: "Aucune donnée ni charge textuelle valide fournie pour Gemini." };
 }
 
 /**
  * Evaluates whether an AI request is permitted for a given AI provider.
  *
  * Rules for FREE GEMINI provider:
- * - ANY attached file (fileInput) is STRICTLY REFUSED prior to network call. `isMockData: true` does NOT override file blocking.
- * - Real candidate CVs (`REAL_CV`) are STRICTLY BLOCKED before network call.
- * - Candidate private data (`CANDIDATE_DATA`) including PII is STRICTLY BLOCKED before network call.
- * - Confidential enterprise data (`CONFIDENTIAL_ENTERPRISE`) is STRICTLY BLOCKED before network call.
- * - Pseudonymized candidate data is NOT considered sufficient anonymization and is STILL BLOCKED.
- * - Internal platform identifiers (CUIDs, UUIDs) are STRICTLY BLOCKED.
- * - Declarative classification alone is NOT trusted: content is dynamically inspected.
- * - Only PUBLIC_OFFER or explicitly verified MOCK_DATA (fictional non-confidential text) without files/PII/confidential content are allowed.
+ * - PUBLIC_OFFER classification alone NEVER gives automatic authorization.
+ * - ANY attached file (fileInput) is STRICTLY REFUSED prior to network call.
+ * - Real candidate CVs, candidate private data, PII, pseudonymized data, internal IDs, confidential offers, company names, URLs are STRICTLY BLOCKED.
+ * - Centralized payload sanitization enforces strict allowlist of minimal fields.
  */
 export function evaluatePrivacyGuardrails(
   provider: AiProvider,
   context: AiAnalysisContext,
   payloadText?: string,
-  hasFileInput?: boolean
+  hasFileInput?: boolean,
+  geminiFields?: AllowedGeminiPayloadFields | null
 ): PrivacyGuardrailResult {
-  // OpenAI provider preserves existing operations for real candidate data
   if (provider === "openai") {
     return { allowed: true };
   }
 
   if (provider === "gemini") {
-    // 0. STRICT FILE BLOCKING: Refuse any binary/file input regardless of mock flags
+    // 0. STRICT FILE BLOCKING
     if (hasFileInput) {
       return {
         allowed: false,
@@ -141,54 +231,24 @@ export function evaluatePrivacyGuardrails(
       };
     }
 
-    // 2. Dynamic content inspection check (does not rely on declarative classification alone)
-    if (payloadText) {
-      const inspection = inspectContentForPrivacyRisks(payloadText);
-
-      if (inspection.containsPii) {
-        return {
-          allowed: false,
-          reason: `Le contenu fourni contient des données personnelles (PII) détectées (${inspection.detectedIssues.join(", ")}). Blocage pré-réseau Gemini.`,
-        };
-      }
-
-      if (inspection.containsCandidateMarkers && !context.isMockData) {
-        return {
-          allowed: false,
-          reason: "Le contenu fourni présente des marqueurs de CV / données candidates réelles. Blocage pré-réseau Gemini.",
-        };
-      }
-
-      if (inspection.containsPseudonymizationMarkers) {
-        return {
-          allowed: false,
-          reason: "La pseudonymisation détectée n'est pas acceptée comme une anonymisation suffisante pour Gemini gratuit.",
-        };
-      }
-
-      if (inspection.containsConfidentialEnterprise) {
-        return {
-          allowed: false,
-          reason: "Marqueurs de confidentialité d'entreprise détectés dans le contenu. Blocage pré-réseau Gemini.",
-        };
-      }
-
-      if (inspection.containsInternalIdentifiers) {
-        return {
-          allowed: false,
-          reason: "Identifiants internes de plateforme détectés dans le contenu. Blocage pré-réseau Gemini.",
-        };
-      }
+    // PUBLIC_OFFER alone is NOT automatically permitted without minimal field sanitization
+    if (context.classification !== "PUBLIC_OFFER" && context.classification !== "MOCK_DATA" && !context.isMockData) {
+      return {
+        allowed: false,
+        reason: "Classification déclarative non autorisée pour Gemini gratuit.",
+      };
     }
 
-    if (context.classification === "PUBLIC_OFFER" || context.classification === "MOCK_DATA" || context.isMockData) {
-      return { allowed: true };
+    // 2. Centralized minimal payload sanitization and validation
+    const sanitization = sanitizeAndValidateGeminiPayload(geminiFields, payloadText);
+    if (!sanitization.allowed || !sanitization.sanitizedPrompt) {
+      return {
+        allowed: false,
+        reason: sanitization.reason || "Échec du filtrage et de la validation de la charge Gemini.",
+      };
     }
 
-    return {
-      allowed: false,
-      reason: "Catégorie de données non autorisée pour le mode Gemini gratuit.",
-    };
+    return { allowed: true, sanitizedPrompt: sanitization.sanitizedPrompt };
   }
 
   return { allowed: false, reason: "Fournisseur d'IA inconnu ou non supporté." };
@@ -200,20 +260,13 @@ export function evaluatePrivacyGuardrails(
 export function safeSanitizeLogMessage(message: string): string {
   if (!message) return "";
   return message
-    // Redact API keys (e.g. AIzaSy..., sk-...)
     .replace(/(AIzaSy[A-Za-z0-9_-]{33})/g, "[REDACTED_GEMINI_KEY]")
     .replace(/(sk-[A-Za-z0-9_-]{30,})/g, "[REDACTED_OPENAI_KEY]")
-    // Redact bearer tokens
     .replace(/(Bearer\s+)[A-Za-z0-9_.-]+/gi, "$1[REDACTED_TOKEN]")
-    // Redact emails
     .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, "[REDACTED_EMAIL]")
-    // Redact phone numbers (international / standard formats)
     .replace(/(\+\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-]?\d{2,4}[\s.-]?\d{2,4}/g, "[REDACTED_PHONE]");
 }
 
-/**
- * Safe logger that ensures no sensitive payloads, prompts, or API keys leak into console logs.
- */
 export function safeLogInfo(tag: string, details: string) {
   const sanitized = safeSanitizeLogMessage(details);
   console.log(`[AI_SAFE_LOG][${tag}] ${sanitized}`);

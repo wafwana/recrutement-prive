@@ -27,6 +27,18 @@ export type AiStructuredRequest<T = unknown> = {
   jsonSchema: Record<string, unknown>;
   context: AiAnalysisContext;
   modelOverride?: string;
+  /**
+   * Optional structured minimal allowed fields for Gemini Free provider.
+   * When Gemini is the active provider, ONLY these fields will be sanitized, formatted, and sent.
+   */
+  geminiAllowedFields?: {
+    title?: string | null;
+    location?: string | null;
+    missionType?: string | null;
+    skills?: string[] | null;
+    experienceYears?: number | null;
+    descriptionSummary?: string | null;
+  } | null;
 };
 
 export type AiAnalysisResponse<T> = {

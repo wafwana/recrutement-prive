@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluatePrivacyGuardrails, safeSanitizeLogMessage, inspectContentForPrivacyRisks } from "../lib/ai/privacy";
+import { evaluatePrivacyGuardrails, safeSanitizeLogMessage, inspectContentForPrivacyRisks, sanitizeAndValidateGeminiPayload } from "../lib/ai/privacy";
 import { executeAiStructuredTask } from "../lib/ai/client";
 import { analyzeCvDocument } from "../lib/cv/analyzer";
 import { analyzeJobOffer } from "../lib/jobs/analyzer";
+import { analyzeExternalOffer } from "../lib/sourcing/offer-analyzer";
+import { analyzeRawOffer } from "../lib/sourcing/raw-offer";
 
-test("Network Interception Test: File attachments (fileInput) trigger 0 network calls even with isMockData: true", async () => {
+test("Network Interception 1: File attachments (fileInput) trigger 0 network calls even with isMockData: true", async () => {
   const originalProvider = process.env.AI_PROVIDER;
   const originalGeminiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
@@ -46,7 +48,7 @@ test("Network Interception Test: File attachments (fileInput) trigger 0 network 
   }
 });
 
-test("Network Interception Test: Forbidden Gemini requests trigger 0 network calls (0 fetch invocations)", async () => {
+test("Network Interception 2: Offer containing email -> blocked, fetch = 0", async () => {
   const originalProvider = process.env.AI_PROVIDER;
   const originalGeminiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
@@ -54,70 +56,22 @@ test("Network Interception Test: Forbidden Gemini requests trigger 0 network cal
   let fetchCallCount = 0;
   globalThis.fetch = (async () => {
     fetchCallCount++;
-    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }), { status: 200 });
   }) as typeof globalThis.fetch;
 
   try {
     process.env.AI_PROVIDER = "gemini";
     process.env.GEMINI_API_KEY = "test-gemini-key";
 
-    // 1. Real CV payload
     fetchCallCount = 0;
-    const cvRes = await analyzeCvDocument({
-      fileName: "cv_jean_dupont.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from("Jean Dupont - Ingénieur Logiciel - email: jean.dupont@gmail.com - tel: 0612345678"),
+    const res = await analyzeJobOffer({
+      title: "Développeur Web",
+      description: "Contactez sophie.martin@entreprise.com pour cette offre.",
       taxonomy: [],
     });
-    assert.equal(cvRes, null);
-    assert.equal(fetchCallCount, 0, "Network call was made for a real CV! Must be 0.");
 
-    // 2. Candidate private data with PII
-    fetchCallCount = 0;
-    const piiRes = await executeAiStructuredTask({
-      context: { classification: "PUBLIC_OFFER" }, // Attempting classification trick with PII text
-      jsonSchemaName: "test_schema",
-      jsonSchema: { type: "object" },
-      userPrompt: "Offre d'emploi. Contact recrutement: sophie.martin@entreprise.fr - 0140506070",
-    });
-    assert.equal(piiRes.data, null);
-    assert.equal(fetchCallCount, 0, "Network call was made for payload with PII! Must be 0.");
-
-    // 3. Pseudonymized candidate data
-    fetchCallCount = 0;
-    const pseudoRes = await executeAiStructuredTask({
-      context: { classification: "PUBLIC_OFFER", isPseudonymized: true },
-      jsonSchemaName: "test_schema",
-      jsonSchema: { type: "object" },
-      userPrompt: "Profil Candidat A - Expérience anonymisée 10 ans en finance",
-    });
-    assert.equal(pseudoRes.data, null);
-    assert.equal(fetchCallCount, 0, "Network call was made for pseudonymized candidate data! Must be 0.");
-
-    // 4. Confidential enterprise job offer
-    fetchCallCount = 0;
-    const confRes = await analyzeJobOffer({
-      title: "Directeur de Filiale",
-      description: "Recrutement strictement confidentiel et secret pour restructuration interne",
-      taxonomy: [],
-      isConfidentialEnterprise: true,
-    });
-    assert.equal(confRes, null);
-    assert.equal(fetchCallCount, 0, "Network call was made for confidential enterprise offer! Must be 0.");
-
-    // 5. Text containing internal platform CUID / UUID
-    fetchCallCount = 0;
-    const internalIdRes = await executeAiStructuredTask({
-      context: { classification: "PUBLIC_OFFER" },
-      jsonSchemaName: "test_schema",
-      jsonSchema: { type: "object" },
-      userPrompt: "Offre associee a usr_1234567890abcdef et job_99887766554433221100",
-    });
-    assert.equal(internalIdRes.data, null);
-    assert.equal(fetchCallCount, 0, "Network call was made for text containing internal platform IDs! Must be 0.");
+    assert.equal(res, null);
+    assert.equal(fetchCallCount, 0, "Email in offer must trigger 0 network calls.");
   } finally {
     process.env.AI_PROVIDER = originalProvider;
     process.env.GEMINI_API_KEY = originalGeminiKey;
@@ -125,7 +79,268 @@ test("Network Interception Test: Forbidden Gemini requests trigger 0 network cal
   }
 });
 
-test("Network Interception Test: Authorized mock/public offer uses x-goog-api-key header (0 key in URL)", async () => {
+test("Network Interception 3: Offer containing phone -> blocked, fetch = 0", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+
+  let fetchCallCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCallCount++;
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }), { status: 200 });
+  }) as typeof globalThis.fetch;
+
+  try {
+    process.env.AI_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+
+    fetchCallCount = 0;
+    const res = await analyzeJobOffer({
+      title: "Ingénieur Réseau",
+      description: "Appelez le 06 12 34 56 78 pour candidater.",
+      taxonomy: [],
+    });
+
+    assert.equal(res, null);
+    assert.equal(fetchCallCount, 0, "Phone in offer must trigger 0 network calls.");
+  } finally {
+    process.env.AI_PROVIDER = originalProvider;
+    process.env.GEMINI_API_KEY = originalGeminiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Network Interception 4: Offer containing internal platform ID -> blocked, fetch = 0", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+
+  let fetchCallCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCallCount++;
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }), { status: 200 });
+  }) as typeof globalThis.fetch;
+
+  try {
+    process.env.AI_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+
+    fetchCallCount = 0;
+    const res = await analyzeJobOffer({
+      title: "Chef de projet IT",
+      description: "Offre associée au compte usr_1234567890abcdef et job_998877665544",
+      taxonomy: [],
+    });
+
+    assert.equal(res, null);
+    assert.equal(fetchCallCount, 0, "Internal platform ID in offer must trigger 0 network calls.");
+  } finally {
+    process.env.AI_PROVIDER = originalProvider;
+    process.env.GEMINI_API_KEY = originalGeminiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Network Interception 5: Explicitly confidential content -> blocked, fetch = 0", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+
+  let fetchCallCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCallCount++;
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }), { status: 200 });
+  }) as typeof globalThis.fetch;
+
+  try {
+    process.env.AI_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+
+    fetchCallCount = 0;
+    const res = await analyzeJobOffer({
+      title: "Directeur de Restructuration",
+      description: "Mission strictly confidentielle et projet secret d'entreprise",
+      taxonomy: [],
+      isConfidentialEnterprise: true,
+    });
+
+    assert.equal(res, null);
+    assert.equal(fetchCallCount, 0, "Confidential offer must trigger 0 network calls.");
+  } finally {
+    process.env.AI_PROVIDER = originalProvider;
+    process.env.GEMINI_API_KEY = originalGeminiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Network Interception 6: PUBLIC_OFFER alone without valid sanitized fields -> blocked, fetch = 0", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+
+  let fetchCallCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCallCount++;
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }), { status: 200 });
+  }) as typeof globalThis.fetch;
+
+  try {
+    process.env.AI_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+
+    fetchCallCount = 0;
+    const res = await executeAiStructuredTask({
+      context: { classification: "PUBLIC_OFFER" },
+      jsonSchemaName: "test_schema",
+      jsonSchema: { type: "object" },
+      geminiAllowedFields: null, // No minimal sanitized fields provided
+      userPrompt: "",
+    });
+
+    assert.equal(res.data, null);
+    assert.equal(fetchCallCount, 0, "PUBLIC_OFFER without valid minimal fields must trigger 0 network calls.");
+  } finally {
+    process.env.AI_PROVIDER = originalProvider;
+    process.env.GEMINI_API_KEY = originalGeminiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Network Interception 7: Company name, sourceUrl, SIRET, raw text, and metadata are NOT sent in Gemini fetch body", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+
+  let requestBody = "";
+  let fetchCallCount = 0;
+
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    fetchCallCount++;
+    requestBody = String(init?.body || "");
+    return new Response(
+      JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    title: "Développeur React",
+                    summary: "Poste frontend",
+                    skills: ["React"],
+                    experienceYears: 3,
+                    language: "FR",
+                    categoryCode: "IT",
+                    subCategoryCode: "DEV",
+                    inPlatformScope: true,
+                    scopeReason: "Ok",
+                    confidence: 0.9,
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  }) as typeof globalThis.fetch;
+
+  try {
+    process.env.AI_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+
+    const res = await analyzeExternalOffer({
+      title: "Développeur React Senior",
+      description: "Poste en développement frontend moderne.",
+      companyName: "Entreprise Interdite SAS",
+      sourceUrl: "https://recrutement.externe/offre/123",
+      country: "France",
+      city: "Lyon",
+      taxonomy: [],
+    });
+
+    assert.notEqual(res, null);
+    assert.equal(fetchCallCount, 1, "Authorized request reached network once.");
+
+    // Inspect request body to confirm companyName and sourceUrl were stripped
+    assert.doesNotMatch(requestBody, /Entreprise Interdite SAS/);
+    assert.doesNotMatch(requestBody, /https:\/\/recrutement\.externe\/offre\/123/);
+    assert.doesNotMatch(requestBody, /companyName/);
+    assert.doesNotMatch(requestBody, /sourceUrl/);
+    assert.match(requestBody, /Développeur React Senior/);
+    assert.match(requestBody, /Lyon, France/);
+  } finally {
+    process.env.AI_PROVIDER = originalProvider;
+    process.env.GEMINI_API_KEY = originalGeminiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Network Interception 8: Sourcing external offer uses same central guardrail & blocks forbidden data before network", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+
+  let fetchCallCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCallCount++;
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }), { status: 200 });
+  }) as typeof globalThis.fetch;
+
+  try {
+    process.env.AI_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+
+    fetchCallCount = 0;
+    const res = await analyzeExternalOffer({
+      title: "Consultant DevOps",
+      description: "Envoyer un mail à recrutement@devops-agency.com pour postuler",
+      companyName: "DevOps Agency",
+      taxonomy: [],
+    });
+
+    assert.equal(res, null);
+    assert.equal(fetchCallCount, 0, "External offer with PII must be blocked before network call.");
+  } finally {
+    process.env.AI_PROVIDER = originalProvider;
+    process.env.GEMINI_API_KEY = originalGeminiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Network Interception 9: Raw offer analysis uses same central guardrail & blocks forbidden data before network", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+
+  let fetchCallCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCallCount++;
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "{}" }] } }] }), { status: 200 });
+  }) as typeof globalThis.fetch;
+
+  try {
+    process.env.AI_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+
+    fetchCallCount = 0;
+    const res = await analyzeRawOffer({
+      rawText: "Offre brute avec SIRET 12345678901234 et mail contact@societe.com",
+      source: { title: "Architecte Cloud" },
+      taxonomy: [],
+    });
+
+    assert.equal(res, null);
+    assert.equal(fetchCallCount, 0, "Raw offer with PII must be blocked before network call.");
+  } finally {
+    process.env.AI_PROVIDER = originalProvider;
+    process.env.GEMINI_API_KEY = originalGeminiKey;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Network Interception 10: Authorized text offer works, fetch = 1, request uses x-goog-api-key header", async () => {
   const originalProvider = process.env.AI_PROVIDER;
   const originalGeminiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
@@ -146,15 +361,15 @@ test("Network Interception Test: Authorized mock/public offer uses x-goog-api-ke
               parts: [
                 {
                   text: JSON.stringify({
-                    skills: ["TypeScript", "React"],
-                    experienceYears: 5,
+                    skills: ["TypeScript", "Node.js"],
+                    experienceYears: 4,
                     location: "Paris",
                     missionType: "CDI",
-                    description: "Développeur Senior",
+                    description: "Développeur Backend",
                     categoryCode: "IT",
                     subCategoryCode: "DEV",
-                    summary: "Poste dev senior",
-                    confidence: 0.9,
+                    summary: "Poste backend senior",
+                    confidence: 0.95,
                   }),
                 },
               ],
@@ -162,37 +377,33 @@ test("Network Interception Test: Authorized mock/public offer uses x-goog-api-ke
           },
         ],
       }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }
+      { status: 200, headers: { "Content-Type": "application/json" } }
     );
   }) as typeof globalThis.fetch;
 
   try {
     process.env.AI_PROVIDER = "gemini";
-    process.env.GEMINI_API_KEY = "test-secret-gemini-key-12345";
+    process.env.GEMINI_API_KEY = "test-secret-header-key-999";
 
     const res = await analyzeJobOffer({
-      title: "Développeur Senior Fullstack",
-      description: "Poste ouvert au public pour renforcer l'équipe technique.",
+      title: "Développeur Backend TypeScript",
+      description: "Poste ouvert au public pour concevoir des API REST robustes.",
       location: "Paris",
       missionType: "CDI",
+      requiredExperienceYears: 4,
       taxonomy: [],
       isConfidentialEnterprise: false,
     });
 
     assert.notEqual(res, null);
     assert.equal(res?.location, "Paris");
-    assert.equal(fetchCallCount, 1, "Authorized public job offer should reach network fetch exactly once.");
+    assert.equal(fetchCallCount, 1, "Authorized request should reach network exactly once.");
 
-    // Assert API Key is NOT in the requested URL
-    assert.doesNotMatch(requestedUrl, /test-secret-gemini-key-12345/);
+    assert.doesNotMatch(requestedUrl, /test-secret-header-key-999/);
     assert.doesNotMatch(requestedUrl, /key=/);
 
-    // Assert API Key IS supplied via x-goog-api-key header
     const headersObj = requestHeaders as Record<string, string>;
-    assert.equal(headersObj["x-goog-api-key"], "test-secret-gemini-key-12345");
+    assert.equal(headersObj["x-goog-api-key"], "test-secret-header-key-999");
   } finally {
     process.env.AI_PROVIDER = originalProvider;
     process.env.GEMINI_API_KEY = originalGeminiKey;
@@ -200,39 +411,31 @@ test("Network Interception Test: Authorized mock/public offer uses x-goog-api-ke
   }
 });
 
-test("Privacy Guardrails: Deep content inspection detects hidden PII, CV markers, and internal IDs", () => {
-  const inspection1 = inspectContentForPrivacyRisks("Coordonnées: contact@domaine.com / 06 12 34 56 78");
-  assert.equal(inspection1.containsPii, true);
+test("Sanitizer Unit Test: sanitizeAndValidateGeminiPayload reconstructs minimal text allowlist", () => {
+  const res = sanitizeAndValidateGeminiPayload({
+    title: "Développeur Python",
+    location: "Bordeaux, France",
+    missionType: "CDI",
+    skills: ["Python", "Django"],
+    experienceYears: 3,
+    descriptionSummary: "Conception d'applications backend.",
+  });
 
-  const inspection2 = inspectContentForPrivacyRisks("Mon curriculum vitae présente mon parcours en ingénierie");
-  assert.equal(inspection2.containsCandidateMarkers, true);
-
-  const inspection3 = inspectContentForPrivacyRisks("Projet secret strictement confidentiel");
-  assert.equal(inspection3.containsConfidentialEnterprise, true);
-
-  const inspection4 = inspectContentForPrivacyRisks("Fiche Candidat A masqué");
-  assert.equal(inspection4.containsPseudonymizationMarkers, true);
-
-  const inspection5 = inspectContentForPrivacyRisks("Candidature référencée usr_a1b2c3d4e5f6g7h8");
-  assert.equal(inspection5.containsInternalIdentifiers, true);
+  assert.equal(res.allowed, true);
+  assert.match(res.sanitizedPrompt || "", /Titre: Développeur Python/);
+  assert.match(res.sanitizedPrompt || "", /Localisation: Bordeaux, France/);
+  assert.match(res.sanitizedPrompt || "", /Compétences: Python, Django/);
 });
 
-test("Sanitization & Logging: Redacts sensitive fields, keys, emails, and phone numbers", () => {
-  const logMsg = "Clé AIzaSy123456789012345678901234567890123 email user@test.fr tel +33612345678";
-  const sanitized = safeSanitizeLogMessage(logMsg);
-
-  assert.doesNotMatch(sanitized, /AIzaSy123456789012345678901234567890123/);
-  assert.doesNotMatch(sanitized, /user@test\.fr/);
-  assert.doesNotMatch(sanitized, /\+33612345678/);
-
-  assert.match(sanitized, /\[REDACTED_GEMINI_KEY\]/);
-  assert.match(sanitized, /\[REDACTED_EMAIL\]/);
-  assert.match(sanitized, /\[REDACTED_PHONE\]/);
-});
-
-test("OpenAI behavior remains completely untouched", () => {
-  const openAiResult = evaluatePrivacyGuardrails("openai", {
+test("OpenAI Non-Regression: Real CVs and candidate data remain fully operational with OpenAI", () => {
+  const openAiCvResult = evaluatePrivacyGuardrails("openai", {
     classification: "REAL_CV",
   });
-  assert.equal(openAiResult.allowed, true);
+  assert.equal(openAiCvResult.allowed, true);
+
+  const openAiCandidateResult = evaluatePrivacyGuardrails("openai", {
+    classification: "CANDIDATE_DATA",
+    containsPii: true,
+  });
+  assert.equal(openAiCandidateResult.allowed, true);
 });

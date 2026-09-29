@@ -149,11 +149,17 @@ export async function analyzeRawOffer(input: {
 }): Promise<RawOfferAnalysis | null> {
   const taxonomy = input.taxonomy.map((x) => `${x.code} — ${x.name}${x.parentCode ? ` (parent: ${x.parentCode})` : ""}`).join("\n");
   const context: AiAnalysisContext = { classification: "PUBLIC_OFFER" };
+  const genericLocation = [input.source.city, input.source.country].filter(Boolean).join(", ");
 
   const res = await executeAiStructuredTask<RawOfferAnalysis>({
     context,
     jsonSchemaName: "raw_offer_analysis",
     jsonSchema: schema as any,
+    geminiAllowedFields: {
+      title: input.source.title || "Offre d'emploi",
+      location: genericLocation,
+      descriptionSummary: input.rawText.slice(0, 3000),
+    },
     userPrompt: `Analyse cette offre brute pour Recrutement Privé, sans inventer de faits.
 Structure le poste, identifie l'entreprise seulement si elle est réellement mentionnée, extrait compétences/expérience/localisation/type de mission, classe avec la taxonomie fournie et résume le besoin.
 Propose 3 à 4 postes potentiellement difficiles à recruter à partir des éléments disponibles. Tout poste non explicitement présent doit être marqué COMPANY_HYPOTHESIS et ne doit jamais être présenté comme un fait.

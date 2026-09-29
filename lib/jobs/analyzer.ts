@@ -55,10 +55,22 @@ export async function analyzeJobOffer(input: {
     isConfidentialEnterprise: Boolean(input.isConfidentialEnterprise),
   };
 
+  const skillsList = Array.isArray(input.requiredSkills)
+    ? (input.requiredSkills as unknown[]).filter((x): x is string => typeof x === "string")
+    : [];
+
   const response = await executeAiStructuredTask<JobAnalysis>({
     context,
     jsonSchemaName: "job_offer_analysis",
     jsonSchema: schema as any,
+    geminiAllowedFields: {
+      title: input.title,
+      location: input.location,
+      missionType: input.missionType,
+      skills: skillsList,
+      experienceYears: input.requiredExperienceYears,
+      descriptionSummary: input.description,
+    },
     userPrompt: `Analyse cette offre pour le moteur de recrutement Recrutement Privé.
 
 Objectif : transformer une saisie parfois incomplète en fiche d'offre exploitable par le moteur de matching.

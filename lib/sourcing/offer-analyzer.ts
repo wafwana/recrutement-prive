@@ -58,10 +58,17 @@ export async function analyzeExternalOffer(input: {
     classification: "PUBLIC_OFFER",
   };
 
+  const genericLocation = [input.city, input.country].filter(Boolean).join(", ");
+
   const response = await executeAiStructuredTask<ExternalOfferAnalysis>({
     context,
     jsonSchemaName: "external_offer_analysis",
     jsonSchema: schema as any,
+    geminiAllowedFields: {
+      title: input.title,
+      location: genericLocation,
+      descriptionSummary: input.description,
+    },
     userPrompt: `Analyse cette offre d'emploi pour Recrutement Privé.
 Décortique le poste en titre, résumé professionnel, compétences requises, expérience, langue et taxonomie métier.
 L'offre n'entre dans le périmètre de Recrutement Privé que si elle correspond à un recrutement professionnel réel et peut être rattachée de façon fiable à une catégorie ou sous-catégorie de la taxonomie fournie. Exclue les contenus qui ne sont pas des offres d'emploi exploitables.

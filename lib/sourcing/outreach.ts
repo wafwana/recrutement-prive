@@ -73,6 +73,7 @@ export async function generateExternalOfferOutreach(input: {
   let text = "";
 
   const context: AiAnalysisContext = { classification: "PUBLIC_OFFER" };
+  const genericLocation = [input.city, input.country].filter(Boolean).join(", ");
 
   const res = await executeAiStructuredTask<{ subject?: string; text?: string }>({
     context,
@@ -82,6 +83,13 @@ export async function generateExternalOfferOutreach(input: {
       additionalProperties: false,
       properties: { subject: { type: "string" }, text: { type: "string" } },
       required: ["subject", "text"],
+    },
+    geminiAllowedFields: {
+      title: input.title,
+      location: genericLocation,
+      skills: input.skills,
+      experienceYears: input.experienceYears,
+      descriptionSummary: input.summary,
     },
     userPrompt: `Rédige un premier courrier B2B très court à partir de cette offre d'emploi publique.
 Montre que Recrutement Privé a compris le besoin de l'entreprise.

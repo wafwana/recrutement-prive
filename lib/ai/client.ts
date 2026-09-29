@@ -85,7 +85,7 @@ async function callOpenAiStructured<T>(request: AiStructuredRequest<T>): Promise
 }
 
 /**
- * Main AI entrypoint that enforces pre-network privacy guardrails.
+ * Main AI entrypoint that enforces pre-network privacy guardrails and centralized payload sanitization.
  */
 export async function executeAiStructuredTask<T>(
   request: AiStructuredRequest<T>
@@ -103,7 +103,14 @@ export async function executeAiStructuredTask<T>(
   const fullPayloadText = [request.systemPrompt, request.userPrompt].filter(Boolean).join("\n");
   const hasFileInput = Boolean(request.fileInput);
 
-  const guardrailCheck = evaluatePrivacyGuardrails(provider, request.context, fullPayloadText, hasFileInput);
+  const guardrailCheck = evaluatePrivacyGuardrails(
+    provider,
+    request.context,
+    fullPayloadText,
+    hasFileInput,
+    request.geminiAllowedFields
+  );
+
   if (!guardrailCheck.allowed) {
     safeLogError(
       "PRIVACY_GUARDRAIL",
@@ -117,7 +124,13 @@ export async function executeAiStructuredTask<T>(
   }
 
   if (provider === "gemini") {
-    const data = await callGeminiStructured<T>(request);
+    // Override user prompt with sanitized minimal prompt if available
+    const sanitizedRequest: AiStructuredRequest<T> = {
+      ...request,
+      userPrompt: guardrailCheck.sanitizedPrompt || request.userPrompt,
+      systemPrompt: undefined, // Strip system prompt for Gemini
+    };
+    const data = await callGeminiStructured<T>(sanitizedRequest);
     return { providerUsed: "gemini", data };
   }
 
