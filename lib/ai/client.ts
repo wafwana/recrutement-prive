@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { AiAnalysisResponse, AiProvider, AiStructuredRequest } from "./types";
-import { evaluatePrivacyGuardrails, safeLogError, safeLogInfo } from "./privacy";
+import { evaluatePrivacyGuardrails, safeLogError } from "./privacy";
 import { callGeminiStructured } from "./gemini";
 
 /**
@@ -99,7 +99,10 @@ export async function executeAiStructuredTask<T>(
     };
   }
 
-  const guardrailCheck = evaluatePrivacyGuardrails(provider, request.context);
+  // Combine system prompt and user prompt for deep content inspection
+  const fullPayloadText = [request.systemPrompt, request.userPrompt].filter(Boolean).join("\n");
+
+  const guardrailCheck = evaluatePrivacyGuardrails(provider, request.context, fullPayloadText);
   if (!guardrailCheck.allowed) {
     safeLogError(
       "PRIVACY_GUARDRAIL",

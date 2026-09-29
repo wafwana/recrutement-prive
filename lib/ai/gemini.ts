@@ -4,6 +4,10 @@ import { safeLogError, safeLogInfo } from "./privacy";
 /**
  * Calls Gemini REST API using Google's Generative Language API (`https://generativelanguage.googleapis.com/v1beta/models/...:generateContent`)
  * and returns structured JSON output strictly adhering to the requested JSON schema.
+ *
+ * Security & Privacy:
+ * - Does NOT log raw request payloads, prompts, CV/offer text, or raw API response bodies.
+ * - Uses generic error messages with minimal technical status codes.
  */
 export async function callGeminiStructured<T>(
   request: AiStructuredRequest<T>
@@ -51,8 +55,7 @@ export async function callGeminiStructured<T>(
     });
 
     if (!res.ok) {
-      const errorText = await res.text();
-      safeLogError("GEMINI", `Erreur HTTP ${res.status} de l'API Gemini: ${errorText}`);
+      safeLogError("GEMINI", `Erreur de communication API (HTTP ${res.status}).`);
       return null;
     }
 
@@ -66,16 +69,15 @@ export async function callGeminiStructured<T>(
 
     const rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      safeLogError("GEMINI", "Réponse vide reçue de l'API Gemini.");
+      safeLogError("GEMINI", "Réponse vide de l'API Gemini.");
       return null;
     }
 
     const parsed = JSON.parse(rawText) as T;
-    safeLogInfo("GEMINI", `Analyse exécutée avec succès via le modèle ${model}.`);
+    safeLogInfo("GEMINI", `Traitement IA terminé avec succès (modèle: ${model}).`);
     return parsed;
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    safeLogError("GEMINI", `Échec de l'appel Gemini: ${msg}`);
+    safeLogError("GEMINI", "Échec du traitement de la requête IA.");
     return null;
   }
 }
