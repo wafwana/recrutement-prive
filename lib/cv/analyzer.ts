@@ -1,5 +1,4 @@
-import { executeAiStructuredTask } from "@/lib/ai/client";
-import { AiAnalysisContext } from "@/lib/ai/types";
+import OpenAI from "openai";
 
 export type CvTaxonomyItem = {
   code: string;
@@ -47,22 +46,7 @@ const schema = {
     skills: { type: "array", items: { type: "string" } },
     explicitSkills: { type: "array", items: { type: "string" } },
     experienceYears: { type: ["number", "null"] },
-    experiences: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          title: { type: "string" },
-          company: { type: ["string", "null"] },
-          start: { type: ["string", "null"] },
-          end: { type: ["string", "null"] },
-          durationYears: { type: ["number", "null"] },
-          evidence: { type: "string" },
-        },
-        required: ["title", "company", "start", "end", "durationYears", "evidence"],
-      },
-    },
+    experiences: { type: "array", items: { type: "object", additionalProperties: false, properties: { title: { type: "string" }, company: { type: ["string","null"] }, start: { type: ["string","null"] }, end: { type: ["string","null"] }, durationYears: { type: ["number","null"] }, evidence: { type: "string" } }, required: ["title","company","start","end","durationYears","evidence"] } },
     education: { type: "array", items: { type: "string" } },
     certifications: { type: "array", items: { type: "string" } },
     languages: { type: "array", items: { type: "string" } },
@@ -70,10 +54,7 @@ const schema = {
     subCategoryCodes: { type: "array", items: { type: "string" } },
     alternativeCategoryCodes: { type: "array", items: { type: "string" } },
     suggestedPositioning: { type: "array", items: { type: "string" } },
-    careerLevel: {
-      type: "string",
-      enum: ["SPECIALISTE", "MANAGER", "CADRE", "HAUT_CADRE", "DIRECTION", "NON_SPECIFIE"],
-    },
+    careerLevel: { type: "string", enum: ["SPECIALISTE", "MANAGER", "CADRE", "HAUT_CADRE", "DIRECTION", "NON_SPECIFIE"] },
     careerLevelEvidence: { type: ["string", "null"] },
     suggestedFolder: { type: ["string", "null"] },
     confidence: { type: "number" },
@@ -130,27 +111,25 @@ export async function analyzeCvDocument(input: {
   mimeType: string;
   buffer: Buffer;
   taxonomy: CvTaxonomyItem[];
-  isMockData?: boolean;
 }): Promise<CvAnalysis | null> {
+  if (!process.env.OPENAI_API_KEY) return null;
+
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const taxonomyText = input.taxonomy
     .map((item) => `${item.code} — ${item.name}${item.parentCode ? ` (parent: ${item.parentCode})` : ""}`)
     .join("\n");
 
-  const context: AiAnalysisContext = {
-    classification: input.isMockData ? "MOCK_DATA" : "REAL_CV",
-    isMockData: Boolean(input.isMockData),
-  };
+  const fileContent = buildCvFileContent(input);
 
-  const response = await executeAiStructuredTask<CvAnalysis>({
-    context,
-    jsonSchemaName: "cv_analysis",
-    jsonSchema: schema as any,
-    fileInput: {
-      fileName: input.fileName,
-      mimeType: input.mimeType,
-      buffer: input.buffer,
-    },
-    userPrompt: `Analyse ce CV pour le moteur de recrutement Recrutement Privé.
+  const response = await client.responses.create({
+    model: process.env.OPENAI_CV_MODEL || "gpt-4.1-mini",
+    input: [{
+      role: "user",
+      content: [
+        fileContent,
+        {
+          type: "input_text",
+          text: `Analyse ce CV pour le moteur de recrutement Recrutement Privé.
 Extrais uniquement des informations professionnelles utiles au recrutement.
 Ne déduis pas de données sensibles non nécessaires et ne crée aucune expérience ou compétence absente du document.
 Sépare les faits explicitement présents du positionnement suggéré. Détermine aussi un niveau de carrière uniquement lorsqu'il est étayé par le CV (SPECIALISTE, MANAGER, CADRE, HAUT_CADRE, DIRECTION), sinon NON_SPECIFIE, et fournis une preuve courte. Pour chaque expérience, conserve un élément de preuve textuel court. Extrait aussi formations et certifications. improvedSummary peut reformuler et mieux présenter les faits, mais ne doit ajouter aucun fait absent du CV.
@@ -161,11 +140,22 @@ Le CV doit pouvoir être rematché ensuite avec des offres différentes de celle
 
 Taxonomie disponible:
 ${taxonomyText || "Aucune taxonomie fournie."}`,
+        },
+      ],
+    }],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "cv_analysis",
+        strict: true,
+        schema,
+      },
+    },
   });
 
-  if (!response.data) return null;
+  if (!response.output_text) return null;
 
-  const parsed = response.data;
+  const parsed = JSON.parse(response.output_text) as CvAnalysis;
   return {
     headline: typeof parsed.headline === "string" ? parsed.headline.trim() || null : null,
     summary: typeof parsed.summary === "string" ? parsed.summary.trim() || null : null,

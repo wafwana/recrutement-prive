@@ -1,5 +1,4 @@
-import { executeAiStructuredTask } from "@/lib/ai/client";
-import { AiAnalysisContext } from "@/lib/ai/types";
+import OpenAI from "openai";
 
 export type OfferTaxonomyItem = {
   code: string;
@@ -50,26 +49,20 @@ export async function analyzeExternalOffer(input: {
   sourceUrl?: string | null;
   taxonomy: OfferTaxonomyItem[];
 }): Promise<ExternalOfferAnalysis | null> {
+  if (!process.env.OPENAI_API_KEY) return null;
+
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const taxonomyText = input.taxonomy
     .map((item) => `${item.code} — ${item.name}${item.parentCode ? ` (parent: ${item.parentCode})` : ""}`)
     .join("\n");
 
-  const context: AiAnalysisContext = {
-    classification: "PUBLIC_OFFER",
-  };
-
-  const genericLocation = [input.city, input.country].filter(Boolean).join(", ");
-
-  const response = await executeAiStructuredTask<ExternalOfferAnalysis>({
-    context,
-    jsonSchemaName: "external_offer_analysis",
-    jsonSchema: schema as any,
-    geminiAllowedFields: {
-      title: input.title,
-      location: genericLocation,
-      descriptionSummary: input.description,
-    },
-    userPrompt: `Analyse cette offre d'emploi pour Recrutement Privé.
+  const response = await client.responses.create({
+    model: process.env.OPENAI_CV_MODEL || "gpt-4.1-mini",
+    input: [{
+      role: "user",
+      content: [{
+        type: "input_text",
+        text: `Analyse cette offre d'emploi pour Recrutement Privé.
 Décortique le poste en titre, résumé professionnel, compétences requises, expérience, langue et taxonomie métier.
 L'offre n'entre dans le périmètre de Recrutement Privé que si elle correspond à un recrutement professionnel réel et peut être rattachée de façon fiable à une catégorie ou sous-catégorie de la taxonomie fournie. Exclue les contenus qui ne sont pas des offres d'emploi exploitables.
 Ne déduis pas de critères sensibles et ne crée pas d'information absente de l'offre.
@@ -87,11 +80,20 @@ ${input.description || "Non précisée"}
 
 Taxonomie:
 ${taxonomyText || "Aucune taxonomie fournie."}`,
+      }],
+    }],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "external_offer_analysis",
+        strict: true,
+        schema,
+      },
+    },
   });
 
-  if (!response.data) return null;
-  const parsed = response.data;
-
+  if (!response.output_text) return null;
+  const parsed = JSON.parse(response.output_text) as ExternalOfferAnalysis;
   return {
     title: parsed.title?.trim() || input.title,
     summary: parsed.summary?.trim() || "",
