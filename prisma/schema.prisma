@@ -243,6 +243,7 @@ model Job {
   financialConditionStatus FinancialConditionStatus @default(PENDING)
   jobCategoryId String?
   subCategoryId String?
+  translations Json?
   jobCategory JobCategory? @relation("JobCategoryJobs", fields: [jobCategoryId], references: [id], onDelete: SetNull)
   subCategory JobCategory? @relation("SubCategoryJobs", fields: [subCategoryId], references: [id], onDelete: SetNull)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -345,6 +346,7 @@ model ExternalJobOpportunity {
   closingAt DateTime?
   description String?
   rawData Json?
+  translations Json?
   enterpriseMatches EnterpriseSourcedOffer[]
   status String @default("DETECTED")
   createdAt DateTime @default(now())

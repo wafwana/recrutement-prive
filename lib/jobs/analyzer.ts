@@ -1,4 +1,5 @@
-import OpenAI from "openai";
+import { executeAiStructuredTask } from "@/lib/ai/client";
+import { AiAnalysisContext } from "@/lib/ai/types";
 
 export type JobTaxonomyItem = {
   code: string;
@@ -43,21 +44,34 @@ export async function analyzeJobOffer(input: {
   requiredSkills?: unknown;
   requiredExperienceYears?: number | null;
   taxonomy: JobTaxonomyItem[];
+  isConfidentialEnterprise?: boolean;
 }): Promise<JobAnalysis | null> {
-  if (!process.env.OPENAI_API_KEY) return null;
-
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const taxonomyText = input.taxonomy
     .map((item) => `${item.code} — ${item.name}${item.parentCode ? ` (parent: ${item.parentCode})` : ""}`)
     .join("\n");
 
-  const response = await client.responses.create({
-    model: process.env.OPENAI_JOB_MODEL || "gpt-4.1-mini",
-    input: [{
-      role: "user",
-      content: [{
-        type: "input_text",
-        text: `Analyse cette offre pour le moteur de recrutement Recrutement Privé.
+  const context: AiAnalysisContext = {
+    classification: input.isConfidentialEnterprise ? "CONFIDENTIAL_ENTERPRISE" : "PUBLIC_OFFER",
+    isConfidentialEnterprise: Boolean(input.isConfidentialEnterprise),
+  };
+
+  const skillsList = Array.isArray(input.requiredSkills)
+    ? (input.requiredSkills as unknown[]).filter((x): x is string => typeof x === "string")
+    : [];
+
+  const response = await executeAiStructuredTask<JobAnalysis>({
+    context,
+    jsonSchemaName: "job_offer_analysis",
+    jsonSchema: schema as any,
+    geminiAllowedFields: {
+      title: input.title,
+      location: input.location,
+      missionType: input.missionType,
+      skills: skillsList,
+      experienceYears: input.requiredExperienceYears,
+      descriptionSummary: input.description,
+    },
+    userPrompt: `Analyse cette offre pour le moteur de recrutement Recrutement Privé.
 
 Objectif : transformer une saisie parfois incomplète en fiche d'offre exploitable par le moteur de matching.
 - N'invente aucune information absente.
@@ -79,20 +93,10 @@ Expérience saisie : ${input.requiredExperienceYears ?? "(non renseignée)"}
 
 Taxonomie :
 ${taxonomyText || "(aucune taxonomie disponible)"}`,
-      }],
-    }],
-    text: {
-      format: {
-        type: "json_schema",
-        name: "job_offer_analysis",
-        strict: true,
-        schema,
-      },
-    },
   });
 
-  if (!response.output_text) return null;
-  const parsed = JSON.parse(response.output_text) as JobAnalysis;
+  if (!response.data) return null;
+  const parsed = response.data;
 
   return {
     skills: Array.isArray(parsed.skills)
