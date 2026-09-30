@@ -9,23 +9,47 @@ export default function BatchProcessOffersButton() {
   async function runBatch() {
     setRunning(true);
     setMessage(null);
+    let totalAnalyzed = 0;
+    let totalQualified = 0;
+    let totalMatched = 0;
+    let totalErrors = 0;
+    let hasMore = true;
+
     try {
-      const response = await fetch("/api/owner/offres-vivier/batch-process", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ limit: 100 }),
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(data?.error || "La reprise par lot n'a pas pu être exécutée.");
+      while (hasMore) {
+        const response = await fetch("/api/owner/offres-vivier/batch-process", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ limit: 20 }),
+        });
+
+        const data = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(data?.error || "La reprise par lot n'a pas pu être exécutée.");
+        }
+
+        const summary = data?.batchSummary;
+        const processed = summary?.totalProcessed ?? 0;
+        if (processed === 0) break;
+
+        totalAnalyzed += processed;
+        totalQualified += summary?.qualified ?? 0;
+        totalMatched += summary?.matched ?? 0;
+        totalErrors += summary?.errors ?? 0;
+
+        const remaining = summary?.remainingPendingCount ?? 0;
+        hasMore = Boolean(summary?.hasMore) && remaining > 0;
+
+        setMessage(
+          `Traitement en cours : ${totalAnalyzed} offre(s) traitée(s)... (${remaining} restante(s))`
+        );
+
+        // Safety break if loop runs for too many iterations in a single session
+        if (totalAnalyzed >= 2000) break;
       }
-      const summary = data?.batchSummary;
-      const processed = summary?.totalProcessed ?? 0;
-      const qualified = summary?.qualified ?? 0;
-      const matched = summary?.matched ?? 0;
-      const errors = summary?.errors ?? 0;
+
       setMessage(
-        `Lot traité : ${processed} offre(s) analysée(s), ${qualified} qualifiée(s), ${matched} en matching, ${errors} erreur(s).`
+        `Traitement terminé : ${totalAnalyzed} offre(s) analysée(s), ${totalQualified} qualifiée(s), ${totalMatched} en matching, ${totalErrors} erreur(s).`
       );
       window.location.reload();
     } catch (err) {

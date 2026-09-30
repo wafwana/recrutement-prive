@@ -13,7 +13,7 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
     const sourceCollectedAt = new Date();
     const existing = await prisma.externalJobOpportunity.findUnique({
       where: { source_externalId: { source: item.source, externalId: item.externalId } },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     const saved = await prisma.externalJobOpportunity.upsert({
       where: { source_externalId: { source: item.source, externalId: item.externalId } },
@@ -29,18 +29,21 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
         experienceYears: item.experienceYears, language: item.language, salary: item.salary, publishedAt, closingAt,
         description: item.description, rawData, updatedAt: new Date(),
       },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (existing) updated++; else created++;
 
-    try {
-      const qRes = await qualifyAndMatchExternalOffer(saved.id);
-      if (qRes.qualified) {
-        qualified++;
-        if (qRes.matchesCount > 0) matched++;
+    // Idempotent trigger: only trigger automatic qualification & matching for newly created or pending offers
+    if (!existing || ["DETECTED", "A_QUALIFIER"].includes(existing.status)) {
+      try {
+        const qRes = await qualifyAndMatchExternalOffer(saved.id);
+        if (qRes.qualified) {
+          qualified++;
+          if (qRes.matchesCount > 0) matched++;
+        }
+      } catch (err) {
+        console.warn("[ingestGlobalJobs] Auto qualification error for job", saved.id, err);
       }
-    } catch (err) {
-      console.warn("[ingestGlobalJobs] Auto qualification error for job", saved.id, err);
     }
   }
 

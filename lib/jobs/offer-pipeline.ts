@@ -13,7 +13,10 @@ export type QualificationResult = {
   error?: string;
 };
 
-export async function qualifyAndMatchExternalOffer(externalJobId: string): Promise<QualificationResult> {
+export async function qualifyAndMatchExternalOffer(
+  externalJobId: string,
+  options?: { force?: boolean }
+): Promise<QualificationResult> {
   const offer = await prisma.externalJobOpportunity.findUnique({
     where: { id: externalJobId },
   });
@@ -28,6 +31,51 @@ export async function qualifyAndMatchExternalOffer(externalJobId: string): Promi
       reason: "Offre introuvable dans la base de données.",
       matchesCount: 0,
       error: "Offre introuvable.",
+    };
+  }
+
+  // Idempotency check: if offer is already processed and force is not true, skip
+  if (
+    !options?.force &&
+    ["QUALIFIED", "MATCHING", "CONTACTED", "FILLED", "ARCHIVED", "REJECTED"].includes(offer.status)
+  ) {
+    const existingRaw = offer.rawData && typeof offer.rawData === "object" && !Array.isArray(offer.rawData)
+      ? (offer.rawData as Record<string, unknown>)
+      : {};
+    const existingMatching = existingRaw?.matching && typeof existingRaw.matching === "object"
+      ? (existingRaw.matching as Record<string, unknown>)
+      : null;
+    const matchCount = typeof existingMatching?.matchCount === "number" ? existingMatching.matchCount : 0;
+
+    return {
+      success: true,
+      externalJobId: offer.id,
+      title: offer.title,
+      qualified: offer.status === "QUALIFIED" || offer.status === "MATCHING",
+      status: offer.status,
+      reason: "Offre déjà traitée.",
+      matchesCount: matchCount,
+    };
+  }
+
+  // Atomic lock protection against concurrent execution
+  const acquiredLock = await prisma.externalJobOpportunity.updateMany({
+    where: {
+      id: externalJobId,
+      status: { in: ["DETECTED", "A_QUALIFIER"] },
+    },
+    data: { status: "QUALIFYING" },
+  });
+
+  if (acquiredLock.count === 0 && offer.status !== "QUALIFYING" && !options?.force) {
+    return {
+      success: false,
+      externalJobId,
+      title: offer.title,
+      qualified: false,
+      status: offer.status,
+      reason: "Offre en cours de traitement par un autre processus.",
+      matchesCount: 0,
     };
   }
 
@@ -63,58 +111,48 @@ export async function qualifyAndMatchExternalOffer(externalJobId: string): Promi
     console.warn("[offer-pipeline] AI qualification unavailable/error:", err instanceof Error ? err.message : err);
   }
 
-  const fallbackCategory = offer.categoryCode && validCodes.has(offer.categoryCode) ? offer.categoryCode : null;
-  const fallbackSubCategory = offer.subCategoryCode && validCodes.has(offer.subCategoryCode) ? offer.subCategoryCode : null;
+  // Determine Category safely - NEVER arbitrarily default to taxonomy[0]
+  let categoryCode: string | null = null;
+  if (analysis?.categoryCode && validCodes.has(analysis.categoryCode)) {
+    categoryCode = analysis.categoryCode;
+  } else if (offer.categoryCode && validCodes.has(offer.categoryCode)) {
+    categoryCode = offer.categoryCode;
+  } else {
+    // Attempt deterministic keyword lookup against taxonomy
+    const titleLower = offer.title.toLowerCase();
+    for (const item of taxonomy) {
+      if (item.code && titleLower.includes(item.code.toLowerCase())) {
+        categoryCode = item.code;
+        break;
+      }
+    }
+  }
 
-  // A missing/invalid AI result is not evidence that an offer is admissible.
-  // Deterministic qualification is allowed only when the offer already carries a
-  // valid taxonomy category; never assign an arbitrary first category.
+  let subCategoryCode: string | null = null;
+  if (analysis?.subCategoryCode && validCodes.has(analysis.subCategoryCode)) {
+    subCategoryCode = analysis.subCategoryCode;
+  } else if (offer.subCategoryCode && validCodes.has(offer.subCategoryCode)) {
+    subCategoryCode = offer.subCategoryCode;
+  }
+
   const inPlatformScope = analysis
-    ? analysis.inPlatformScope === false
-      ? false
-      : Boolean(
-          analysis.inPlatformScope &&
-          ((analysis.categoryCode && validCodes.has(analysis.categoryCode)) || fallbackCategory)
-        )
-    : Boolean(fallbackCategory);
-
-  const categoryCode =
-    analysis?.categoryCode && validCodes.has(analysis.categoryCode)
-      ? analysis.categoryCode
-      : fallbackCategory;
-
-  const subCategoryCode =
-    analysis?.subCategoryCode && validCodes.has(analysis.subCategoryCode)
-      ? analysis.subCategoryCode
-      : fallbackSubCategory;
+    ? analysis.inPlatformScope && Boolean(categoryCode)
+    : Boolean(categoryCode && offer.title && offer.title.trim().length >= 3 && !/spam|test|junk|fake/i.test(offer.title));
 
   const existingRawData =
     offer.rawData && typeof offer.rawData === "object" && !Array.isArray(offer.rawData)
       ? (offer.rawData as Record<string, unknown>)
       : {};
 
-  if (
-    (!analysis && !fallbackCategory) ||
-    (analysis?.inPlatformScope === true && !categoryCode)
-  ) {
-    return {
-      success: false,
-      externalJobId: offer.id,
-      title: offer.title,
-      qualified: false,
-      status: offer.status,
-      reason: "Qualification en attente : analyse ou catégorie métier insuffisante.",
-      matchesCount: 0,
-      error: "Qualification non concluante; l'offre reste en attente de traitement.",
-    };
-  }
+  if (!inPlatformScope || !categoryCode) {
+    const scopeReason =
+      analysis?.scopeReason ||
+      (!categoryCode ? "Catégorie professionnelle indéterminée, qualification requise." : "Offre hors périmètre.");
 
-  if (analysis?.inPlatformScope === false) {
-    const scopeReason = analysis?.scopeReason || "Offre hors périmètre ou non exploitable par la plateforme.";
     await prisma.externalJobOpportunity.update({
       where: { id: offer.id },
       data: {
-        status: "REJECTED",
+        status: !categoryCode ? "A_QUALIFIER" : "REJECTED",
         rawData: {
           ...existingRawData,
           qualification: {
@@ -132,14 +170,18 @@ export async function qualifyAndMatchExternalOffer(externalJobId: string): Promi
       externalJobId: offer.id,
       title: offer.title,
       qualified: false,
-      status: "REJECTED",
+      status: !categoryCode ? "A_QUALIFIER" : "REJECTED",
       reason: scopeReason,
       matchesCount: 0,
     };
   }
 
   const qualifiedTitle = analysis?.title?.trim() || offer.title;
-  const qualifiedSkills = analysis?.skills?.length ? analysis.skills : (Array.isArray(offer.skills) ? offer.skills.filter((s): s is string => typeof s === "string") : []);
+  const qualifiedSkills = analysis?.skills?.length
+    ? analysis.skills
+    : Array.isArray(offer.skills)
+    ? offer.skills.filter((s): s is string => typeof s === "string")
+    : [];
   const qualifiedExperience = analysis?.experienceYears ?? offer.experienceYears ?? null;
   const qualifiedLanguage = analysis?.language || offer.language || null;
   const qualifiedDescription = analysis?.summary || offer.description || null;
@@ -167,6 +209,7 @@ export async function qualifyAndMatchExternalOffer(externalJobId: string): Promi
     },
   });
 
+  // Candidate Matching Execution
   const candidates = await prisma.candidateProfile.findMany({
     where: { status: "ACTIVE" },
     include: {
@@ -263,9 +306,12 @@ export async function processOfferBatch(options?: {
   rejected: number;
   matched: number;
   errors: number;
+  remainingPendingCount: number;
+  hasMore: boolean;
   results: QualificationResult[];
 }> {
-  const limit = options?.limit ?? 50;
+  // Safe default batch limit of 20 to ensure sub-10 second execution on Vercel HTTP handlers
+  const limit = Math.min(50, Math.max(1, options?.limit ?? 20));
   const statusFilter = options?.statusFilter ?? ["DETECTED", "A_QUALIFIER"];
 
   const pendingOffers = await prisma.externalJobOpportunity.findMany({
@@ -302,10 +348,19 @@ export async function processOfferBatch(options?: {
         qualified: false,
         status: "ERROR",
         matchesCount: 0,
-        error: err instanceof Error ? err.message : "Erreur inconnue pendant la qualification/matching.",
+        error: err instanceof Error ? err.message : "Erreur pendant la qualification/matching.",
       });
+      // Revert status from QUALIFYING to A_QUALIFIER on unhandled error so it can be retried
+      await prisma.externalJobOpportunity.updateMany({
+        where: { id: pending.id, status: "QUALIFYING" },
+        data: { status: "A_QUALIFIER" },
+      }).catch(() => null);
     }
   }
+
+  const remainingPendingCount = await prisma.externalJobOpportunity.count({
+    where: { status: { in: statusFilter } },
+  });
 
   return {
     totalProcessed: pendingOffers.length,
@@ -313,6 +368,8 @@ export async function processOfferBatch(options?: {
     rejected,
     matched,
     errors,
+    remainingPendingCount,
+    hasMore: remainingPendingCount > 0,
     results,
   };
 }
