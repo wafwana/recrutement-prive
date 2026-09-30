@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import { compareOfferPriority, getFinancialStatus, parseSalary } from "@/lib/offers/salary";
+import { extractOfferCountries, matchOfferCountry } from "@/lib/offers/country";
 import BackButton from "@/components/navigation/BackButton";
 import { processOwnerRawOffer } from "@/app/espace/owner/offres/nouvelle/raw-actions";
 
@@ -34,7 +35,7 @@ export default async function OfferPoolPage({
   const params = await searchParams;
   const q = params.q?.trim().toLowerCase() || "";
   const statusFilter = params.status?.trim() || "";
-  const countryFilter = params.country?.trim().toLowerCase() || "";
+  const countryFilter = params.country?.trim() || "";
 
   const [offers, total, toQualify, qualified, matching] = await Promise.all([
     prisma.externalJobOpportunity.findMany({
@@ -52,9 +53,11 @@ export default async function OfferPoolPage({
     prisma.externalJobOpportunity.count({ where: { status: "MATCHING" } }),
   ]);
 
+  const countries = extractOfferCountries(offers);
+
   const filtered = offers.filter((offer) => {
     if (statusFilter && offer.status !== statusFilter) return false;
-    if (countryFilter && !(offer.country || "").toLowerCase().includes(countryFilter)) return false;
+    if (countryFilter && !matchOfferCountry(offer.country, countryFilter)) return false;
     if (!q) return true;
     return [offer.title, offer.companyName, offer.country, offer.city, offer.categoryCode, offer.subCategoryCode]
       .some((value) => String(value || "").toLowerCase().includes(q));
@@ -65,8 +68,6 @@ export default async function OfferPoolPage({
     if (salaryOrder !== 0) return salaryOrder;
     return 0;
   });
-
-  const countries = [...new Set(offers.map((offer) => offer.country).filter(Boolean) as string[])].sort();
 
   return (
     <section className="mx-auto w-[min(1400px,calc(100%-40px))] py-12 md:py-20">
