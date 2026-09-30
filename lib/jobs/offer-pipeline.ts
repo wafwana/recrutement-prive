@@ -39,12 +39,14 @@ export async function qualifyAndMatchExternalOffer(
     !options?.force &&
     ["QUALIFIED", "MATCHING", "CONTACTED", "FILLED", "ARCHIVED", "REJECTED"].includes(offer.status)
   ) {
-    const existingRaw = offer.rawData && typeof offer.rawData === "object" && !Array.isArray(offer.rawData)
-      ? (offer.rawData as Record<string, unknown>)
-      : {};
-    const existingMatching = existingRaw?.matching && typeof existingRaw.matching === "object"
-      ? (existingRaw.matching as Record<string, unknown>)
-      : null;
+    const existingRaw =
+      offer.rawData && typeof offer.rawData === "object" && !Array.isArray(offer.rawData)
+        ? (offer.rawData as Record<string, unknown>)
+        : {};
+    const existingMatching =
+      existingRaw?.matching && typeof existingRaw.matching === "object"
+        ? (existingRaw.matching as Record<string, unknown>)
+        : null;
     const matchCount = typeof existingMatching?.matchCount === "number" ? existingMatching.matchCount : 0;
 
     return {
@@ -58,7 +60,7 @@ export async function qualifyAndMatchExternalOffer(
     };
   }
 
-  // Atomic lock protection against concurrent execution
+  // Strict atomic lock protection: return immediately if lock acquisition fails
   const acquiredLock = await prisma.externalJobOpportunity.updateMany({
     where: {
       id: externalJobId,
@@ -67,14 +69,14 @@ export async function qualifyAndMatchExternalOffer(
     data: { status: "QUALIFYING" },
   });
 
-  if (acquiredLock.count === 0 && offer.status !== "QUALIFYING" && !options?.force) {
+  if (acquiredLock.count === 0 && !options?.force) {
     return {
       success: false,
       externalJobId,
       title: offer.title,
       qualified: false,
       status: offer.status,
-      reason: "Offre en cours de traitement par un autre processus.",
+      reason: "Offre en cours de traitement par un autre processus ou déjà verrouillée.",
       matchesCount: 0,
     };
   }
@@ -144,6 +146,15 @@ export async function qualifyAndMatchExternalOffer(
       ? (offer.rawData as Record<string, unknown>)
       : {};
 
+  const existingQual =
+    existingRawData?.qualification && typeof existingRawData.qualification === "object"
+      ? (existingRawData.qualification as Record<string, unknown>)
+      : {};
+
+  const previousAttempts = typeof existingQual?.attemptCount === "number" ? existingQual.attemptCount : 0;
+  const newAttemptCount = previousAttempts + 1;
+  const lastAttemptAt = new Date().toISOString();
+
   if (!inPlatformScope || !categoryCode) {
     const scopeReason =
       analysis?.scopeReason ||
@@ -157,6 +168,8 @@ export async function qualifyAndMatchExternalOffer(
           ...existingRawData,
           qualification: {
             qualifiedAt: new Date().toISOString(),
+            lastAttemptAt,
+            attemptCount: newAttemptCount,
             inPlatformScope: false,
             scopeReason,
             aiUsed: Boolean(analysis),
@@ -200,6 +213,8 @@ export async function qualifyAndMatchExternalOffer(
         ...existingRawData,
         qualification: {
           qualifiedAt: new Date().toISOString(),
+          lastAttemptAt,
+          attemptCount: newAttemptCount,
           inPlatformScope: true,
           scopeReason: analysis?.scopeReason || "Offre qualifiée avec succès.",
           aiUsed: Boolean(analysis),
@@ -272,6 +287,8 @@ export async function qualifyAndMatchExternalOffer(
         ...existingRawData,
         qualification: {
           qualifiedAt: new Date().toISOString(),
+          lastAttemptAt,
+          attemptCount: newAttemptCount,
           inPlatformScope: true,
           scopeReason: analysis?.scopeReason || "Offre qualifiée avec succès.",
           aiUsed: Boolean(analysis),
@@ -300,18 +317,21 @@ export async function qualifyAndMatchExternalOffer(
 export async function processOfferBatch(options?: {
   limit?: number;
   statusFilter?: string[];
+  force?: boolean;
 }): Promise<{
   totalProcessed: number;
   qualified: number;
   rejected: number;
   matched: number;
+  unresolved: number;
+  progressCount: number;
   errors: number;
   remainingPendingCount: number;
   hasMore: boolean;
   results: QualificationResult[];
 }> {
-  // Safe default batch limit of 20 to ensure sub-10 second execution on Vercel HTTP handlers
-  const limit = Math.min(50, Math.max(1, options?.limit ?? 20));
+  // Strict server-side cap at 15 items per batch execution
+  const limit = Math.min(15, Math.max(1, options?.limit ?? 15));
   const statusFilter = options?.statusFilter ?? ["DETECTED", "A_QUALIFIER"];
 
   const pendingOffers = await prisma.externalJobOpportunity.findMany({
@@ -319,25 +339,53 @@ export async function processOfferBatch(options?: {
       status: { in: statusFilter },
     },
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-    take: limit,
-    select: { id: true },
+    take: 200,
+    select: { id: true, rawData: true },
   });
+
+  const oneHourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
+
+  // Exclude offers attempted within the last 1 hour or with attemptCount >= 3 unless forced
+  const eligibleOffers = pendingOffers
+    .filter((o) => {
+      if (options?.force) return true;
+      const raw =
+        o.rawData && typeof o.rawData === "object" && !Array.isArray(o.rawData)
+          ? (o.rawData as Record<string, unknown>)
+          : null;
+      const qual =
+        raw?.qualification && typeof raw.qualification === "object"
+          ? (raw.qualification as Record<string, unknown>)
+          : null;
+      const lastAttempt = typeof qual?.lastAttemptAt === "string" ? qual.lastAttemptAt : null;
+      const attempts = typeof qual?.attemptCount === "number" ? qual.attemptCount : 0;
+      if (attempts >= 3) return false;
+      if (lastAttempt && lastAttempt > oneHourAgo) return false;
+      return true;
+    })
+    .slice(0, limit);
 
   let qualified = 0;
   let rejected = 0;
   let matched = 0;
+  let unresolved = 0;
+  let progressCount = 0;
   let errors = 0;
   const results: QualificationResult[] = [];
 
-  for (const pending of pendingOffers) {
+  for (const pending of eligibleOffers) {
     try {
-      const res = await qualifyAndMatchExternalOffer(pending.id);
+      const res = await qualifyAndMatchExternalOffer(pending.id, { force: options?.force });
       results.push(res);
       if (res.qualified) {
         qualified++;
+        progressCount++;
         if (res.matchesCount > 0) matched++;
       } else if (res.status === "REJECTED") {
         rejected++;
+        progressCount++;
+      } else {
+        unresolved++;
       }
     } catch (err) {
       errors++;
@@ -351,10 +399,12 @@ export async function processOfferBatch(options?: {
         error: err instanceof Error ? err.message : "Erreur pendant la qualification/matching.",
       });
       // Revert status from QUALIFYING to A_QUALIFIER on unhandled error so it can be retried
-      await prisma.externalJobOpportunity.updateMany({
-        where: { id: pending.id, status: "QUALIFYING" },
-        data: { status: "A_QUALIFIER" },
-      }).catch(() => null);
+      await prisma.externalJobOpportunity
+        .updateMany({
+          where: { id: pending.id, status: "QUALIFYING" },
+          data: { status: "A_QUALIFIER" },
+        })
+        .catch(() => null);
     }
   }
 
@@ -362,14 +412,18 @@ export async function processOfferBatch(options?: {
     where: { status: { in: statusFilter } },
   });
 
+  const remainingEligibleCount = pendingOffers.length - eligibleOffers.length;
+
   return {
-    totalProcessed: pendingOffers.length,
+    totalProcessed: eligibleOffers.length,
     qualified,
     rejected,
     matched,
+    unresolved,
+    progressCount,
     errors,
     remainingPendingCount,
-    hasMore: remainingPendingCount > 0,
+    hasMore: (remainingPendingCount > 0 || remainingEligibleCount > 0) && progressCount > 0,
     results,
   };
 }

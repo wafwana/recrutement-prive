@@ -20,7 +20,7 @@ export default function BatchProcessOffersButton() {
         const response = await fetch("/api/owner/offres-vivier/batch-process", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ limit: 20 }),
+          body: JSON.stringify({ limit: 15 }),
         });
 
         const data = await response.json().catch(() => null);
@@ -30,7 +30,11 @@ export default function BatchProcessOffersButton() {
 
         const summary = data?.batchSummary;
         const processed = summary?.totalProcessed ?? 0;
-        if (processed === 0) break;
+        const progressCount = summary?.progressCount ?? 0;
+
+        if (processed === 0) {
+          break;
+        }
 
         totalAnalyzed += processed;
         totalQualified += summary?.qualified ?? 0;
@@ -38,19 +42,30 @@ export default function BatchProcessOffersButton() {
         totalErrors += summary?.errors ?? 0;
 
         const remaining = summary?.remainingPendingCount ?? 0;
+
+        // Bounded loop termination: STOP if no forward progress was made in this batch
+        if (progressCount === 0) {
+          setMessage(
+            `Traitement en pause : ${totalAnalyzed} offre(s) vérifiée(s). ${remaining} offre(s) restent à qualifier manuellement.`
+          );
+          hasMore = false;
+          break;
+        }
+
         hasMore = Boolean(summary?.hasMore) && remaining > 0;
 
         setMessage(
           `Traitement en cours : ${totalAnalyzed} offre(s) traitée(s)... (${remaining} restante(s))`
         );
 
-        // Safety break if loop runs for too many iterations in a single session
-        if (totalAnalyzed >= 2000) break;
+        if (totalAnalyzed >= 1500) break;
       }
 
-      setMessage(
-        `Traitement terminé : ${totalAnalyzed} offre(s) analysée(s), ${totalQualified} qualifiée(s), ${totalMatched} en matching, ${totalErrors} erreur(s).`
-      );
+      if (hasMore === false && totalAnalyzed > 0) {
+        setMessage(
+          `Traitement terminé : ${totalAnalyzed} offre(s) analysée(s), ${totalQualified} qualifiée(s), ${totalMatched} en matching, ${totalErrors} erreur(s).`
+        );
+      }
       window.location.reload();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erreur pendant le traitement du lot.");
