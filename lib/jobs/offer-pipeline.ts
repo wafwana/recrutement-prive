@@ -93,20 +93,23 @@ export async function qualifyAndMatchExternalOffer(externalJobId: string): Promi
       ? (offer.rawData as Record<string, unknown>)
       : {};
 
-  if (!inPlatformScope && !analysis && !fallbackCategory) {
+  if (
+    (!analysis && !fallbackCategory) ||
+    (analysis?.inPlatformScope === true && !categoryCode)
+  ) {
     return {
       success: false,
       externalJobId: offer.id,
       title: offer.title,
       qualified: false,
       status: offer.status,
-      reason: "Qualification en attente : aucune analyse IA valide ni catégorie existante vérifiable.",
+      reason: "Qualification en attente : analyse ou catégorie métier insuffisante.",
       matchesCount: 0,
       error: "Qualification non concluante; l'offre reste en attente de traitement.",
     };
   }
 
-  if (!inPlatformScope) {
+  if (analysis?.inPlatformScope === false) {
     const scopeReason = analysis?.scopeReason || "Offre hors périmètre ou non exploitable par la plateforme.";
     await prisma.externalJobOpportunity.update({
       where: { id: offer.id },
