@@ -26,6 +26,7 @@ const PERMISSION_LABELS: Record<Permission, { title: string; description: string
   MESSAGING_CLIENTS_ENTERPRISE: { title: "Messagerie Clients / Entreprises", description: "Communication directe avec les recruteurs et clients.", category: "Messagerie" },
   PLATFORM_SETTINGS: { title: "Configuration Plateforme", description: "Gestion des paramètres globaux de fonctionnement.", category: "Configuration" },
   ENTERPRISE_OFFER_SOURCING: { title: "Sourcing Offres Entreprises", description: "Collecte et qualification automatisée d'offres externes.", category: "Sourcing" },
+  PARTNERS_MANAGE: { title: "Partenaires & Sources", description: "Gestion des partenaires institutionnels, éducatifs, associatifs et réseaux d'expatriés.", category: "Partenaires" },
 };
 
 export default async function AdminAutorisationsPage() {
@@ -37,7 +38,6 @@ export default async function AdminAutorisationsPage() {
   const role = session.user.role;
   const isOwner = role === "OWNER";
 
-  // Get active permissions explicitly granted by the Owner
   const permissionsList = await getUserPermissions(session.user.id);
   const activePermissions = isOwner
     ? (Object.keys(PERMISSION_LABELS) as Permission[])
