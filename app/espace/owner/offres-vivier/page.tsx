@@ -6,6 +6,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { compareOfferPriority, getFinancialStatus, parseSalary } from "@/lib/offers/salary";
 import { extractOfferCountries, matchOfferCountry } from "@/lib/offers/country";
 import BackButton from "@/components/navigation/BackButton";
+import BatchProcessOffersButton from "@/components/owner/BatchProcessOffersButton";
 import { processOwnerRawOffer } from "@/app/espace/owner/offres/nouvelle/raw-actions";
 
 async function submitRawOffer(formData: FormData) { "use server"; await processOwnerRawOffer(formData); }
@@ -37,7 +38,7 @@ export default async function OfferPoolPage({
   const statusFilter = params.status?.trim() || "";
   const countryFilter = params.country?.trim() || "";
 
-  const [offers, total, toQualify, qualified, matching] = await Promise.all([
+  const [offers, total, toQualify, qualified, matching, rejected] = await Promise.all([
     prisma.externalJobOpportunity.findMany({
       orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
       take: 5000,
@@ -48,9 +49,10 @@ export default async function OfferPoolPage({
       },
     }),
     prisma.externalJobOpportunity.count(),
-    prisma.externalJobOpportunity.count({ where: { status: "A_QUALIFIER" } }),
+    prisma.externalJobOpportunity.count({ where: { status: { in: ["DETECTED", "A_QUALIFIER", "QUALIFYING"] } } }),
     prisma.externalJobOpportunity.count({ where: { status: "QUALIFIED" } }),
     prisma.externalJobOpportunity.count({ where: { status: "MATCHING" } }),
+    prisma.externalJobOpportunity.count({ where: { status: "REJECTED" } }),
   ]);
 
   const countries = extractOfferCountries(offers);
@@ -81,17 +83,21 @@ export default async function OfferPoolPage({
             conservées pour qualification et matching. Aucune offre détaillée n’est exposée publiquement.
           </p>
         </div>
-        <Link href="/espace/owner/sourcing" className="border border-[#F97316] px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">
-          Lancer / voir le sourcing
-        </Link>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <BatchProcessOffersButton />
+          <Link href="/espace/owner/sourcing" className="border border-[#F97316] px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">
+            Lancer / voir le sourcing
+          </Link>
+        </div>
       </div>
 
-      <div className="mt-8 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-8 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-5">
         {[
           ["Offres conservées", total],
-          ["À qualifier", toQualify],
+          ["À qualifier / En cours", toQualify],
           ["Qualifiées", qualified],
           ["En matching", matching],
+          ["Écartées", rejected],
         ].map(([label, value]) => (
           <div key={String(label)} className="bg-[#111] p-5">
             <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">{label}</p>
@@ -129,6 +135,10 @@ export default async function OfferPoolPage({
         </div>
         {filtered.map((offer) => {
           const salary = parseSalary(offer.salary);
+          const rawObj = offer.rawData && typeof offer.rawData === "object" && !Array.isArray(offer.rawData) ? (offer.rawData as Record<string, unknown>) : null;
+          const matchingObj = rawObj?.matching && typeof rawObj.matching === "object" ? (rawObj.matching as Record<string, unknown>) : null;
+          const matchCount = typeof matchingObj?.matchCount === "number" ? matchingObj.matchCount : null;
+
           return (
             <article key={offer.id} className="grid grid-cols-1 gap-3 border-b border-white/10 px-5 py-5 last:border-b-0 md:grid-cols-[2fr_1.1fr_1fr_1fr_1fr] md:items-center">
               <div>
@@ -147,6 +157,11 @@ export default async function OfferPoolPage({
                       SOURCE_DIFFICULTY: "difficulté signalée",
                       UNKNOWN: "à vérifier",
                     }[getFinancialStatus(offer.rawData)]}
+                  </p>
+                )}
+                {matchCount !== null && (
+                  <p className="mt-1 text-[10px] text-[#F97316]">
+                    {matchCount} candidat(s) suggéré(s) en vivier
                   </p>
                 )}
               </div>
