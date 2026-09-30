@@ -5,21 +5,19 @@ import { callGeminiStructured } from "./gemini";
 
 /**
  * Resolves which AI provider to use.
- * Order of preference:
- * 1. Forced provider specified via AI_PROVIDER env ("openai" | "gemini")
- * 2. Default to "openai" if OPENAI_API_KEY is available
- * 3. Default to "gemini" if GEMINI_API_KEY is available
+ * An explicit AI_PROVIDER always wins. Otherwise prefer Gemini when configured,
+ * so a dormant OpenAI key cannot silently route production CV work to OpenAI.
  */
 export function getActiveAiProvider(): AiProvider | null {
   const forced = process.env.AI_PROVIDER?.toLowerCase() as AiProvider | undefined;
   if (forced === "gemini" || forced === "openai") {
     return forced;
   }
-  if (process.env.OPENAI_API_KEY) {
-    return "openai";
-  }
   if (process.env.GEMINI_API_KEY) {
     return "gemini";
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return "openai";
   }
   return null;
 }
