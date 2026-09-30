@@ -1,6 +1,6 @@
-import OpenAI from "openai";
 import { createHash } from "node:crypto";
 import { isIP } from "node:net";
+import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
 import { lookupCompanyBySiret } from "@/lib/company/public-registry";
 import { sendEmail } from "@/lib/email/service";
 
@@ -46,9 +46,9 @@ export async function fetchPublicOfferUrl(raw:string){const u=safeUrl(raw);const
  const text=htmlText((await r.text()).slice(0,500000)).slice(0,30000);if(text.length<80)throw new Error("Contenu d'offre insuffisant.");return{url:r.url,text};}
 
 export async function analyzeRawOffer(input:{rawText:string;source:{title?:string|null;companyName?:string|null;country?:string|null;city?:string|null;sourceUrl?:string|null};taxonomy:{code:string;name:string;parentCode?:string|null}[]}):Promise<RawOfferAnalysis|null>{
- if(!process.env.OPENAI_API_KEY)return null;const client=new OpenAI({apiKey:process.env.OPENAI_API_KEY});
+ if(!getActiveAiProvider())return null;
  const taxonomy=input.taxonomy.map(x=>`${x.code} — ${x.name}${x.parentCode?` (parent: ${x.parentCode})`:""}`).join("\n");
- const r=await client.responses.create({model:process.env.OPENAI_JOB_MODEL||"gpt-4.1-mini",input:[{role:"user",content:[{type:"input_text",text:`Analyse cette offre brute pour Recrutement Privé, sans inventer de faits.
+ const promptText=`Analyse cette offre brute pour Recrutement Privé, sans inventer de faits.
 Structure le poste, identifie l'entreprise seulement si elle est réellement mentionnée, extrait compétences/expérience/localisation/type de mission, classe avec la taxonomie fournie et résume le besoin.
 Propose 3 à 4 postes potentiellement difficiles à recruter à partir des éléments disponibles. Tout poste non explicitement présent doit être marqué COMPANY_HYPOTHESIS et ne doit jamais être présenté comme un fait.
 Prépare un premier email très court (maximum 140 mots), personnalisé, montrant que RP a compris le besoin; mentionne 1 à 3 compétences réelles et pourquoi elles comptent; indique que RP peut se positionner sur une recherche difficile, sans promettre de candidat ni de résultat.
@@ -57,8 +57,22 @@ Contexte: titre=${input.source.title||"(non précisé)"}; entreprise=${input.sou
 OFFRE:
 ${input.rawText.slice(0,30000)}
 TAXONOMIE:
-${taxonomy||"(aucune)"}`}] }],text:{format:{type:"json_schema",name:"raw_offer_analysis",strict:true,schema}}});
- if(!r.output_text)return null;const p=JSON.parse(r.output_text) as RawOfferAnalysis;
+${taxonomy||"(aucune)"}`;
+
+ const res=await executeAiStructuredTask<RawOfferAnalysis>({
+   userPrompt: promptText,
+   jsonSchemaName: "raw_offer_analysis",
+   jsonSchema: schema as unknown as Record<string, unknown>,
+   context: { classification: "PUBLIC_OFFER" },
+   modelOverride: process.env.OPENAI_JOB_MODEL,
+   geminiAllowedFields: {
+     title: input.source.title,
+     location: [input.source.city, input.source.country].filter(Boolean).join(", ") || null,
+     descriptionSummary: input.rawText.slice(0, 1000),
+   },
+ });
+
+ if(!res.data)return null;const p=res.data;
  return {title:clean(p.title)||input.source.title||"Offre à qualifier",companyName:clean(p.companyName)||clean(input.source.companyName),
  companySiret:siret(clean(p.companySiret)),country:clean(p.country)||clean(input.source.country),city:clean(p.city)||clean(input.source.city),
  location:clean(p.location),skills:strings(p.skills).slice(0,30),experienceYears:typeof p.experienceYears==="number"&&Number.isFinite(p.experienceYears)?Math.max(0,Math.min(60,Math.round(p.experienceYears))):null,

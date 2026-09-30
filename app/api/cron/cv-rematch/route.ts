@@ -51,8 +51,6 @@ export async function GET(request: Request) {
 
   let updated = 0;
   for (const intake of intakeQueue) {
-    if (!process.env.OPENAI_API_KEY) break;
-
     const taxonomy = await prisma.jobCategory.findMany({
       where: { isActive: true },
       select: { id: true, code: true, name: true, parentId: true },
@@ -72,7 +70,16 @@ export async function GET(request: Request) {
         buffer: Buffer.from(intake.fileData),
         taxonomy: taxonomyItems,
       });
-      if (!analysis) continue;
+      if (!analysis) {
+        await prisma.cvIntake.update({
+          where: { id: intake.id },
+          data: {
+            status: "NON_ANALYSE",
+            analysis: { error: "Aucun fournisseur IA disponible ou rejeté par règles de confidentialité." },
+          },
+        });
+        continue;
+      }
 
       const primary = taxonomy.find((row) => row.code === analysis.primaryCategoryCode && row.parentId === null);
       const subCategories = taxonomy.filter((row) => analysis.subCategoryCodes.includes(row.code) && row.parentId);
