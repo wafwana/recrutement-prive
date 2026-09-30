@@ -40,31 +40,32 @@ const LEGACY_PERMISSION_ALIASES: Record<string, Permission> = {
 };
 
 export async function getUserPermissions(userId: string): Promise<Permission[] | null> {
-  const record = await prisma.systemSetting.findUnique({
-    where: { key: `permissions:${userId}` },
-    select: { value: true },
-  });
-  if (!record) return null;
-  const value = record.value;
-  if (!Array.isArray(value)) return [];
-  const normalized = new Set<string>();
-  for (const item of value) {
-    if (typeof item !== "string") continue;
-    // A granted permission is atomic: it never expands into another
-    // business function or access level by association.
-    const canonical = LEGACY_PERMISSION_ALIASES[item] || item;
-    if ((PERMISSIONS as readonly string[]).includes(canonical)) normalized.add(canonical);
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    const record = await prisma.systemSetting.findUnique({
+      where: { key: `permissions:${userId}` },
+      select: { value: true },
+    });
+    if (!record) return null;
+    const value = record.value;
+    if (!Array.isArray(value)) return [];
+    const normalized = new Set<string>();
+    for (const item of value) {
+      if (typeof item !== "string") continue;
+      const canonical = LEGACY_PERMISSION_ALIASES[item] || item;
+      if ((PERMISSIONS as readonly string[]).includes(canonical)) normalized.add(canonical);
+    }
+    return [...normalized].filter((item): item is Permission =>
+      (PERMISSIONS as readonly string[]).includes(item),
+    );
+  } catch {
+    return null;
   }
-  return [...normalized].filter((item): item is Permission =>
-    (PERMISSIONS as readonly string[]).includes(item),
-  );
 }
 
 export async function hasPermission(userId: string, role: Role | string | undefined, permission: Permission): Promise<boolean> {
   if (role === "OWNER") return true;
   const permissions = await getUserPermissions(userId);
-  // Granular governance is explicit for every non-OWNER account.
-  // Having a staff role, or having another permission, never grants this one.
   if (permissions === null) return false;
   return permissions.includes(permission);
 }
