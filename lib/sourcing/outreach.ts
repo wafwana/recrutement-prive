@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
 import { sendEmail } from "@/lib/email/service";
 
 export type ExternalOfferOutreach = {
@@ -71,15 +71,9 @@ export async function generateExternalOfferOutreach(input: {
   let subject = `Recrutement Privé — ${input.title}`;
   let text = "";
 
-  if (process.env.OPENAI_API_KEY) {
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const response = await client.responses.create({
-      model: process.env.OPENAI_JOB_MODEL || "gpt-4.1-mini",
-      input: [{
-        role: "user",
-        content: [{
-          type: "input_text",
-          text: `Rédige un premier courrier B2B très court à partir de cette offre d'emploi publique.
+  if (getActiveAiProvider()) {
+    const response = await executeAiStructuredTask<{ subject?: string; text?: string }>({
+      userPrompt: `Rédige un premier courrier B2B très court à partir de cette offre d'emploi publique.
 Montre que Recrutement Privé a compris le besoin de l'entreprise.
 Mentionne brièvement 1 à 3 compétences réellement présentes dans l'offre et explique pourquoi elles comptent pour le poste.
 Indique que Recrutement Privé peut se positionner sur cette recherche de profil difficile, sans promettre de candidat ni de résultat.
@@ -92,26 +86,27 @@ Expérience: ${input.experienceYears ?? "non précisée"}
 Langue: ${input.language || "non précisée"}
 Résumé: ${input.summary}
 URL source: ${input.sourceUrl || "non précisée"}`,
-        }],
-      }],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "external_offer_outreach",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: { subject: { type: "string" }, text: { type: "string" } },
-            required: ["subject", "text"],
-          },
-        },
+      jsonSchemaName: "external_offer_outreach",
+      jsonSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: { subject: { type: "string" }, text: { type: "string" } },
+        required: ["subject", "text"],
+      },
+      context: { classification: "PUBLIC_OFFER" },
+      modelOverride: process.env.OPENAI_JOB_MODEL,
+      geminiAllowedFields: {
+        title: input.title,
+        location: [input.city, input.country].filter(Boolean).join(", ") || null,
+        skills: input.skills,
+        experienceYears: input.experienceYears ?? null,
+        descriptionSummary: input.summary,
       },
     });
-    if (response.output_text) {
-      const parsed = JSON.parse(response.output_text) as { subject?: string; text?: string };
-      subject = parsed.subject?.trim() || subject;
-      text = parsed.text?.trim() || "";
+
+    if (response.data) {
+      subject = response.data.subject?.trim() || subject;
+      text = response.data.text?.trim() || "";
     }
   }
 

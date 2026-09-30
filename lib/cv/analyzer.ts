@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
 
 export type CvTaxonomyItem = {
   code: string;
@@ -112,24 +112,14 @@ export async function analyzeCvDocument(input: {
   buffer: Buffer;
   taxonomy: CvTaxonomyItem[];
 }): Promise<CvAnalysis | null> {
-  if (!process.env.OPENAI_API_KEY) return null;
+  const provider = getActiveAiProvider();
+  if (!provider) return null;
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const taxonomyText = input.taxonomy
     .map((item) => `${item.code} — ${item.name}${item.parentCode ? ` (parent: ${item.parentCode})` : ""}`)
     .join("\n");
 
-  const fileContent = buildCvFileContent(input);
-
-  const response = await client.responses.create({
-    model: process.env.OPENAI_CV_MODEL || "gpt-4.1-mini",
-    input: [{
-      role: "user",
-      content: [
-        fileContent,
-        {
-          type: "input_text",
-          text: `Analyse ce CV pour le moteur de recrutement Recrutement Privé.
+  const promptText = `Analyse ce CV pour le moteur de recrutement Recrutement Privé.
 Extrais uniquement des informations professionnelles utiles au recrutement.
 Ne déduis pas de données sensibles non nécessaires et ne crée aucune expérience ou compétence absente du document.
 Sépare les faits explicitement présents du positionnement suggéré. Détermine aussi un niveau de carrière uniquement lorsqu'il est étayé par le CV (SPECIALISTE, MANAGER, CADRE, HAUT_CADRE, DIRECTION), sinon NON_SPECIFIE, et fournis une preuve courte. Pour chaque expérience, conserve un élément de preuve textuel court. Extrait aussi formations et certifications. improvedSummary peut reformuler et mieux présenter les faits, mais ne doit ajouter aucun fait absent du CV.
@@ -139,23 +129,24 @@ Utilise uniquement les codes de la taxonomie fournie. Si aucune correspondance f
 Le CV doit pouvoir être rematché ensuite avec des offres différentes de celle qui aurait éventuellement conduit à son dépôt.
 
 Taxonomie disponible:
-${taxonomyText || "Aucune taxonomie fournie."}`,
-        },
-      ],
-    }],
-    text: {
-      format: {
-        type: "json_schema",
-        name: "cv_analysis",
-        strict: true,
-        schema,
-      },
+${taxonomyText || "Aucune taxonomie fournie."}`;
+
+  const response = await executeAiStructuredTask<CvAnalysis>({
+    userPrompt: promptText,
+    fileInput: {
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      buffer: input.buffer,
     },
+    jsonSchemaName: "cv_analysis",
+    jsonSchema: schema as unknown as Record<string, unknown>,
+    context: { classification: "REAL_CV" },
+    modelOverride: process.env.OPENAI_CV_MODEL,
   });
 
-  if (!response.output_text) return null;
+  if (!response.data) return null;
 
-  const parsed = JSON.parse(response.output_text) as CvAnalysis;
+  const parsed = response.data;
   return {
     headline: typeof parsed.headline === "string" ? parsed.headline.trim() || null : null,
     summary: typeof parsed.summary === "string" ? parsed.summary.trim() || null : null,
