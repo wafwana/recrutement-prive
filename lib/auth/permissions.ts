@@ -27,7 +27,6 @@ export const PERMISSIONS = [
   "MESSAGING_CLIENTS_ENTERPRISE",
   "PLATFORM_SETTINGS",
   "ENTERPRISE_OFFER_SOURCING",
-  "PARTNERS_MANAGE",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
