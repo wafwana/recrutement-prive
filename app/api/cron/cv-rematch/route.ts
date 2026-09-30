@@ -13,12 +13,12 @@ export async function GET(request: Request) {
   const candidates = await prisma.candidateProfile.findMany({
     where: {
       status: "ACTIVE",
-      documents: { some: { docType: "CV", isPrimaryCv: true } },
+      documents: { some: { docType: "CV" } },
     },
     include: {
       primaryCategory: { select: { code: true } },
       documents: {
-        where: { docType: "CV", isPrimaryCv: true },
+        where: { docType: "CV" },
         orderBy: { createdAt: "desc" },
         take: 1,
         select: { id: true, analysis: true },
