@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { analyzeAndMatchJob } from "@/lib/jobs/automation";
+import { triggerJobCandidateMatching } from "@/lib/jobs/matching-trigger";
 
 const schema = z.object({
   companyId: z.string().min(1),
@@ -109,6 +110,14 @@ export async function createOwnerJob(formData: FormData) {
     actorUserId,
     actorRole: "OWNER",
   });
+
+  if (job.status === "OPEN") {
+    try {
+      await triggerJobCandidateMatching(job.id);
+    } catch (e) {
+      console.error("[owner-job] candidate matching trigger failed", e);
+    }
+  }
 
   return {
     ok: true,
