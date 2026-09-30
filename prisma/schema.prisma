@@ -654,3 +654,98 @@ model RecruitmentInvoicePayment {
   createdAt   DateTime @default(now())
   @@index([invoiceId, paidAt])
 }
+
+model Partner {
+  id                    String             @id @default(cuid())
+  officialName          String
+  usualName             String?
+  category              String
+  subCategory           String?
+  partnerType           String?
+  status                String             @default("IDENTIFIED")
+  country               String?
+  region                String?
+  city                  String?
+  website               String?
+  institutionalAddress  String?
+  publicContactEmail    String?
+  publicContactPhone    String?
+  languages             Json?
+  sectors               Json?
+  professions           Json?
+  targetAudience        Json?
+  skills                Json?
+  collaborationTypes    Json?
+  potentialNeed         String?
+  interest              String?
+  coveredZones          Json?
+  priority              String             @default("MEDIUM")
+  assignedOwner         String?
+  lastQualifiedAt       DateTime?
+  lastContactAt         DateTime?
+  notes                 String?
+  source                String             @default("MANUAL")
+  sourceUrl             String?
+  discoveredAt          DateTime           @default(now())
+  lastVerifiedAt        DateTime?
+  contacts              PartnerContact[]
+  agreements            PartnerAgreement[]
+  history               PartnerHistory[]
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([category, subCategory])
+  @@index([status])
+  @@index([country, city])
+  @@index([createdAt])
+}
+
+model PartnerContact {
+  id                    String             @id @default(cuid())
+  partnerId             String
+  name                  String
+  roleTitle             String?
+  email                 String?
+  phone                 String?
+  source                String?
+  collectedAt           DateTime           @default(now())
+  notes                 String?
+  partner               Partner            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([partnerId])
+  @@index([email])
+}
+
+model PartnerAgreement {
+  id                    String             @id @default(cuid())
+  partnerId             String
+  title                 String
+  agreementType         String
+  status                String             @default("PROJECT")
+  startDate             DateTime?
+  endDate               DateTime?
+  clauses               String?
+  documentUrl           String?
+  partner               Partner            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([partnerId, status])
+}
+
+model PartnerHistory {
+  id                    String             @id @default(cuid())
+  partnerId             String
+  actorUserId           String
+  actorName             String?
+  action                String
+  fromStatus            String?
+  toStatus              String?
+  details               Json?
+  partner               Partner            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  createdAt             DateTime           @default(now())
+
+  @@index([partnerId, createdAt])
+}

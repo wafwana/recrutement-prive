@@ -1,9 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@prisma/client";
 
-// Each functional Owner tab has its own atomic permission.
-// Permission names deliberately follow the corresponding module/folder name
-// so the Owner can immediately identify exactly what is being granted.
 export const PERMISSIONS = [
   "CANDIDATES_VIEW",
   "CANDIDATES_MANAGE",
@@ -27,6 +24,7 @@ export const PERMISSIONS = [
   "MESSAGING_CLIENTS_ENTERPRISE",
   "PLATFORM_SETTINGS",
   "ENTERPRISE_OFFER_SOURCING",
+  "PARTNERS_MANAGE",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
