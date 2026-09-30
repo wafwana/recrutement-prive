@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import { compareOfferPriority, getFinancialStatus, parseSalary } from "@/lib/offers/salary";
 import BackButton from "@/components/navigation/BackButton";
+import BatchProcessOffersButton from "@/components/owner/BatchProcessOffersButton";
 import { processOwnerRawOffer } from "@/app/espace/owner/offres/nouvelle/raw-actions";
 
 async function submitRawOffer(formData: FormData) { "use server"; await processOwnerRawOffer(formData); }
@@ -47,7 +48,7 @@ export default async function OfferPoolPage({
       },
     }),
     prisma.externalJobOpportunity.count(),
-    prisma.externalJobOpportunity.count({ where: { status: "A_QUALIFIER" } }),
+    prisma.externalJobOpportunity.count({ where: { status: { in: ["DETECTED", "A_QUALIFIER"] } } }),
     prisma.externalJobOpportunity.count({ where: { status: "QUALIFIED" } }),
     prisma.externalJobOpportunity.count({ where: { status: "MATCHING" } }),
   ]);
@@ -76,13 +77,16 @@ export default async function OfferPoolPage({
           <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Vivier des offres</p>
           <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Vivier des offres.</h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">
-            Vivier strictement interne : offres issues du sourcing automatique ou ajoutées manuellement,
+            Vivier strictly interne : offres issues du sourcing automatique ou ajoutées manuellement,
             conservées pour qualification et matching. Aucune offre détaillée n’est exposée publiquement.
           </p>
         </div>
-        <Link href="/espace/owner/sourcing" className="border border-[#F97316] px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">
-          Lancer / voir le sourcing
-        </Link>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <BatchProcessOffersButton />
+          <Link href="/espace/owner/sourcing" className="border border-[#F97316] px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">
+            Lancer / voir le sourcing
+          </Link>
+        </div>
       </div>
 
       <div className="mt-8 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
@@ -128,6 +132,10 @@ export default async function OfferPoolPage({
         </div>
         {filtered.map((offer) => {
           const salary = parseSalary(offer.salary);
+          const rawObj = offer.rawData && typeof offer.rawData === "object" && !Array.isArray(offer.rawData) ? (offer.rawData as Record<string, unknown>) : null;
+          const matchingObj = rawObj?.matching && typeof rawObj.matching === "object" ? (rawObj.matching as Record<string, unknown>) : null;
+          const matchCount = typeof matchingObj?.matchCount === "number" ? matchingObj.matchCount : null;
+
           return (
             <article key={offer.id} className="grid grid-cols-1 gap-3 border-b border-white/10 px-5 py-5 last:border-b-0 md:grid-cols-[2fr_1.1fr_1fr_1fr_1fr] md:items-center">
               <div>
@@ -146,6 +154,11 @@ export default async function OfferPoolPage({
                       SOURCE_DIFFICULTY: "difficulté signalée",
                       UNKNOWN: "à vérifier",
                     }[getFinancialStatus(offer.rawData)]}
+                  </p>
+                )}
+                {matchCount !== null && (
+                  <p className="mt-1 text-[10px] text-[#F97316]">
+                    {matchCount} candidat(s) suggéré(s) en vivier
                   </p>
                 )}
               </div>
