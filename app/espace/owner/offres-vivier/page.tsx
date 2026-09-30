@@ -77,7 +77,7 @@ export default async function OfferPoolPage({
           <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Vivier des offres</p>
           <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Vivier des offres.</h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">
-            Vivier strictly interne : offres issues du sourcing automatique ou ajoutées manuellement,
+            Vivier strictement interne : offres issues du sourcing automatique ou ajoutées manuellement,
             conservées pour qualification et matching. Aucune offre détaillée n’est exposée publiquement.
           </p>
         </div>
