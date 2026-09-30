@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { isCompanyManager, requireCompanyAccess } from "@/lib/company-access";
+import { triggerJobCandidateMatching } from "@/lib/jobs/matching-trigger";
 
 const jobSchema = z.object({
   title: z.string().trim().min(2).max(160),
@@ -167,6 +168,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ jobI
       }
       return updated;
     });
+
+    if (job.status === "OPEN") {
+      try {
+        await triggerJobCandidateMatching(job.id);
+      } catch (matchingError) {
+        console.error("[company-job] candidate matching on update failed", { jobId: job.id, error: matchingError });
+      }
+    }
 
     return NextResponse.json(job);
   } catch (error) {
