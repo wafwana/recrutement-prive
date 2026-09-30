@@ -14,7 +14,7 @@ async function requirePartnerAccess() {
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
   const name = typeof session?.user?.name === "string" ? session.user.name : session?.user?.email || "Utilisateur";
-  if (!session?.user || !userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role || "")) return null;
+  if (!session?.user || !userId || !role === "OWNER") return null;
   if (!(await hasPermission(userId, role, "PARTNERS_MANAGE"))) return null;
   return { id: userId, role: role!, name };
 }
