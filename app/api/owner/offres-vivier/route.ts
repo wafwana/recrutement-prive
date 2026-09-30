@@ -3,6 +3,7 @@ import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import { compareSalaryPriority, parseSalary } from "@/lib/offers/salary";
+import { qualifyAndMatchExternalOffer } from "@/lib/jobs/offer-pipeline";
 
 const ALLOWED_STATUS = ["DETECTED", "A_QUALIFIER", "QUALIFIED", "MATCHING", "CONTACTED", "FILLED", "ARCHIVED", "REJECTED"] as const;
 type AllowedStatus = (typeof ALLOWED_STATUS)[number];
@@ -90,6 +91,18 @@ export async function POST(request: Request) {
     select: { id: true, title: true, status: true },
   });
 
+  let qualificationResult = null;
+  try {
+    qualificationResult = await qualifyAndMatchExternalOffer(offer.id);
+  } catch (err) {
+    console.warn("[POST /api/owner/offres-vivier] Automatic qualification failed:", err);
+  }
+
+  const updatedOffer = await prisma.externalJobOpportunity.findUnique({
+    where: { id: offer.id },
+    select: { id: true, title: true, status: true, categoryCode: true, subCategoryCode: true },
+  });
+
   await prisma.auditLog.create({
     data: {
       actorUserId: actor.userId,
@@ -97,11 +110,11 @@ export async function POST(request: Request) {
       action: "CREATE_OFFER_POOL_ENTRY",
       targetType: "EXTERNAL_JOB_OPPORTUNITY",
       targetId: offer.id,
-      details: { source: "MANUAL_RP" },
+      details: { source: "MANUAL_RP", qualificationResult },
     },
   });
 
-  return NextResponse.json({ offer }, { status: 201 });
+  return NextResponse.json({ offer: updatedOffer || offer, qualificationResult }, { status: 201 });
 }
 
 export async function PATCH(request: Request) {

@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { fetchGlobalJobs } from "@/lib/sourcing/global";
+import { qualifyAndMatchExternalOffer } from "@/lib/jobs/offer-pipeline";
 
 export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
   const items = await fetchGlobalJobs(sourceUrl);
-  let created = 0, updated = 0;
+  let created = 0, updated = 0, qualified = 0, matched = 0;
   for (const item of items) {
     const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
     const closingAt = item.closingAt ? new Date(item.closingAt) : null;
@@ -14,7 +15,7 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
       where: { source_externalId: { source: item.source, externalId: item.externalId } },
       select: { id: true },
     });
-    await prisma.externalJobOpportunity.upsert({
+    const saved = await prisma.externalJobOpportunity.upsert({
       where: { source_externalId: { source: item.source, externalId: item.externalId } },
       create: {
         externalId: item.externalId, source: item.source, sourceUrl: item.sourceUrl, sourceType: "PUBLIC_JOB_SOURCE", sourceCollectedAt, title: item.title,
@@ -28,14 +29,26 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
         experienceYears: item.experienceYears, language: item.language, salary: item.salary, publishedAt, closingAt,
         description: item.description, rawData, updatedAt: new Date(),
       },
+      select: { id: true },
     });
     if (existing) updated++; else created++;
+
+    try {
+      const qRes = await qualifyAndMatchExternalOffer(saved.id);
+      if (qRes.qualified) {
+        qualified++;
+        if (qRes.matchesCount > 0) matched++;
+      }
+    } catch (err) {
+      console.warn("[ingestGlobalJobs] Auto qualification error for job", saved.id, err);
+    }
   }
+
   await prisma.auditLog.create({
     data: {
       actorUserId, actorRole: "SYSTEM", action: "GLOBAL_JOB_SOURCING", targetType: "EXTERNAL_JOB_SOURCE",
-      details: { sourceUrl, fetched: items.length, created, updated },
+      details: { sourceUrl, fetched: items.length, created, updated, qualified, matched },
     },
   });
-  return { sourceUrl, fetched: items.length, created, updated };
+  return { sourceUrl, fetched: items.length, created, updated, qualified, matched };
 }

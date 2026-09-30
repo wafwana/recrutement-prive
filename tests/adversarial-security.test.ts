@@ -121,11 +121,11 @@ test("email service configuration adheres to public sender contact@recrutement-p
   assert.equal(ownerRes.ok, true);
 });
 
-test("i18n multilingual support covers 6 languages (FR, EN, ES, DE, IT, AR) and handles RTL for Arabic", async () => {
+test("i18n multilingual support covers 7 languages (FR, EN, ES, DE, IT, AR, NL) and handles RTL for Arabic", async () => {
   const { SUPPORTED_LOCALES, RTL_LOCALES } = await import("../lib/i18n/config");
   const { DICTIONARIES, getTranslation } = await import("../lib/i18n/dictionaries");
 
-  assert.equal(SUPPORTED_LOCALES.length, 6);
+  assert.equal(SUPPORTED_LOCALES.length, 7);
   assert.ok(RTL_LOCALES.has("ar"));
   assert.equal(RTL_LOCALES.has("fr"), false);
 
