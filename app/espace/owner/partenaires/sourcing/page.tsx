@@ -6,7 +6,7 @@ import SourcingClient from "./SourcingClient";
 
 export default async function OwnerPartenaireSourcingPage() {
   const session = await auth();
-  if (!session?.user?.id || !["OWNER", "ADMIN", "CONSULTANT"].includes(session.user.role || "")) {
+  if (!session?.user?.id || session.user.role !== "OWNER") {
     redirect("/connexion");
   }
 
