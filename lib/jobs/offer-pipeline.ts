@@ -66,18 +66,22 @@ export async function qualifyAndMatchExternalOffer(externalJobId: string): Promi
   const fallbackCategory = offer.categoryCode && validCodes.has(offer.categoryCode) ? offer.categoryCode : null;
   const fallbackSubCategory = offer.subCategoryCode && validCodes.has(offer.subCategoryCode) ? offer.subCategoryCode : null;
 
+  // A missing/invalid AI result is not evidence that an offer is admissible.
+  // Deterministic qualification is allowed only when the offer already carries a
+  // valid taxonomy category; never assign an arbitrary first category.
   const inPlatformScope = analysis
-    ? analysis.inPlatformScope && Boolean(analysis.categoryCode && validCodes.has(analysis.categoryCode))
-    : Boolean(
-        offer.title &&
-        offer.title.trim().length >= 3 &&
-        !/spam|test|junk|fake/i.test(offer.title)
-      );
+    ? analysis.inPlatformScope === false
+      ? false
+      : Boolean(
+          analysis.inPlatformScope &&
+          ((analysis.categoryCode && validCodes.has(analysis.categoryCode)) || fallbackCategory)
+        )
+    : Boolean(fallbackCategory);
 
   const categoryCode =
     analysis?.categoryCode && validCodes.has(analysis.categoryCode)
       ? analysis.categoryCode
-      : fallbackCategory || (taxonomy.length > 0 ? taxonomy[0].code : null);
+      : fallbackCategory;
 
   const subCategoryCode =
     analysis?.subCategoryCode && validCodes.has(analysis.subCategoryCode)
@@ -88,6 +92,19 @@ export async function qualifyAndMatchExternalOffer(externalJobId: string): Promi
     offer.rawData && typeof offer.rawData === "object" && !Array.isArray(offer.rawData)
       ? (offer.rawData as Record<string, unknown>)
       : {};
+
+  if (!inPlatformScope && !analysis && !fallbackCategory) {
+    return {
+      success: false,
+      externalJobId: offer.id,
+      title: offer.title,
+      qualified: false,
+      status: offer.status,
+      reason: "Qualification en attente : aucune analyse IA valide ni catégorie existante vérifiable.",
+      matchesCount: 0,
+      error: "Qualification non concluante; l'offre reste en attente de traitement.",
+    };
+  }
 
   if (!inPlatformScope) {
     const scopeReason = analysis?.scopeReason || "Offre hors périmètre ou non exploitable par la plateforme.";
