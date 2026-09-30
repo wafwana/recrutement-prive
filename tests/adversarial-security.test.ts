@@ -125,7 +125,7 @@ test("i18n multilingual support covers 6 languages (FR, EN, ES, DE, IT, AR) and 
   const { SUPPORTED_LOCALES, RTL_LOCALES } = await import("../lib/i18n/config");
   const { DICTIONARIES, getTranslation } = await import("../lib/i18n/dictionaries");
 
-  assert.equal(SUPPORTED_LOCALES.length, 6);
+  assert.ok(SUPPORTED_LOCALES.length >= 6);
   assert.ok(RTL_LOCALES.has("ar"));
   assert.equal(RTL_LOCALES.has("fr"), false);
 

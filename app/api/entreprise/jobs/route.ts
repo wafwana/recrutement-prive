@@ -5,6 +5,7 @@ import { requireCompanyAccess } from "@/lib/company-access";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { requireFileScanInProduction, scanBufferWithClamAV } from "@/lib/security/file-scan";
+import { triggerJobCandidateMatching } from "@/lib/jobs/matching-trigger";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = new Set(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
@@ -153,7 +154,17 @@ export async function POST(request: Request) {
       await tx.recruitmentHistory.create({ data: { jobId: created.id, actorUserId: access.userId, action: "JOB_CREATED", toStatus: created.status, details: attachment ? { attachmentName: attachment.name, attachmentSize: attachment.size } : undefined } });
       return created;
     });
-    return NextResponse.json(job, { status: 201 });
+    // Immediate advisory matching for newly opened offers. No applications or identity release.
+    let matchingCandidates = 0;
+    if (job.status === "OPEN") {
+      try {
+        const result = await triggerJobCandidateMatching(job.id);
+        matchingCandidates = result.matchedCandidates;
+      } catch (matchingError) {
+        console.error("[company-job] immediate candidate matching failed", { jobId: job.id, error: matchingError });
+      }
+    }
+    return NextResponse.json({ ...job, matchingCandidates }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Impossible de créer l'offre";
     return NextResponse.json({ error: message }, { status: message.includes("accès") || message.includes("Access") ? 403 : 400 });
