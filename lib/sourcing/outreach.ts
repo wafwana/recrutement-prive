@@ -1,4 +1,5 @@
-import OpenAI from "openai";
+import { executeAiStructuredTask } from "@/lib/ai/client";
+import { AiAnalysisContext } from "@/lib/ai/types";
 import { sendEmail } from "@/lib/email/service";
 
 export type ExternalOfferOutreach = {
@@ -71,15 +72,26 @@ export async function generateExternalOfferOutreach(input: {
   let subject = `Recrutement Privé — ${input.title}`;
   let text = "";
 
-  if (process.env.OPENAI_API_KEY) {
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const response = await client.responses.create({
-      model: process.env.OPENAI_JOB_MODEL || "gpt-4.1-mini",
-      input: [{
-        role: "user",
-        content: [{
-          type: "input_text",
-          text: `Rédige un premier courrier B2B très court à partir de cette offre d'emploi publique.
+  const context: AiAnalysisContext = { classification: "PUBLIC_OFFER" };
+  const genericLocation = [input.city, input.country].filter(Boolean).join(", ");
+
+  const res = await executeAiStructuredTask<{ subject?: string; text?: string }>({
+    context,
+    jsonSchemaName: "external_offer_outreach",
+    jsonSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: { subject: { type: "string" }, text: { type: "string" } },
+      required: ["subject", "text"],
+    },
+    geminiAllowedFields: {
+      title: input.title,
+      location: genericLocation,
+      skills: input.skills,
+      experienceYears: input.experienceYears,
+      descriptionSummary: input.summary,
+    },
+    userPrompt: `Rédige un premier courrier B2B très court à partir de cette offre d'emploi publique.
 Montre que Recrutement Privé a compris le besoin de l'entreprise.
 Mentionne brièvement 1 à 3 compétences réellement présentes dans l'offre et explique pourquoi elles comptent pour le poste.
 Indique que Recrutement Privé peut se positionner sur cette recherche de profil difficile, sans promettre de candidat ni de résultat.
@@ -92,27 +104,11 @@ Expérience: ${input.experienceYears ?? "non précisée"}
 Langue: ${input.language || "non précisée"}
 Résumé: ${input.summary}
 URL source: ${input.sourceUrl || "non précisée"}`,
-        }],
-      }],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "external_offer_outreach",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: { subject: { type: "string" }, text: { type: "string" } },
-            required: ["subject", "text"],
-          },
-        },
-      },
-    });
-    if (response.output_text) {
-      const parsed = JSON.parse(response.output_text) as { subject?: string; text?: string };
-      subject = parsed.subject?.trim() || subject;
-      text = parsed.text?.trim() || "";
-    }
+  });
+
+  if (res.data) {
+    subject = res.data.subject?.trim() || subject;
+    text = res.data.text?.trim() || "";
   }
 
   if (!text) text = fallbackMessage(input).text;
@@ -121,7 +117,7 @@ URL source: ${input.sourceUrl || "non précisée"}`,
     recipientEmail,
     subject,
     text,
-    html: text.split("\n").map((line) => line ? `<p>${escapeHtml(line)}</p>` : "").join(""),
+    html: text.split("\n").map((line) => (line ? `<p>${escapeHtml(line)}</p>` : "")).join(""),
     source: "EXTERNAL_OFFER",
   };
 }
