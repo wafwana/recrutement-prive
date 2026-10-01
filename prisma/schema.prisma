@@ -99,6 +99,8 @@ model User {
   conversations ConversationParticipant[]
   sentMessages Message[]
   sourcedCandidates SourcedCandidate[]
+  telephonyPermission TelephonyPermission? @relation("TelephonyPermissionUser")
+  initiatedCalls CallLog[] @relation("CallLogInitiator")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -750,4 +752,68 @@ model PartnerHistory {
   createdAt             DateTime           @default(now())
 
   @@index([partnerId, createdAt])
+}
+
+model TelephonyConfig {
+  id                   String   @id @default(cuid())
+  centralPhoneNumber   String   @default("+33100000000")
+  ownerPhone           String   @default("+33600000000")
+  secondaryPhone       String?
+  ringMode             String   @default("SEQUENTIAL")
+  transferDelaySeconds Int      @default(15)
+  businessHours        Json?
+  offHoursBehavior     String   @default("VOICEMAIL")
+  customIvrGreeting    String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model TelephonyPermission {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  canMakeOutboundCalls Boolean  @default(false)
+  grantedByUserId      String
+  grantedAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation("TelephonyPermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CallLog {
+  id                String            @id @default(cuid())
+  direction         String            @default("INBOUND")
+  callerNumber      String
+  callerName        String?
+  callerType        String?
+  ivrChoice         String?
+  destinationPhone  String?
+  status            String            @default("MISSED")
+  durationSeconds   Int               @default(0)
+  linkedEntityId    String?
+  linkedEntityType  String?
+  initiatorUserId   String?
+  initiatorUser     User?             @relation("CallLogInitiator", fields: [initiatorUserId], references: [id], onDelete: SetNull)
+  notes             String?
+  treatmentState    String            @default("NEW")
+  voicemail         VoicemailMessage?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([direction, createdAt])
+  @@index([callerNumber])
+  @@index([treatmentState])
+}
+
+model VoicemailMessage {
+  id              String   @id @default(cuid())
+  callLogId       String   @unique
+  audioUrl        String?
+  audioData       Bytes?
+  durationSeconds Int      @default(0)
+  transcription   String?
+  status          String   @default("UNREAD")
+  callLog         CallLog  @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status, createdAt])
 }
