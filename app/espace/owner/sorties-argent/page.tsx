@@ -94,16 +94,28 @@ export default function RegistreSortiesPage() {
       if (beneficiaryFilter) params.set("beneficiary", beneficiaryFilter);
 
       const res = await fetch(`/api/owner/outflows?${params.toString()}`, { cache: "no-store" });
-      const data = await res.json();
 
-      if (!res.ok) {
-        setError(data.error || "Accès refusé au registre comptable.");
-      } else {
+      let data: { error?: string; outflows?: OutflowItem[]; summary?: SummaryData } | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON response (e.g. HTML 500 error page from server)
+      }
+
+      if (res.status === 401) {
+        setError(data?.error || "Session expirée ou non authentifiée. Veuillez vous reconnecter.");
+      } else if (res.status === 403) {
+        setError(data?.error || "Accès strictement réservé à l'Owner. Rôle non autorisé.");
+      } else if (!res.ok) {
+        setError(data?.error || `Erreur serveur (${res.status}). Veuillez réessayer ou contacter le support.`);
+      } else if (data) {
         setOutflows(data.outflows || []);
         setSummary(data.summary || null);
+      } else {
+        setError("Réponse du serveur invalide.");
       }
     } catch {
-      setError("Erreur lors de la récupération des décaissements.");
+      setError("Erreur réseau ou connexion au serveur impossible.");
     } finally {
       setLoading(false);
     }
@@ -132,9 +144,19 @@ export default function RegistreSortiesPage() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setActionMessage(`Erreur: ${data.error}`);
+      let data: { error?: string; message?: string } | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON response
+      }
+
+      if (res.status === 401) {
+        setActionMessage("Session expirée. Veuillez vous reconnecter.");
+      } else if (res.status === 403) {
+        setActionMessage("Accès refusé. Rôle Owner requis.");
+      } else if (!res.ok) {
+        setActionMessage(`Erreur: ${data?.error || "Échec de l'enregistrement de la sortie d'argent."}`);
       } else {
         setActionMessage("Sortie d'argent ajoutée au registre comptable !");
         setShowCreateModal(false);
@@ -157,7 +179,7 @@ export default function RegistreSortiesPage() {
         loadOutflows();
       }
     } catch {
-      setActionMessage("Erreur réseau.");
+      setActionMessage("Erreur réseau lors de la création.");
     }
   }
 
@@ -178,9 +200,19 @@ export default function RegistreSortiesPage() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setActionMessage(`Erreur: ${data.error}`);
+      let data: { error?: string; message?: string } | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON response
+      }
+
+      if (res.status === 401) {
+        setActionMessage("Session expirée. Veuillez vous reconnecter.");
+      } else if (res.status === 403) {
+        setActionMessage("Accès refusé. Rôle Owner requis.");
+      } else if (!res.ok) {
+        setActionMessage(`Erreur: ${data?.error || "Échec de la mise à jour."}`);
       } else {
         setActionMessage("Opération comptable mise à jour.");
         setSelectedOutflow(null);
@@ -206,10 +238,26 @@ export default function RegistreSortiesPage() {
     return (
       <div className="mx-auto max-w-4xl py-20 px-5 text-center">
         <BackButton />
-        <p className="text-xl text-red-400 mt-6">{error}</p>
-        <p className="mt-4 text-sm text-white/50">
-          Ce registre est exclusivement réservé au rôle OWNER. Aucun autre utilisateur ou rôle ne peut y accéder.
-        </p>
+        <div className="mt-8 border border-red-500/30 bg-red-500/10 p-8 rounded-lg">
+          <p className="text-xl font-semibold text-red-400">{error}</p>
+          <p className="mt-4 text-sm text-white/60">
+            Ce registre est exclusivement réservé au rôle OWNER. Aucun autre utilisateur ou rôle ne peut y accéder.
+          </p>
+          <div className="mt-6 flex items-center justify-center gap-4">
+            <button
+              onClick={loadOutflows}
+              className="border border-[#c7a15a] bg-[#c7a15a] px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-black hover:bg-[#c7a15a]/90"
+            >
+              Réessayer
+            </button>
+            <a
+              href="/connexion"
+              className="border border-white/20 bg-white/5 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-white hover:bg-white/10"
+            >
+              Se reconnecter
+            </a>
+          </div>
+        </div>
       </div>
     );
   }

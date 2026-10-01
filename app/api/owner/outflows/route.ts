@@ -4,18 +4,33 @@ import { prisma } from "@/lib/prisma";
 import { createOrSyncOutflow, exportOutflowsToCsv, OutflowOriginModule, OutflowStatus } from "@/lib/accounting/outflow-service";
 import { z } from "zod";
 
-async function requireOwner() {
+type AuthResult =
+  | { user: { id: string; role: string; name?: string | null; email?: string | null }; status: 200 }
+  | { error: string; status: 401 | 403 };
+
+async function verifyOwnerAccess(): Promise<AuthResult> {
   const activeSession = getActiveSessionContext();
   if (activeSession) {
-    if (!activeSession.user?.id || activeSession.user.role !== "OWNER") return null;
-    return activeSession.user;
+    if (!activeSession.user) {
+      return { error: "Session non authentifiée. Veuillez vous connecter.", status: 401 };
+    }
+    if (activeSession.user.role !== "OWNER" || !activeSession.user.id) {
+      return { error: "Accès strictement réservé à l'Owner. Décaissements et registre comptable réservés à l'Owner.", status: 403 };
+    }
+    return { user: activeSession.user as { id: string; role: string; name?: string | null; email?: string | null }, status: 200 };
   }
+
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "OWNER") return null;
-    return session.user;
+    if (!session?.user) {
+      return { error: "Session non authentifiée. Veuillez vous connecter.", status: 401 };
+    }
+    if (session.user.role !== "OWNER" || !session.user.id) {
+      return { error: "Accès strictement réservé à l'Owner. Décaissements et registre comptable réservés à l'Owner.", status: 403 };
+    }
+    return { user: session.user as { id: string; role: string; name?: string | null; email?: string | null }, status: 200 };
   } catch {
-    return null;
+    return { error: "Session non authentifiée. Veuillez vous connecter.", status: 401 };
   }
 }
 
@@ -51,89 +66,102 @@ const createOutflowSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const owner = await requireOwner();
-  if (!owner) {
-    return NextResponse.json(
-      { error: "Accès strictement réservé à l'Owner. Décaissements et registre comptable réservés à l'Owner." },
-      { status: 403 }
-    );
+  const authCheck = await verifyOwnerAccess();
+  if (authCheck.status !== 200) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
   }
 
-  const { searchParams } = new URL(request.url);
-  const format = searchParams.get("format");
-  const moduleFilter = searchParams.get("module");
-  const categoryFilter = searchParams.get("category");
-  const statusFilter = searchParams.get("status");
-  const beneficiaryFilter = searchParams.get("beneficiary");
-  const yearStr = searchParams.get("year");
-  const monthStr = searchParams.get("month");
+  try {
+    const { searchParams } = new URL(request.url);
+    const format = searchParams.get("format");
+    const moduleFilter = searchParams.get("module");
+    const categoryFilter = searchParams.get("category");
+    const statusFilter = searchParams.get("status");
+    const beneficiaryFilter = searchParams.get("beneficiary");
+    const yearStr = searchParams.get("year");
+    const monthStr = searchParams.get("month");
 
-  const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = {};
 
-  if (moduleFilter) where.originModule = moduleFilter;
-  if (categoryFilter) where.category = categoryFilter;
-  if (statusFilter) where.status = statusFilter;
-  if (beneficiaryFilter) {
-    where.beneficiaryName = { contains: beneficiaryFilter, mode: "insensitive" };
-  }
-
-  if (yearStr) {
-    const year = parseInt(yearStr, 10);
-    let startDate: Date;
-    let endDate: Date;
-    if (monthStr) {
-      const month = parseInt(monthStr, 10);
-      startDate = new Date(year, month - 1, 1);
-      endDate = new Date(year, month, 0, 23, 59, 59, 999);
-    } else {
-      startDate = new Date(year, 0, 1);
-      endDate = new Date(year, 11, 31, 23, 59, 59, 999);
+    if (moduleFilter) where.originModule = moduleFilter;
+    if (categoryFilter) where.category = categoryFilter;
+    if (statusFilter) where.status = statusFilter;
+    if (beneficiaryFilter) {
+      where.beneficiaryName = { contains: beneficiaryFilter, mode: "insensitive" };
     }
-    where.operationDate = { gte: startDate, lte: endDate };
-  }
 
-  const outflows = await prisma.financialOutflow.findMany({
-    where,
-    orderBy: { operationDate: "desc" },
-  });
+    if (yearStr) {
+      const year = parseInt(yearStr, 10);
+      if (!isNaN(year) && year > 1900 && year < 2100) {
+        let startDate: Date;
+        let endDate: Date;
+        if (monthStr) {
+          const month = parseInt(monthStr, 10);
+          if (!isNaN(month) && month >= 1 && month <= 12) {
+            startDate = new Date(year, month - 1, 1);
+            endDate = new Date(year, month, 0, 23, 59, 59, 999);
+          } else {
+            startDate = new Date(year, 0, 1);
+            endDate = new Date(year, 11, 31, 23, 59, 59, 999);
+          }
+        } else {
+          startDate = new Date(year, 0, 1);
+          endDate = new Date(year, 11, 31, 23, 59, 59, 999);
+        }
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          where.operationDate = { gte: startDate, lte: endDate };
+        }
+      }
+    }
 
-  if (format === "csv") {
-    const csvContent = exportOutflowsToCsv(outflows);
-    return new NextResponse(csvContent, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="registre-sorties-argent-${new Date().toISOString().slice(0, 10)}.csv"`,
+    const outflows = await prisma.financialOutflow.findMany({
+      where,
+      orderBy: { operationDate: "desc" },
+    });
+
+    if (format === "csv") {
+      const csvContent = exportOutflowsToCsv(outflows);
+      return new NextResponse(csvContent, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="registre-sorties-argent-${new Date().toISOString().slice(0, 10)}.csv"`,
+        },
+      });
+    }
+
+    // Summary totals
+    const totalHt = outflows.reduce((acc, item) => acc + (item.status === "ANNULE" ? 0 : item.amountHt), 0);
+    const totalTva = outflows.reduce((acc, item) => acc + (item.status === "ANNULE" ? 0 : item.amountTva), 0);
+    const totalTtc = outflows.reduce((acc, item) => acc + (item.status === "ANNULE" ? 0 : item.amountTtc), 0);
+    const pendingDocsCount = outflows.filter((item) => item.status === "A_COMPLETER" || !item.category || (!item.documentUrl && !item.documentId)).length;
+
+    return NextResponse.json({
+      outflows,
+      summary: {
+        count: outflows.length,
+        totalHt,
+        totalTva,
+        totalTtc,
+        pendingDocsCount,
       },
     });
+  } catch (error) {
+    console.error("[outflows GET error]", error);
+    const diagId = `OUT-ERR-${Date.now().toString(36).toUpperCase()}`;
+    return NextResponse.json(
+      { error: `Erreur serveur lors de la récupération des décaissements. (Réf: ${diagId})` },
+      { status: 500 }
+    );
   }
-
-  // Summary totals
-  const totalHt = outflows.reduce((acc, item) => acc + (item.status === "ANNULE" ? 0 : item.amountHt), 0);
-  const totalTva = outflows.reduce((acc, item) => acc + (item.status === "ANNULE" ? 0 : item.amountTva), 0);
-  const totalTtc = outflows.reduce((acc, item) => acc + (item.status === "ANNULE" ? 0 : item.amountTtc), 0);
-  const pendingDocsCount = outflows.filter((item) => item.status === "A_COMPLETER" || !item.category || (!item.documentUrl && !item.documentId)).length;
-
-  return NextResponse.json({
-    outflows,
-    summary: {
-      count: outflows.length,
-      totalHt,
-      totalTva,
-      totalTtc,
-      pendingDocsCount,
-    },
-  });
 }
 
 export async function POST(request: Request) {
-  const owner = await requireOwner();
-  if (!owner) {
-    return NextResponse.json(
-      { error: "Accès strictement réservé à l'Owner. Seul l'OWNER peut autoriser ou enregistrer une sortie d'argent." },
-      { status: 403 }
-    );
+  const authCheck = await verifyOwnerAccess();
+  if (authCheck.status !== 200) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
   }
+  const owner = authCheck.user;
 
   let body: unknown;
   try {
@@ -167,8 +195,8 @@ export async function POST(request: Request) {
       referenceNumber: parsed.data.referenceNumber || null,
       documentUrl: parsed.data.documentUrl || null,
       documentId: parsed.data.documentId || null,
-      createdById: owner.id!,
-      authorizedById: owner.id!,
+      createdById: owner.id,
+      authorizedById: owner.id,
       operationDate: parsed.data.operationDate ? new Date(parsed.data.operationDate) : new Date(),
       paymentDate: parsed.data.paymentDate ? new Date(parsed.data.paymentDate) : null,
       status: parsed.data.status as OutflowStatus,
@@ -179,7 +207,7 @@ export async function POST(request: Request) {
 
     await prisma.auditLog.create({
       data: {
-        actorUserId: owner.id!,
+        actorUserId: owner.id,
         actorRole: "OWNER",
         action: "CREATE_FINANCIAL_OUTFLOW",
         targetType: "FINANCIAL_OUTFLOW",
