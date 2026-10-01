@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import { compareOfferPriority, getFinancialStatus, parseSalary } from "@/lib/offers/salary";
+import { extractOfferCountries, matchOfferCountry } from "@/lib/offers/country";
 import BackButton from "@/components/navigation/BackButton";
 import BatchProcessOffersButton from "@/components/owner/BatchProcessOffersButton";
 import { processOwnerRawOffer } from "@/app/espace/owner/offres/nouvelle/raw-actions";
@@ -35,9 +36,9 @@ export default async function OfferPoolPage({
   const params = await searchParams;
   const q = params.q?.trim().toLowerCase() || "";
   const statusFilter = params.status?.trim() || "";
-  const countryFilter = params.country?.trim().toLowerCase() || "";
+  const countryFilter = params.country?.trim() || "";
 
-  const [offers, total, toQualify, qualified, matching] = await Promise.all([
+  const [offers, total, toQualify, qualified, matching, rejected] = await Promise.all([
     prisma.externalJobOpportunity.findMany({
       orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
       take: 5000,
@@ -48,14 +49,17 @@ export default async function OfferPoolPage({
       },
     }),
     prisma.externalJobOpportunity.count(),
-    prisma.externalJobOpportunity.count({ where: { status: { in: ["DETECTED", "A_QUALIFIER"] } } }),
+    prisma.externalJobOpportunity.count({ where: { status: { in: ["DETECTED", "A_QUALIFIER", "QUALIFYING"] } } }),
     prisma.externalJobOpportunity.count({ where: { status: "QUALIFIED" } }),
     prisma.externalJobOpportunity.count({ where: { status: "MATCHING" } }),
+    prisma.externalJobOpportunity.count({ where: { status: "REJECTED" } }),
   ]);
+
+  const countries = extractOfferCountries(offers);
 
   const filtered = offers.filter((offer) => {
     if (statusFilter && offer.status !== statusFilter) return false;
-    if (countryFilter && !(offer.country || "").toLowerCase().includes(countryFilter)) return false;
+    if (countryFilter && !matchOfferCountry(offer.country, countryFilter)) return false;
     if (!q) return true;
     return [offer.title, offer.companyName, offer.country, offer.city, offer.categoryCode, offer.subCategoryCode]
       .some((value) => String(value || "").toLowerCase().includes(q));
@@ -66,8 +70,6 @@ export default async function OfferPoolPage({
     if (salaryOrder !== 0) return salaryOrder;
     return 0;
   });
-
-  const countries = [...new Set(offers.map((offer) => offer.country).filter(Boolean) as string[])].sort();
 
   return (
     <section className="mx-auto w-[min(1400px,calc(100%-40px))] py-12 md:py-20">
@@ -89,12 +91,13 @@ export default async function OfferPoolPage({
         </div>
       </div>
 
-      <div className="mt-8 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-8 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-5">
         {[
           ["Offres conservées", total],
-          ["À qualifier", toQualify],
+          ["À qualifier / En cours", toQualify],
           ["Qualifiées", qualified],
           ["En matching", matching],
+          ["Écartées", rejected],
         ].map(([label, value]) => (
           <div key={String(label)} className="bg-[#111] p-5">
             <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">{label}</p>
