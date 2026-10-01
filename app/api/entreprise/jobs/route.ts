@@ -154,7 +154,6 @@ export async function POST(request: Request) {
       await tx.recruitmentHistory.create({ data: { jobId: created.id, actorUserId: access.userId, action: "JOB_CREATED", toStatus: created.status, details: attachment ? { attachmentName: attachment.name, attachmentSize: attachment.size } : undefined } });
       return created;
     });
-    // Immediate advisory matching for newly opened offers. No applications or identity release.
     let matchingCandidates = 0;
     if (job.status === "OPEN") {
       try {
