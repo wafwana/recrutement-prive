@@ -5,18 +5,33 @@ import { evaluateOutflowStatus, validateOutflowAmounts, OutflowAuditEntry, Outfl
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
-async function requireOwner() {
+type AuthResult =
+  | { user: { id: string; role: string; name?: string | null; email?: string | null }; status: 200 }
+  | { error: string; status: 401 | 403 };
+
+async function verifyOwnerAccess(): Promise<AuthResult> {
   const activeSession = getActiveSessionContext();
   if (activeSession) {
-    if (!activeSession.user?.id || activeSession.user.role !== "OWNER") return null;
-    return activeSession.user;
+    if (!activeSession.user) {
+      return { error: "Session non authentifiée. Veuillez vous connecter.", status: 401 };
+    }
+    if (activeSession.user.role !== "OWNER" || !activeSession.user.id) {
+      return { error: "Accès strictement réservé à l'Owner.", status: 403 };
+    }
+    return { user: activeSession.user as { id: string; role: string; name?: string | null; email?: string | null }, status: 200 };
   }
+
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "OWNER") return null;
-    return session.user;
+    if (!session?.user) {
+      return { error: "Session non authentifiée. Veuillez vous connecter.", status: 401 };
+    }
+    if (session.user.role !== "OWNER" || !session.user.id) {
+      return { error: "Accès strictement réservé à l'Owner.", status: 403 };
+    }
+    return { user: session.user as { id: string; role: string; name?: string | null; email?: string | null }, status: 200 };
   } catch {
-    return null;
+    return { error: "Session non authentifiée. Veuillez vous connecter.", status: 401 };
   }
 }
 
@@ -42,157 +57,170 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const owner = await requireOwner();
-  if (!owner) {
+  const authCheck = await verifyOwnerAccess();
+  if (authCheck.status !== 200) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
+  }
+
+  try {
+    const resolvedParams = await params;
+    const outflow = await prisma.financialOutflow.findUnique({
+      where: { id: resolvedParams.id },
+    });
+
+    if (!outflow) {
+      return NextResponse.json({ error: "Décaissement introuvable." }, { status: 404 });
+    }
+
+    return NextResponse.json({ outflow });
+  } catch (error) {
+    console.error("[outflow GET id error]", error);
+    const diagId = `OUT-ERR-${Date.now().toString(36).toUpperCase()}`;
     return NextResponse.json(
-      { error: "Accès strictement réservé à l'Owner." },
-      { status: 403 }
+      { error: `Erreur serveur lors de la récupération du décaissement. (Réf: ${diagId})` },
+      { status: 500 }
     );
   }
-
-  const resolvedParams = await params;
-  const outflow = await prisma.financialOutflow.findUnique({
-    where: { id: resolvedParams.id },
-  });
-
-  if (!outflow) {
-    return NextResponse.json({ error: "Décaissement introuvable." }, { status: 404 });
-  }
-
-  return NextResponse.json({ outflow });
 }
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const owner = await requireOwner();
-  if (!owner) {
-    return NextResponse.json(
-      { error: "Accès strictement réservé à l'Owner. Seul l'OWNER peut modifier un enregistrement comptable." },
-      { status: 403 }
-    );
+  const authCheck = await verifyOwnerAccess();
+  if (authCheck.status !== 200) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
   }
+  const owner = authCheck.user;
 
-  const resolvedParams = await params;
-  const existing = await prisma.financialOutflow.findUnique({
-    where: { id: resolvedParams.id },
-  });
-
-  if (!existing) {
-    return NextResponse.json({ error: "Décaissement introuvable." }, { status: 404 });
-  }
-
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Corps JSON invalide." }, { status: 400 });
-  }
+    const resolvedParams = await params;
+    const existing = await prisma.financialOutflow.findUnique({
+      where: { id: resolvedParams.id },
+    });
 
-  const parsed = updateOutflowSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message || "Données de modification invalides." },
-      { status: 400 }
-    );
-  }
+    if (!existing) {
+      return NextResponse.json({ error: "Décaissement introuvable." }, { status: 404 });
+    }
 
-  const newHt = parsed.data.amountHt !== undefined ? parsed.data.amountHt : existing.amountHt;
-  const newTva = parsed.data.amountTva !== undefined ? parsed.data.amountTva : existing.amountTva;
-  const newTtc = parsed.data.amountTtc !== undefined ? parsed.data.amountTtc : existing.amountTtc;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Corps JSON invalide." }, { status: 400 });
+    }
 
-  if (!validateOutflowAmounts(newHt, newTva, newTtc)) {
-    return NextResponse.json(
-      { error: "Montants invalides : la somme HT + TVA doit être égale au montant TTC." },
-      { status: 400 }
-    );
-  }
+    const parsed = updateOutflowSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Données de modification invalides." },
+        { status: 400 }
+      );
+    }
 
-  const targetCategory = parsed.data.category !== undefined ? parsed.data.category : existing.category;
-  const targetDocUrl = parsed.data.documentUrl !== undefined ? parsed.data.documentUrl : existing.documentUrl;
-  const targetDocId = parsed.data.documentId !== undefined ? parsed.data.documentId : existing.documentId;
-  const targetStatus = (parsed.data.status || existing.status) as OutflowStatus;
+    const newHt = parsed.data.amountHt !== undefined ? parsed.data.amountHt : existing.amountHt;
+    const newTva = parsed.data.amountTva !== undefined ? parsed.data.amountTva : existing.amountTva;
+    const newTtc = parsed.data.amountTtc !== undefined ? parsed.data.amountTtc : existing.amountTtc;
 
-  const effectiveStatus = evaluateOutflowStatus(targetStatus, targetCategory, targetDocUrl, targetDocId);
+    if (!validateOutflowAmounts(newHt, newTva, newTtc)) {
+      return NextResponse.json(
+        { error: "Montants invalides : la somme HT + TVA doit être égale au montant TTC." },
+        { status: 400 }
+      );
+    }
 
-  // Build traceable audit record
-  const currentAudit = Array.isArray(existing.auditHistory)
-    ? (existing.auditHistory as unknown as OutflowAuditEntry[])
-    : [];
+    const targetCategory = parsed.data.category !== undefined ? parsed.data.category : existing.category;
+    const targetDocUrl = parsed.data.documentUrl !== undefined ? parsed.data.documentUrl : existing.documentUrl;
+    const targetDocId = parsed.data.documentId !== undefined ? parsed.data.documentId : existing.documentId;
+    const targetStatus = (parsed.data.status || existing.status) as OutflowStatus;
 
-  const changes: Record<string, { from: unknown; to: unknown }> = {};
-  if (parsed.data.category !== undefined && parsed.data.category !== existing.category) {
-    changes.category = { from: existing.category, to: parsed.data.category };
-  }
-  if (parsed.data.documentUrl !== undefined && parsed.data.documentUrl !== existing.documentUrl) {
-    changes.documentUrl = { from: existing.documentUrl, to: parsed.data.documentUrl };
-  }
-  if (effectiveStatus !== existing.status) {
-    changes.status = { from: existing.status, to: effectiveStatus };
-  }
-  if (parsed.data.amountTtc !== undefined && parsed.data.amountTtc !== existing.amountTtc) {
-    changes.amountTtc = { from: existing.amountTtc, to: parsed.data.amountTtc };
-  }
+    const effectiveStatus = evaluateOutflowStatus(targetStatus, targetCategory, targetDocUrl, targetDocId);
 
-  const auditEntry: OutflowAuditEntry = {
-    timestamp: new Date().toISOString(),
-    actorUserId: owner.id!,
-    actorRole: "OWNER",
-    action: parsed.data.status === "ANNULE" ? "REVERSAL_OUTFLOW" : "UPDATE_OUTFLOW",
-    notes: parsed.data.notes || parsed.data.reason || "Modification comptable enregistrée par l'Owner",
-    changes,
-  };
+    // Build traceable audit record
+    const currentAudit = Array.isArray(existing.auditHistory)
+      ? (existing.auditHistory as unknown as OutflowAuditEntry[])
+      : [];
 
-  const updatedOutflow = await prisma.financialOutflow.update({
-    where: { id: existing.id },
-    data: {
-      category: targetCategory,
-      description: parsed.data.description !== undefined ? parsed.data.description : existing.description,
-      documentUrl: targetDocUrl,
-      documentId: targetDocId,
-      paymentMethod: parsed.data.paymentMethod !== undefined ? parsed.data.paymentMethod : existing.paymentMethod,
-      paymentSource: parsed.data.paymentSource !== undefined ? parsed.data.paymentSource : existing.paymentSource,
-      referenceNumber: parsed.data.referenceNumber !== undefined ? parsed.data.referenceNumber : existing.referenceNumber,
-      status: effectiveStatus,
-      reconciliationStatus: parsed.data.reconciliationStatus !== undefined ? parsed.data.reconciliationStatus : existing.reconciliationStatus,
-      isPrivateOwnerExpense: parsed.data.isPrivateOwnerExpense !== undefined ? parsed.data.isPrivateOwnerExpense : existing.isPrivateOwnerExpense,
-      amountHt: newHt,
-      amountTva: newTva,
-      amountTtc: newTtc,
-      reason: parsed.data.reason !== undefined ? parsed.data.reason : existing.reason,
-      auditHistory: [...currentAudit, auditEntry] as unknown as Prisma.InputJsonValue,
-    },
-  });
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    if (parsed.data.category !== undefined && parsed.data.category !== existing.category) {
+      changes.category = { from: existing.category, to: parsed.data.category };
+    }
+    if (parsed.data.documentUrl !== undefined && parsed.data.documentUrl !== existing.documentUrl) {
+      changes.documentUrl = { from: existing.documentUrl, to: parsed.data.documentUrl };
+    }
+    if (effectiveStatus !== existing.status) {
+      changes.status = { from: existing.status, to: effectiveStatus };
+    }
+    if (parsed.data.amountTtc !== undefined && parsed.data.amountTtc !== existing.amountTtc) {
+      changes.amountTtc = { from: existing.amountTtc, to: parsed.data.amountTtc };
+    }
 
-  await prisma.auditLog.create({
-    data: {
-      actorUserId: owner.id!,
+    const auditEntry: OutflowAuditEntry = {
+      timestamp: new Date().toISOString(),
+      actorUserId: owner.id,
       actorRole: "OWNER",
-      action: parsed.data.status === "ANNULE" ? "CANCEL_FINANCIAL_OUTFLOW" : "UPDATE_FINANCIAL_OUTFLOW",
-      targetType: "FINANCIAL_OUTFLOW",
-      targetId: updatedOutflow.id,
-      details: {
-        outflowNumber: updatedOutflow.outflowNumber,
-        changes: changes as unknown as Prisma.InputJsonValue,
-        newStatus: updatedOutflow.status,
-      },
-    },
-  });
+      action: parsed.data.status === "ANNULE" ? "REVERSAL_OUTFLOW" : "UPDATE_OUTFLOW",
+      notes: parsed.data.notes || parsed.data.reason || "Modification comptable enregistrée par l'Owner",
+      changes,
+    };
 
-  return NextResponse.json({
-    outflow: updatedOutflow,
-    message: "Opération comptable mise à jour avec traçabilité et historique d'audit.",
-  });
+    const updatedOutflow = await prisma.financialOutflow.update({
+      where: { id: existing.id },
+      data: {
+        category: targetCategory,
+        description: parsed.data.description !== undefined ? parsed.data.description : existing.description,
+        documentUrl: targetDocUrl,
+        documentId: targetDocId,
+        paymentMethod: parsed.data.paymentMethod !== undefined ? parsed.data.paymentMethod : existing.paymentMethod,
+        paymentSource: parsed.data.paymentSource !== undefined ? parsed.data.paymentSource : existing.paymentSource,
+        referenceNumber: parsed.data.referenceNumber !== undefined ? parsed.data.referenceNumber : existing.referenceNumber,
+        status: effectiveStatus,
+        reconciliationStatus: parsed.data.reconciliationStatus !== undefined ? parsed.data.reconciliationStatus : existing.reconciliationStatus,
+        isPrivateOwnerExpense: parsed.data.isPrivateOwnerExpense !== undefined ? parsed.data.isPrivateOwnerExpense : existing.isPrivateOwnerExpense,
+        amountHt: newHt,
+        amountTva: newTva,
+        amountTtc: newTtc,
+        reason: parsed.data.reason !== undefined ? parsed.data.reason : existing.reason,
+        auditHistory: [...currentAudit, auditEntry] as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: owner.id,
+        actorRole: "OWNER",
+        action: parsed.data.status === "ANNULE" ? "CANCEL_FINANCIAL_OUTFLOW" : "UPDATE_FINANCIAL_OUTFLOW",
+        targetType: "FINANCIAL_OUTFLOW",
+        targetId: updatedOutflow.id,
+        details: {
+          outflowNumber: updatedOutflow.outflowNumber,
+          changes: changes as unknown as Prisma.InputJsonValue,
+          newStatus: updatedOutflow.status,
+        },
+      },
+    });
+
+    return NextResponse.json({
+      outflow: updatedOutflow,
+      message: "Opération comptable mise à jour avec traçabilité et historique d'audit.",
+    });
+  } catch (error) {
+    console.error("[outflow PATCH error]", error);
+    const diagId = `OUT-ERR-${Date.now().toString(36).toUpperCase()}`;
+    return NextResponse.json(
+      { error: `Erreur serveur lors de la mise à jour du décaissement. (Réf: ${diagId})` },
+      { status: 500 }
+    );
+  }
 }
 
 export async function DELETE(
   _request: Request,
   _context: { params: Promise<{ id: string }> }
 ) {
-  const owner = await requireOwner();
-  if (!owner) {
-    return NextResponse.json({ error: "Accès strictement réservé à l'Owner." }, { status: 403 });
+  const authCheck = await verifyOwnerAccess();
+  if (authCheck.status !== 200) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status });
   }
 
   // Interdiction de suppression silencieuse selon la RÈGLE ABSOLUE
