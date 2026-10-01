@@ -305,6 +305,7 @@ export async function qualifyAndMatchExternalOffer(
           totalCandidatesEvaluated: candidates.length,
           matchCount: matches.length,
           topMatches: matches,
+          humanValidated: false,
         },
       },
     },

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import { compareOfferPriority, getFinancialStatus, parseSalary } from "@/lib/offers/salary";
 import { extractOfferCountries, matchOfferCountry } from "@/lib/offers/country";
+import { getOfferMatchingStatus } from "@/lib/offers/matching-status";
 import BackButton from "@/components/navigation/BackButton";
 import BatchProcessOffersButton from "@/components/owner/BatchProcessOffersButton";
 import { processOwnerRawOffer } from "@/app/espace/owner/offres/nouvelle/raw-actions";
@@ -15,7 +16,7 @@ const statusLabels: Record<string, string> = {
   DETECTED: "Nouvelle",
   A_QUALIFIER: "À qualifier",
   QUALIFIED: "Qualifiée",
-  MATCHING: "En matching",
+  MATCHING: "Matchings traités",
   CONTACTED: "Contactée",
   FILLED: "Pourvue",
   ARCHIVED: "Archivée",
@@ -96,7 +97,7 @@ export default async function OfferPoolPage({
           ["Offres conservées", total],
           ["À qualifier / En cours", toQualify],
           ["Qualifiées", qualified],
-          ["En matching", matching],
+          ["Matchings traités", matching],
           ["Écartées", rejected],
         ].map(([label, value]) => (
           <div key={String(label)} className="bg-[#111] p-5">
@@ -138,6 +139,7 @@ export default async function OfferPoolPage({
           const rawObj = offer.rawData && typeof offer.rawData === "object" && !Array.isArray(offer.rawData) ? (offer.rawData as Record<string, unknown>) : null;
           const matchingObj = rawObj?.matching && typeof rawObj.matching === "object" ? (rawObj.matching as Record<string, unknown>) : null;
           const matchCount = typeof matchingObj?.matchCount === "number" ? matchingObj.matchCount : null;
+          const matchingStatus = getOfferMatchingStatus(offer);
 
           return (
             <article key={offer.id} className="grid grid-cols-1 gap-3 border-b border-white/10 px-5 py-5 last:border-b-0 md:grid-cols-[2fr_1.1fr_1fr_1fr_1fr] md:items-center">
@@ -169,7 +171,7 @@ export default async function OfferPoolPage({
               <p className="text-xs text-white/55">{[offer.city, offer.country].filter(Boolean).join(", ") || "—"}</p>
               <p className="text-xs text-white/55">{offer.categoryCode || "À qualifier"}{offer.subCategoryCode ? " · " + offer.subCategoryCode : ""}</p>
               <div>
-                <p className="text-xs text-[#c7a15a]">{statusLabels[offer.status] || offer.status}</p>
+                <p className={`text-xs font-medium ${matchingStatus.colorClass}`}>{matchingStatus.label}</p>
                 <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/30">{offer.source}</p>
                 {offer.sourceUrl && <a href={offer.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[10px] text-[#F97316] hover:underline">Source</a>}
                 <form action={submitRawOffer} className="mt-2"><input type="hidden" name="externalJobId" value={offer.id}/><button className="border border-[#c7a15a]/70 px-3 py-2 text-[9px] uppercase tracking-[0.12em] text-[#c7a15a]">Rentrer une offre</button></form>
