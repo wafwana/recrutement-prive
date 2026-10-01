@@ -1,0 +1,175 @@
+
+> recrutement-prive@0.1.0 build
+> prisma generate && next build
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v6.16.2) to ./node_modules/@prisma/client in 426ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+   ▲ Next.js 15.5.26
+   - Experiments (use with caution):
+     · serverActions
+
+   Creating an optimized production build ...
+ ⚠ Compiled with warnings in 2.6s
+
+./node_modules/jose/dist/webapi/lib/deflate.js
+A Node.js API is used (CompressionStream at line: 31) which is not supported in the Edge Runtime.
+Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+
+Import trace for requested module:
+./node_modules/jose/dist/webapi/lib/deflate.js
+./node_modules/jose/dist/webapi/lib/jwe_encrypt.js
+./node_modules/jose/dist/webapi/jwt/encrypt.js
+./node_modules/jose/dist/webapi/index.js
+./node_modules/@auth/core/jwt.js
+./node_modules/@auth/core/lib/init.js
+./node_modules/@auth/core/lib/index.js
+./node_modules/@auth/core/index.js
+./node_modules/next-auth/index.js
+
+./node_modules/jose/dist/webapi/lib/deflate.js
+A Node.js API is used (DecompressionStream at line: 34) which is not supported in the Edge Runtime.
+Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+
+Import trace for requested module:
+./node_modules/jose/dist/webapi/lib/deflate.js
+./node_modules/jose/dist/webapi/lib/jwe_encrypt.js
+./node_modules/jose/dist/webapi/jwt/encrypt.js
+./node_modules/jose/dist/webapi/index.js
+./node_modules/@auth/core/jwt.js
+./node_modules/@auth/core/lib/init.js
+./node_modules/@auth/core/lib/index.js
+./node_modules/@auth/core/index.js
+./node_modules/next-auth/index.js
+
+ ✓ Compiled successfully in 27.6s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/81) ...
+   Generating static pages (20/81)
+   Generating static pages (40/81)
+   Generating static pages (60/81)
+ ✓ Generating static pages (81/81)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                            Size  First Load JS
+┌ ○ /                                               3.95 kB         117 kB
+├ ○ /_not-found                                       996 B         104 kB
+├ ƒ /api/activity/heartbeat                           260 B         103 kB
+├ ƒ /api/admin/settings                               260 B         103 kB
+├ ƒ /api/auth/[...nextauth]                           260 B         103 kB
+├ ƒ /api/candidat/photo                               260 B         103 kB
+├ ƒ /api/candidat/photo/[candidateId]                 260 B         103 kB
+├ ƒ /api/candidat/profil                              260 B         103 kB
+├ ƒ /api/candidats/documents/[documentId]             260 B         103 kB
+├ ƒ /api/company/siret                                260 B         103 kB
+├ ƒ /api/consultant/presentations                     260 B         103 kB
+├ ƒ /api/contact                                      260 B         103 kB
+├ ƒ /api/cron/cv-rematch                              260 B         103 kB
+├ ƒ /api/cron/enterprise-offer-sourcing               260 B         103 kB
+├ ƒ /api/cron/global-jobs                             260 B         103 kB
+├ ƒ /api/documents/archive                            260 B         103 kB
+├ ƒ /api/documents/archive/[id]                       260 B         103 kB
+├ ƒ /api/documents/cv-library                         260 B         103 kB
+├ ƒ /api/documents/deposit                            260 B         103 kB
+├ ƒ /api/entreprise/applications                      260 B         103 kB
+├ ƒ /api/entreprise/applications/[applicationId]      260 B         103 kB
+├ ƒ /api/entreprise/jobs                              260 B         103 kB
+├ ƒ /api/entreprise/jobs/[jobId]                      260 B         103 kB
+├ ƒ /api/entreprise/jobs/[jobId]/attachment           260 B         103 kB
+├ ƒ /api/health                                       260 B         103 kB
+├ ƒ /api/messages                                     260 B         103 kB
+├ ƒ /api/owner/admins                                 260 B         103 kB
+├ ƒ /api/owner/archivage                              260 B         103 kB
+├ ƒ /api/owner/cv-candidates                          260 B         103 kB
+├ ƒ /api/owner/cv-import                              260 B         103 kB
+├ ƒ /api/owner/cv-intake                              260 B         103 kB
+├ ƒ /api/owner/cv-intake/[id]/original                260 B         103 kB
+├ ƒ /api/owner/cv-matching                            260 B         103 kB
+├ ƒ /api/owner/exclusions                             260 B         103 kB
+├ ƒ /api/owner/facturation                            260 B         103 kB
+├ ƒ /api/owner/init                                   260 B         103 kB
+├ ƒ /api/owner/offres-vivier                          260 B         103 kB
+├ ƒ /api/owner/offres-vivier/batch-process            260 B         103 kB
+├ ƒ /api/owner/outflows                               260 B         103 kB
+├ ƒ /api/owner/outflows/[id]                          260 B         103 kB
+├ ƒ /api/owner/partenaires                            260 B         103 kB
+├ ƒ /api/owner/partenaires/[id]                       260 B         103 kB
+├ ƒ /api/owner/partenaires/[id]/accords               260 B         103 kB
+├ ƒ /api/owner/partenaires/[id]/accords/[accordId]    260 B         103 kB
+├ ƒ /api/owner/partenaires/[id]/contacts              260 B         103 kB
+├ ƒ /api/owner/partenaires/sourcing                   260 B         103 kB
+├ ƒ /api/owner/payouts                                260 B         103 kB
+├ ƒ /api/owner/permissions                            260 B         103 kB
+├ ƒ /api/owner/pre-comptabilite                       260 B         103 kB
+├ ƒ /api/owner/presentations/confirm-condition        260 B         103 kB
+├ ƒ /api/owner/prestations-tarifs                     260 B         103 kB
+├ ƒ /api/sourcing/global-candidates                   260 B         103 kB
+├ ƒ /api/sourcing/global-jobs                         260 B         103 kB
+├ ○ /connexion                                      1.64 kB         110 kB
+├ ƒ /espace                                           419 B         109 kB
+├ ƒ /espace/admin                                     182 B         106 kB
+├ ƒ /espace/admin/autorisations                       182 B         106 kB
+├ ƒ /espace/admin/configuration                     1.59 kB         104 kB
+├ ƒ /espace/candidat                                4.22 kB         107 kB
+├ ƒ /espace/consultant                              2.59 kB         105 kB
+├ ƒ /espace/documents                               2.31 kB         105 kB
+├ ƒ /espace/documents/cv-library                    1.94 kB         104 kB
+├ ƒ /espace/entreprise                                166 B         110 kB
+├ ƒ /espace/entreprise/[companyId]                    178 B         110 kB
+├ ƒ /espace/entreprise/offres/[jobId]               2.23 kB         108 kB
+├ ƒ /espace/messages                                2.18 kB         105 kB
+├ ƒ /espace/owner                                     412 B         109 kB
+├ ƒ /espace/owner/admins                            2.52 kB         105 kB
+├ ƒ /espace/owner/archivage                         2.42 kB         105 kB
+├ ƒ /espace/owner/consultants                       2.26 kB         105 kB
+├ ƒ /espace/owner/cv-intake                         3.11 kB         106 kB
+├ ƒ /espace/owner/cv-matching                       2.04 kB         105 kB
+├ ƒ /espace/owner/entreprises/nouvelle              2.28 kB         108 kB
+├ ƒ /espace/owner/facturation                        3.1 kB         106 kB
+├ ƒ /espace/owner/metiers                             623 B         107 kB
+├ ƒ /espace/owner/offres-vivier                     1.62 kB         108 kB
+├ ƒ /espace/owner/offres/nouvelle                     182 B         106 kB
+├ ƒ /espace/owner/partenaires                         623 B         107 kB
+├ ƒ /espace/owner/partenaires/[id]                  6.47 kB         109 kB
+├ ƒ /espace/owner/partenaires/nouveau               4.64 kB         111 kB
+├ ƒ /espace/owner/partenaires/sourcing              3.98 kB         110 kB
+├ ƒ /espace/owner/pre-comptabilite                  2.52 kB         105 kB
+├ ƒ /espace/owner/prestations-tarifs                2.13 kB         105 kB
+├ ƒ /espace/owner/sorties-argent                    4.69 kB         107 kB
+├ ƒ /espace/owner/sourcing                          1.22 kB         104 kB
+├ ○ /inscription                                    2.91 kB         111 kB
+├ ○ /inscription/entreprise                         3.68 kB         112 kB
+├ ○ /maintenance                                      182 B         106 kB
+├ ○ /mentions-legales                                 260 B         103 kB
+├ ○ /mot-de-passe-oublie                            1.37 kB         107 kB
+├ ○ /offres                                           182 B         106 kB
+├ ƒ /offres/[jobId]                                   182 B         106 kB
+├ ○ /owner/initialisation                           1.56 kB         104 kB
+├ ○ /owner/permissions                              2.42 kB         105 kB
+├ ƒ /owner/supervision                                260 B         103 kB
+└ ○ /reinitialisation-mot-de-passe                  2.21 kB         108 kB
++ First Load JS shared by all                        103 kB
+  ├ chunks/1255-0f12d1d68e0b5948.js                 46.4 kB
+  ├ chunks/4bd1b696-f785427dddbba9fb.js             54.2 kB
+  └ other shared chunks (total)                     1.93 kB
+
+
+ƒ Middleware                                          87 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

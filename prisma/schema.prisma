@@ -751,3 +751,40 @@ model PartnerHistory {
 
   @@index([partnerId, createdAt])
 }
+
+model FinancialOutflow {
+  id                    String    @id @default(cuid())
+  outflowNumber         String    @unique
+  operationDate         DateTime  @default(now())
+  paymentDate           DateTime?
+  beneficiaryName       String
+  beneficiaryEmail      String?
+  reason                String
+  description           String?
+  category              String?
+  originModule          String    @default("AUTRE") // PAIE, PRESTATAIRE, FRAIS_PRO, REMBOURSEMENT, FOURNISSEUR, PRELEVEMENT_OWNER, AUTRE
+  amountHt              Float
+  amountTva             Float     @default(0)
+  amountTtc             Float
+  currency              String    @default("EUR")
+  paymentMethod         String?   // VIREMENT, CARTE, PRELEVEMENT, CHEQUE, ESPÈCES, AUTRE
+  paymentSource         String?   // COMPTE_PRINCIPAL, COMPTE_RESERVE, CARTE_PRO, etc.
+  referenceNumber       String?   // Ref facture, bulletin, contrat, etc.
+  documentUrl           String?
+  documentId            String?
+  createdById           String
+  authorizedById        String?
+  status                String    @default("A_COMPLETER") // PREVU, AUTORISE, PAYE, RAPPROCHE, A_COMPLETER, ANNULE
+  reconciliationStatus  String    @default("NON_RAPPROCHE") // NON_RAPPROCHE, RAPPROCHE, ECART_DETECTE
+  isPrivateOwnerExpense Boolean   @default(false)
+  payoutRequestId       String?   @unique
+  auditHistory          Json?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([category])
+  @@index([originModule])
+  @@index([beneficiaryName])
+  @@index([operationDate])
+}
