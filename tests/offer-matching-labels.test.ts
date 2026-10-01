@@ -69,6 +69,30 @@ describe("Offer Matching Status Helper - Functional Rules", () => {
     assert.equal(status.label, "Aucun matching trouvé");
   });
 
+  test("MATCHING without result metadata is not mislabeled as zero matches", () => {
+    const status = getOfferMatchingStatus({ status: "MATCHING" });
+    assert.equal(status.code, "MATCHING_IN_PROGRESS");
+    assert.equal(status.label, "Matching en cours");
+  });
+
+  test("Completed matching without count or topMatches reports unavailable results", () => {
+    const status = getOfferMatchingStatus({
+      status: "MATCHING",
+      rawData: { matching: { matchedAt: "2026-10-01T20:00:00.000Z" } },
+    });
+    assert.equal(status.code, "MATCHING_UNAVAILABLE");
+    assert.equal(status.label, "Résultats de matching indisponibles");
+  });
+
+  test("Missing matchCount uses a present topMatches array as the result set", () => {
+    const status = getOfferMatchingStatus({
+      status: "MATCHING",
+      rawData: { matching: { matchedAt: "2026-10-01T20:00:00.000Z", topMatches: [] } },
+    });
+    assert.equal(status.code, "NO_MATCH");
+    assert.equal(status.label, "Aucun matching trouvé");
+  });
+
   test("Standard lifecycle fallback labels remain accurate", () => {
     assert.equal(getOfferMatchingStatus({ status: "DETECTED" }).label, "Nouvelle");
     assert.equal(getOfferMatchingStatus({ status: "A_QUALIFIER" }).label, "À qualifier");
