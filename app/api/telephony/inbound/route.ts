@@ -10,11 +10,26 @@ const inboundSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const isLiveConfigured =
+    process.env.TELEPHONY_PROVIDER_LIVE === "true" && Boolean(process.env.TELEPHONY_WEBHOOK_SECRET);
+
+  if (!isLiveConfigured) {
+    return NextResponse.json(
+      {
+        error: "Service de téléphonie entrante indisponible.",
+        details: "Aucun fournisseur de téléphonie en direct n'est actuellement configuré ou validé en production.",
+        mode: "SIMULATION",
+      },
+      { status: 503 }
+    );
+  }
+
   try {
     const rawBody = await request.text();
     const signatureHeader = request.headers.get("x-rp-signature") || request.headers.get("x-telephony-signature");
+    const timestampHeader = request.headers.get("x-rp-timestamp") || request.headers.get("x-telephony-timestamp");
 
-    const verification = verifyTelephonyWebhookSignature(rawBody, signatureHeader);
+    const verification = verifyTelephonyWebhookSignature(rawBody, signatureHeader, timestampHeader);
     if (!verification.valid) {
       return NextResponse.json(
         { error: "Signature de webhook invalide ou non autorisée.", reason: verification.reason },
@@ -57,7 +72,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (err) {
-    console.error("[/api/telephony/inbound] Exception:", err);
+    console.error("[/api/telephony/inbound] Exception in inbound handler");
     return NextResponse.json(
       { error: "Erreur lors du traitement de l'appel entrant." },
       { status: 500 }

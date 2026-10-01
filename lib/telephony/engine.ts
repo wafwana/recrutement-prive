@@ -91,7 +91,8 @@ export class DefaultTelephonyEngine implements TelephonyProvider {
         });
         callLogId = log.id;
       } catch (err) {
-        console.error("[DefaultTelephonyEngine] Error persisting call log:", err);
+        console.error("[DefaultTelephonyEngine] Failed to persist inbound call log");
+        throw new Error("Erreur de persistance de l'historique d'appel.");
       }
     }
 
@@ -135,7 +136,7 @@ export class DefaultTelephonyEngine implements TelephonyProvider {
         const log = await prisma.callLog.create({
           data: {
             direction: "OUTBOUND",
-            callerNumber: settings.centralPhoneNumber, // RP central number presented
+            callerNumber: settings.centralPhoneNumber,
             callerName: null,
             destinationPhone: req.targetPhoneNumber,
             status: "INITIATED",
@@ -147,7 +148,8 @@ export class DefaultTelephonyEngine implements TelephonyProvider {
         });
         callLogId = log.id;
       } catch (err) {
-        console.error("[DefaultTelephonyEngine] Error persisting outbound call log:", err);
+        console.error("[DefaultTelephonyEngine] Failed to persist outbound call log");
+        throw new Error("Erreur de persistance du journal d'appel sortant.");
       }
     }
 

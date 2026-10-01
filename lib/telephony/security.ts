@@ -1,25 +1,31 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
 /**
- * Verifies HMAC-SHA256 signature for incoming telephony webhooks.
+ * Verifies HMAC-SHA256 signature and anti-replay timestamp for incoming telephony webhooks.
  */
 export function verifyTelephonyWebhookSignature(
   rawBody: string,
   signatureHeader: string | null,
+  timestampHeader: string | null,
   secret?: string
 ): { valid: boolean; reason?: string } {
   const webhookSecret = secret || process.env.TELEPHONY_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
-    if (process.env.NODE_ENV === "production") {
-      return { valid: false, reason: "Clé secrète de webhook non configurée sur le serveur." };
-    }
-    // Dev/Test mode without secret configured
-    return { valid: true };
+    return { valid: false, reason: "Clé secrète de webhook non configurée sur le serveur." };
   }
 
   if (!signatureHeader) {
     return { valid: false, reason: "En-tête de signature x-rp-signature manquant." };
+  }
+
+  // Anti-replay timestamp verification if header provided
+  if (timestampHeader) {
+    const ts = parseInt(timestampHeader, 10);
+    if (isNaN(ts) || Math.abs(Date.now() - ts) > 300000) {
+      // > 5 minutes
+      return { valid: false, reason: "Horodatage de requête trop ancien ou invalide (protection anti-rejeu)." };
+    }
   }
 
   try {

@@ -756,8 +756,8 @@ model PartnerHistory {
 
 model TelephonyConfig {
   id                   String   @id @default(cuid())
-  centralPhoneNumber   String   @default("+33100000000")
-  ownerPhone           String   @default("+33600000000")
+  centralPhoneNumber   String   @default("")
+  ownerPhone           String   @default("")
   secondaryPhone       String?
   ringMode             String   @default("SEQUENTIAL")
   transferDelaySeconds Int      @default(15)

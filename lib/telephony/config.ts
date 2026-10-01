@@ -2,8 +2,8 @@ import { prisma } from "@/lib/prisma";
 import type { TelephonySettings } from "./types";
 
 export const DEFAULT_TELEPHONY_SETTINGS: TelephonySettings = {
-  centralPhoneNumber: "+33100000000",
-  ownerPhone: "+33600000000",
+  centralPhoneNumber: "",
+  ownerPhone: "",
   secondaryPhone: null,
   ringMode: "SEQUENTIAL",
   transferDelaySeconds: 15,

@@ -106,16 +106,16 @@ test("Telephony - HMAC-SHA256 Webhook signature validation", () => {
   const validHmac = createHmac("sha256", secret).update(payload).digest("hex");
 
   // 1. Valid signature
-  const validRes = verifyTelephonyWebhookSignature(payload, validHmac, secret);
+  const validRes = verifyTelephonyWebhookSignature(payload, validHmac, null, secret);
   assert.equal(validRes.valid, true);
 
   // 2. Invalid signature
-  const invalidRes = verifyTelephonyWebhookSignature(payload, "invalid_signature_hash", secret);
+  const invalidRes = verifyTelephonyWebhookSignature(payload, "invalid_signature_hash", null, secret);
   assert.equal(invalidRes.valid, false);
   assert.match(invalidRes.reason || "", /invalide/i);
 
   // 3. Missing signature when secret is configured
-  const missingRes = verifyTelephonyWebhookSignature(payload, null, secret);
+  const missingRes = verifyTelephonyWebhookSignature(payload, null, null, secret);
   assert.equal(missingRes.valid, false);
   assert.match(missingRes.reason || "", /manquant/i);
 });
