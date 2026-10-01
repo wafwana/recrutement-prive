@@ -166,7 +166,7 @@ export default function DocumentsPage() {
                     <p className="mt-1 text-xs text-white/40">Introduit par {doc.senderEmail} ({doc.senderRole})</p>
                     <p className="mt-1 text-xs text-white/30">{new Date(doc.createdAt).toLocaleString("fr-FR")} · {doc.status}</p>
                   </div>
-                  <a href={"/api/documents/archive/" + doc.id} target="_blank" rel="noreferrer" className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a]">Consulter</a>
+                  <a href={"/api/documents/archive/" + doc.id} target="_blank" rel="noreferrer" className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a]">Lire en ligne</a>
                 </div>
               </div>
             ))}

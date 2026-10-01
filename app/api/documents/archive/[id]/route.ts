@@ -13,14 +13,50 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
   const role = session.user.role || "";
+  const userId = session.user.id;
+  const url = new URL(request.url);
+  const download = url.searchParams.get("download") === "true";
+
   if (role !== "OWNER" && role !== "ADMIN" && role !== "CONSULTANT") {
     return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   }
-  if (role !== "OWNER" && !(await hasPermission(session.user.id, role, "DOCUMENTS_VIEW"))) {
-    return NextResponse.json({ error: "Permission requise : consulter les documents." }, { status: 403 });
-  }
 
   const { id } = await context.params;
+
+  // Strict enforcement: File download/export of binary is exclusively reserved to OWNER
+  if (download && role !== "OWNER") {
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: userId,
+        actorRole: role,
+        action: "UNAUTHORIZED_DOWNLOAD_ATTEMPT",
+        targetType: "ARCHIVED_DOCUMENT",
+        targetId: id,
+        details: { access: "download", deniedReason: "Download is exclusively reserved to OWNER" },
+      },
+    });
+    return NextResponse.json({ error: "Le téléchargement est exclusivement réservé au compte OWNER." }, { status: 403 });
+  }
+
+  if (role !== "OWNER") {
+    // Non-OWNER access check: must have DOCUMENTS_VIEW permission OR explicit internal transfer from OWNER
+    const hasDocPermission = await hasPermission(userId, role, "DOCUMENTS_VIEW");
+    const activeTransfer = await prisma.internalTransfer.findFirst({
+      where: {
+        collaboratorUserId: userId,
+        status: "ACTIVE",
+        OR: [
+          { targetType: "DOCUMENT", targetId: id },
+          { targetType: "ARCHIVE_FOLDER" },
+        ],
+      },
+    });
+
+    if (!hasDocPermission && !activeTransfer) {
+      return NextResponse.json({ error: "Permission requise : consulter les documents." }, { status: 403 });
+    }
+  }
+
   const doc = await prisma.archivedDocument.findUnique({
     where: { id },
     select: { name: true, mimeType: true, fileData: true, categoryPath: true },
@@ -32,22 +68,24 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
   await prisma.auditLog.create({
     data: {
-      actorUserId: session.user.id,
+      actorUserId: userId,
       actorRole: role,
-      action: "DOCUMENT_DOWNLOAD",
+      action: download ? "DOCUMENT_DOWNLOAD" : "DOCUMENT_VIEW",
       targetType: "ARCHIVED_DOCUMENT",
       targetId: id,
-      details: { fileName: doc.name, categoryPath: doc.categoryPath, access: "download" },
+      details: { fileName: doc.name, categoryPath: doc.categoryPath, access: download ? "download" : "view" },
     },
   });
 
   const body = new ArrayBuffer(doc.fileData.byteLength);
   new Uint8Array(body).set(doc.fileData);
 
+  const disposition = download ? "attachment" : "inline";
+
   return new NextResponse(body, {
     headers: {
       "Content-Type": doc.mimeType || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${encodeURIComponent(doc.name)}"`,
+      "Content-Disposition": `${disposition}; filename="${encodeURIComponent(doc.name)}"`,
       "Cache-Control": "private, no-store",
     },
   });
