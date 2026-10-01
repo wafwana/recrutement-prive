@@ -10,7 +10,11 @@ import CandidateSourcingClient from "@/components/owner/CandidateSourcingClient"
 export default async function OwnerSourcingPage() {
   const session = await auth();
   if (!session?.user?.id || !["OWNER", "ADMIN", "CONSULTANT"].includes(session.user.role || "")) redirect("/connexion");
-  if (!(await hasPermission(session.user.id, session.user.role, "SOURCING"))) redirect("/espace/owner");
+  if (!(await hasPermission(session.user.id, session.user.role, "SOURCING"))) {
+    if (session.user.role === "ADMIN") redirect("/espace/admin");
+    if (session.user.role === "CONSULTANT") redirect("/espace/consultant");
+    redirect("/connexion");
+  }
 
   const jobSources = configuredSources("RP_GLOBAL_JOB_SOURCES");
   const candidateSources = configuredSources("RP_GLOBAL_CANDIDATE_SOURCES");
