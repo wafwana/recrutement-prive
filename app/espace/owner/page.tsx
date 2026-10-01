@@ -56,6 +56,7 @@ export default async function OwnerPage() {
           <Link href="/espace/owner/offres/nouvelle" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Rentrer une offre</Link>
           <Link href="/espace/owner/partenaires" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Partenaires & Sources</Link>
           <Link href="/espace/owner/offres-vivier" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Vivier des offres</Link>
+          <Link href="/espace/owner/sorties-argent" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Registre — Sorties d’argent</Link>
           <Link href="/espace/owner/pre-comptabilite" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Pré-comptabilité</Link>
           <Link href="/espace/owner/admins" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Gérer les ADMIN</Link>
           <Link href="/espace/owner/consultants" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Gérer les CONSULTANTS</Link>

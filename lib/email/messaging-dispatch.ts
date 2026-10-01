@@ -17,12 +17,12 @@ export interface DispatchMessageEmailParams {
   senderId: string;
   senderName: string;
   senderRole: string;
-  bodyText: string;
+  bodyText?: string;
 }
 
 /**
- * Dispatches email notifications to conversation participants when a new message is posted.
- * Errors in email sending are logged and never throw/fail internal message creation.
+ * Dispatches minimal email notifications to conversation participants when a new message is posted.
+ * Enforces idempotency via SystemSetting tracking and omits raw sensitive message body text.
  */
 export async function dispatchMessageNotificationEmail(
   params: DispatchMessageEmailParams
@@ -34,7 +34,18 @@ export async function dispatchMessageNotificationEmail(
     return { dispatchedCount: 0, errors: ["Base de données non disponible."] };
   }
 
+  const idempotencyKey = `msg_email:${params.messageId}`;
+
   try {
+    // Idempotency check: verify whether notification email was already dispatched for this message
+    const existingKey = await prisma.systemSetting.findUnique({
+      where: { key: idempotencyKey },
+    });
+
+    if (existingKey) {
+      return { dispatchedCount: 0, errors: [] }; // Already sent, idempotent exit
+    }
+
     const conversation = await prisma.conversation.findUnique({
       where: { id: params.conversationId },
       include: {
@@ -64,12 +75,7 @@ export async function dispatchMessageNotificationEmail(
     const baseUrl = getAppBaseUrl();
     const messageUrl = `${baseUrl}/espace/messages?conversationId=${encodeURIComponent(params.conversationId)}`;
     const safeSubject = escapeHtml(conversation.subject || "Nouveau message Recrutement Privé");
-    const safeSenderName = escapeHtml(params.senderName || "Un utilisateur");
-    const safeExcerpt = escapeHtml(
-      params.bodyText.length > 300
-        ? params.bodyText.substring(0, 300) + "..."
-        : params.bodyText
-    );
+    const safeSenderName = escapeHtml(params.senderName || "Un membre Recrutement Privé");
 
     for (const participant of recipientParticipants) {
       const recipientUser = participant.user;
@@ -77,21 +83,22 @@ export async function dispatchMessageNotificationEmail(
 
       const safeRecipientName = escapeHtml(recipientUser.name || "Bonjour");
 
+      // Minimal non-sensitive email body without exposing candidate/company PII or raw text
       const htmlBody = `
         <div style="font-family: Arial, sans-serif; color: #111; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0;">
           <h2 style="color: #0b1b2b; font-size: 18px; border-bottom: 2px solid #c7a15a; padding-bottom: 10px;">
-            Recrutement Privé · Nouveau Message
+            Recrutement Privé · Notification de Message
           </h2>
           <p style="font-size: 14px; line-height: 1.6;">Bonjour ${safeRecipientName},</p>
           <p style="font-size: 14px; line-height: 1.6;">
-            Vous avez reçu un nouveau message de <strong>${safeSenderName}</strong> (${escapeHtml(params.senderRole)}) concernant : <em>${safeSubject}</em>.
+            Vous avez reçu un nouveau message de <strong>${safeSenderName}</strong> (${escapeHtml(params.senderRole)}) dans votre fil de discussion : <em>${safeSubject}</em>.
           </p>
-          <div style="background-color: #f8fafc; border-left: 4px solid #c7a15a; padding: 15px; margin: 20px 0; font-size: 13px; font-style: italic;">
-            "${safeExcerpt}"
+          <div style="background-color: #f8fafc; border-left: 4px solid #c7a15a; padding: 15px; margin: 20px 0; font-size: 13px; color: #555;">
+            Afin de garantir la confidentialité et la sécurité des échanges, le contenu du message est accessible uniquement sur la plateforme.
           </div>
           <div style="margin-top: 25px;">
-            <a href="${messageUrl}" style="background-color: #0b1b2b; color: #ffffff; padding: 10px 20px; text-decoration: none; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
-              Accéder à la messagerie sécurisée →
+            <a href="${messageUrl}" style="background-color: #0b1b2b; color: #ffffff; padding: 12px 24px; text-decoration: none; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; display: inline-block;">
+              Consulter le message sur Recrutement Privé →
             </a>
           </div>
           <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; font-size: 11px; color: #888;">
@@ -112,6 +119,14 @@ export async function dispatchMessageNotificationEmail(
         errors.push(`Échec d'envoi à ${recipientUser.email}: ${sendResult.error}`);
       }
     }
+
+    // Persist idempotency key after dispatch attempt
+    await prisma.systemSetting.create({
+      data: {
+        key: idempotencyKey,
+        value: { messageId: params.messageId, dispatchedAt: new Date().toISOString(), dispatchedCount },
+      },
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[dispatchMessageNotificationEmail] Exception:", msg);

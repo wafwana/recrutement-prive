@@ -20,9 +20,11 @@ test("CV & AI Pipeline: getActiveAiProvider resolves provider or returns null wh
     process.env.GEMINI_API_KEY = "test_gemini_key";
     assert.equal(getActiveAiProvider(), "gemini");
 
+    delete process.env.GEMINI_API_KEY;
     process.env.OPENAI_API_KEY = "test_openai_key";
     assert.equal(getActiveAiProvider(), "openai");
 
+    process.env.GEMINI_API_KEY = "test_gemini_key";
     process.env.AI_PROVIDER = "gemini";
     assert.equal(getActiveAiProvider(), "gemini");
   } finally {

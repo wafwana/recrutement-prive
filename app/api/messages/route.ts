@@ -144,17 +144,29 @@ export async function POST(request: Request) {
     });
     if (!participant) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   } else {
-    const recipientId = parsed.data.recipientId!;
-    if (recipientId === senderId) return NextResponse.json({ error: "Impossible de s'envoyer un message à soi-même." }, { status: 400 });
-    const recipient = await prisma.user.findUnique({ where: { id: recipientId }, select: { id: true } });
+    let effectiveRecipientId = parsed.data.recipientId!;
+
+    // Requirement B: External messages/documents from ENTREPRISE or SPONSOR must arrive in the OWNER inbox first.
+    if (senderRole === "ENTREPRISE" || senderRole === "SPONSOR") {
+      const ownerUser = await prisma.user.findFirst({
+        where: { role: "OWNER", status: "ACTIVE" },
+        select: { id: true },
+      });
+      if (ownerUser) {
+        effectiveRecipientId = ownerUser.id;
+      }
+    }
+
+    if (effectiveRecipientId === senderId) return NextResponse.json({ error: "Impossible de s'envoyer un message à soi-même." }, { status: 400 });
+    const recipient = await prisma.user.findUnique({ where: { id: effectiveRecipientId }, select: { id: true } });
     if (!recipient) return NextResponse.json({ error: "Destinataire introuvable" }, { status: 404 });
 
     const existing = await prisma.conversation.findFirst({
       where: {
         AND: [
-          { participants: { every: { userId: { in: [senderId, recipientId] } } } },
+          { participants: { every: { userId: { in: [senderId, effectiveRecipientId] } } } },
           { participants: { some: { userId: senderId } } },
-          { participants: { some: { userId: recipientId } } },
+          { participants: { some: { userId: effectiveRecipientId } } },
         ],
       },
       select: { id: true },
@@ -165,7 +177,7 @@ export async function POST(request: Request) {
       const conversation = await prisma.conversation.create({
         data: {
           subject: parsed.data.subject || "Nouvelle conversation",
-          participants: { create: [{ userId: senderId }, { userId: recipientId }] },
+          participants: { create: [{ userId: senderId }, { userId: effectiveRecipientId }] },
         },
       });
       conversationId = conversation.id;

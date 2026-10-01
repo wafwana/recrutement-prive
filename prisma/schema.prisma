@@ -101,6 +101,8 @@ model User {
   sourcedCandidates SourcedCandidate[]
   telephonyPermission TelephonyPermission? @relation("TelephonyPermissionUser")
   initiatedCalls CallLog[] @relation("CallLogInitiator")
+  receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
+  grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -425,11 +427,40 @@ model Message {
   senderId String
   body String
   readAt DateTime?
+  archivedDocumentId String?
+  archivedDocument ArchivedDocument? @relation(fields: [archivedDocumentId], references: [id], onDelete: SetNull)
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   @@index([conversationId, createdAt])
   @@index([senderId, createdAt])
+  @@index([archivedDocumentId])
+}
+
+enum InternalTransferStatus {
+  ACTIVE
+  REVOKED
+}
+
+model InternalTransfer {
+  id                 String                 @id @default(cuid())
+  targetType         String
+  targetId           String
+  collaboratorUserId String
+  scope              String?
+  status             InternalTransferStatus @default(ACTIVE)
+  grantedByUserId    String
+  grantedAt          DateTime               @default(now())
+  revokedAt          DateTime?
+  notes              String?
+  collaborator       User                   @relation("TransferredToCollaborator", fields: [collaboratorUserId], references: [id], onDelete: Cascade)
+  grantedBy          User                   @relation("TransferredByOwner", fields: [grantedByUserId], references: [id], onDelete: Cascade)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([collaboratorUserId, status])
+  @@index([targetType, targetId, status])
+  @@index([grantedByUserId])
 }
 model SystemSetting {
   id String @id @default(cuid())
@@ -494,6 +525,7 @@ model ArchivedDocument {
   verificationNotes  String?
   verifiedAt         DateTime?
   verifiedByUserId   String?
+  messages           Message[]
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 
@@ -816,4 +848,41 @@ model VoicemailMessage {
   updatedAt       DateTime @updatedAt
 
   @@index([status, createdAt])
+}
+
+model FinancialOutflow {
+  id                    String    @id @default(cuid())
+  outflowNumber         String    @unique
+  operationDate         DateTime  @default(now())
+  paymentDate           DateTime?
+  beneficiaryName       String
+  beneficiaryEmail      String?
+  reason                String
+  description           String?
+  category              String?
+  originModule          String    @default("AUTRE") // PAIE, PRESTATAIRE, FRAIS_PRO, REMBOURSEMENT, FOURNISSEUR, PRELEVEMENT_OWNER, AUTRE
+  amountHt              Float
+  amountTva             Float     @default(0)
+  amountTtc             Float
+  currency              String    @default("EUR")
+  paymentMethod         String?   // VIREMENT, CARTE, PRELEVEMENT, CHEQUE, ESPÈCES, AUTRE
+  paymentSource         String?   // COMPTE_PRINCIPAL, COMPTE_RESERVE, CARTE_PRO, etc.
+  referenceNumber       String?   // Ref facture, bulletin, contrat, etc.
+  documentUrl           String?
+  documentId            String?
+  createdById           String
+  authorizedById        String?
+  status                String    @default("A_COMPLETER") // PREVU, AUTORISE, PAYE, RAPPROCHE, A_COMPLETER, ANNULE
+  reconciliationStatus  String    @default("NON_RAPPROCHE") // NON_RAPPROCHE, RAPPROCHE, ECART_DETECTE
+  isPrivateOwnerExpense Boolean   @default(false)
+  payoutRequestId       String?   @unique
+  auditHistory          Json?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([category])
+  @@index([originModule])
+  @@index([beneficiaryName])
+  @@index([operationDate])
 }
