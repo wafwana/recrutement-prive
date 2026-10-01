@@ -10,13 +10,12 @@ export default async function PartnerDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== "OWNER") {
+  if (!session?.user?.id || session.user.role !== "ADMIN") {
     redirect("/connexion");
   }
 
   if (!(await hasPermission(session.user.id, session.user.role, "PARTNERS_MANAGE"))) {
-    const fallbackRedirect = session.user.role === "ADMIN" ? "/espace/admin" : session.user.role === "CONSULTANT" ? "/espace/consultant" : "/espace";
-    redirect(fallbackRedirect);
+    redirect("/espace/admin");
   }
 
   const { id } = await params;

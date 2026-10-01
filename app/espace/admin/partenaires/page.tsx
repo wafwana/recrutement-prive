@@ -19,13 +19,12 @@ export default async function OwnerPartenairesPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== "OWNER") {
+  if (!session?.user?.id || session.user.role !== "ADMIN") {
     redirect("/connexion");
   }
 
   if (!(await hasPermission(session.user.id, session.user.role, "PARTNERS_MANAGE"))) {
-    const fallbackRedirect = session.user.role === "ADMIN" ? "/espace/admin" : session.user.role === "CONSULTANT" ? "/espace/consultant" : "/espace";
-    redirect(fallbackRedirect);
+    redirect("/espace/admin");
   }
 
   const sp = await searchParams;
@@ -63,7 +62,7 @@ export default async function OwnerPartenairesPage({
 
       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Stratégie & Réseau</p>
+          <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">ADMIN · Partenaires & Sources</p>
           <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Partenaires & Sources</h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">
             Gestion, qualification et recherche centralisée des partenaires institutionnels, éducatifs, associatifs et réseaux d&apos;expatriés à l&apos;international.
@@ -71,13 +70,13 @@ export default async function OwnerPartenairesPage({
         </div>
         <div className="flex flex-wrap gap-3">
           <Link
-            href="/espace/owner/partenaires/sourcing"
+            href="/espace/admin/partenaires/sourcing"
             className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316] hover:bg-[#F97316]/20"
           >
             Sourcing & Découverte
           </Link>
           <Link
-            href="/espace/owner/partenaires/nouveau"
+            href="/espace/admin/partenaires/nouveau"
             className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a] hover:bg-[#c7a15a]/20"
           >
             + Rentrer un partenaire
@@ -211,7 +210,7 @@ export default async function OwnerPartenairesPage({
               Filtrer les résultats
             </button>
             <Link
-              href="/espace/owner/partenaires"
+              href="/espace/admin/partenaires"
               className="border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.14em] text-white/60 hover:text-white"
             >
               Réinitialiser
@@ -238,7 +237,7 @@ export default async function OwnerPartenairesPage({
             >
               <div>
                 <Link
-                  href={`/espace/owner/partenaires/${partner.id}`}
+                  href={`/espace/admin/partenaires/${partner.id}`}
                   className="text-sm font-semibold text-white/90 hover:text-[#c7a15a]"
                 >
                   {partner.officialName}
@@ -292,7 +291,7 @@ export default async function OwnerPartenairesPage({
 
               <div>
                 <Link
-                  href={`/espace/owner/partenaires/${partner.id}`}
+                  href={`/espace/admin/partenaires/${partner.id}`}
                   className="inline-block border border-[#c7a15a]/50 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-[#c7a15a] hover:bg-[#c7a15a]/10"
                 >
                   Fiche Organisme →

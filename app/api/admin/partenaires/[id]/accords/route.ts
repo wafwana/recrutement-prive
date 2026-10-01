@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth, getActiveSessionContext } from "@/auth";
 import { hasPermission } from "@/lib/auth/permissions";
-import { updatePartnerAgreement, deletePartnerAgreement } from "@/lib/partenaires/partner-service";
+import { createPartnerAgreement, getPartnerDetails } from "@/lib/partenaires/partner-service";
 
 async function requirePartnerAccess() {
   const activeSession = getActiveSessionContext();
@@ -9,56 +9,53 @@ async function requirePartnerAccess() {
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
   const name = typeof session?.user?.name === "string" ? session.user.name : session?.user?.email || "Utilisateur";
-  if (!session?.user || !userId || !role === "OWNER") return null;
+  if (!session?.user || !userId || !role === "ADMIN") return null;
   if (!(await hasPermission(userId, role, "PARTNERS_MANAGE"))) return null;
   return { id: userId, role: role!, name };
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string; accordId: string }> }
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await requirePartnerAccess();
   if (!user) {
     return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
   }
 
-  const { id: partnerId, accordId } = await params;
+  const { id } = await params;
+  const partner = await getPartnerDetails(id);
+  if (!partner) {
+    return NextResponse.json({ error: "Partenaire introuvable." }, { status: 404 });
+  }
+
+  return NextResponse.json({ agreements: partner.agreements });
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const user = await requirePartnerAccess();
+  if (!user) {
+    return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
+  }
+
+  const { id: partnerId } = await params;
 
   try {
     const body = await request.json();
-    const updated = await updatePartnerAgreement(partnerId, accordId, body, {
-      userId: user.id,
-      name: user.name,
-      role: user.role,
-    });
+    if (!body.title || !body.agreementType) {
+      return NextResponse.json({ error: "Champs obligatoires : title, agreementType." }, { status: 400 });
+    }
 
-    return NextResponse.json({ agreement: updated });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Erreur serveur.";
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
-}
+    const agreement = await createPartnerAgreement(
+      partnerId,
+      body,
+      { userId: user.id, name: user.name, role: user.role }
+    );
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string; accordId: string }> }
-) {
-  const user = await requirePartnerAccess();
-  if (!user) {
-    return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
-  }
-
-  const { id: partnerId, accordId } = await params;
-
-  try {
-    const res = await deletePartnerAgreement(partnerId, accordId, {
-      userId: user.id,
-      name: user.name,
-      role: user.role,
-    });
-
-    return NextResponse.json(res);
+    return NextResponse.json({ agreement }, { status: 201 });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erreur serveur.";
     return NextResponse.json({ error: msg }, { status: 500 });
