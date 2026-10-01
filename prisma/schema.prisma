@@ -99,6 +99,8 @@ model User {
   conversations ConversationParticipant[]
   sentMessages Message[]
   sourcedCandidates SourcedCandidate[]
+  receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
+  grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -423,11 +425,40 @@ model Message {
   senderId String
   body String
   readAt DateTime?
+  archivedDocumentId String?
+  archivedDocument ArchivedDocument? @relation(fields: [archivedDocumentId], references: [id], onDelete: SetNull)
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   @@index([conversationId, createdAt])
   @@index([senderId, createdAt])
+  @@index([archivedDocumentId])
+}
+
+enum InternalTransferStatus {
+  ACTIVE
+  REVOKED
+}
+
+model InternalTransfer {
+  id                 String                 @id @default(cuid())
+  targetType         String
+  targetId           String
+  collaboratorUserId String
+  scope              String?
+  status             InternalTransferStatus @default(ACTIVE)
+  grantedByUserId    String
+  grantedAt          DateTime               @default(now())
+  revokedAt          DateTime?
+  notes              String?
+  collaborator       User                   @relation("TransferredToCollaborator", fields: [collaboratorUserId], references: [id], onDelete: Cascade)
+  grantedBy          User                   @relation("TransferredByOwner", fields: [grantedByUserId], references: [id], onDelete: Cascade)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([collaboratorUserId, status])
+  @@index([targetType, targetId, status])
+  @@index([grantedByUserId])
 }
 model SystemSetting {
   id String @id @default(cuid())
@@ -492,6 +523,7 @@ model ArchivedDocument {
   verificationNotes  String?
   verifiedAt         DateTime?
   verifiedByUserId   String?
+  messages           Message[]
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 

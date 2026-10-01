@@ -14,7 +14,14 @@ export default function MessageCenter({ currentUserId, recipients }: { currentUs
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
+  const [transferSuccess, setTransferSuccess] = useState("");
   const [loading, setLoading] = useState(true);
+  const [collaboratorUserId, setCollaboratorUserId] = useState("");
+  const [transferScope, setTransferScope] = useState("");
+
+  const currentUser = useMemo(() => recipients.find((r) => r.id === currentUserId), [recipients, currentUserId]);
+  const isOwner = currentUser?.role === "OWNER";
+  const staffCollaborators = useMemo(() => recipients.filter((r) => (r.role === "ADMIN" || r.role === "CONSULTANT") && r.id !== currentUserId), [recipients, currentUserId]);
 
   const loadConversations = async () => {
     const response = await fetch("/api/messages", { cache: "no-store" });
@@ -94,6 +101,38 @@ export default function MessageCenter({ currentUserId, recipients }: { currentUs
 
         <main className="flex flex-col bg-[#0d0d0d] p-6 md:p-8">
           <div className="border-b border-white/10 pb-5"><p className="text-[10px] uppercase tracking-[0.22em] text-[#c7a15a]">{selectedOther ? selectedOther.role : "Nouveau message"}</p><h2 className="mt-2 font-serif text-2xl">{selectedOther?.name || selectedOther?.email || "Choisissez un destinataire"}</h2></div>
+          {selectedId && isOwner && (
+            <div className="border-b border-white/10 py-4">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-[#c7a15a]">Transmettre à un collaborateur (OWNER)</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <select value={collaboratorUserId} onChange={(e) => setCollaboratorUserId(e.target.value)} className="border border-white/10 bg-[#0b0b0b] px-3 py-2 text-xs text-white outline-none">
+                  <option value="">Sélectionner un collaborateur</option>
+                  {staffCollaborators.map((collab) => <option key={collab.id} value={collab.id}>{collab.name || collab.email} ({collab.role})</option>)}
+                </select>
+                <input value={transferScope} onChange={(e) => setTransferScope(e.target.value)} placeholder="Périmètre (ex: Dossier Recrutement)" className="border border-white/10 bg-transparent px-3 py-2 text-xs text-white outline-none placeholder:text-white/25" />
+                <button
+                  type="button"
+                  disabled={!collaboratorUserId}
+                  onClick={async () => {
+                    setError(""); setTransferSuccess("");
+                    const res = await fetch("/api/owner/messages/transfer", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ targetType: "CONVERSATION", targetId: selectedId, collaboratorUserId, scope: transferScope || undefined }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) setError(data.error || "Impossible de transmettre.");
+                    else setTransferSuccess(`Conversation transmise à ${data.transfer?.collaborator?.email}.`);
+                  }}
+                  className="border border-[#c7a15a]/60 px-4 py-2 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a] hover:bg-[#c7a15a] hover:text-black disabled:opacity-30"
+                >
+                  Transmettre
+                </button>
+              </div>
+              {transferSuccess && <p className="mt-2 text-xs text-emerald-400">{transferSuccess}</p>}
+            </div>
+          )}
+
           <div className="flex-1 space-y-4 overflow-y-auto py-6">
             {messages.map((message) => <div key={message.id} className={`max-w-[80%] border border-white/10 p-4 ${message.sender.id === currentUserId ? "ml-auto bg-white/[0.04]" : ""}`}><p className="text-sm leading-6 text-white/75">{message.body}</p><p className="mt-2 text-[10px] text-white/30">{new Date(message.createdAt).toLocaleString("fr-FR")}</p></div>)}
             {!selectedId && <p className="py-20 text-center text-sm text-white/30">Sélectionnez une conversation ou choisissez un destinataire pour commencer.</p>}
