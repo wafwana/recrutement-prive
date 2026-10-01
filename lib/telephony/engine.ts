@@ -70,9 +70,12 @@ export class DefaultTelephonyEngine implements TelephonyProvider {
       action = settings.offHoursBehavior === "REJECT" ? "REJECT" : "VOICEMAIL";
     }
 
-    let callLogId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const isLiveConfigured =
+      process.env.TELEPHONY_PROVIDER_LIVE === "true" && Boolean(process.env.TELEPHONY_WEBHOOK_SECRET);
 
-    if (process.env.DATABASE_URL) {
+    let callLogId = `sim_call_${Date.now()}`;
+
+    if (isLiveConfigured && process.env.DATABASE_URL) {
       try {
         const log = await prisma.callLog.create({
           data: {
@@ -96,7 +99,7 @@ export class DefaultTelephonyEngine implements TelephonyProvider {
       }
     }
 
-    const mode = process.env.TELEPHONY_PROVIDER_LIVE === "true" ? "LIVE" : "SIMULATION";
+    const mode = isLiveConfigured ? "LIVE" : "SIMULATION";
 
     return {
       mode,
@@ -122,11 +125,23 @@ export class DefaultTelephonyEngine implements TelephonyProvider {
       return {
         ok: false,
         mode: "SIMULATION",
+        status: "FAILED",
         error: "Appel sortant refusé : vous ne possédez pas l'autorisation nécessaire.",
       };
     }
 
-    const mode = process.env.TELEPHONY_PROVIDER_LIVE === "true" ? "LIVE" : "SIMULATION";
+    const isLiveConfigured =
+      process.env.TELEPHONY_PROVIDER_LIVE === "true" && Boolean(process.env.TELEPHONY_WEBHOOK_SECRET);
+
+    if (!isLiveConfigured) {
+      // In SIMULATION mode: Do NOT create any CallLog in DB, return explicit NOT_EXECUTED_SIMULATION
+      return {
+        ok: false,
+        mode: "SIMULATION",
+        status: "FAILED",
+        error: "Action non exécutée — le module de téléphonie est en mode préparation/simulation (aucun appel réseau émis).",
+      };
+    }
 
     const settings = await getTelephonySettings();
     let callLogId = `outcall_${Date.now()}`;
@@ -155,7 +170,7 @@ export class DefaultTelephonyEngine implements TelephonyProvider {
 
     return {
       ok: true,
-      mode,
+      mode: "LIVE",
       callLogId,
       callerIdUsed: settings.centralPhoneNumber,
       status: "INITIATED",

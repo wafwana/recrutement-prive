@@ -122,11 +122,10 @@ export default function OwnerTelephonyClient({
 
       const data = await res.json();
       if (!res.ok) {
-        setCallingState(`Refusé : ${data.error}`);
+        setCallingState(`Action non exécutée : ${data.error}`);
       } else {
-        setCallingState(`Appel initialisé vers ${outboundTargetPhone} (Réf: ${data.callLogId})`);
+        setCallingState(`Simulation de numérotation vers ${outboundTargetPhone} (Mode préparation)`);
         setOutboundTargetPhone("");
-        // Refresh logs
         const refRes = await fetch("/api/owner/telephony");
         const refData = await refRes.json();
         if (refData.callLogs) setCallLogs(refData.callLogs);

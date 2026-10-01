@@ -84,7 +84,7 @@ test("Telephony - Engine outbound call initiation block for unpermitted role", a
   assert.match(result.error || "", /refusé/i);
 });
 
-test("Telephony - Engine outbound call allowed for OWNER", async () => {
+test("Telephony - Engine outbound call in simulation mode rejects real call execution", async () => {
   const engine = new DefaultTelephonyEngine();
 
   const result = await engine.initiateOutboundCall(
@@ -95,9 +95,10 @@ test("Telephony - Engine outbound call allowed for OWNER", async () => {
     "OWNER"
   );
 
-  assert.equal(result.ok, true);
-  assert.ok(result.callLogId);
+  // In SIMULATION mode without TELEPHONY_PROVIDER_LIVE=true, real execution is refused
+  assert.equal(result.ok, false);
   assert.equal(result.mode, "SIMULATION");
+  assert.match(result.error || "", /non exécutée/i);
 });
 
 test("Telephony - HMAC-SHA256 Webhook signature validation", () => {
