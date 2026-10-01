@@ -31,7 +31,10 @@ export default async function OfferPoolPage({
   const id = session?.user?.id;
   const role = session?.user?.role;
   if (!id || !["OWNER", "ADMIN", "CONSULTANT"].includes(role || "")) redirect("/connexion");
-  if (!(await hasPermission(id, role, "OFFRES_VIVIER"))) redirect("/espace/owner");
+  if (!(await hasPermission(id, role, "OFFRES_VIVIER"))) {
+    const fallbackRedirect = role === "ADMIN" ? "/espace/admin" : role === "CONSULTANT" ? "/espace/consultant" : "/espace";
+    redirect(fallbackRedirect);
+  }
 
   const params = await searchParams;
   const q = params.q?.trim().toLowerCase() || "";

@@ -15,7 +15,8 @@ export default async function PartnerDetailPage({
   }
 
   if (!(await hasPermission(session.user.id, session.user.role, "PARTNERS_MANAGE"))) {
-    redirect("/espace/owner");
+    const fallbackRedirect = session.user.role === "ADMIN" ? "/espace/admin" : session.user.role === "CONSULTANT" ? "/espace/consultant" : "/espace";
+    redirect(fallbackRedirect);
   }
 
   const { id } = await params;
