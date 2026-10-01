@@ -3,6 +3,8 @@ export type OfferMatchingState =
   | "MATCH_DETECTED"
   | "PENDING_HUMAN_VALIDATION"
   | "NO_MATCH"
+  | "MATCHING_IN_PROGRESS"
+  | "MATCHING_UNAVAILABLE"
   | "OTHER";
 
 export type OfferMatchingStatusInfo = {
@@ -36,17 +38,30 @@ export function getOfferMatchingStatus(offer: {
     };
   }
 
-  // 2, 3, 4. Matching processing completed
+  // Matching is not a confirmed zero-result until the pipeline records a
+  // completed result set (matchCount or topMatches). Missing metadata is unknown.
   if (status === "MATCHING" || matchingObj?.matchedAt) {
-    const matchCount =
-      typeof matchingObj?.matchCount === "number"
-        ? matchingObj.matchCount
-        : Array.isArray(matchingObj?.topMatches)
-        ? matchingObj.topMatches.length
-        : 0;
+    const hasMatchCount =
+      typeof matchingObj?.matchCount === "number" &&
+      Number.isFinite(matchingObj.matchCount) &&
+      matchingObj.matchCount >= 0;
+    const hasTopMatches = Array.isArray(matchingObj?.topMatches);
+
+    if (!hasMatchCount && !hasTopMatches) {
+      const completed = Boolean(matchingObj?.matchedAt);
+      return {
+        code: completed ? "MATCHING_UNAVAILABLE" : "MATCHING_IN_PROGRESS",
+        label: completed ? "Résultats de matching indisponibles" : "Matching en cours",
+        colorClass: "text-[#c7a15a]",
+        badgeStyle: "border-[#c7a15a]/50 text-[#c7a15a] bg-[#c7a15a]/10",
+      };
+    }
+
+    const matchCount = hasMatchCount
+      ? (matchingObj!.matchCount as number)
+      : (matchingObj!.topMatches as unknown[]).length;
 
     if (matchCount === 0) {
-      // 4. Treatment finished without correspondence
       return {
         code: "NO_MATCH",
         label: "Aucun matching trouvé",
@@ -55,7 +70,6 @@ export function getOfferMatchingStatus(offer: {
       };
     }
 
-    // Candidate match(es) detected (matchCount > 0)
     const isHumanValidated = Boolean(
       matchingObj?.humanValidated === true ||
         matchingObj?.isValidated === true ||
@@ -63,22 +77,20 @@ export function getOfferMatchingStatus(offer: {
     );
 
     if (isHumanValidated) {
-      // 2. Engine finished and detected at least one match + human validated
       return {
         code: "MATCH_DETECTED",
         label: "Matching détecté",
         colorClass: "text-emerald-400",
         badgeStyle: "border-emerald-500/50 text-emerald-400 bg-emerald-500/10",
       };
-    } else {
-      // 3. Match found and awaiting human validation
-      return {
-        code: "PENDING_HUMAN_VALIDATION",
-        label: "À valider",
-        colorClass: "text-[#c7a15a]",
-        badgeStyle: "border-[#c7a15a]/50 text-[#c7a15a] bg-[#c7a15a]/10",
-      };
     }
+
+    return {
+      code: "PENDING_HUMAN_VALIDATION",
+      label: "À valider",
+      colorClass: "text-[#c7a15a]",
+      badgeStyle: "border-[#c7a15a]/50 text-[#c7a15a] bg-[#c7a15a]/10",
+    };
   }
 
   // Standard fallback labels
