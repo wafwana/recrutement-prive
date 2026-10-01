@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizePhoneNumber, mapIvrChoiceToCategory } from "../lib/telephony/caller-id";
 import { buildWhisperAnnouncement, isOffHours, DefaultTelephonyEngine } from "../lib/telephony/engine";
+import { verifyTelephonyWebhookSignature } from "../lib/telephony/security";
+import { createHmac } from "crypto";
 import { canMakeOutboundCalls } from "../lib/telephony/permissions";
 import { DEFAULT_TELEPHONY_SETTINGS } from "../lib/telephony/config";
 
@@ -95,4 +97,25 @@ test("Telephony - Engine outbound call allowed for OWNER", async () => {
 
   assert.equal(result.ok, true);
   assert.ok(result.callLogId);
+  assert.equal(result.mode, "SIMULATION");
+});
+
+test("Telephony - HMAC-SHA256 Webhook signature validation", () => {
+  const secret = "test_webhook_secret_123";
+  const payload = JSON.stringify({ callerNumber: "+33612345678", ivrChoice: "1" });
+  const validHmac = createHmac("sha256", secret).update(payload).digest("hex");
+
+  // 1. Valid signature
+  const validRes = verifyTelephonyWebhookSignature(payload, validHmac, secret);
+  assert.equal(validRes.valid, true);
+
+  // 2. Invalid signature
+  const invalidRes = verifyTelephonyWebhookSignature(payload, "invalid_signature_hash", secret);
+  assert.equal(invalidRes.valid, false);
+  assert.match(invalidRes.reason || "", /invalide/i);
+
+  // 3. Missing signature when secret is configured
+  const missingRes = verifyTelephonyWebhookSignature(payload, null, secret);
+  assert.equal(missingRes.valid, false);
+  assert.match(missingRes.reason || "", /manquant/i);
 });

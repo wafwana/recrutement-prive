@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { telephonyEngine } from "@/lib/telephony/engine";
+import { verifyTelephonyWebhookSignature } from "@/lib/telephony/security";
 import { z } from "zod";
 
 const inboundSchema = z.object({
@@ -10,7 +11,24 @@ const inboundSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json().catch(() => ({}));
+    const rawBody = await request.text();
+    const signatureHeader = request.headers.get("x-rp-signature") || request.headers.get("x-telephony-signature");
+
+    const verification = verifyTelephonyWebhookSignature(rawBody, signatureHeader);
+    if (!verification.valid) {
+      return NextResponse.json(
+        { error: "Signature de webhook invalide ou non autorisée.", reason: verification.reason },
+        { status: 401 }
+      );
+    }
+
+    let body: any = {};
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: "Corps de requête JSON invalide." }, { status: 400 });
+    }
+
     const parsed = inboundSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -24,6 +42,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
+      mode: result.mode,
       callLogId: result.callLogId,
       caller: result.caller,
       selectedCategory: result.selectedCategory,

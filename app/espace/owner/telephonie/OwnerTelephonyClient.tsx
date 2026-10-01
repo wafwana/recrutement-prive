@@ -148,6 +148,10 @@ export default function OwnerTelephonyClient({
         <p className="mt-1 text-xs text-white/60">
           Gestion du standard centralisé, routage par catégorie, numéros relais et contrôle d'accès aux appels sortants.
         </p>
+        <div className="mt-3 inline-flex items-center gap-2 border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-300">
+          <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+          <strong>Mode Simulation &amp; Préparation Opérateur</strong> · Aucun abonnement ni coût engagé sans validation Owner.
+        </div>
       </div>
 
       {/* Grid configuration & Outbound call launcher */}

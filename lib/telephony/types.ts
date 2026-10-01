@@ -51,6 +51,7 @@ export interface InboundCallInput {
 }
 
 export interface InboundRoutingResult {
+  mode: "SIMULATION" | "LIVE";
   callLogId: string;
   caller: IdentifiedCaller;
   selectedCategory: IvrCategory;
@@ -72,6 +73,7 @@ export interface OutboundCallRequest {
 
 export interface OutboundCallResult {
   ok: boolean;
+  mode: "SIMULATION" | "LIVE";
   callLogId?: string;
   callerIdUsed?: string;
   status?: CallStatus;

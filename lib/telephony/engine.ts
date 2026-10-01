@@ -95,7 +95,10 @@ export class DefaultTelephonyEngine implements TelephonyProvider {
       }
     }
 
+    const mode = process.env.TELEPHONY_PROVIDER_LIVE === "true" ? "LIVE" : "SIMULATION";
+
     return {
+      mode,
       callLogId,
       caller,
       selectedCategory,
@@ -117,9 +120,12 @@ export class DefaultTelephonyEngine implements TelephonyProvider {
     if (!allowed) {
       return {
         ok: false,
+        mode: "SIMULATION",
         error: "Appel sortant refusé : vous ne possédez pas l'autorisation nécessaire.",
       };
     }
+
+    const mode = process.env.TELEPHONY_PROVIDER_LIVE === "true" ? "LIVE" : "SIMULATION";
 
     const settings = await getTelephonySettings();
     let callLogId = `outcall_${Date.now()}`;
@@ -147,6 +153,7 @@ export class DefaultTelephonyEngine implements TelephonyProvider {
 
     return {
       ok: true,
+      mode,
       callLogId,
       callerIdUsed: settings.centralPhoneNumber,
       status: "INITIATED",
