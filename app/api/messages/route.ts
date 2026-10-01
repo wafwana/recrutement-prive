@@ -189,19 +189,17 @@ export async function POST(request: Request) {
     include: { sender: { select: { id: true, name: true, email: true } } },
   });
 
-  // Trigger non-blocking email notification dispatch to recipient participants
-  try {
-    await dispatchMessageNotificationEmail({
-      conversationId,
-      messageId: message.id,
-      senderId,
-      senderName: session.user.name || message.sender.name || "Utilisateur RP",
-      senderRole: session.user.role || "MEMBRE",
-      bodyText: message.body,
-    });
-  } catch (emailErr) {
+  // Trigger non-blocking async email notification dispatch to recipient participants
+  void dispatchMessageNotificationEmail({
+    conversationId,
+    messageId: message.id,
+    senderId,
+    senderName: session.user.name || message.sender.name || "Utilisateur RP",
+    senderRole: session.user.role || "MEMBRE",
+    bodyText: message.body,
+  }).catch((emailErr) => {
     console.error("[POST /api/messages] Non-blocking email dispatch failure:", emailErr);
-  }
+  });
 
   return NextResponse.json({ message }, { status: 201 });
 }
