@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasPermission } from "@/lib/auth/permissions";
+import { dispatchMessageNotificationEmail } from "@/lib/email/messaging-dispatch";
 
 const createMessageSchema = z.object({
   recipientId: z.string().trim().min(1).optional(),
@@ -175,6 +176,21 @@ export async function POST(request: Request) {
     data: { conversationId, senderId, body: parsed.data.body },
     include: { sender: { select: { id: true, name: true, email: true } } },
   });
+
+  // Trigger non-blocking email notification dispatch to recipient participants
+  try {
+    await dispatchMessageNotificationEmail({
+      conversationId,
+      messageId: message.id,
+      senderId,
+      senderName: session.user.name || message.sender.name || "Utilisateur RP",
+      senderRole: session.user.role || "MEMBRE",
+      bodyText: message.body,
+    });
+  } catch (emailErr) {
+    console.error("[POST /api/messages] Non-blocking email dispatch failure:", emailErr);
+  }
+
   return NextResponse.json({ message }, { status: 201 });
 }
 
