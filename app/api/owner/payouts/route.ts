@@ -184,6 +184,31 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Versement introuvable après mise à jour." }, { status: 500 });
   }
 
+  // Automatically sync authorized payout into the central accounting registry
+  if (updatedPayout.status === "AUTHORIZED") {
+    try {
+      const { createOrSyncOutflow } = await import("@/lib/accounting/outflow-service");
+      await createOrSyncOutflow({
+        payoutRequestId: updatedPayout.id,
+        beneficiaryName: updatedPayout.beneficiaryName,
+        beneficiaryEmail: updatedPayout.beneficiaryEmail,
+        reason: updatedPayout.reason,
+        amountHt: updatedPayout.amountHt,
+        amountTva: updatedPayout.amountTva,
+        amountTtc: updatedPayout.amountTtc,
+        currency: updatedPayout.currency,
+        referenceNumber: updatedPayout.invoiceRef || undefined,
+        createdById: owner.id!,
+        authorizedById: owner.id!,
+        status: "AUTORISE",
+        originModule: "PRESTATAIRE",
+        actorRole: "OWNER",
+      });
+    } catch (err) {
+      console.error("[payout outflow sync error]", err);
+    }
+  }
+
   await prisma.auditLog.create({
     data: {
       actorUserId: owner.id!,

@@ -1,0 +1,86 @@
+
+> recrutement-prive@0.1.0 start
+> next start
+
+   ▲ Next.js 15.5.26
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.2:3000
+
+ ✓ Starting...
+ ✓ Ready in 861ms
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[31m[auth][error][0m UntrustedHost: Host must be trusted. URL was: http://localhost:3000/api/auth/session. Read more at https://errors.authjs.dev#untrustedhost
+    at /app/.next/server/middleware.js:416:51288
+    at hR (/app/.next/server/middleware.js:416:53983)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
