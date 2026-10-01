@@ -10,7 +10,10 @@ import { isIdentityUnlocked } from "@/lib/mission-lock";
 import { hashPassword } from "@/lib/password-crypto";
 
 test("candidate API taxonomy validation, persistence and strict absence of cvUrl in GET and PUT", async () => {
-  if (!process.env.DATABASE_URL) return;
+  if (!process.env.DATABASE_URL) {
+    console.log("Skipping DB integration test: DATABASE_URL not configured in environment");
+    return;
+  }
 
   const suffix = Date.now().toString();
   const candidateEmail = `cand.tax.${suffix}@example.test`;
@@ -125,7 +128,10 @@ test("candidate API taxonomy validation, persistence and strict absence of cvUrl
 });
 
 test("enterprise job creation and update taxonomy validation & multi-company isolation", async () => {
-  if (!process.env.DATABASE_URL) return;
+  if (!process.env.DATABASE_URL) {
+    console.log("Skipping DB integration test: DATABASE_URL not configured in environment");
+    return;
+  }
 
   const suffix = Date.now().toString();
   const passwordHash = await hashPassword("TestPass@123");
