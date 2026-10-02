@@ -25,14 +25,13 @@ export async function POST(request: Request) {
     body = (await request.json()) as Record<string, unknown>;
   } catch {}
 
-  // Enforce strict server-side max limit of 15 offers per HTTP call
-  const limit = typeof body.limit === "number" && Number.isFinite(body.limit) ? Math.min(15, Math.max(1, body.limit)) : 15;
+  // Strict server-side batch limit enforced <= 20 to fit within Vercel execution timeouts
+  const limit = typeof body.limit === "number" && Number.isFinite(body.limit) ? Math.min(20, Math.max(1, body.limit)) : 20;
   const statusFilter = Array.isArray(body.statusFilter)
     ? body.statusFilter.filter((v): v is string => typeof v === "string")
     : ["DETECTED", "A_QUALIFIER"];
-  const force = body.force === true;
 
-  const batchSummary = await processOfferBatch({ limit, statusFilter, force });
+  const batchSummary = await processOfferBatch({ limit, statusFilter });
 
   await prisma.auditLog.create({
     data: {
@@ -43,13 +42,10 @@ export async function POST(request: Request) {
       details: {
         limit,
         statusFilter,
-        force,
         totalProcessed: batchSummary.totalProcessed,
         qualified: batchSummary.qualified,
         rejected: batchSummary.rejected,
         matched: batchSummary.matched,
-        unresolved: batchSummary.unresolved,
-        progressCount: batchSummary.progressCount,
         errors: batchSummary.errors,
       },
     },

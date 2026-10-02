@@ -11,16 +11,19 @@ export default function BatchProcessOffersButton() {
     setMessage(null);
     let totalAnalyzed = 0;
     let totalQualified = 0;
+    let totalRejected = 0;
     let totalMatched = 0;
     let totalErrors = 0;
-    let hasMore = true;
+    let iterations = 0;
+    let stalled = false;
 
     try {
-      while (hasMore) {
+      while (true) {
+        iterations++;
         const response = await fetch("/api/owner/offres-vivier/batch-process", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ limit: 15 }),
+          body: JSON.stringify({ limit: 20 }),
         });
 
         const data = await response.json().catch(() => null);
@@ -30,43 +33,51 @@ export default function BatchProcessOffersButton() {
 
         const summary = data?.batchSummary;
         const processed = summary?.totalProcessed ?? 0;
-        const progressCount = summary?.progressCount ?? 0;
-
         if (processed === 0) {
           break;
         }
 
         totalAnalyzed += processed;
         totalQualified += summary?.qualified ?? 0;
+        totalRejected += summary?.rejected ?? 0;
         totalMatched += summary?.matched ?? 0;
         totalErrors += summary?.errors ?? 0;
 
         const remaining = summary?.remainingPendingCount ?? 0;
+        const progressMade = summary?.progressMade ?? (summary?.qualified > 0 || summary?.rejected > 0);
 
-        // Bounded loop termination: STOP if no forward progress was made in this batch
-        if (progressCount === 0) {
+        setMessage(
+          `Traitement en cours : ${totalAnalyzed} traitée(s), ${totalQualified} qualifiée(s), ${totalRejected} rejetée(s), ${totalErrors} erreur(s)... (${remaining} en attente)`
+        );
+
+        if (!progressMade && remaining > 0) {
+          stalled = true;
           setMessage(
-            `Traitement en pause : ${totalAnalyzed} offre(s) vérifiée(s). ${remaining} offre(s) restent à qualifier manuellement.`
+            `Traitement interrompu : ${remaining} offre(s) restent en attente de qualification humaine ou d'une nouvelle tentative. Aucun progrès automatique supplémentaire.`
           );
-          hasMore = false;
           break;
         }
 
-        hasMore = Boolean(summary?.hasMore) && remaining > 0;
+        if (!summary?.hasMore || remaining === 0) {
+          break;
+        }
 
-        setMessage(
-          `Traitement en cours : ${totalAnalyzed} offre(s) traitée(s)... (${remaining} restante(s))`
-        );
-
-        if (totalAnalyzed >= 1500) break;
+        if (iterations >= 100 || totalAnalyzed >= 2000) {
+          setMessage(
+            `Session de traitement bornée atteinte (${totalAnalyzed} offres). Reprise disponible.`
+          );
+          break;
+        }
       }
 
-      if (hasMore === false && totalAnalyzed > 0) {
+      if (!stalled) {
         setMessage(
-          `Traitement terminé : ${totalAnalyzed} offre(s) analysée(s), ${totalQualified} qualifiée(s), ${totalMatched} en matching, ${totalErrors} erreur(s).`
+          `Traitement terminé : ${totalAnalyzed} analysée(s), ${totalQualified} qualifiée(s), ${totalRejected} rejetée(s), ${totalMatched} avec matching(s), ${totalErrors} erreur(s).`
         );
       }
-      window.location.reload();
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erreur pendant le traitement du lot.");
     } finally {
