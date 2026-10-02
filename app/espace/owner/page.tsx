@@ -95,7 +95,18 @@ export default async function OwnerPage() {
       </div>
 
       <section className="mt-8 border border-white/10 p-7">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between"><div><p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Sourcing & matching</p><h2 className="mt-3 font-serif text-2xl">Profils récemment détectés</h2></div><span className="text-[10px] uppercase tracking-[0.16em] text-white/30">100 derniers</span></div>
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Sourcing & matching</p>
+            <h2 className="mt-3 font-serif text-2xl">Profils récemment détectés</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/espace/owner/sourcing" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-[#F97316] hover:bg-[#F97316]/20">
+              Cockpit Sourcing →
+            </Link>
+            <span className="text-[10px] uppercase tracking-[0.16em] text-white/30">100 derniers</span>
+          </div>
+        </div>
         <div className="mt-6 space-y-2">{sourcedCandidates.slice(0,20).map((candidate)=><div key={candidate.id} className="flex flex-col gap-2 border border-white/10 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm text-white/80">{candidate.name||"Profil sans nom"}</p><p className="mt-1 text-xs text-white/35">{candidate.source}</p></div><div className="flex gap-5 text-[10px] uppercase tracking-[0.14em] text-white/40"><span>{candidate.status}</span><span>{candidate.matchingScore??"—"}/100</span></div></div>)}{sourcedCandidates.length===0&&<p className="text-sm text-white/35">Aucun profil sourcé enregistré pour le moment.</p>}</div>
       </section>
     </section>

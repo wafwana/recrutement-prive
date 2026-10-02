@@ -28,7 +28,10 @@ function keepQuery(sector: string, profession: string, q: string, dossier: strin
 export default async function OwnerMetiersPage({ searchParams }: { searchParams: SearchParams }) {
   const session = await auth();
   if (!session?.user?.id || !["OWNER", "ADMIN", "CONSULTANT"].includes(session.user.role || "")) redirect("/connexion");
-  if (!(await hasPermission(session.user.id, session.user.role, "METIERS_DOSSIERS"))) redirect("/espace/owner");
+  if (!(await hasPermission(session.user.id, session.user.role, "METIERS_DOSSIERS"))) {
+    const fallbackRedirect = session.user.role === "ADMIN" ? "/espace/admin" : session.user.role === "CONSULTANT" ? "/espace/consultant" : "/espace";
+    redirect(fallbackRedirect);
+  }
 
   const params = await searchParams;
   await ensureTaxonomySynced();
