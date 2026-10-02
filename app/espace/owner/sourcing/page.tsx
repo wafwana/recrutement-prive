@@ -10,11 +10,8 @@ import CandidateSourcingClient from "@/components/owner/CandidateSourcingClient"
 export default async function OwnerSourcingPage() {
   const session = await auth();
   if (!session?.user?.id || !["OWNER", "ADMIN", "CONSULTANT"].includes(session.user.role || "")) redirect("/connexion");
-  if (!(await hasPermission(session.user.id, session.user.role, "SOURCING"))) {
-    if (session.user.role === "ADMIN") redirect("/espace/admin");
-    if (session.user.role === "CONSULTANT") redirect("/espace/consultant");
-    redirect("/connexion");
-  }
+  const fallbackRedirect = session.user.role === "ADMIN" ? "/espace/admin" : session.user.role === "CONSULTANT" ? "/espace/consultant" : "/connexion";
+  if (!(await hasPermission(session.user.id, session.user.role, "SOURCING"))) redirect(fallbackRedirect);
 
   const jobSources = await getConfiguredSourcesAsync("RP_GLOBAL_JOB_SOURCES");
   const candidateSources = await getConfiguredSourcesAsync("RP_GLOBAL_CANDIDATE_SOURCES");
@@ -103,7 +100,7 @@ export default async function OwnerSourcingPage() {
       <BackButton />
       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Cockpit Sourcing Automatique</p>
+          <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">{session.user.role === "OWNER" ? "Owner" : "Sourcing"} · Cockpit Sourcing Automatique</p>
           <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Sourcing Candidats & Offres.</h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">
             Collecte et qualification automatisées depuis des sources autorisées. Déduplication native, préservation de la provenance
