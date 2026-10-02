@@ -97,6 +97,7 @@ const DEFAULT_FREE_JOB_SOURCES = [
 ] as const;
 
 import { prisma } from "@/lib/prisma";
+import { isSafeHttpsUrl } from "@/lib/security/ssrf";
 
 export function configuredSources(envName: string): string[] {
   const raw = process.env[envName];
@@ -126,8 +127,8 @@ export async function getConfiguredSourcesAsync(envName: string): Promise<string
       });
       if (record && Array.isArray(record.value)) {
         const dbSources = record.value
-          .filter((v): v is string => typeof v === "string" && /^https:\/\//i.test(v.trim()))
-          .map((v) => v.trim());
+          .filter((v): v is string => typeof v === "string" && isSafeHttpsUrl(v).safe)
+          .map((v) => isSafeHttpsUrl(v).url || v.trim());
         if (dbSources.length > 0) return dbSources;
       }
     } catch (err) {

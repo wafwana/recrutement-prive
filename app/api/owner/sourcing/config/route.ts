@@ -3,6 +3,7 @@ import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import { z } from "zod";
+import { isSafeHttpsUrl } from "@/lib/security/ssrf";
 
 const configSchema = z.object({
   sources: z.array(z.string().trim().url("Chaque source doit être une URL valide (https://)")).default([]),
@@ -50,7 +51,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message || "URLs de sources invalides." }, { status: 400 });
   }
 
-  const validSources = parsed.data.sources.filter((s) => /^https:\/\//i.test(s));
+  const validSources: string[] = [];
+  for (const rawUrl of parsed.data.sources) {
+    const ssrfCheck = isSafeHttpsUrl(rawUrl);
+    if (!ssrfCheck.safe) {
+      return NextResponse.json({ error: `URL rejetée pour motif de sécurité : ${ssrfCheck.reason} (${rawUrl})` }, { status: 400 });
+    }
+    if (ssrfCheck.url) validSources.push(ssrfCheck.url);
+  }
 
   await prisma.systemSetting.upsert({
     where: { key: "sourcing:candidate_sources" },
