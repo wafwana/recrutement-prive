@@ -96,13 +96,15 @@ const DEFAULT_FREE_JOB_SOURCES = [
   "https://www.arbeitnow.co.uk/api/job-board-api",
 ] as const;
 
+import { prisma } from "@/lib/prisma";
+
 export function configuredSources(envName: string): string[] {
   const raw = process.env[envName];
   if (!raw) return envName === "RP_GLOBAL_JOB_SOURCES" ? [...DEFAULT_FREE_JOB_SOURCES] : [];
   try {
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = typeof raw === "string" && raw.trim().startsWith("[") ? JSON.parse(raw) as unknown : raw.split(/[,;\n]/);
     const configured = Array.isArray(parsed)
-      ? parsed.filter((v): v is string => typeof v === "string" && /^https:\/\//i.test(v))
+      ? parsed.map((v) => (typeof v === "string" ? v.trim() : "")).filter((v): v is string => Boolean(v) && /^https:\/\//i.test(v))
       : [];
     return configured.length || envName !== "RP_GLOBAL_JOB_SOURCES"
       ? configured
@@ -110,4 +112,28 @@ export function configuredSources(envName: string): string[] {
   } catch {
     return envName === "RP_GLOBAL_JOB_SOURCES" ? [...DEFAULT_FREE_JOB_SOURCES] : [];
   }
+}
+
+export async function getConfiguredSourcesAsync(envName: string): Promise<string[]> {
+  const envSources = configuredSources(envName);
+  if (envSources.length > 0) return envSources;
+
+  if (envName === "RP_GLOBAL_CANDIDATE_SOURCES" && process.env.DATABASE_URL) {
+    try {
+      const record = await prisma.systemSetting.findUnique({
+        where: { key: "sourcing:candidate_sources" },
+        select: { value: true },
+      });
+      if (record && Array.isArray(record.value)) {
+        const dbSources = record.value
+          .filter((v): v is string => typeof v === "string" && /^https:\/\//i.test(v.trim()))
+          .map((v) => v.trim());
+        if (dbSources.length > 0) return dbSources;
+      }
+    } catch (err) {
+      console.warn("[getConfiguredSourcesAsync] Failed to fetch DB candidate sources:", err);
+    }
+  }
+
+  return envName === "RP_GLOBAL_JOB_SOURCES" ? [...DEFAULT_FREE_JOB_SOURCES] : [];
 }
