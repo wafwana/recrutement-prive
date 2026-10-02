@@ -5,6 +5,7 @@ import { requireCompanyAccess } from "@/lib/company-access";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { requireFileScanInProduction, scanBufferWithClamAV } from "@/lib/security/file-scan";
+import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = new Set(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
@@ -153,7 +154,55 @@ export async function POST(request: Request) {
       await tx.recruitmentHistory.create({ data: { jobId: created.id, actorUserId: access.userId, action: "JOB_CREATED", toStatus: created.status, details: attachment ? { attachmentName: attachment.name, attachmentSize: attachment.size } : undefined } });
       return created;
     });
-    return NextResponse.json(job, { status: 201 });
+    // Immediate advisory matching for newly opened offers. No applications or identity release.
+    let matchingCandidates = 0;
+    if (job.status === "OPEN") {
+      try {
+        const [candidates, categories] = await Promise.all([
+          prisma.candidateProfile.findMany({
+            where: { status: "ACTIVE", documents: { some: { docType: "CV" } } },
+            include: {
+              primaryCategory: { select: { code: true } },
+              documents: { where: { docType: "CV" }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true, analysis: true } },
+            },
+            take: 500,
+          }),
+          prisma.jobCategory.findMany({ select: { id: true, code: true } }),
+        ]);
+        const categoryCodes = new Map(categories.map((row) => [row.id, row.code]));
+        const [jobCategory, subCategory] = await Promise.all([
+          job.jobCategoryId ? prisma.jobCategory.findUnique({ where: { id: job.jobCategoryId }, select: { code: true } }) : null,
+          job.subCategoryId ? prisma.jobCategory.findUnique({ where: { id: job.subCategoryId }, select: { code: true } }) : null,
+        ]);
+        for (const candidate of candidates) {
+          const document = candidate.documents[0];
+          if (!document) continue;
+          const subCategoryCodes = Array.isArray(candidate.subCategoryIds)
+            ? candidate.subCategoryIds.filter((value): value is string => typeof value === "string").map((value) => categoryCodes.get(value) || value)
+            : [];
+          const result = matchCandidateToJob(
+            { skills: candidate.skills, experienceYears: candidate.experienceYears, headline: candidate.headline, bio: candidate.bio, location: candidate.location, country: candidate.country, primaryCategoryCode: candidate.primaryCategory?.code, subCategoryCodes },
+            { requiredSkills: job.requiredSkills, requiredExperienceYears: job.requiredExperienceYears, title: job.title, description: job.description, location: job.location, categoryCode: jobCategory?.code, subCategoryCode: subCategory?.code },
+          );
+          const previous = document.analysis && typeof document.analysis === "object" && !Array.isArray(document.analysis)
+            ? document.analysis as Record<string, unknown>
+            : {};
+          const previousMatches = Array.isArray(previous.suggestedMatches) ? previous.suggestedMatches : [];
+          const withoutThisJob = previousMatches.filter((item) => !item || typeof item !== "object" || (item as Record<string, unknown>).jobId !== job.id);
+          const suggestedMatches = [...withoutThisJob, { jobId: job.id, title: job.title, score: result.score, matchedSkills: result.matchedSkills, missingSkills: result.missingSkills, categoryMatchLevel: result.categoryMatchLevel }]
+            .sort((a, b) => Number((b as Record<string, unknown>).score ?? 0) - Number((a as Record<string, unknown>).score ?? 0))
+            .slice(0, 20);
+          await prisma.candidateDocument.update({
+            where: { id: document.id },
+            data: { analysis: { ...previous, suggestedMatches, rematchedAt: new Date().toISOString() } },
+          });
+          matchingCandidates++;
+        }
+      } catch (matchingError) {
+        console.error("[company-job] immediate candidate matching failed", { jobId: job.id, error: matchingError });
+      }
+    }
+    return NextResponse.json({ ...job, matchingCandidates }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Impossible de créer l'offre";
     return NextResponse.json({ error: message }, { status: message.includes("accès") || message.includes("Access") ? 403 : 400 });
