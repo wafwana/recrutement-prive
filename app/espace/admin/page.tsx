@@ -100,7 +100,7 @@ export default async function AdminPage() {
               Sourcing
             </Link>
           )}
-          {canCvIntake && (
+          {canManagePartners && (\n            <Link\n              href="/espace/owner/partenaires"\n              className="border border-[#F97316]/50 bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316] hover:bg-[#F97316]/20"\n            >\n              Partenaires & Sources\n            </Link>\n          )}\n          {canCvIntake && (
             <Link
               href="/espace/owner/cv-intake"
               className="border border-white/20 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/80 hover:border-white/40"
