@@ -72,7 +72,7 @@ export default function BatchProcessOffersButton() {
 
       if (!stalled) {
         setMessage(
-          `Traitement terminé : ${totalAnalyzed} analysée(s), ${totalQualified} qualifiée(s), ${totalRejected} rejetée(s), ${totalMatched} en matching, ${totalErrors} erreur(s).`
+          `Traitement terminé : ${totalAnalyzed} analysée(s), ${totalQualified} qualifiée(s), ${totalRejected} rejetée(s), ${totalMatched} avec matching(s), ${totalErrors} erreur(s).`
         );
       }
       setTimeout(() => {
