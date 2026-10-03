@@ -97,14 +97,43 @@ const DEFAULT_FREE_JOB_SOURCES = [
 ] as const;
 
 import { prisma } from "@/lib/prisma";
+import { request as httpsRequest } from "node:https";
 import { assertPublicDnsHost, isSafeHttpsUrl } from "@/lib/security/ssrf";
+
+async function requestPinnedHttps(url: URL, init: RequestInit, address: string, family: number): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const headers = new Headers(init.headers);
+    const request = httpsRequest(url, {
+      method: "GET",
+      headers: Object.fromEntries(headers.entries()),
+      servername: url.hostname,
+      lookup: (_hostname, _options, callback) => callback(null, address, family),
+    }, (incoming) => {
+      const chunks: Buffer[] = [];
+      incoming.on("data", (chunk: Buffer | string) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      incoming.on("end", () => {
+        const responseHeaders = new Headers();
+        for (const [name, value] of Object.entries(incoming.headers)) {
+          if (Array.isArray(value)) value.forEach((entry) => responseHeaders.append(name, entry));
+          else if (typeof value === "string") responseHeaders.set(name, value);
+        }
+        resolve(new Response(Buffer.concat(chunks), { status: incoming.statusCode ?? 502, statusText: incoming.statusMessage, headers: responseHeaders }));
+      });
+    });
+    request.setTimeout(15000, () => request.destroy(new Error("Source request timed out.")));
+    request.on("error", reject);
+    request.end();
+  });
+}
+
 async function fetchSafeSource(input: string, init: RequestInit): Promise<Response> {
   let current = input;
   for (let redirects = 0; redirects <= 5; redirects++) {
     const checked = isSafeHttpsUrl(current);
     if (!checked.safe || !checked.url) throw new Error(`Source URL rejected: ${checked.reason ?? "invalid URL"}`);
-    await assertPublicDnsHost(new URL(checked.url).hostname);
-    const response = await fetch(checked.url, { ...init, redirect: "manual" });
+    const url = new URL(checked.url);
+    const resolved = await assertPublicDnsHost(url.hostname);
+    const response = await requestPinnedHttps(url, init, resolved.address, resolved.family);
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get("location");
     if (!location) return response;
