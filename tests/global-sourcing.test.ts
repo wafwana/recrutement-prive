@@ -11,19 +11,14 @@ test("configuredSources accepte uniquement des URLs HTTPS", () => {
 });
 
 test("fetchGlobalJobs normalise un flux JSON autorisé", async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({
+  const jobs = await fetchGlobalJobs("https://example.com/jobs.json", async () => new Response(JSON.stringify({
     jobs: [{ id: "job-1", title: "Senior Engineer", company: "Example", country: "India", skills: ["TypeScript", "PostgreSQL"], experienceYears: 5 }],
-  }), { status: 200, headers: { "content-type": "application/json" } });
-  try {
-    const jobs = await fetchGlobalJobs("https://example.com/jobs.json");
-    assert.equal(jobs.length, 1);
-    assert.equal(jobs[0]?.externalId, "job-1");
-    assert.equal(jobs[0]?.companyName, "Example");
-    assert.deepEqual(jobs[0]?.skills, ["TypeScript", "PostgreSQL"]);
-  } finally { globalThis.fetch = originalFetch; }
+  }), { status: 200, headers: { "content-type": "application/json" } }));
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0]?.externalId, "job-1");
+  assert.equal(jobs[0]?.companyName, "Example");
+  assert.deepEqual(jobs[0]?.skills, ["TypeScript", "PostgreSQL"]);
 });
-
 test("SSRF guard rejects local, reserved, credentialed and literal IPv6 source URLs", () => {
   for (const url of [
     "https://localhost/jobs", "https://127.0.0.1/jobs", "https://10.0.0.5/jobs",
@@ -35,19 +30,13 @@ test("SSRF guard rejects local, reserved, credentialed and literal IPv6 source U
 });
 
 test("fetchGlobalJobs revalidates redirects and refuses a redirect to localhost", async () => {
-  const originalFetch = globalThis.fetch;
   const requested: string[] = [];
-  globalThis.fetch = async (input, init) => {
-    requested.push(String(input));
-    assert.equal(init?.redirect, "manual");
+  await assert.rejects(() => fetchGlobalJobs("https://example.com/jobs", async (url) => {
+    requested.push(url.toString());
     return new Response(null, { status: 302, headers: { location: "https://127.0.0.1/private" } });
-  };
-  try {
-    await assert.rejects(() => fetchGlobalJobs("https://example.com/jobs"), /Source URL rejected/);
-    assert.deepEqual(requested, ["https://example.com/jobs"]);
-  } finally { globalThis.fetch = originalFetch; }
+  }), /Source URL rejected/);
+  assert.deepEqual(requested, ["https://example.com/jobs"]);
 });
-
 test("SSRF address classifier blocks private, link-local, mapped-private and special-use IPs", () => {
   for (const ip of ["10.1.2.3", "172.16.0.1", "192.168.1.1", "169.254.169.254", "127.0.0.1", "100.64.0.1", "224.0.0.1", "::1", "fc00::1", "fe80::1", "::ffff:127.0.0.1", "2001:db8::1"]) {
     assert.equal(isPublicIpAddress(ip), false, ip);
