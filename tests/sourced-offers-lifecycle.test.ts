@@ -26,7 +26,7 @@ test("sourcing engine normalizes undated job offers as active opportunities", as
     );
 
   try {
-    const jobs = await fetchGlobalJobs("https://source.example/undated-jobs.json");
+    const jobs = await fetchGlobalJobs("https://example.com/undated-jobs.json");
     assert.equal(jobs.length, 1);
     const job = jobs[0];
 
