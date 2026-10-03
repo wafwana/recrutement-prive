@@ -76,10 +76,10 @@ export function isPublicIpAddress(address: string): boolean {
  * Resolve every DNS answer and reject the hostname if any answer is non-public.
  * Call immediately before each outbound request and after every redirect.
  */
-export async function assertPublicDnsHost(hostname: string): Promise<void> {
+export async function assertPublicDnsHost(hostname: string): Promise<{ address: string; family: number }> {
   if (isIP(hostname)) {
     if (!isPublicIpAddress(hostname)) throw new Error("Source DNS resolved to a non-public address (SSRF).");
-    return;
+    return { address: hostname, family: isIP(hostname) };
   }
   let records: Array<{ address: string; family: number }>;
   try { records = await lookup(hostname, { all: true, verbatim: true }); }
@@ -87,4 +87,5 @@ export async function assertPublicDnsHost(hostname: string): Promise<void> {
   if (!records.length || records.some((record) => !isPublicIpAddress(record.address))) {
     throw new Error("Source DNS resolved to a private, reserved, or non-routable address (SSRF).");
   }
+  return records[0];
 }
