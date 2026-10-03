@@ -103,7 +103,7 @@ async function fetchSafeSource(input: string, init: RequestInit): Promise<Respon
   for (let redirects = 0; redirects <= 5; redirects++) {
     const checked = isSafeHttpsUrl(current);
     if (!checked.safe || !checked.url) throw new Error(`Source URL rejected: ${checked.reason ?? "invalid URL"}`);
-    await assertPublicDnsHost(new URL(checked.url).hostname.replace(/^\\[|\\]$/g, ""));
+    await assertPublicDnsHost(new URL(checked.url).hostname);
     const response = await fetch(checked.url, { ...init, redirect: "manual" });
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get("location");
