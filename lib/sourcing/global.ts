@@ -98,6 +98,21 @@ const DEFAULT_FREE_JOB_SOURCES = [
 
 import { prisma } from "@/lib/prisma";
 import { isSafeHttpsUrl } from "@/lib/security/ssrf";
+async function fetchSafeSource(input: string, init: RequestInit): Promise<Response> {
+  let current = input;
+  for (let redirects = 0; redirects <= 5; redirects++) {
+    const checked = isSafeHttpsUrl(current);
+    if (!checked.safe || !checked.url) throw new Error(`Source URL rejected: ${checked.reason ?? "invalid URL"}`);
+    const response = await fetch(checked.url, { ...init, redirect: "manual" });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const location = response.headers.get("location");
+    if (!location) return response;
+    if (redirects === 5) throw new Error("Source redirect limit exceeded.");
+    current = new URL(location, checked.url).toString();
+  }
+  throw new Error("Source redirect limit exceeded.");
+}
+
 
 export function configuredSources(envName: string): string[] {
   const raw = process.env[envName];
