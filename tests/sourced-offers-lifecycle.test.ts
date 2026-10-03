@@ -4,43 +4,23 @@ import { fetchGlobalJobs } from "@/lib/sourcing/global";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 
 test("sourcing engine normalizes undated job offers as active opportunities", async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () =>
-    new Response(
-      JSON.stringify({
-        jobs: [
-          {
-            id: "undated-job-001",
-            title: "Architecte Solution Cloud",
-            company: "Enterprise Corp",
-            country: "France",
-            city: "Paris",
-            skills: ["AWS", "Kubernetes", "Terraform"],
-            experienceYears: 7,
-            description: "Conception d'architectures cloud hybrides.",
-            // Notice: no publishedAt or closingAt provided
-          },
-        ],
-      }),
-      { status: 200, headers: { "content-type": "application/json" } }
-    );
-
-  try {
-    const jobs = await fetchGlobalJobs("https://example.com/undated-jobs.json");
-    assert.equal(jobs.length, 1);
-    const job = jobs[0];
-
-    assert.equal(job.externalId, "undated-job-001");
-    assert.equal(job.title, "Architecte Solution Cloud");
-    assert.equal(job.companyName, "Enterprise Corp");
-    assert.equal(job.publishedAt, undefined);
-    assert.equal(job.closingAt, undefined);
-    assert.deepEqual(job.skills, ["AWS", "Kubernetes", "Terraform"]);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+  const jobs = await fetchGlobalJobs("https://example.com/undated-jobs.json", async () => new Response(
+    JSON.stringify({ jobs: [{
+      id: "undated-job-001", title: "Architecte Solution Cloud", company: "Enterprise Corp",
+      country: "France", city: "Paris", skills: ["AWS", "Kubernetes", "Terraform"], experienceYears: 7,
+      description: "Conception d'architectures cloud hybrides.",
+    }] }),
+    { status: 200, headers: { "content-type": "application/json" } }
+  ));
+  assert.equal(jobs.length, 1);
+  const job = jobs[0];
+  assert.equal(job.externalId, "undated-job-001");
+  assert.equal(job.title, "Architecte Solution Cloud");
+  assert.equal(job.companyName, "Enterprise Corp");
+  assert.equal(job.publishedAt, undefined);
+  assert.equal(job.closingAt, undefined);
+  assert.deepEqual(job.skills, ["AWS", "Kubernetes", "Terraform"]);
 });
-
 test("absence of closingAt or publishedAt date does not prevent candidate matching", () => {
   const candidate = {
     headline: "Architecte Cloud AWS Senior",
