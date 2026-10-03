@@ -68,8 +68,8 @@ function parseXmlItems(xml: string, source: string): GlobalJobItem[] {
   }).filter((item): item is GlobalJobItem => Boolean(item));
 }
 
-export async function fetchGlobalJobs(sourceUrl: string): Promise<GlobalJobItem[]> {
-  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json, application/rss+xml, application/atom+xml, text/xml" }, cache: "no-store" });
+export async function fetchGlobalJobs(sourceUrl: string, requester?: PinnedSourceRequester): Promise<GlobalJobItem[]> {
+  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json, application/rss+xml, application/atom+xml, text/xml" }, cache: "no-store" }, requester);
   if (!response.ok) throw new Error(`Source jobs inaccessible: HTTP ${response.status}`);
   const contentType = response.headers.get("content-type") ?? "";
   const body = await response.text();
@@ -82,8 +82,8 @@ export async function fetchGlobalJobs(sourceUrl: string): Promise<GlobalJobItem[
   return parseXmlItems(body, sourceUrl);
 }
 
-export async function fetchGlobalCandidates(sourceUrl: string): Promise<GlobalCandidateItem[]> {
-  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json" }, cache: "no-store" });
+export async function fetchGlobalCandidates(sourceUrl: string, requester?: PinnedSourceRequester): Promise<GlobalCandidateItem[]> {
+  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json" }, cache: "no-store" }, requester);
   if (!response.ok) throw new Error(`Source candidates inaccessible: HTTP ${response.status}`);
   const parsed = JSON.parse(await response.text()) as unknown;
   const root = asRecord(parsed);
@@ -126,14 +126,16 @@ async function requestPinnedHttps(url: URL, init: RequestInit, address: string, 
   });
 }
 
-async function fetchSafeSource(input: string, init: RequestInit): Promise<Response> {
+type PinnedSourceRequester = (url: URL, init: RequestInit, address: string, family: number) => Promise<Response>;
+
+async function fetchSafeSource(input: string, init: RequestInit, requester: PinnedSourceRequester = requestPinnedHttps): Promise<Response> {
   let current = input;
   for (let redirects = 0; redirects <= 5; redirects++) {
     const checked = isSafeHttpsUrl(current);
     if (!checked.safe || !checked.url) throw new Error(`Source URL rejected: ${checked.reason ?? "invalid URL"}`);
     const url = new URL(checked.url);
     const resolved = await assertPublicDnsHost(url.hostname);
-    const response = await requestPinnedHttps(url, init, resolved.address, resolved.family);
+    const response = await requester(url, init, resolved.address, resolved.family);
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get("location");
     if (!location) return response;
