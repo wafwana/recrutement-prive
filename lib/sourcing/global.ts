@@ -69,7 +69,7 @@ function parseXmlItems(xml: string, source: string): GlobalJobItem[] {
 }
 
 export async function fetchGlobalJobs(sourceUrl: string): Promise<GlobalJobItem[]> {
-  const response = await fetch(sourceUrl, { headers: { accept: "application/json, application/rss+xml, application/atom+xml, text/xml" }, cache: "no-store" });
+  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json, application/rss+xml, application/atom+xml, text/xml" }, cache: "no-store" });
   if (!response.ok) throw new Error(`Source jobs inaccessible: HTTP ${response.status}`);
   const contentType = response.headers.get("content-type") ?? "";
   const body = await response.text();
@@ -83,7 +83,7 @@ export async function fetchGlobalJobs(sourceUrl: string): Promise<GlobalJobItem[
 }
 
 export async function fetchGlobalCandidates(sourceUrl: string): Promise<GlobalCandidateItem[]> {
-  const response = await fetch(sourceUrl, { headers: { accept: "application/json" }, cache: "no-store" });
+  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json" }, cache: "no-store" });
   if (!response.ok) throw new Error(`Source candidates inaccessible: HTTP ${response.status}`);
   const parsed = JSON.parse(await response.text()) as unknown;
   const root = asRecord(parsed);
