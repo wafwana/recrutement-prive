@@ -57,7 +57,7 @@ export function isPublicIpAddress(address: string): boolean {
     const missing = 8 - groups.filter(Boolean).length;
     const compressedIndex = groups.indexOf("");
     const expanded = compressedIndex >= 0
-      ? [...groups.slice(0, compressedIndex).filter(Boolean), ...Array(missing + 1).fill("0"), ...groups.slice(compressedIndex + 1).filter(Boolean)]
+      ? [...groups.slice(0, compressedIndex).filter(Boolean), ...Array(missing).fill("0"), ...groups.slice(compressedIndex + 1).filter(Boolean)]
       : groups;
     if (expanded.length !== 8) return false;
     const first = Number.parseInt(expanded[0] || "0", 16);
