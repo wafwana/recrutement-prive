@@ -60,13 +60,13 @@ export function isPublicIpAddress(address: string): boolean {
       ? [...groups.slice(0, compressedIndex).filter(Boolean), ...Array(missing).fill("0"), ...groups.slice(compressedIndex + 1).filter(Boolean)]
       : groups;
     if (expanded.length !== 8) return false;
-    const first = Number.parseInt(expanded[0] || "0", 16);
-    // Only global-unicast 2000::/3 is allowed. This excludes unspecified,
-    // loopback, link-local, ULA, multicast, IPv4-compatible and special-use space.
-    if ((first & 0xe000) !== 0x2000) return false;
     const full = expanded.map((part) => Number.parseInt(part || "0", 16));
-    if (full[0] === 0x2001 && full[1] <= 0x01ff) return false; // special-use 2001::/23, including documentation and ORCHID
-    if (full[0] === 0x2002) return false; // 6to4 can encapsulate private IPv4 destinations
+    const first = full[0];
+    // Only global-unicast 2000::/3 is allowed.
+    if ((first & 0xe000) !== 0x2000) return false;
+    // Reject IANA special-purpose allocations and transition mechanisms.
+    if (first === 0x2001 && (full[1] <= 0x01ff || full[1] === 0x0db8)) return false;
+    if (first === 0x2002) return false; // 6to4 can encapsulate private IPv4 destinations
     return true;
   }
   return false;
