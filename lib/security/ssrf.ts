@@ -5,67 +5,55 @@ export function isSafeHttpsUrl(inputUrl: string): { safe: boolean; reason?: stri
     return { safe: false, reason: "URL absente ou invalide." };
   }
 
-  const trimmed = inputUrl.trim();
   let parsed: URL;
   try {
-    parsed = new URL(trimmed);
+    parsed = new URL(inputUrl.trim());
   } catch {
     return { safe: false, reason: "Format d'URL malformé." };
   }
 
   if (parsed.protocol !== "https:") {
-    return { safe: false, reason: "Protocol non sécurisé. Seul HTTPS est autorisé." };
+    return { safe: false, reason: "Protocole non sécurisé. Seul HTTPS est autorisé." };
+  }
+  if (parsed.username || parsed.password) {
+    return { safe: false, reason: "Les identifiants intégrés aux URL sont interdits." };
   }
 
-  const hostname = parsed.hostname.toLowerCase();
-
-  // Block localhost and internal domain names
+  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
   if (
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname.endsWith(".local") ||
-    hostname.endsWith(".internal") ||
-    hostname === "0.0.0.0" ||
-    hostname === "::" ||
-    hostname === "::1"
+    hostname === "localhost" || hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") || hostname.endsWith(".internal") ||
+    hostname.endsWith(".test") || hostname === "0.0.0.0"
   ) {
     return { safe: false, reason: "Accès aux hôtes locaux ou internes strictement interdit (SSRF)." };
   }
 
-  // IPv4 Private & Reserved Ranges Check
-  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-  const match = hostname.match(ipv4Regex);
-  if (match) {
-    const octets = match.slice(1, 5).map(Number);
-    if (octets.some((o) => o < 0 || o > 255)) {
+  // Reject IPv6 literals conservatively; public hostnames remain supported.
+  if (hostname.includes(":")) {
+    return { safe: false, reason: "Les adresses IPv6 littérales sont interdites pour les sources (SSRF)." };
+  }
+
+  const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const octets = ipv4.slice(1).map(Number);
+    if (octets.some((octet) => octet < 0 || octet > 255)) {
       return { safe: false, reason: "Adresse IP IPv4 invalide." };
     }
-
-    const [o1, o2] = octets;
-
-    // 127.0.0.0/8 Loopback
-    if (o1 === 127) {
-      return { safe: false, reason: "Adresse IP de bouclage (127.0.0.0/8) interdite (SSRF)." };
-    }
-    // 10.0.0.0/8 Private network
-    if (o1 === 10) {
-      return { safe: false, reason: "Réseau privé (10.0.0.0/8) interdit (SSRF)." };
-    }
-    // 172.16.0.0/12 Private network
-    if (o1 === 172 && o2 >= 16 && o2 <= 31) {
-      return { safe: false, reason: "Réseau privé (172.16.0.0/12) interdit (SSRF)." };
-    }
-    // 192.168.0.0/16 Private network
-    if (o1 === 192 && o2 === 168) {
-      return { safe: false, reason: "Réseau privé (192.168.0.0/16) interdit (SSRF)." };
-    }
-    // 169.254.0.0/16 Link-local / Cloud metadata (AWS/GCP/Azure IMDS)
-    if (o1 === 169 && o2 === 254) {
-      return { safe: false, reason: "Adresse Link-local / Métadonnées Cloud (169.254.0.0/16) interdite (SSRF)." };
-    }
-    // 0.0.0.0/8
-    if (o1 === 0) {
-      return { safe: false, reason: "Adresse réseau réservée (0.0.0.0/8) interdite." };
+    const [a, b, c] = octets;
+    const blocked =
+      a === 0 || a === 10 || a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 0 && c === 0) ||
+      (a === 192 && b === 0 && c === 2) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      (a === 198 && b === 51 && c === 100) ||
+      (a === 203 && b === 0 && c === 113) ||
+      a >= 224;
+    if (blocked) {
+      return { safe: false, reason: "Adresse IPv4 privée, réservée ou non routable interdite (SSRF)." };
     }
   }
 
