@@ -97,12 +97,13 @@ const DEFAULT_FREE_JOB_SOURCES = [
 ] as const;
 
 import { prisma } from "@/lib/prisma";
-import { isSafeHttpsUrl } from "@/lib/security/ssrf";
+import { assertPublicDnsHost, isSafeHttpsUrl } from "@/lib/security/ssrf";
 async function fetchSafeSource(input: string, init: RequestInit): Promise<Response> {
   let current = input;
   for (let redirects = 0; redirects <= 5; redirects++) {
     const checked = isSafeHttpsUrl(current);
     if (!checked.safe || !checked.url) throw new Error(`Source URL rejected: ${checked.reason ?? "invalid URL"}`);
+    await assertPublicDnsHost(new URL(checked.url).hostname.replace(/^\\[|\\]$/g, ""));
     const response = await fetch(checked.url, { ...init, redirect: "manual" });
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get("location");
