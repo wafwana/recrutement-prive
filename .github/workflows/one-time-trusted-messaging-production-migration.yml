@@ -45,6 +45,20 @@ jobs:
             to_regclass('"FinancialOutflow_payoutRequestId_key"') AS payout_request_index,
             to_regclass('"FinancialOutflow_status_createdAt_idx"') AS status_created_index;
           SQL
+      - name: Verify 0029 schema before recovery
+        env:
+          DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: |
+          set -euo pipefail
+          COLUMNS_OK=$(psql "$DATABASE_URL_PRODUCTION" -Atqc "SELECT COALESCE((array_agg(column_name ORDER BY ordinal_position) = ARRAY['id','outflowNumber','operationDate','paymentDate','beneficiaryName','beneficiaryEmail','reason','description','category','originModule','amountHt','amountTva','amountTtc','currency','paymentMethod','paymentSource','referenceNumber','documentUrl','documentId','createdById','authorizedById','status','reconciliationStatus','isPrivateOwnerExpense','payoutRequestId','auditHistory','createdAt','updatedAt']), false) FROM information_schema.columns WHERE table_schema='public' AND table_name='FinancialOutflow';")
+          INDEXES_OK=$(psql "$DATABASE_URL_PRODUCTION" -Atqc "SELECT (COUNT(*) = 6) FROM pg_class idx JOIN pg_index i ON i.indexrelid=idx.oid JOIN pg_class tbl ON i.indrelid=tbl.oid JOIN pg_namespace ns ON tbl.relnamespace=ns.oid WHERE ns.nspname='public' AND tbl.relname='FinancialOutflow' AND idx.relname IN ('FinancialOutflow_pkey','FinancialOutflow_outflowNumber_key','FinancialOutflow_payoutRequestId_key','FinancialOutflow_status_createdAt_idx','FinancialOutflow_category_idx','FinancialOutflow_originModule_idx','FinancialOutflow_beneficiaryName_idx','FinancialOutflow_operationDate_idx');")
+          test "$COLUMNS_OK" = "t" || { echo "0029 schema column set mismatch; refusing recovery"; exit 1; }
+          test "$INDEXES_OK" = "t" || { echo "0029 schema index set mismatch; refusing recovery"; exit 1; }
+          echo "0029 schema matches expected migration objects; safe to mark applied."
+      - name: Resolve 0029 as already applied
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx prisma migrate resolve --applied 0029_financial_outflows
       - name: Apply pending Prisma migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
