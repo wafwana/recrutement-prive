@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { fetchGlobalJobs, fetchGlobalCandidates, configuredSources } from "@/lib/sourcing/global";
+import { fetchGlobalJobs, fetchGlobalCandidates, configuredSources, getConfiguredSourcesAsync } from "@/lib/sourcing/global";
 import { qualifyAndMatchExternalOffer } from "@/lib/jobs/offer-pipeline";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 
@@ -137,7 +137,7 @@ export async function ingestGlobalCandidates(params: {
   const { sourceUrl, filter, actorUserId } = params;
   const sources = sourceUrl && /^https:\/\//i.test(sourceUrl)
     ? [sourceUrl]
-    : configuredSources("RP_GLOBAL_CANDIDATE_SOURCES");
+    : await getConfiguredSourcesAsync("RP_GLOBAL_CANDIDATE_SOURCES");
 
   if (!sources.length) {
     return {

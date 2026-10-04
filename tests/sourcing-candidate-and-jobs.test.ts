@@ -49,7 +49,28 @@ test("fetchGlobalCandidates normalizes candidate profile fields without hallucin
     );
 
   try {
-    const candidates = await fetchGlobalCandidates("https://candidates.org/api");
+    const candidates = await fetchGlobalCandidates("https://candidates.org/api", async () => new Response(
+      JSON.stringify({
+        candidates: [
+          {
+            id: "cand-101",
+            title: "Lead Architect",
+            skills: ["Go", "Kubernetes"],
+            experienceYears: 8,
+            country: "France",
+            url: "https://candidates.org/profiles/101",
+          },
+          {
+            profileId: "cand-102",
+            name: "Samira K.",
+            headline: "Consultante RH",
+            location: "Casablanca",
+            country: "Maroc",
+          },
+        ],
+      }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    ));
     assert.equal(candidates.length, 2);
 
     assert.equal(candidates[0].externalId, "cand-101");

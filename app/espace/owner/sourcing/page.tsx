@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
-import { configuredSources } from "@/lib/sourcing/global";
+import { configuredSources, getConfiguredSourcesAsync } from "@/lib/sourcing/global";
 import BackButton from "@/components/navigation/BackButton";
 import SourcingRunButton from "@/components/owner/SourcingRunButton";
 import CandidateSourcingClient from "@/components/owner/CandidateSourcingClient";
@@ -13,8 +13,8 @@ export default async function OwnerSourcingPage() {
   const fallbackRedirect = session.user.role === "ADMIN" ? "/espace/admin" : session.user.role === "CONSULTANT" ? "/espace/consultant" : "/espace";
   if (!(await hasPermission(session.user.id, session.user.role, "SOURCING"))) redirect(fallbackRedirect);
 
-  const jobSources = configuredSources("RP_GLOBAL_JOB_SOURCES");
-  const candidateSources = configuredSources("RP_GLOBAL_CANDIDATE_SOURCES");
+  const jobSources = await getConfiguredSourcesAsync("RP_GLOBAL_JOB_SOURCES");
+  const candidateSources = await getConfiguredSourcesAsync("RP_GLOBAL_CANDIDATE_SOURCES");
 
   const [offers, candidatesRaw, jobs] = await Promise.all([
     prisma.externalJobOpportunity.findMany({
