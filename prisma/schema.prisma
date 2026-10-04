@@ -98,7 +98,8 @@ model User {
   activitySessions CollaboratorActivitySession[]
   conversations ConversationParticipant[]
   sentMessages Message[]
-  trustConversations MissionPresentation[] @relation("PresentationCandidateUser")
+  candidateTrustPresentations MissionPresentation[] @relation("PresentationCandidateUser")
+  companyTrustPresentations MissionPresentation[] @relation("PresentationCompanyUser")
   sourcedCandidates SourcedCandidate[]
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
