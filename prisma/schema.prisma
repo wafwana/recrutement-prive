@@ -102,8 +102,6 @@ model User {
   companyTrustPresentations MissionPresentation[] @relation("PresentationCompanyUser")
   disclosureRequestsSent AnonymousDisclosureRequest[] @relation("DisclosureRequestedBy")
   disclosureRequestsDecided AnonymousDisclosureRequest[] @relation("DisclosureDecidedBy")
-  disclosureRequestsSent AnonymousDisclosureRequest[] @relation("DisclosureRequestedBy")
-  disclosureRequestsDecided AnonymousDisclosureRequest[] @relation("DisclosureDecidedBy")
   sourcedCandidates SourcedCandidate[]
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
