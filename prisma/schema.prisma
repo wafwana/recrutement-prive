@@ -98,6 +98,7 @@ model User {
   activitySessions CollaboratorActivitySession[]
   conversations ConversationParticipant[]
   sentMessages Message[]
+  trustConversations MissionPresentation[] @relation("PresentationCandidateUser")
   sourcedCandidates SourcedCandidate[]
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
@@ -286,6 +287,11 @@ model MissionPresentation {
   candidateId String
   companyId String
   state MissionPresentationState @default(MISSION_ACTIVE)
+  anonymousMessagingEnabled Boolean @default(false)
+  candidateAlias String?
+  companyAlias String?
+  candidateUserId String?
+  companyUserId String?
   financialConditionStatus FinancialConditionStatus @default(PENDING)
   presentedAt DateTime @default(now())
   conditionConfirmedAt DateTime?
@@ -296,6 +302,9 @@ model MissionPresentation {
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   candidate CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  candidateUser User? @relation("PresentationCandidateUser", fields: [candidateUserId], references: [id], onDelete: SetNull)
+  companyUser User? @relation("PresentationCompanyUser", fields: [companyUserId], references: [id], onDelete: SetNull)
+  conversations Conversation[]
   recruitmentInvoices RecruitmentInvoice[]
   @@unique([applicationId, companyId])
   @@index([missionId, companyId, state])
@@ -403,11 +412,16 @@ model RecruitmentHistory {
 
 model Conversation {
   id String @id @default(cuid())
+  presentationId String?
+  mode String @default("STANDARD")
+  status String @default("ACTIVE")
   subject String @default("Nouvelle conversation")
+  presentation MissionPresentation? @relation(fields: [presentationId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
   messages Message[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([presentationId, mode, status])
 }
 model ConversationParticipant {
   id String @id @default(cuid())
@@ -424,6 +438,8 @@ model Message {
   conversationId String
   senderId String
   body String
+  moderationStatus String @default("ALLOWED")
+  moderationReason String?
   readAt DateTime?
   archivedDocumentId String?
   archivedDocument ArchivedDocument? @relation(fields: [archivedDocumentId], references: [id], onDelete: SetNull)
