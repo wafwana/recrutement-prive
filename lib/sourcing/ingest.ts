@@ -126,7 +126,6 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
   const demandRows = await prisma.externalJobOpportunity.findMany({
     where: {
       status: "QUALIFIED",
-      skills: { not: null },
     },
     select: { skills: true, categoryCode: true, subCategoryCode: true },
     orderBy: { sourceCollectedAt: "desc" },
