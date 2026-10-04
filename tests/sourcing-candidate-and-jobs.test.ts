@@ -89,7 +89,7 @@ test("fetchGlobalCandidates normalizes candidate profile fields without hallucin
   }
 });
 
-test("ingestGlobalCandidates reports 'Aucune source active' when no candidate sources configured", async () => {
+test("ingestGlobalCandidates falls back to the internal CVthèque when no candidate sources are configured", async () => {
   const originalEnv = process.env.RP_GLOBAL_CANDIDATE_SOURCES;
   delete process.env.RP_GLOBAL_CANDIDATE_SOURCES;
 
@@ -97,10 +97,9 @@ test("ingestGlobalCandidates reports 'Aucune source active' when no candidate so
     actorUserId: "test-user-id",
   });
 
-  assert.equal(result.ok, false);
-  assert.equal(result.activeSourcesCount, 0);
-  assert.equal(result.fetched, 0);
-  assert.match(result.message || "", /Aucune source candidats active/i);
+  assert.equal(result.ok, true);
+  assert.equal(result.activeSourcesCount, 1);
+  assert.equal(result.fallbackSource, "PLATFORM_CVTHEQUE");
 
   if (typeof originalEnv === "string") {
     process.env.RP_GLOBAL_CANDIDATE_SOURCES = originalEnv;
