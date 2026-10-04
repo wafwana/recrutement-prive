@@ -135,7 +135,7 @@ async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string
   }
 
   const offers = await prisma.externalJobOpportunity.findMany({
-    where: { status: "QUALIFIED" },
+    where: { status: { in: ["QUALIFIED", "MATCHING"] } },
     select: {
       id: true, title: true, description: true, country: true, city: true,
       skills: true, experienceYears: true, categoryCode: true, subCategoryCode: true, source: true,
@@ -208,7 +208,7 @@ async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string
 export async function refreshProactiveCandidatePool(actorUserId: string) {
   const demandRows = await prisma.externalJobOpportunity.findMany({
     where: {
-      status: "QUALIFIED",
+      status: { in: ["QUALIFIED", "MATCHING"] },
     },
     select: { skills: true, categoryCode: true, subCategoryCode: true },
     orderBy: { sourceCollectedAt: "desc" },
