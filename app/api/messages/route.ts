@@ -314,7 +314,11 @@ export async function PATCH(request: Request) {
     where: { conversationId_userId: { conversationId: parsed.data.conversationId, userId: session.user.id } },
   });
   if (!participant) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-  if (await isDirectCandidateCompanyConversation(parsed.data.conversationId)) {
+  const readConversation = await prisma.conversation.findUnique({
+    where: { id: parsed.data.conversationId },
+    select: { mode: true },
+  });
+  if (readConversation?.mode !== "TRUST_ANONYMOUS" && await isDirectCandidateCompanyConversation(parsed.data.conversationId)) {
     return NextResponse.json({ error: "Le contact direct candidat-entreprise est interdit" }, { status: 403 });
   }
 
