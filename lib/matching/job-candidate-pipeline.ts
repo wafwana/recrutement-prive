@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 
-export async function matchOpenJobCandidates(jobId: string, limit = 250) {
+export async function matchOpenJobCandidates(jobId: string, actorUserId: string, actorRole: string, limit = 250) {
   const job = await prisma.job.findUnique({
     where: { id: jobId },
     select: {
@@ -52,8 +52,8 @@ export async function matchOpenJobCandidates(jobId: string, limit = 250) {
 
   await prisma.auditLog.create({
     data: {
-      actorUserId: "SYSTEM",
-      actorRole: "SYSTEM",
+      actorUserId,
+      actorRole,
       action: "JOB_IMMEDIATE_MATCHING",
       targetType: "JOB",
       targetId: job.id,
