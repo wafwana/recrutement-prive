@@ -146,10 +146,29 @@ export async function GET(request: Request) {
     },
   });
 
-  const visibleConversations = conversations.filter((conversation) => {
-    const roles = new Set(conversation.participants.map((participant) => participant.user.role));
-    return !(roles.has("CANDIDAT") && roles.has("ENTREPRISE") && conversation.participants.length === 2);
-  });
+  const visibleConversations = conversations
+    .filter((conversation) => {
+      const roles = new Set(conversation.participants.map((participant) => participant.user.role));
+      const directCandidateCompany = roles.has("CANDIDAT") && roles.has("ENTREPRISE") && conversation.participants.length === 2;
+      return conversation.mode === "TRUST_ANONYMOUS" || !directCandidateCompany;
+    })
+    .map((conversation) => {
+      if (conversation.mode !== "TRUST_ANONYMOUS") return conversation;
+      return {
+        id: conversation.id,
+        subject: conversation.subject,
+        mode: conversation.mode,
+        status: conversation.status,
+        updatedAt: conversation.updatedAt,
+        messages: conversation.messages.map((message) => ({
+          id: message.id,
+          body: message.body,
+          moderationStatus: message.moderationStatus,
+          createdAt: message.createdAt,
+          readAt: message.readAt,
+        })),
+      };
+    });
 
   return NextResponse.json({ conversations: visibleConversations });
 }
