@@ -16,8 +16,8 @@ test("0010 validator is fail-closed and checks the baseline schema", () => {
   assert.match(source, /update_rule/);
   assert.match(source, /idx\.relname IN/);
   assert.match(source, /LEFT JOIN pg_constraint/);
-  assert.match(source, /Object\.keys\(foreignKeys\)\.sort\(\), Object\.keys\(EXPECTED\.foreignKeys\)\.sort\(\)/);
-  assert.match(source, /Object\.keys\(indexes\)\.sort\(\), Object\.keys\(EXPECTED\.indexes\)\.sort\(\)/);
+  assert.match(source, /for \(const \[name, expected\] of Object\.entries\(EXPECTED.foreignKeys\)/);
+  assert.match(source, /for \(const \[name, expected\] of Object\.entries\(EXPECTED.indexes\)/);
 });
 
 test("0010 recovery is state-aware and only resolves a failed migration", () => {
