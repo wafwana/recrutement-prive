@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { configuredSources } from "@/lib/sourcing/global";
-import { ingestGlobalJobs } from "@/lib/sourcing/ingest";
+import { ingestGlobalJobs, refreshProactiveCandidatePool } from "@/lib/sourcing/ingest";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -18,5 +18,13 @@ export async function GET(request: Request) {
     try { results.push(await ingestGlobalJobs(source, owner.id)); }
     catch (error) { results.push({ sourceUrl: source, error: error instanceof Error ? error.message : "Erreur inconnue" }); }
   }
-  return NextResponse.json({ results });
+
+  let proactive: Awaited<ReturnType<typeof refreshProactiveCandidatePool>> | null = null;
+  try {
+    proactive = await refreshProactiveCandidatePool(owner.id);
+  } catch (error) {
+    console.warn("[global-jobs] Proactive candidate pool refresh failed", error);
+  }
+
+  return NextResponse.json({ results, proactive });
 }
