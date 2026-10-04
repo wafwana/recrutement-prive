@@ -122,6 +122,89 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
   return { sourceUrl, fetched: items.length, created, updated, qualified, matched, expired, sweptExpired };
 }
 
+async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string) {
+  const candidate = await prisma.sourcedCandidate.findUnique({
+    where: { id: candidateId },
+    select: {
+      id: true, status: true, source: true, skills: true, experienceYears: true,
+      headline: true, location: true, matchingDetails: true,
+    },
+  });
+  if (!candidate || ["REJECTED", "ARCHIVED"].includes(candidate.status)) {
+    return { candidateId, evaluated: 0, matches: 0, bestScore: 0 };
+  }
+
+  const offers = await prisma.externalJobOpportunity.findMany({
+    where: { status: "QUALIFIED" },
+    select: {
+      id: true, title: true, description: true, country: true, city: true,
+      skills: true, experienceYears: true, categoryCode: true, subCategoryCode: true, source: true,
+    },
+    orderBy: { sourceCollectedAt: "desc" },
+    take: 1000,
+  });
+
+  const matches = offers
+    .map((offer) => {
+      const result = matchCandidateToJob(
+        {
+          skills: candidate.skills,
+          experienceYears: candidate.experienceYears,
+          headline: candidate.headline,
+          location: candidate.location,
+        },
+        {
+          requiredSkills: offer.skills,
+          requiredExperienceYears: offer.experienceYears,
+          title: offer.title,
+          description: offer.description,
+          location: [offer.city, offer.country].filter(Boolean).join(", ") || null,
+          categoryCode: offer.categoryCode,
+          subCategoryCode: offer.subCategoryCode,
+        },
+      );
+      return {
+        externalJobId: offer.id,
+        title: offer.title,
+        score: result.score,
+        matchedSkills: result.matchedSkills,
+        missingSkills: result.missingSkills,
+        categoryMatchLevel: result.categoryMatchLevel,
+        reasons: result.reasons,
+        source: offer.source,
+      };
+    })
+    .filter((match) => match.score >= 25)
+    .sort((a, b) => b.score - a.score);
+
+  const previousDetails =
+    candidate.matchingDetails && typeof candidate.matchingDetails === "object" && !Array.isArray(candidate.matchingDetails)
+      ? candidate.matchingDetails as Record<string, unknown>
+      : {};
+
+  await prisma.sourcedCandidate.update({
+    where: { id: candidate.id },
+    data: {
+      matchingScore: matches[0]?.score ?? 0,
+      matchingDetails: {
+        ...previousDetails,
+        mode: previousDetails.mode || "CANDIDATE_TO_OFFER",
+        rematchedAt: new Date().toISOString(),
+        offersEvaluated: offers.length,
+        matchedOffers: matches.slice(0, 20),
+        humanValidated: candidate.status === "VALIDATED",
+      } as unknown as Prisma.InputJsonValue,
+    },
+  });
+
+  return {
+    candidateId: candidate.id,
+    evaluated: offers.length,
+    matches: matches.length,
+    bestScore: matches[0]?.score ?? 0,
+  };
+}
+
 export async function refreshProactiveCandidatePool(actorUserId: string) {
   const demandRows = await prisma.externalJobOpportunity.findMany({
     where: {
@@ -191,9 +274,11 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
         where: { id: existing.id },
         data: { ...data, status: finished ? existing.status : "DETECTED", updatedAt: new Date() },
       });
+      if (!finished) await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
       updated++;
     } else {
-      await prisma.sourcedCandidate.create({ data: { ...data, externalId, status: "DETECTED" } });
+      const createdCandidate = await prisma.sourcedCandidate.create({ data: { ...data, externalId, status: "DETECTED" } });
+      await rematchSourcedCandidateAgainstQualifiedOffers(createdCandidate.id);
       created++;
     }
   }
@@ -427,15 +512,18 @@ export async function ingestGlobalCandidates(params: {
                 updatedAt: new Date(),
               },
             });
+            if (!isFinished) await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
             updated++;
           } else {
-            await prisma.sourcedCandidate.create({
+            const createdCandidate = await prisma.sourcedCandidate.create({
               data: { ...data, externalId: candidate.externalId },
             });
+            await rematchSourcedCandidateAgainstQualifiedOffers(createdCandidate.id);
             created++;
           }
         } else {
-          await prisma.sourcedCandidate.create({ data });
+          const createdCandidate = await prisma.sourcedCandidate.create({ data });
+          await rematchSourcedCandidateAgainstQualifiedOffers(createdCandidate.id);
           created++;
         }
       }
