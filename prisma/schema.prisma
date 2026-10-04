@@ -102,6 +102,8 @@ model User {
   companyTrustPresentations MissionPresentation[] @relation("PresentationCompanyUser")
   disclosureRequestsSent AnonymousDisclosureRequest[] @relation("DisclosureRequestedBy")
   disclosureRequestsDecided AnonymousDisclosureRequest[] @relation("DisclosureDecidedBy")
+  disclosureRequestsSent AnonymousDisclosureRequest[] @relation("DisclosureRequestedBy")
+  disclosureRequestsDecided AnonymousDisclosureRequest[] @relation("DisclosureDecidedBy")
   sourcedCandidates SourcedCandidate[]
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
@@ -308,10 +310,26 @@ model MissionPresentation {
   candidateUser User? @relation("PresentationCandidateUser", fields: [candidateUserId], references: [id], onDelete: SetNull)
   companyUser User? @relation("PresentationCompanyUser", fields: [companyUserId], references: [id], onDelete: SetNull)
   conversations Conversation[]
+  disclosureRequests AnonymousDisclosureRequest[]
   recruitmentInvoices RecruitmentInvoice[]
   @@unique([applicationId, companyId])
   @@index([missionId, companyId, state])
   @@index([candidateId, companyId])
+}
+
+model AnonymousDisclosureRequest {
+  id String @id @default(cuid())
+  presentationId String
+  requestedByUserId String
+  status String @default("PENDING")
+  reason String?
+  decidedByUserId String?
+  requestedAt DateTime @default(now())
+  decidedAt DateTime?
+  presentation MissionPresentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  requestedBy User @relation("DisclosureRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+  decidedBy User? @relation("DisclosureDecidedBy", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+  @@index([presentationId, status, requestedAt])
 }
 
 model EnterpriseSourcedOffer {
