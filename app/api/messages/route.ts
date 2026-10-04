@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasPermission } from "@/lib/auth/permissions";
+import { moderateAnonymousMessage } from "@/lib/messaging/anonymous-moderation";
 
 const createMessageSchema = z.object({
   recipientId: z.string().trim().min(1).optional(),
@@ -14,6 +15,16 @@ const createMessageSchema = z.object({
 });
 
 const readSchema = z.object({ conversationId: z.string().trim().min(1) });
+
+async function getTrustAnonymousConversation(conversationId: string) {
+  return prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      presentation: { select: { id: true, state: true, candidateAlias: true, companyAlias: true, candidateUserId: true, companyUserId: true } },
+      participants: { select: { userId: true, user: { select: { role: true } } } },
+    },
+  });
+}
 
 async function isDirectCandidateCompanyConversation(conversationId: string) {
   const participants = await prisma.conversationParticipant.findMany({
@@ -97,6 +108,32 @@ export async function GET(request: Request) {
       },
     });
     if (!conversation) return NextResponse.json({ error: "Conversation introuvable" }, { status: 404 });
+
+    if (conversation.mode === "TRUST_ANONYMOUS") {
+      const trust = await getTrustAnonymousConversation(conversationId);
+      if (!trust?.presentation) return NextResponse.json({ error: "Canal de confiance invalide" }, { status: 409 });
+      const p = trust.presentation;
+      const anonymousMessages = conversation.messages.map((message) => ({
+        id: message.id,
+        body: message.body,
+        moderationStatus: message.moderationStatus,
+        createdAt: message.createdAt,
+        readAt: message.readAt,
+        senderAlias: message.senderId === p.candidateUserId ? p.candidateAlias : p.companyAlias,
+      }));
+      return NextResponse.json({
+        conversation: {
+          id: conversation.id,
+          subject: conversation.subject,
+          mode: conversation.mode,
+          status: conversation.status,
+          presentationId: p.id,
+          aliases: { candidate: p.candidateAlias, company: p.companyAlias },
+          messages: anonymousMessages,
+        },
+      });
+    }
+
     return NextResponse.json({ conversation });
   }
 
@@ -136,6 +173,36 @@ export async function POST(request: Request) {
   }
 
   let conversationId = parsed.data.conversationId;
+
+  if (conversationId) {
+    const trust = await getTrustAnonymousConversation(conversationId);
+    if (trust?.mode === "TRUST_ANONYMOUS") {
+      if (!trust.presentation || trust.presentation.state === "IDENTITE_DEBLOQUEE" || trust.presentation.state === "MISSION_TERMINEE") {
+        return NextResponse.json({ error: "Canal anonyme fermé." }, { status: 409 });
+      }
+      const participantIds = new Set(trust.participants.map((p) => p.userId));
+      if (!participantIds.has(senderId) || trust.participants.length !== 2) {
+        return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+      }
+      const moderation = moderateAnonymousMessage(parsed.data.body);
+      if (!moderation.allowed) {
+        await prisma.auditLog.create({
+          data: {
+            actorUserId: senderId,
+            actorRole: senderRole || "CANDIDAT",
+            action: "TRUST_ANONYMOUS_MESSAGE_BLOCKED",
+            targetType: "CONVERSATION",
+            targetId: conversationId,
+            details: { categories: moderation.categories, reason: moderation.reason },
+          },
+        });
+        return NextResponse.json({
+          error: "Message bloqué : les coordonnées, liens externes et identifiants sociaux ne sont pas autorisés dans ce canal.",
+          categories: moderation.categories,
+        }, { status: 422 });
+      }
+    }
+  }
 
   if (conversationId) {
     const participant = await prisma.conversationParticipant.findUnique({
@@ -183,10 +250,30 @@ export async function POST(request: Request) {
     }
   }
 
+  const trust = await getTrustAnonymousConversation(conversationId);
   const message = await prisma.message.create({
-    data: { conversationId, senderId, body: parsed.data.body },
+    data: {
+      conversationId,
+      senderId,
+      body: parsed.data.body,
+      moderationStatus: trust?.mode === "TRUST_ANONYMOUS" ? "ALLOWED" : "NOT_APPLICABLE",
+    },
     include: { sender: { select: { id: true, name: true, email: true } } },
   });
+
+  if (trust?.mode === "TRUST_ANONYMOUS" && trust.presentation) {
+    const p = trust.presentation;
+    return NextResponse.json({
+      message: {
+        id: message.id,
+        body: message.body,
+        moderationStatus: message.moderationStatus,
+        createdAt: message.createdAt,
+        senderAlias: senderId === p.candidateUserId ? p.candidateAlias : p.companyAlias,
+      },
+    }, { status: 201 });
+  }
+
   return NextResponse.json({ message }, { status: 201 });
 }
 
