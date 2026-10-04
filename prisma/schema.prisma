@@ -98,6 +98,10 @@ model User {
   activitySessions CollaboratorActivitySession[]
   conversations ConversationParticipant[]
   sentMessages Message[]
+  candidateTrustPresentations MissionPresentation[] @relation("PresentationCandidateUser")
+  companyTrustPresentations MissionPresentation[] @relation("PresentationCompanyUser")
+  disclosureRequestsSent AnonymousDisclosureRequest[] @relation("DisclosureRequestedBy")
+  disclosureRequestsDecided AnonymousDisclosureRequest[] @relation("DisclosureDecidedBy")
   sourcedCandidates SourcedCandidate[]
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
@@ -286,6 +290,11 @@ model MissionPresentation {
   candidateId String
   companyId String
   state MissionPresentationState @default(MISSION_ACTIVE)
+  anonymousMessagingEnabled Boolean @default(false)
+  candidateAlias String?
+  companyAlias String?
+  candidateUserId String?
+  companyUserId String?
   financialConditionStatus FinancialConditionStatus @default(PENDING)
   presentedAt DateTime @default(now())
   conditionConfirmedAt DateTime?
@@ -296,10 +305,29 @@ model MissionPresentation {
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   candidate CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  candidateUser User? @relation("PresentationCandidateUser", fields: [candidateUserId], references: [id], onDelete: SetNull)
+  companyUser User? @relation("PresentationCompanyUser", fields: [companyUserId], references: [id], onDelete: SetNull)
+  conversations Conversation[]
+  disclosureRequests AnonymousDisclosureRequest[]
   recruitmentInvoices RecruitmentInvoice[]
   @@unique([applicationId, companyId])
   @@index([missionId, companyId, state])
   @@index([candidateId, companyId])
+}
+
+model AnonymousDisclosureRequest {
+  id String @id @default(cuid())
+  presentationId String
+  requestedByUserId String
+  status String @default("PENDING")
+  reason String?
+  decidedByUserId String?
+  requestedAt DateTime @default(now())
+  decidedAt DateTime?
+  presentation MissionPresentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  requestedBy User @relation("DisclosureRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+  decidedBy User? @relation("DisclosureDecidedBy", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+  @@index([presentationId, status, requestedAt])
 }
 
 model EnterpriseSourcedOffer {
@@ -403,11 +431,17 @@ model RecruitmentHistory {
 
 model Conversation {
   id String @id @default(cuid())
+  presentationId String?
+  mode String @default("STANDARD")
+  status String @default("ACTIVE")
+  dataExchangeLocked Boolean @default(true)
   subject String @default("Nouvelle conversation")
+  presentation MissionPresentation? @relation(fields: [presentationId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
   messages Message[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([presentationId, mode, status])
 }
 model ConversationParticipant {
   id String @id @default(cuid())
@@ -424,6 +458,9 @@ model Message {
   conversationId String
   senderId String
   body String
+  moderationStatus String @default("ALLOWED")
+  moderationReason String?
+  metadataSanitized Boolean @default(false)
   readAt DateTime?
   archivedDocumentId String?
   archivedDocument ArchivedDocument? @relation(fields: [archivedDocumentId], references: [id], onDelete: SetNull)

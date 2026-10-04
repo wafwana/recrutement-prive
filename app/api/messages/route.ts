@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasPermission } from "@/lib/auth/permissions";
+import { moderateAnonymousMessage } from "@/lib/messaging/anonymous-moderation";
 
 const createMessageSchema = z.object({
   recipientId: z.string().trim().min(1).optional(),
@@ -14,6 +15,16 @@ const createMessageSchema = z.object({
 });
 
 const readSchema = z.object({ conversationId: z.string().trim().min(1) });
+
+async function getTrustAnonymousConversation(conversationId: string) {
+  return prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      presentation: { select: { id: true, state: true, candidateAlias: true, companyAlias: true, candidateUserId: true, companyUserId: true } },
+      participants: { select: { userId: true, user: { select: { role: true } } } },
+    },
+  });
+}
 
 async function isDirectCandidateCompanyConversation(conversationId: string) {
   const participants = await prisma.conversationParticipant.findMany({
@@ -51,8 +62,12 @@ async function assertStaffConversationScope(userId: string, role: string | undef
 }
 
 async function assertNoDirectCandidateCompanyContact(userId: string, recipientId?: string, conversationId?: string) {
-  if (conversationId && await isDirectCandidateCompanyConversation(conversationId)) {
-    throw new Error("Le contact direct candidat-entreprise est interdit");
+  if (conversationId) {
+    const mode = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { mode: true } });
+    if (mode?.mode === "TRUST_ANONYMOUS") return;
+    if (await isDirectCandidateCompanyConversation(conversationId)) {
+      throw new Error("Le contact direct candidat-entreprise est interdit");
+    }
   }
 
   if (!recipientId || recipientId === userId) return;
@@ -85,7 +100,8 @@ export async function GET(request: Request) {
       where: { conversationId_userId: { conversationId, userId } },
     });
     if (!participant) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-    if (await isDirectCandidateCompanyConversation(conversationId)) {
+    const conversationMode = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { mode: true } });
+    if (conversationMode?.mode !== "TRUST_ANONYMOUS" && await isDirectCandidateCompanyConversation(conversationId)) {
       return NextResponse.json({ error: "Le contact direct candidat-entreprise est interdit" }, { status: 403 });
     }
 
@@ -97,6 +113,32 @@ export async function GET(request: Request) {
       },
     });
     if (!conversation) return NextResponse.json({ error: "Conversation introuvable" }, { status: 404 });
+
+    if (conversation.mode === "TRUST_ANONYMOUS") {
+      const trust = await getTrustAnonymousConversation(conversationId);
+      if (!trust?.presentation) return NextResponse.json({ error: "Canal de confiance invalide" }, { status: 409 });
+      const p = trust.presentation;
+      const anonymousMessages = conversation.messages.map((message) => ({
+        id: message.id,
+        body: message.body,
+        moderationStatus: message.moderationStatus,
+        createdAt: message.createdAt,
+        readAt: message.readAt,
+        senderAlias: message.senderId === p.candidateUserId ? p.candidateAlias : p.companyAlias,
+      }));
+      return NextResponse.json({
+        conversation: {
+          id: conversation.id,
+          subject: conversation.subject,
+          mode: conversation.mode,
+          status: conversation.status,
+          presentationId: p.id,
+          aliases: { candidate: p.candidateAlias, company: p.companyAlias },
+          messages: anonymousMessages,
+        },
+      });
+    }
+
     return NextResponse.json({ conversation });
   }
 
@@ -109,10 +151,29 @@ export async function GET(request: Request) {
     },
   });
 
-  const visibleConversations = conversations.filter((conversation) => {
-    const roles = new Set(conversation.participants.map((participant) => participant.user.role));
-    return !(roles.has("CANDIDAT") && roles.has("ENTREPRISE") && conversation.participants.length === 2);
-  });
+  const visibleConversations = conversations
+    .filter((conversation) => {
+      const roles = new Set(conversation.participants.map((participant) => participant.user.role));
+      const directCandidateCompany = roles.has("CANDIDAT") && roles.has("ENTREPRISE") && conversation.participants.length === 2;
+      return conversation.mode === "TRUST_ANONYMOUS" || !directCandidateCompany;
+    })
+    .map((conversation) => {
+      if (conversation.mode !== "TRUST_ANONYMOUS") return conversation;
+      return {
+        id: conversation.id,
+        subject: conversation.subject,
+        mode: conversation.mode,
+        status: conversation.status,
+        updatedAt: conversation.updatedAt,
+        messages: conversation.messages.map((message) => ({
+          id: message.id,
+          body: message.body,
+          moderationStatus: message.moderationStatus,
+          createdAt: message.createdAt,
+          readAt: message.readAt,
+        })),
+      };
+    });
 
   return NextResponse.json({ conversations: visibleConversations });
 }
@@ -136,6 +197,36 @@ export async function POST(request: Request) {
   }
 
   let conversationId = parsed.data.conversationId;
+
+  if (conversationId) {
+    const trust = await getTrustAnonymousConversation(conversationId);
+    if (trust?.mode === "TRUST_ANONYMOUS") {
+      if (!trust.presentation || trust.presentation.state === "IDENTITE_DEBLOQUEE" || trust.presentation.state === "MISSION_TERMINEE") {
+        return NextResponse.json({ error: "Canal anonyme fermé." }, { status: 409 });
+      }
+      const participantIds = new Set(trust.participants.map((p) => p.userId));
+      if (!participantIds.has(senderId) || trust.participants.length !== 2) {
+        return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+      }
+      const moderation = moderateAnonymousMessage(parsed.data.body);
+      if (!moderation.allowed) {
+        await prisma.auditLog.create({
+          data: {
+            actorUserId: senderId,
+            actorRole: senderRole || "CANDIDAT",
+            action: "TRUST_ANONYMOUS_MESSAGE_BLOCKED",
+            targetType: "CONVERSATION",
+            targetId: conversationId,
+            details: { categories: moderation.categories, reason: moderation.reason },
+          },
+        });
+        return NextResponse.json({
+          error: "Message bloqué : les coordonnées, liens externes et identifiants sociaux ne sont pas autorisés dans ce canal.",
+          categories: moderation.categories,
+        }, { status: 422 });
+      }
+    }
+  }
 
   if (conversationId) {
     const participant = await prisma.conversationParticipant.findUnique({
@@ -183,10 +274,31 @@ export async function POST(request: Request) {
     }
   }
 
+  const trust = await getTrustAnonymousConversation(conversationId);
   const message = await prisma.message.create({
-    data: { conversationId, senderId, body: parsed.data.body },
+    data: {
+      conversationId,
+      senderId,
+      body: parsed.data.body,
+      moderationStatus: trust?.mode === "TRUST_ANONYMOUS" ? "ALLOWED" : "NOT_APPLICABLE",
+      metadataSanitized: trust?.mode === "TRUST_ANONYMOUS",
+    },
     include: { sender: { select: { id: true, name: true, email: true } } },
   });
+
+  if (trust?.mode === "TRUST_ANONYMOUS" && trust.presentation) {
+    const p = trust.presentation;
+    return NextResponse.json({
+      message: {
+        id: message.id,
+        body: message.body,
+        moderationStatus: message.moderationStatus,
+        createdAt: message.createdAt,
+        senderAlias: senderId === p.candidateUserId ? p.candidateAlias : p.companyAlias,
+      },
+    }, { status: 201 });
+  }
+
   return NextResponse.json({ message }, { status: 201 });
 }
 
