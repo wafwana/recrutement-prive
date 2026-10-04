@@ -196,9 +196,6 @@ export async function POST(request: Request) {
   if (conversationId) {
     const trust = await getTrustAnonymousConversation(conversationId);
     if (trust?.mode === "TRUST_ANONYMOUS") {
-      if (trust.presentation && trust.dataExchangeLocked === false) {
-        return NextResponse.json({ error: "Le canal doit rester en mode contrôlé tant que le cabinet n'a pas autorisé l'échange de données." }, { status: 409 });
-      }
       if (!trust.presentation || trust.presentation.state === "IDENTITE_DEBLOQUEE" || trust.presentation.state === "MISSION_TERMINEE") {
         return NextResponse.json({ error: "Canal anonyme fermé." }, { status: 409 });
       }
