@@ -27,6 +27,7 @@ export default auth((request) => {
     if (
       pathname !== "/maintenance" &&
       !pathname.startsWith("/_next/") &&
+      !pathname.startsWith("/visuals/") &&
       !isOwnerInitialization
     ) {
       return NextResponse.rewrite(new URL("/maintenance", request.url));
@@ -37,7 +38,10 @@ export default auth((request) => {
   if (
     PUBLIC_PATHS.has(pathname) ||
     pathname.startsWith("/inscription") ||
-    pathname.startsWith("/_next/")
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/visuals/") ||
+    pathname.startsWith("/favicon") ||
+    /\.(?:jpeg|webp|png|jpg|svg|ico|css|js)$/i.test(pathname)
   ) {
     return NextResponse.next();
   }

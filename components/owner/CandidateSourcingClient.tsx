@@ -52,6 +52,47 @@ export default function CandidateSourcingClient({
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
+  const [sourcesList, setSourcesList] = useState<string[]>(candidateSources);
+  const [newSourceInput, setNewSourceInput] = useState("");
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [configMessage, setConfigMessage] = useState<string | null>(null);
+
+  async function handleAddSource() {
+    if (!newSourceInput.trim() || !/^https:\/\//i.test(newSourceInput.trim())) {
+      setConfigMessage("Veuillez saisir une URL HTTPS valide (commençant par https://).");
+      return;
+    }
+    const updated = [...sourcesList, newSourceInput.trim()];
+    await saveSourcesConfig(updated);
+  }
+
+  async function handleRemoveSource(index: number) {
+    const updated = sourcesList.filter((_, i) => i !== index);
+    await saveSourcesConfig(updated);
+  }
+
+  async function saveSourcesConfig(nextSources: string[]) {
+    setSavingConfig(true);
+    setConfigMessage(null);
+    try {
+      const res = await fetch("/api/owner/sourcing/config", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sources: nextSources }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur lors de l'enregistrement de la configuration.");
+      setSourcesList(data.sources || []);
+      setNewSourceInput("");
+      setConfigMessage("Configuration des sources sauvegardée avec succès.");
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (err) {
+      setConfigMessage(err instanceof Error ? err.message : "Erreur de configuration.");
+    } finally {
+      setSavingConfig(false);
+    }
+  }
+
   async function handleRunSourcing() {
     setRunning(true);
     setRunMessage(null);
@@ -135,17 +176,70 @@ export default function CandidateSourcingClient({
 
   return (
     <div className="space-y-8">
+      {/* Sources management box */}
+      <div className="border border-white/10 bg-[#111] p-5 space-y-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-sm font-medium text-white">Gestion des sources candidats HTTPS</h3>
+            <p className="text-xs text-white/50">
+              Configurez et enregistrez les URLs d&apos;API de sources candidats autorisées.
+            </p>
+          </div>
+          <span className="text-[10px] uppercase tracking-[0.16em] text-[#c7a15a]">
+            {sourcesList.length} source(s) configurée(s)
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            type="url"
+            value={newSourceInput}
+            onChange={(e) => setNewSourceInput(e.target.value)}
+            placeholder="https://votre-source-candidats.com/api/candidates"
+            className="flex-1 border border-white/15 bg-transparent px-3 py-2 text-xs text-white outline-none focus:border-[#c7a15a]"
+          />
+          <button
+            type="button"
+            onClick={handleAddSource}
+            disabled={savingConfig}
+            className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-2 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a] hover:bg-[#c7a15a]/20 disabled:opacity-50"
+          >
+            {savingConfig ? "Enregistrement..." : "Ajouter la Source"}
+          </button>
+        </div>
+
+        {configMessage && <p className="text-xs text-[#c7a15a]">{configMessage}</p>}
+
+        {sourcesList.length > 0 && (
+          <div className="space-y-2 pt-2 border-t border-white/10">
+            {sourcesList.map((src, idx) => (
+              <div key={idx} className="flex items-center justify-between border border-white/5 bg-black/30 px-3 py-2 text-xs text-white/80">
+                <span className="truncate pr-4 font-mono text-[11px]">{src}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSource(idx)}
+                  disabled={savingConfig}
+                  className="text-[10px] text-red-400 hover:underline uppercase tracking-wider"
+                >
+                  Supprimer
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Configuration status banner */}
-      {activeSourcesCount === 0 ? (
+      {sourcesList.length === 0 ? (
         <div className="border border-[#F97316]/40 bg-[#F97316]/10 p-5 text-sm text-white/80">
           <div className="flex items-start gap-3">
             <span className="text-xl text-[#F97316]">⚠️</span>
             <div>
               <h3 className="font-medium text-[#F97316]">Aucune source candidats active</h3>
               <p className="mt-1 text-xs text-white/60 leading-relaxed">
-                Le sourcing candidats automatique requiert la configuration de la variable d&apos;environnement{" "}
-                <code className="bg-black/40 px-1.5 py-0.5 text-[#c7a15a]">RP_GLOBAL_CANDIDATE_SOURCES</code> avec une liste
-                d&apos;URLs HTTPS sécurisées (format JSON). Conforme au RGPD : aucun profil fictif ou simulé n&apos;est créé.
+                Ajoutez une URL de source HTTPS ci-dessus ou configurez la variable d&apos;environnement{" "}
+                <code className="bg-black/40 px-1.5 py-0.5 text-[#c7a15a]">RP_GLOBAL_CANDIDATE_SOURCES</code>.
+                Conforme au RGPD : aucun profil fictif ou simulé n&apos;est créé.
               </p>
             </div>
           </div>
@@ -155,7 +249,7 @@ export default function CandidateSourcingClient({
           <div className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>
-              <strong className="text-white">{activeSourcesCount}</strong> source(s) candidats active(s) configurée(s)
+              <strong className="text-white">{sourcesList.length}</strong> source(s) candidats active(s) configurée(s)
             </span>
           </div>
           <div className="text-[10px] text-white/40">

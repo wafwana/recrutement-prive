@@ -68,8 +68,8 @@ function parseXmlItems(xml: string, source: string): GlobalJobItem[] {
   }).filter((item): item is GlobalJobItem => Boolean(item));
 }
 
-export async function fetchGlobalJobs(sourceUrl: string): Promise<GlobalJobItem[]> {
-  const response = await fetch(sourceUrl, { headers: { accept: "application/json, application/rss+xml, application/atom+xml, text/xml" }, cache: "no-store" });
+export async function fetchGlobalJobs(sourceUrl: string, requester?: PinnedSourceRequester): Promise<GlobalJobItem[]> {
+  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json, application/rss+xml, application/atom+xml, text/xml" }, cache: "no-store" }, requester);
   if (!response.ok) throw new Error(`Source jobs inaccessible: HTTP ${response.status}`);
   const contentType = response.headers.get("content-type") ?? "";
   const body = await response.text();
@@ -82,8 +82,8 @@ export async function fetchGlobalJobs(sourceUrl: string): Promise<GlobalJobItem[
   return parseXmlItems(body, sourceUrl);
 }
 
-export async function fetchGlobalCandidates(sourceUrl: string): Promise<GlobalCandidateItem[]> {
-  const response = await fetch(sourceUrl, { headers: { accept: "application/json" }, cache: "no-store" });
+export async function fetchGlobalCandidates(sourceUrl: string, requester?: PinnedSourceRequester): Promise<GlobalCandidateItem[]> {
+  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json" }, cache: "no-store" }, requester);
   if (!response.ok) throw new Error(`Source candidates inaccessible: HTTP ${response.status}`);
   const parsed = JSON.parse(await response.text()) as unknown;
   const root = asRecord(parsed);
@@ -96,13 +96,63 @@ const DEFAULT_FREE_JOB_SOURCES = [
   "https://www.arbeitnow.co.uk/api/job-board-api",
 ] as const;
 
+import { prisma } from "@/lib/prisma";
+import { request as httpsRequest } from "node:https";
+import { assertPublicDnsHost, isSafeHttpsUrl } from "@/lib/security/ssrf";
+
+async function requestPinnedHttps(url: URL, init: RequestInit, address: string, family: number): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const headers = new Headers(init.headers);
+    const request = httpsRequest(url, {
+      method: "GET",
+      headers: Object.fromEntries(headers.entries()),
+      servername: url.hostname,
+      lookup: (_hostname, _options, callback) => callback(null, address, family),
+    }, (incoming) => {
+      const chunks: Buffer[] = [];
+      incoming.on("data", (chunk: Buffer | string) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      incoming.on("end", () => {
+        const responseHeaders = new Headers();
+        for (const [name, value] of Object.entries(incoming.headers)) {
+          if (Array.isArray(value)) value.forEach((entry) => responseHeaders.append(name, entry));
+          else if (typeof value === "string") responseHeaders.set(name, value);
+        }
+        resolve(new Response(Buffer.concat(chunks), { status: incoming.statusCode ?? 502, statusText: incoming.statusMessage, headers: responseHeaders }));
+      });
+    });
+    request.setTimeout(15000, () => request.destroy(new Error("Source request timed out.")));
+    request.on("error", reject);
+    request.end();
+  });
+}
+
+type PinnedSourceRequester = (url: URL, init: RequestInit, address: string, family: number) => Promise<Response>;
+
+async function fetchSafeSource(input: string, init: RequestInit, requester: PinnedSourceRequester = requestPinnedHttps): Promise<Response> {
+  let current = input;
+  for (let redirects = 0; redirects <= 5; redirects++) {
+    const checked = isSafeHttpsUrl(current);
+    if (!checked.safe || !checked.url) throw new Error(`Source URL rejected: ${checked.reason ?? "invalid URL"}`);
+    const url = new URL(checked.url);
+    const resolved = await assertPublicDnsHost(url.hostname);
+    const response = await requester(url, init, resolved.address, resolved.family);
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const location = response.headers.get("location");
+    if (!location) return response;
+    if (redirects === 5) throw new Error("Source redirect limit exceeded.");
+    current = new URL(location, checked.url).toString();
+  }
+  throw new Error("Source redirect limit exceeded.");
+}
+
+
 export function configuredSources(envName: string): string[] {
   const raw = process.env[envName];
   if (!raw) return envName === "RP_GLOBAL_JOB_SOURCES" ? [...DEFAULT_FREE_JOB_SOURCES] : [];
   try {
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = typeof raw === "string" && raw.trim().startsWith("[") ? JSON.parse(raw) as unknown : raw.split(/[,;\n]/);
     const configured = Array.isArray(parsed)
-      ? parsed.filter((v): v is string => typeof v === "string" && /^https:\/\//i.test(v))
+      ? parsed.map((v) => (typeof v === "string" ? v.trim() : "")).filter((v): v is string => Boolean(v) && /^https:\/\//i.test(v))
       : [];
     return configured.length || envName !== "RP_GLOBAL_JOB_SOURCES"
       ? configured
@@ -110,4 +160,28 @@ export function configuredSources(envName: string): string[] {
   } catch {
     return envName === "RP_GLOBAL_JOB_SOURCES" ? [...DEFAULT_FREE_JOB_SOURCES] : [];
   }
+}
+
+export async function getConfiguredSourcesAsync(envName: string): Promise<string[]> {
+  const envSources = configuredSources(envName);
+  if (envSources.length > 0) return envSources;
+
+  if (envName === "RP_GLOBAL_CANDIDATE_SOURCES" && process.env.DATABASE_URL) {
+    try {
+      const record = await prisma.systemSetting.findUnique({
+        where: { key: "sourcing:candidate_sources" },
+        select: { value: true },
+      });
+      if (record && Array.isArray(record.value)) {
+        const dbSources = record.value
+          .filter((v): v is string => typeof v === "string" && isSafeHttpsUrl(v).safe)
+          .map((v) => isSafeHttpsUrl(v).url || v.trim());
+        if (dbSources.length > 0) return dbSources;
+      }
+    } catch (err) {
+      console.warn("[getConfiguredSourcesAsync] Failed to fetch DB candidate sources:", err);
+    }
+  }
+
+  return envName === "RP_GLOBAL_JOB_SOURCES" ? [...DEFAULT_FREE_JOB_SOURCES] : [];
 }

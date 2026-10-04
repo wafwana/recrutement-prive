@@ -16,9 +16,8 @@ export function getActiveAiProvider(): AiProvider | null {
   if (process.env.GEMINI_API_KEY) {
     return "gemini";
   }
-  if (process.env.OPENAI_API_KEY) {
-    return "openai";
-  }
+  // Presence of OPENAI_API_KEY alone does NOT authorize OpenAI usage for Recrutement Privé.
+  // OpenAI is strictly disabled unless AI_PROVIDER=openai is explicitly configured.
   return null;
 }
 
