@@ -47,12 +47,18 @@ function normalizeJob(value: unknown, source: string, index: number): GlobalJobI
 
 function normalizeCandidate(value: unknown, source: string, index: number): GlobalCandidateItem | null {
   const r = asRecord(value);
-  if (!r) return null;
+  if (!r || r.type === "Organization") return null;
   return {
-    externalId: text(r.externalId ?? r.id ?? r.profileId) ?? `${source}:${index}`,
-    source, sourceProfileUrl: text(r.sourceProfileUrl ?? r.profileUrl ?? r.url), name: text(r.name),
-    headline: text(r.headline ?? r.title), location: text(r.location), country: text(r.country),
-    skills: skills(r.skills), experienceYears: number(r.experienceYears), raw: value,
+    externalId: text(r.externalId ?? r.id ?? r.profileId ?? r.user_id) ?? source + ":" + index,
+    source,
+    sourceProfileUrl: text(r.sourceProfileUrl ?? r.profileUrl ?? r.html_url ?? r.link ?? r.url),
+    name: text(r.name ?? r.login ?? r.display_name),
+    headline: text(r.headline ?? r.title ?? r.bio ?? r.about_me),
+    location: text(r.location),
+    country: text(r.country),
+    skills: skills(r.skills ?? r.tags),
+    experienceYears: number(r.experienceYears),
+    raw: value,
   };
 }
 
@@ -94,6 +100,11 @@ export async function fetchGlobalCandidates(sourceUrl: string, requester?: Pinne
 const DEFAULT_FREE_JOB_SOURCES = [
   "https://www.arbeitnow.com/api/job-board-api",
   "https://www.arbeitnow.co.uk/api/job-board-api",
+] as const;
+
+const DEFAULT_FREE_CANDIDATE_SOURCES = [
+  "https://api.github.com/users?per_page=30",
+  "https://api.stackexchange.com/2.3/users?site=stackoverflow&pagesize=30",
 ] as const;
 
 import { prisma } from "@/lib/prisma";
@@ -148,17 +159,24 @@ async function fetchSafeSource(input: string, init: RequestInit, requester: Pinn
 
 export function configuredSources(envName: string): string[] {
   const raw = process.env[envName];
-  if (!raw) return envName === "RP_GLOBAL_JOB_SOURCES" ? [...DEFAULT_FREE_JOB_SOURCES] : [];
+  if (!raw) {
+    if (envName === "RP_GLOBAL_JOB_SOURCES") return [...DEFAULT_FREE_JOB_SOURCES];
+    if (envName === "RP_GLOBAL_CANDIDATE_SOURCES") return [...DEFAULT_FREE_CANDIDATE_SOURCES];
+    return [];
+  }
   try {
     const parsed = typeof raw === "string" && raw.trim().startsWith("[") ? JSON.parse(raw) as unknown : raw.split(/[,;\n]/);
     const configured = Array.isArray(parsed)
       ? parsed.map((v) => (typeof v === "string" ? v.trim() : "")).filter((v): v is string => Boolean(v) && /^https:\/\//i.test(v))
       : [];
-    return configured.length || envName !== "RP_GLOBAL_JOB_SOURCES"
-      ? configured
-      : [...DEFAULT_FREE_JOB_SOURCES];
+    if (configured.length > 0) return configured;
+    if (envName === "RP_GLOBAL_JOB_SOURCES") return [...DEFAULT_FREE_JOB_SOURCES];
+    if (envName === "RP_GLOBAL_CANDIDATE_SOURCES") return [...DEFAULT_FREE_CANDIDATE_SOURCES];
+    return [];
   } catch {
-    return envName === "RP_GLOBAL_JOB_SOURCES" ? [...DEFAULT_FREE_JOB_SOURCES] : [];
+    if (envName === "RP_GLOBAL_JOB_SOURCES") return [...DEFAULT_FREE_JOB_SOURCES];
+    if (envName === "RP_GLOBAL_CANDIDATE_SOURCES") return [...DEFAULT_FREE_CANDIDATE_SOURCES];
+    return [];
   }
 }
 
