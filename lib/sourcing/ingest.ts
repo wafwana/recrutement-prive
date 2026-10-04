@@ -129,6 +129,60 @@ export type CandidateSourcingFilter = {
   jobId?: string;
 };
 
+async function ingestPlatformCvthequeCandidates(actorUserId: string) {
+  const candidates = await prisma.candidateProfile.findMany({
+    where: { status: "ACTIVE" },
+    include: { user: { select: { name: true } } },
+    take: 1000,
+  });
+
+  let created = 0;
+  let updated = 0;
+
+  for (const candidate of candidates) {
+    const externalId = `platform:${candidate.id}`;
+    const data = {
+      source: "PLATFORM_CVTHEQUE",
+      sourceProfileUrl: null,
+      sourceCollectedAt: new Date(),
+      name: candidate.user.name || null,
+      headline: candidate.headline || null,
+      location: candidate.location || candidate.country || null,
+      skills: candidate.skills && Array.isArray(candidate.skills)
+        ? candidate.skills as Prisma.InputJsonValue
+        : undefined,
+      experienceYears: candidate.experienceYears ?? null,
+      notes: "Projection interne de la CVthèque : utilisée pour le matching, jamais contactée automatiquement.",
+      createdByUserId: actorUserId,
+    };
+
+    const existing = await prisma.sourcedCandidate.findUnique({
+      where: { source_externalId: { source: "PLATFORM_CVTHEQUE", externalId } },
+      select: { id: true, status: true },
+    });
+
+    if (existing) {
+      const isFinished = ["VALIDATED", "REJECTED", "ARCHIVED", "CONTACTED"].includes(existing.status);
+      await prisma.sourcedCandidate.update({
+        where: { id: existing.id },
+        data: {
+          ...data,
+          status: isFinished ? existing.status : "DETECTED",
+          updatedAt: new Date(),
+        },
+      });
+      updated++;
+    } else {
+      await prisma.sourcedCandidate.create({
+        data: { ...data, externalId, status: "DETECTED" },
+      });
+      created++;
+    }
+  }
+
+  return { fetched: candidates.length, created, updated };
+}
+
 export async function ingestGlobalCandidates(params: {
   sourceUrl?: string;
   filter?: CandidateSourcingFilter;
@@ -140,15 +194,37 @@ export async function ingestGlobalCandidates(params: {
     : await getConfiguredSourcesAsync("RP_GLOBAL_CANDIDATE_SOURCES");
 
   if (!sources.length) {
+    const internal = await ingestPlatformCvthequeCandidates(actorUserId);
+    await prisma.auditLog.create({
+      data: {
+        actorUserId,
+        actorRole: "SYSTEM",
+        action: "GLOBAL_CANDIDATE_SOURCING",
+        targetType: "PLATFORM_CVTHEQUE",
+        details: {
+          activeSourcesCount: 0,
+          fallbackSource: "PLATFORM_CVTHEQUE",
+          ...internal,
+          matched: 0,
+        },
+      },
+    });
     return {
-      ok: false,
-      activeSourcesCount: 0,
-      message: "Aucune source candidats active. Veuillez configurer RP_GLOBAL_CANDIDATE_SOURCES avec des URLs HTTPS valides.",
-      fetched: 0,
-      created: 0,
-      updated: 0,
+      ok: true,
+      activeSourcesCount: 1,
+      fallbackSource: "PLATFORM_CVTHEQUE",
+      message: "Aucune source externe configurée : la CVthèque interne alimente le sourcing candidat et le matching.",
+      fetched: internal.fetched,
+      created: internal.created,
+      updated: internal.updated,
       matched: 0,
-      results: [],
+      results: [{
+        sourceUrl: "PLATFORM_CVTHEQUE",
+        fetched: internal.fetched,
+        created: internal.created,
+        updated: internal.updated,
+        matched: 0,
+      }],
     };
   }
 
