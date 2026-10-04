@@ -60,3 +60,9 @@ ALTER TABLE "AnonymousDisclosureRequest"
 ALTER TABLE "AnonymousDisclosureRequest"
   ADD CONSTRAINT "AnonymousDisclosureRequest_decidedByUserId_fkey"
   FOREIGN KEY ("decidedByUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE "Conversation"
+  ADD COLUMN "dataExchangeLocked" BOOLEAN NOT NULL DEFAULT true;
+
+ALTER TABLE "Message"
+  ADD COLUMN "metadataSanitized" BOOLEAN NOT NULL DEFAULT false;
