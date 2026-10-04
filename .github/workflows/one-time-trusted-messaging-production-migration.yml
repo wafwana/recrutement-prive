@@ -31,6 +31,20 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
         run: npx tsx scripts/check-migration-0010.ts
+      - name: Diagnose failed 0029 migration (read-only)
+        env:
+          DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: |
+          psql "$DATABASE_URL_PRODUCTION" -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT migration_name, started_at, finished_at, rolled_back_at, logs
+          FROM "_prisma_migrations"
+          WHERE migration_name = '0029_financial_outflows';
+          SELECT
+            to_regclass('"FinancialOutflow"') AS financial_outflow_table,
+            to_regclass('"FinancialOutflow_outflowNumber_key"') AS outflow_number_index,
+            to_regclass('"FinancialOutflow_payoutRequestId_key"') AS payout_request_index,
+            to_regclass('"FinancialOutflow_status_createdAt_idx"') AS status_created_index;
+          SQL
       - name: Apply pending Prisma migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
