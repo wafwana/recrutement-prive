@@ -239,7 +239,7 @@ export async function qualifyAndMatchExternalOffer(
       take: 1000,
     }),
     prisma.sourcedCandidate.findMany({
-      where: { status: { notIn: ["REJECTED", "ARCHIVED"] } },
+      where: { status: { not: "REJECTED" } },
       take: 1000,
     }),
   ]);
