@@ -230,19 +230,25 @@ export async function qualifyAndMatchExternalOffer(
   });
 
   // Candidate Matching Execution
-  const candidates = await prisma.candidateProfile.findMany({
-    where: { status: "ACTIVE" },
-    include: {
-      primaryCategory: { select: { code: true } },
-    },
-    take: 1000,
-  });
+  // Evaluate both the platform CVthèque and externally sourced candidates.
+  // Sourced candidates remain internal until human validation; this step never contacts a candidate or company.
+  const [candidates, sourcedCandidates] = await Promise.all([
+    prisma.candidateProfile.findMany({
+      where: { status: "ACTIVE" },
+      include: { primaryCategory: { select: { code: true } } },
+      take: 1000,
+    }),
+    prisma.sourcedCandidate.findMany({
+      where: { status: { notIn: ["REJECTED", "ARCHIVED"] } },
+      take: 1000,
+    }),
+  ]);
 
   const categoryRows = await prisma.jobCategory.findMany({ select: { id: true, code: true } });
   const categoryCodesMap = new Map(categoryRows.map((row) => [row.id, row.code]));
 
-  const matches = candidates
-    .map((candidate) => {
+  const matches = [
+    ...candidates.map((candidate) => {
       const candidateSubCategoryCodes = Array.isArray(candidate.subCategoryIds)
         ? candidate.subCategoryIds
             .filter((value): value is string => typeof value === "string")
@@ -273,13 +279,45 @@ export async function qualifyAndMatchExternalOffer(
 
       return {
         candidateId: candidate.id,
+        candidateType: "PLATFORM_CANDIDATE" as const,
         score: result.score,
         matchedSkills: result.matchedSkills,
         missingSkills: result.missingSkills,
         categoryMatchLevel: result.categoryMatchLevel,
         reasons: result.reasons,
       };
-    })
+    }),
+    ...sourcedCandidates.map((candidate) => {
+      const result = matchCandidateToJob(
+        {
+          skills: candidate.skills,
+          experienceYears: candidate.experienceYears,
+          headline: candidate.headline,
+          location: candidate.location,
+        },
+        {
+          requiredSkills: qualifiedSkills,
+          requiredExperienceYears: qualifiedExperience,
+          title: qualifiedTitle,
+          description: qualifiedDescription,
+          location: [offer.city, offer.country].filter(Boolean).join(", ") || null,
+          categoryCode,
+          subCategoryCode,
+        }
+      );
+
+      return {
+        candidateId: candidate.id,
+        candidateType: "SOURCED_CANDIDATE" as const,
+        source: candidate.source,
+        score: result.score,
+        matchedSkills: result.matchedSkills,
+        missingSkills: result.missingSkills,
+        categoryMatchLevel: result.categoryMatchLevel,
+        reasons: result.reasons,
+      };
+    }),
+  ]
     .filter((match) => match.score >= 25)
     .sort((a, b) => b.score - a.score)
     .slice(0, 20);
