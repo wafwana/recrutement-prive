@@ -5,7 +5,7 @@ import path from "node:path";
 import { assertPriorMigrationLedgerApplied, classifyMigration0010Ledger, migration0010RecoveryAction, normalizeDefault } from "../scripts/check-migration-0010";
 import { classifyPriorMigrationLedger, MIGRATIONS_0011_0014 } from "../scripts/check-migrations-0011-0014";
 
-test("0010 validator is fail-closed and checks exact schema", () => {
+test("0010 validator is fail-closed and checks the baseline schema", () => {
   const source = fs.readFileSync(path.resolve("scripts/check-migration-0010.ts"), "utf8");
   assert.match(source, /SET TRANSACTION READ ONLY/);
   assert.match(source, /MissionPresentation_applicationId_companyId_key/);
