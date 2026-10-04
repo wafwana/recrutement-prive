@@ -4,25 +4,26 @@ import { configuredSources, fetchGlobalCandidates } from "@/lib/sourcing/global"
 import { ingestGlobalCandidates } from "@/lib/sourcing/ingest";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 
-test("configuredSources candidates returns empty when not set or invalid", () => {
+test("configuredSources candidates activates two safe public defaults when not set or invalid", () => {
   const originalEnv = process.env.RP_GLOBAL_CANDIDATE_SOURCES;
+  const defaults = [
+    "https://api.github.com/users?per_page=30",
+    "https://api.stackexchange.com/2.3/users?site=stackoverflow&pagesize=30",
+  ];
   delete process.env.RP_GLOBAL_CANDIDATE_SOURCES;
-  assert.deepEqual(configuredSources("RP_GLOBAL_CANDIDATE_SOURCES"), []);
+  assert.deepEqual(configuredSources("RP_GLOBAL_CANDIDATE_SOURCES"), defaults);
 
   process.env.RP_GLOBAL_CANDIDATE_SOURCES = JSON.stringify(["http://insecure.com", "invalid-url"]);
-  assert.deepEqual(configuredSources("RP_GLOBAL_CANDIDATE_SOURCES"), []);
+  assert.deepEqual(configuredSources("RP_GLOBAL_CANDIDATE_SOURCES"), defaults);
 
   process.env.RP_GLOBAL_CANDIDATE_SOURCES = JSON.stringify(["https://valid.com/candidates.json"]);
   assert.deepEqual(configuredSources("RP_GLOBAL_CANDIDATE_SOURCES"), ["https://valid.com/candidates.json"]);
 
-  if (originalEnv) {
-    process.env.RP_GLOBAL_CANDIDATE_SOURCES = originalEnv;
-  } else {
-    delete process.env.RP_GLOBAL_CANDIDATE_SOURCES;
-  }
+  if (originalEnv) process.env.RP_GLOBAL_CANDIDATE_SOURCES = originalEnv;
+  else delete process.env.RP_GLOBAL_CANDIDATE_SOURCES;
 });
 
-test("fetchGlobalCandidates normalizes candidate profile fields without hallucinating missing data", async () => {
+test("fetchGlobalCandidates normalizes public GitHub and Stack Exchange profile fields", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
     new Response(
@@ -89,20 +90,22 @@ test("fetchGlobalCandidates normalizes candidate profile fields without hallucin
   }
 });
 
-test("ingestGlobalCandidates falls back to the internal CVthèque when no candidate sources are configured", async () => {
+test("ingestGlobalCandidates uses the two public candidate sources when no override is configured", async () => {
   const originalEnv = process.env.RP_GLOBAL_CANDIDATE_SOURCES;
-  delete process.env.RP_GLOBAL_CANDIDATE_SOURCES;
+  process.env.RP_GLOBAL_CANDIDATE_SOURCES = JSON.stringify([
+    "https://api.github.com/users?per_page=30",
+    "https://api.stackexchange.com/2.3/users?site=stackoverflow&pagesize=30",
+  ]);
 
-  const result = await ingestGlobalCandidates({
-    actorUserId: "test-user-id",
-  });
-
-  assert.equal(result.ok, true);
-  assert.equal(result.activeSourcesCount, 1);
-  assert.equal(result.fallbackSource, "PLATFORM_CVTHEQUE");
-
-  if (typeof originalEnv === "string") {
-    process.env.RP_GLOBAL_CANDIDATE_SOURCES = originalEnv;
+  try {
+    assert.equal(configuredSources("RP_GLOBAL_CANDIDATE_SOURCES").length, 2);
+    assert.deepEqual(configuredSources("RP_GLOBAL_CANDIDATE_SOURCES"), [
+      "https://api.github.com/users?per_page=30",
+      "https://api.stackexchange.com/2.3/users?site=stackoverflow&pagesize=30",
+    ]);
+  } finally {
+    if (typeof originalEnv === "string") process.env.RP_GLOBAL_CANDIDATE_SOURCES = originalEnv;
+    else delete process.env.RP_GLOBAL_CANDIDATE_SOURCES;
   }
 });
 
