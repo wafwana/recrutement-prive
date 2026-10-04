@@ -434,6 +434,7 @@ model Conversation {
   presentationId String?
   mode String @default("STANDARD")
   status String @default("ACTIVE")
+  dataExchangeLocked Boolean @default(true)
   subject String @default("Nouvelle conversation")
   presentation MissionPresentation? @relation(fields: [presentationId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
@@ -459,6 +460,7 @@ model Message {
   body String
   moderationStatus String @default("ALLOWED")
   moderationReason String?
+  metadataSanitized Boolean @default(false)
   readAt DateTime?
   archivedDocumentId String?
   archivedDocument ArchivedDocument? @relation(fields: [archivedDocumentId], references: [id], onDelete: SetNull)
