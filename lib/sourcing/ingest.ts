@@ -122,6 +122,103 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
   return { sourceUrl, fetched: items.length, created, updated, qualified, matched, expired, sweptExpired };
 }
 
+export async function refreshProactiveCandidatePool(actorUserId: string) {
+  const demandRows = await prisma.externalJobOpportunity.findMany({
+    where: {
+      status: "QUALIFIED",
+      skills: { not: null },
+    },
+    select: { skills: true, categoryCode: true, subCategoryCode: true },
+    orderBy: { sourceCollectedAt: "desc" },
+    take: 500,
+  });
+
+  const demand = new Map<string, number>();
+  for (const row of demandRows) {
+    for (const skill of Array.isArray(row.skills) ? row.skills : []) {
+      if (typeof skill !== "string" || !skill.trim()) continue;
+      const key = skill.trim().toLowerCase();
+      demand.set(key, (demand.get(key) ?? 0) + 1);
+    }
+  }
+  const topDemand = [...demand.entries()].sort((a, b) => b[1] - a[1]).slice(0, 50);
+
+  const candidates = await prisma.candidateProfile.findMany({
+    where: { status: "ACTIVE" },
+    include: { user: { select: { name: true } } },
+    take: 1000,
+  });
+
+  let created = 0;
+  let updated = 0;
+  for (const candidate of candidates) {
+    const candidateSkills = Array.isArray(candidate.skills)
+      ? candidate.skills.filter((v): v is string => typeof v === "string").map((v) => v.toLowerCase())
+      : [];
+    const demandMatches = topDemand.filter(([skill]) => candidateSkills.includes(skill));
+    const demandScore = demandMatches.reduce((sum, [, weight]) => sum + weight, 0);
+    const potentialScore = Math.min(100, demandScore * 5 + Math.min(20, (candidate.experienceYears ?? 0) * 2) + (candidate.headline ? 10 : 0));
+    const matchingDetails = {
+      mode: "PROACTIVE_TALENT_POOL",
+      demandScore,
+      potentialScore,
+      matchedDemandSkills: demandMatches.slice(0, 10).map(([skill]) => skill),
+      humanValidated: false,
+    } as unknown as Prisma.InputJsonValue;
+
+    const externalId = `platform:${candidate.id}`;
+    const existing = await prisma.sourcedCandidate.findUnique({
+      where: { source_externalId: { source: "PLATFORM_CVTHEQUE", externalId } },
+      select: { id: true, status: true },
+    });
+    const finished = existing && ["VALIDATED", "REJECTED", "ARCHIVED", "CONTACTED"].includes(existing.status);
+    const data = {
+      source: "PLATFORM_CVTHEQUE",
+      sourceProfileUrl: null,
+      sourceCollectedAt: new Date(),
+      name: candidate.user.name || null,
+      headline: candidate.headline || null,
+      location: candidate.location || candidate.country || null,
+      skills: candidateSkills.length ? (candidateSkills as unknown as Prisma.InputJsonValue) : undefined,
+      experienceYears: candidate.experienceYears ?? null,
+      matchingScore: potentialScore,
+      matchingDetails,
+      notes: "Viviers proactif : candidat classé selon la demande du marché, sans contact automatique.",
+      createdByUserId: actorUserId,
+    };
+
+    if (existing) {
+      await prisma.sourcedCandidate.update({
+        where: { id: existing.id },
+        data: { ...data, status: finished ? existing.status : "DETECTED", updatedAt: new Date() },
+      });
+      updated++;
+    } else {
+      await prisma.sourcedCandidate.create({ data: { ...data, externalId, status: "DETECTED" } });
+      created++;
+    }
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      actorUserId,
+      actorRole: "SYSTEM",
+      action: "GLOBAL_CANDIDATE_SOURCING",
+      targetType: "PROACTIVE_TALENT_POOL",
+      details: {
+        mode: "PROACTIVE_TALENT_POOL",
+        demandSignals: topDemand.slice(0, 20).map(([skill, count]) => ({ skill, count })),
+        candidatesEvaluated: candidates.length,
+        created,
+        updated,
+        humanValidated: false,
+      },
+    },
+  });
+
+  return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidates.length, created, updated };
+}
+
 export type CandidateSourcingFilter = {
   query?: string;
   skills?: string[];
