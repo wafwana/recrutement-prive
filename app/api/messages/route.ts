@@ -62,8 +62,12 @@ async function assertStaffConversationScope(userId: string, role: string | undef
 }
 
 async function assertNoDirectCandidateCompanyContact(userId: string, recipientId?: string, conversationId?: string) {
-  if (conversationId && await isDirectCandidateCompanyConversation(conversationId)) {
-    throw new Error("Le contact direct candidat-entreprise est interdit");
+  if (conversationId) {
+    const mode = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { mode: true } });
+    if (mode?.mode === "TRUST_ANONYMOUS") return;
+    if (await isDirectCandidateCompanyConversation(conversationId)) {
+      throw new Error("Le contact direct candidat-entreprise est interdit");
+    }
   }
 
   if (!recipientId || recipientId === userId) return;
@@ -96,7 +100,8 @@ export async function GET(request: Request) {
       where: { conversationId_userId: { conversationId, userId } },
     });
     if (!participant) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-    if (await isDirectCandidateCompanyConversation(conversationId)) {
+    const conversationMode = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { mode: true } });
+    if (conversationMode?.mode !== "TRUST_ANONYMOUS" && await isDirectCandidateCompanyConversation(conversationId)) {
       return NextResponse.json({ error: "Le contact direct candidat-entreprise est interdit" }, { status: 403 });
     }
 
