@@ -15,11 +15,14 @@ export type MessageModeration = {
 
 export function moderateAnonymousMessage(input: string): MessageModeration {
   const body = input.normalize("NFKC");
+  const compact = body.toLowerCase().replace(/[\s().\-_/]+/g, "");
   const categories: string[] = [];
   if (EMAIL_RE.test(body)) categories.push("EMAIL");
   EMAIL_RE.lastIndex = 0;
+  if (/(?:\bat\b|\[at\]|\(at\)|\barobase\b).*(?:\bdot\b|\[dot\]|\(dot\)|\bpoint\b)/i.test(body)) categories.push("OBFUSCATED_EMAIL");
   if (PHONE_RE.test(body)) categories.push("PHONE");
   PHONE_RE.lastIndex = 0;
+  if (/\d{8,}/.test(compact)) categories.push("PHONE_OR_IDENTIFIER");
   if (URL_RE.test(body)) categories.push("URL");
   URL_RE.lastIndex = 0;
   if (SOCIAL_RE.test(body)) categories.push("SOCIAL");
