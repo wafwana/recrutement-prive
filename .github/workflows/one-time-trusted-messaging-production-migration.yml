@@ -1,0 +1,52 @@
+name: One-time trusted messaging production migration
+
+on:
+  push:
+    branches:
+      - ops/apply-trusted-messaging-migration-20261004
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trusted-messaging-production-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Require production database secret
+        env:
+          DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: |
+          test -n "$DATABASE_URL_PRODUCTION" || { echo "DATABASE_URL_PRODUCTION is missing"; exit 1; }
+      - name: Read-only 0010 precheck
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx tsx scripts/check-migration-0010.ts
+      - name: Apply pending Prisma migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx prisma migrate deploy
+      - name: Verify trusted messaging schema
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT
+            to_regclass('"AnonymousDisclosureRequest"') AS disclosure_table,
+            EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='MissionPresentation' AND column_name='anonymousMessagingEnabled') AS anonymous_messaging_enabled,
+            EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='Conversation' AND column_name='dataExchangeLocked') AS conversation_lock,
+            EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='Message' AND column_name='metadataSanitized') AS metadata_sanitized;
+          SQL
+      - name: Final migration status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: npx prisma migrate status
