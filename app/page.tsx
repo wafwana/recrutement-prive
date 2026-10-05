@@ -99,7 +99,19 @@ export default function HomePage() {
         <strong>{t("about_signature_title")}</strong>
         <p>{t("about_signature_text")}</p>
       </div>
-    </section>
+      <div className="rp-about-method-intro">
+        <SectionHeading><h2>{t("about_method_eyebrow")}</h2></SectionHeading>
+        <h3>{t("about_method_title")}</h3>
+        <p>{t("about_method_lead")}</p>
+      </div>
+      <div className="rp-about-method-grid">
+        <article><span>01</span><h3>{t("about_why_title")}</h3><p>{t("about_why_text")}</p></article>
+        <article><span>02</span><h3>{t("about_search_process_title")}</h3><p>{t("about_search_process_text")}</p></article>
+        <article><span>03</span><h3>{t("about_ai_title")}</h3><p>{t("about_ai_text")}</p></article>
+        <article><span>04</span><h3>{t("about_human_title")}</h3><p>{t("about_human_text")}</p></article>
+        <article><span>05</span><h3>{t("about_security_title")}</h3><p>{t("about_security_text")}</p></article>
+        <article><span>06</span><h3>{t("about_result_title")}</h3><p>{t("about_result_text")}</p></article>
+      </div>
     <section id="secteurs" className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-20">
       <SectionHeading><h2>Secteurs d’activité <span>&amp; métiers</span></h2></SectionHeading>
       <p className="mx-auto mt-4 max-w-3xl text-center text-sm leading-7 text-white/50">Aperçu public des principaux secteurs. L’accès aux métiers, sous-métiers et fonctionnalités complètes est réservé aux utilisateurs inscrits.</p>
