@@ -4,6 +4,7 @@ import { configuredSources, fetchGlobalJobs } from "@/lib/sourcing/global";
 import { analyzeExternalOffer } from "@/lib/sourcing/offer-analyzer";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { extractOfferContactEmail, generateExternalOfferOutreach, sendExternalOfferOutreach } from "@/lib/sourcing/outreach";
+import { translateJobOfferToFrench } from "@/lib/jobs/translation";
 
 const normalize = (value: string) =>
   value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -153,6 +154,21 @@ export async function GET(request: Request) {
                 confidence: categoryCode ? 0.5 : 0,
               };
 
+          let frenchTranslation = null;
+          if (inScope) {
+            try {
+              frenchTranslation = await translateJobOfferToFrench({
+                title: safeAnalysis.title,
+                description: safeAnalysis.summary,
+                location: item.city || item.country,
+                skills: safeAnalysis.skills,
+                experienceYears: safeAnalysis.experienceYears,
+              });
+            } catch (translationError) {
+              console.warn("[enterprise-offer-sourcing] French translation unavailable:", translationError instanceof Error ? translationError.message : translationError);
+            }
+          }
+
           const outreach = inScope
             ? await generateExternalOfferOutreach({
                 companyName: item.companyName,
@@ -230,6 +246,7 @@ export async function GET(request: Request) {
               outreachSubject: outreach?.subject ?? null,
               outreachBody: outreach?.text ?? null,
               outreachStatus: outreach ? (outreach.recipientEmail ? "READY" : "NO_EMAIL") : "NOT_PREPARED",
+              translations: frenchTranslation ? { fr: frenchTranslation } : undefined,
             },
             update: {
               selectedCountry: item.country,
@@ -241,6 +258,7 @@ export async function GET(request: Request) {
               outreachSubject: outreach?.subject ?? null,
               outreachBody: outreach?.text ?? null,
               outreachStatus: outreach ? (outreach.recipientEmail ? "READY" : "NO_EMAIL") : "NOT_PREPARED",
+              translations: frenchTranslation ? { fr: frenchTranslation } : undefined,
             },
           });
 
