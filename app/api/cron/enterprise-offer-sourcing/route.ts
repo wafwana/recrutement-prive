@@ -275,6 +275,8 @@ export async function GET(request: Request) {
             },
           });
 
+          processedInBatch++;
+
           if (
             outreach?.recipientEmail &&
             process.env.RP_AUTO_OUTREACH_ENABLED === "true"
