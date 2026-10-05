@@ -10,8 +10,11 @@ import { callGeminiStructured } from "./gemini";
  */
 export function getActiveAiProvider(): AiProvider | null {
   const forced = process.env.AI_PROVIDER?.toLowerCase() as AiProvider | undefined;
-  if (forced === "gemini" || forced === "openai") {
-    return forced;
+  if (forced === "gemini") {
+    return process.env.GEMINI_API_KEY ? "gemini" : null;
+  }
+  if (forced === "openai") {
+    return process.env.OPENAI_API_KEY ? "openai" : null;
   }
   if (process.env.GEMINI_API_KEY) {
     return "gemini";
@@ -92,7 +95,7 @@ export async function executeAiStructuredTask<T>(
     return {
       providerUsed: "openai",
       data: null,
-      blockedReason: "Aucun fournisseur d'IA n'est configuré (OPENAI_API_KEY ou GEMINI_API_KEY absent).",
+      blockedReason: "Aucun fournisseur d'IA autorisé n'est configuré : Gemini nécessite GEMINI_API_KEY, OpenAI nécessite AI_PROVIDER=openai et OPENAI_API_KEY.",
     };
   }
 
