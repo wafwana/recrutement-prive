@@ -115,11 +115,6 @@ export default function TrustedVideoRoom({ presentationId }: { presentationId: s
     if (!session) return;
     const timer = window.setInterval(async () => {
       try {
-        const fresh = await api("GET", undefined);
-        // GET requires sessionId as query parameter; use the direct fetch below to keep the API explicit.
-        void fresh;
-      } catch {}
-      try {
         const response = await fetch("/api/video/sessions?sessionId=" + encodeURIComponent(session.id), { cache: "no-store" });
         const data = await response.json();
         if (!response.ok || !data.session) return;
