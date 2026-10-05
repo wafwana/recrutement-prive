@@ -250,11 +250,11 @@ export async function qualifyAndMatchExternalOffer(
     prisma.candidateProfile.findMany({
       where: { status: "ACTIVE" },
       include: { primaryCategory: { select: { code: true } } },
-      take: 1000,
+      take: 250,
     }),
     prisma.sourcedCandidate.findMany({
       where: { status: { not: "REJECTED" } },
-      take: 1000,
+      take: 250,
     }),
   ]);
 
@@ -387,8 +387,8 @@ export async function processOfferBatch(options?: {
   hasMore: boolean;
   results: QualificationResult[];
 }> {
-  // Safe default batch limit of 20 to ensure sub-10 second execution on Vercel HTTP handlers
-  const limit = Math.min(20, Math.max(1, options?.limit ?? 20));
+  // Strictly bounded qualification batch to keep Vercel execution resumable.
+  const limit = Math.min(10, Math.max(1, options?.limit ?? 5));
   const statusFilter = options?.statusFilter ?? ["DETECTED", "A_QUALIFIER"];
 
   const pendingOffers = await prisma.externalJobOpportunity.findMany({
