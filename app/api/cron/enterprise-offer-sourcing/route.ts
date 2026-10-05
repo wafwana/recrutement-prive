@@ -5,6 +5,7 @@ import { analyzeExternalOffer } from "@/lib/sourcing/offer-analyzer";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { extractOfferContactEmail, generateExternalOfferOutreach, sendExternalOfferOutreach } from "@/lib/sourcing/outreach";
 import { translateJobOfferToFrench } from "@/lib/jobs/translation";
+import { translateJobOfferToFrench } from "@/lib/jobs/translation";
 
 const normalize = (value: string) =>
   value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -164,6 +165,15 @@ export async function GET(request: Request) {
                 skills: safeAnalysis.skills,
                 experienceYears: safeAnalysis.experienceYears,
               });
+            } catch (translationError) {
+              console.warn("[enterprise-offer-sourcing] French translation unavailable:", translationError instanceof Error ? translationError.message : translationError);
+            }
+          }
+
+          let frenchTranslation = null;
+          if (inScope) {
+            try {
+              frenchTranslation = await translateJobOfferToFrench({ title: safeAnalysis.title, description: safeAnalysis.summary, location: item.city || item.country, skills: safeAnalysis.skills, experienceYears: safeAnalysis.experienceYears });
             } catch (translationError) {
               console.warn("[enterprise-offer-sourcing] French translation unavailable:", translationError instanceof Error ? translationError.message : translationError);
             }
