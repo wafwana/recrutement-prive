@@ -5,7 +5,6 @@ import { analyzeExternalOffer } from "@/lib/sourcing/offer-analyzer";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { extractOfferContactEmail, generateExternalOfferOutreach, sendExternalOfferOutreach } from "@/lib/sourcing/outreach";
 import { translateJobOfferToFrench } from "@/lib/jobs/translation";
-import { translateJobOfferToFrench } from "@/lib/jobs/translation";
 
 const normalize = (value: string) =>
   value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -170,13 +169,9 @@ export async function GET(request: Request) {
             }
           }
 
-          let frenchTranslation = null;
-          if (inScope) {
-            try {
-              frenchTranslation = await translateJobOfferToFrench({ title: safeAnalysis.title, description: safeAnalysis.summary, location: item.city || item.country, skills: safeAnalysis.skills, experienceYears: safeAnalysis.experienceYears });
-            } catch (translationError) {
-              console.warn("[enterprise-offer-sourcing] French translation unavailable:", translationError instanceof Error ? translationError.message : translationError);
-            }
+
+          if (frenchTranslation) {
+            await prisma.externalJobOpportunity.update({ where: { id: externalJob.id }, data: { translations: { fr: frenchTranslation } } });
           }
 
           const outreach = inScope
@@ -256,7 +251,6 @@ export async function GET(request: Request) {
               outreachSubject: outreach?.subject ?? null,
               outreachBody: outreach?.text ?? null,
               outreachStatus: outreach ? (outreach.recipientEmail ? "READY" : "NO_EMAIL") : "NOT_PREPARED",
-              translations: frenchTranslation ? { fr: frenchTranslation } : undefined,
             },
             update: {
               selectedCountry: item.country,
@@ -268,7 +262,6 @@ export async function GET(request: Request) {
               outreachSubject: outreach?.subject ?? null,
               outreachBody: outreach?.text ?? null,
               outreachStatus: outreach ? (outreach.recipientEmail ? "READY" : "NO_EMAIL") : "NOT_PREPARED",
-              translations: frenchTranslation ? { fr: frenchTranslation } : undefined,
             },
           });
 
