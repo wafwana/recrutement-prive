@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { fetchGlobalJobs, fetchGlobalCandidates, configuredSources, getConfiguredSourcesAsync } from "@/lib/sourcing/global";
 import { qualifyAndMatchExternalOffer } from "@/lib/jobs/offer-pipeline";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
+import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 
 export async function markExpiredGlobalJobs() {
   const now = new Date();
@@ -22,7 +23,11 @@ export async function markExpiredGlobalJobs() {
 export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, options?: { maxItems?: number }) {
   const items = await fetchGlobalJobs(sourceUrl);
   const maxItems = Math.min(20, Math.max(1, options?.maxItems ?? 20));
-  const batch = items.length > maxItems ? items.slice(0, maxItems) : items;
+  const batchKey = `sourcing:global-jobs-batch:${encodeURIComponent(sourceUrl)}`;
+  const offset = await readBatchOffset(batchKey, items.length);
+  const batch = items.length > maxItems
+    ? Array.from({ length: maxItems }, (_, index) => items[(offset + index) % items.length])
+    : items;
   let created = 0, updated = 0, qualified = 0, matched = 0, expired = 0;
   const now = new Date();
 
@@ -108,6 +113,8 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, o
       }
     }
   }
+
+  if (items.length > 0 && batch.length > 0) await writeBatchOffset(batchKey, offset + batch.length, items.length);
 
   const sweptExpired = await markExpiredGlobalJobs();
 
