@@ -102,6 +102,7 @@ model User {
   companyTrustPresentations MissionPresentation[] @relation("PresentationCompanyUser")
   disclosureRequestsSent AnonymousDisclosureRequest[] @relation("DisclosureRequestedBy")
   disclosureRequestsDecided AnonymousDisclosureRequest[] @relation("DisclosureDecidedBy")
+  videoSessionsCreated VideoSession[] @relation("VideoSessionCreatedBy")
   sourcedCandidates SourcedCandidate[]
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
@@ -309,6 +310,7 @@ model MissionPresentation {
   companyUser User? @relation("PresentationCompanyUser", fields: [companyUserId], references: [id], onDelete: SetNull)
   conversations Conversation[]
   disclosureRequests AnonymousDisclosureRequest[]
+  videoSessions VideoSession[]
   recruitmentInvoices RecruitmentInvoice[]
   @@unique([applicationId, companyId])
   @@index([missionId, companyId, state])
@@ -442,6 +444,26 @@ model Conversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([presentationId, mode, status])
+}
+
+model VideoSession {
+  id             String       @id @default(cuid())
+  presentationId String
+  createdByUserId String
+  status         String       @default("CREATED")
+  expiresAt      DateTime
+  startedAt      DateTime?
+  endedAt        DateTime?
+  offer          Json?
+  answer         Json?
+  candidateA     Json?
+  candidateB     Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  presentation   MissionPresentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  createdBy      User          @relation("VideoSessionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  @@index([presentationId, status, expiresAt])
+  @@index([createdByUserId, createdAt])
 }
 model ConversationParticipant {
   id String @id @default(cuid())
