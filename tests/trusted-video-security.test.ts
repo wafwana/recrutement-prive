@@ -1,1 +1,33 @@
-import test from "node:test";\nimport assert from "node:assert/strict";\nimport fs from "node:fs";\nimport path from "node:path";\nconst root = process.cwd();\ntest("trusted video fails closed without TURN configuration", () => {\n  const route = fs.readFileSync(path.join(root, "app/api/video/sessions/route.ts"), "utf8");\n  assert.match(route, /RP_TURN_URLS/);\n  assert.match(route, /RP_TURN_USERNAME/);\n  assert.match(route, /RP_TURN_CREDENTIAL/);\n  assert.match(route, /Service vidéo sécurisé non configuré/);\n});\ntest("trusted video enforces relay-only transport in the browser", () => {\n  const client = fs.readFileSync(path.join(root, "components/messaging/TrustedVideoRoom.tsx"), "utf8");\n  assert.match(client, /iceTransportPolicy:\s*"relay"/);\n});\ntest("trusted video closes on identity unlock or mission completion", () => {\n  const route = fs.readFileSync(path.join(root, "app/api/video/sessions/route.ts"), "utf8");\n  assert.match(route, /IDENTITE_DEBLOQUEE/);\n  assert.match(route, /MISSION_TERMINEE/);\n  assert.match(route, /anonymousMessagingEnabled/);\n});\ntest("trusted video is audited", () => {\n  const route = fs.readFileSync(path.join(root, "app/api/video/sessions/route.ts"), "utf8");\n  assert.match(route, /TRUST_VIDEO_CREATED/);\n  assert.match(route, /TRUST_VIDEO_STARTED/);\n  assert.match(route, /TRUST_VIDEO_ENDED/);\n});
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+
+const root = process.cwd();
+
+test("trusted video fails closed without TURN configuration", () => {
+  const route = fs.readFileSync(path.join(root, "app/api/video/sessions/route.ts"), "utf8");
+  assert.match(route, /RP_TURN_URLS/);
+  assert.match(route, /RP_TURN_USERNAME/);
+  assert.match(route, /RP_TURN_CREDENTIAL/);
+  assert.match(route, /Service vidéo sécurisé non configuré/);
+});
+
+test("trusted video enforces relay-only transport in the browser", () => {
+  const client = fs.readFileSync(path.join(root, "components/messaging/TrustedVideoRoom.tsx"), "utf8");
+  assert.match(client, /iceTransportPolicy:\s*"relay"/);
+});
+
+test("trusted video closes on identity unlock or mission completion", () => {
+  const route = fs.readFileSync(path.join(root, "app/api/video/sessions/route.ts"), "utf8");
+  assert.match(route, /IDENTITE_DEBLOQUEE/);
+  assert.match(route, /MISSION_TERMINEE/);
+  assert.match(route, /anonymousMessagingEnabled/);
+});
+
+test("trusted video is audited", () => {
+  const route = fs.readFileSync(path.join(root, "app/api/video/sessions/route.ts"), "utf8");
+  assert.match(route, /TRUST_VIDEO_CREATED/);
+  assert.match(route, /TRUST_VIDEO_STARTED/);
+  assert.match(route, /TRUST_VIDEO_ENDED/);
+});
