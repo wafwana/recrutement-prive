@@ -53,6 +53,7 @@ jobs:
           npm run test:candidate-auth
           npm run test:candidate-flow
           npm run test:company-flow
+          npm run test:trusted-video
           npm run test:taxonomy-cv-protection
           npm run typecheck
       - name: Build after OWNER gate
