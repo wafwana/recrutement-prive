@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { analyzeExternalOffer } from "@/lib/sourcing/offer-analyzer";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { translateJobOfferToFrench } from "@/lib/jobs/translation";
-import { translateJobOfferToFrench } from "@/lib/jobs/translation";
 
 export type QualificationResult = {
   success: boolean;
