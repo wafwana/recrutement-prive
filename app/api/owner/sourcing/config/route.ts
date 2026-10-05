@@ -22,56 +22,34 @@ async function requireOwnerOrSourcingAccess() {
 export async function GET() {
   const actor = await requireOwnerOrSourcingAccess();
   if (!actor) return NextResponse.json({ error: "Non autorisé." }, { status: 403 });
-
   const record = await prisma.systemSetting.findUnique({
     where: { key: "sourcing:candidate_sources" },
     select: { value: true, updatedAt: true },
   });
-
   const dbSources = Array.isArray(record?.value)
     ? record.value.filter((v): v is string => typeof v === "string" && /^https:\/\//i.test(v))
     : [];
-
   return NextResponse.json({ sources: dbSources, updatedAt: record?.updatedAt ?? null });
 }
 
 export async function POST(request: Request) {
   const actor = await requireOwnerOrSourcingAccess();
   if (!actor) return NextResponse.json({ error: "Non autorisé." }, { status: 403 });
-
   let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Corps JSON invalide." }, { status: 400 });
-  }
-
+  try { body = await request.json(); } catch { return NextResponse.json({ error: "Corps JSON invalide." }, { status: 400 }); }
   const parsed = configSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message || "URLs de sources invalides." }, { status: 400 });
-  }
-
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || "URLs de sources invalides." }, { status: 400 });
   const validSources: string[] = [];
   for (const rawUrl of parsed.data.sources) {
     const ssrfCheck = isSafeHttpsUrl(rawUrl);
-    if (!ssrfCheck.safe) {
-      return NextResponse.json({ error: `URL rejetée pour motif de sécurité : ${ssrfCheck.reason} (${rawUrl})` }, { status: 400 });
-    }
+    if (!ssrfCheck.safe) return NextResponse.json({ error: `URL rejetée pour motif de sécurité : ${ssrfCheck.reason} (${rawUrl})` }, { status: 400 });
     if (ssrfCheck.url) validSources.push(ssrfCheck.url);
   }
-
   await prisma.systemSetting.upsert({
     where: { key: "sourcing:candidate_sources" },
-    create: {
-      key: "sourcing:candidate_sources",
-      value: validSources,
-    },
-    update: {
-      value: validSources,
-      updatedAt: new Date(),
-    },
+    create: { key: "sourcing:candidate_sources", value: validSources },
+    update: { value: validSources, updatedAt: new Date() },
   });
-
   await prisma.auditLog.create({
     data: {
       actorUserId: actor.userId,
@@ -81,6 +59,5 @@ export async function POST(request: Request) {
       details: { sourcesCount: validSources.length, sources: validSources },
     },
   });
-
   return NextResponse.json({ ok: true, sources: validSources });
 }
