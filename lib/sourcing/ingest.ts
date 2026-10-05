@@ -240,10 +240,9 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
     take: 1000,
   });
 
-  const batch = candidates.slice(0, maxItems);
   let created = 0;
   let updated = 0;
-  for (const candidate of batch) {
+  for (const candidate of candidates) {
     const candidateSkills = Array.isArray(candidate.skills)
       ? candidate.skills.filter((v): v is string => typeof v === "string").map((v) => v.toLowerCase())
       : [];
