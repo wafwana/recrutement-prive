@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { analyzeExternalOffer } from "@/lib/sourcing/offer-analyzer";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
+import { translateJobOfferToFrench } from "@/lib/jobs/translation";
 
 export type QualificationResult = {
   success: boolean;
@@ -202,6 +203,18 @@ export async function qualifyAndMatchExternalOffer(
   const qualifiedExperience = analysis?.experienceYears ?? offer.experienceYears ?? null;
   const qualifiedLanguage = analysis?.language || offer.language || null;
   const qualifiedDescription = analysis?.summary || offer.description || null;
+  let frenchTranslation = null;
+  try {
+    frenchTranslation = await translateJobOfferToFrench({
+      title: qualifiedTitle,
+      description: qualifiedDescription,
+      location: offer.city || offer.country,
+      skills: qualifiedSkills,
+      experienceYears: qualifiedExperience,
+    });
+  } catch (translationError) {
+    console.warn("[offer-pipeline] French translation unavailable:", translationError instanceof Error ? translationError.message : translationError);
+  }
 
   await prisma.externalJobOpportunity.update({
     where: { id: offer.id },
@@ -213,6 +226,7 @@ export async function qualifyAndMatchExternalOffer(
       experienceYears: qualifiedExperience,
       language: qualifiedLanguage,
       status: "QUALIFIED",
+      translations: frenchTranslation ? { fr: frenchTranslation } : undefined,
       rawData: {
         ...existingRawData,
         qualification: {

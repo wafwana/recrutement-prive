@@ -32,6 +32,7 @@ export default async function OwnerSourcingPage() {
         categoryCode: true,
         subCategoryCode: true,
         status: true,
+        translations: true,
         createdAt: true,
       },
     }),
@@ -190,7 +191,7 @@ export default async function OwnerSourcingPage() {
               {offers.map((offer) => (
                 <article key={offer.id} className="grid grid-cols-1 gap-3 px-5 py-5 md:grid-cols-[2fr_1.1fr_1fr_1fr_1fr] md:items-center">
                   <div>
-                    <p className="text-sm font-medium text-white/85">{offer.title}</p>
+                    <p className="text-sm font-medium text-white/85">{typeof offer.translations === "object" && offer.translations !== null && "fr" in offer.translations && typeof (offer.translations as Record<string, unknown>).fr === "object" && (offer.translations as Record<string, unknown>).fr !== null && "titleFr" in ((offer.translations as Record<string, unknown>).fr as Record<string, unknown>) ? String(((offer.translations as Record<string, unknown>).fr as Record<string, unknown>).titleFr || offer.title) : offer.title}</p>
                     <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/40">{offer.status}</p>
                   </div>
                   <p className="text-xs text-white/55">{offer.companyName || "Entreprise non renseignée"}</p>
