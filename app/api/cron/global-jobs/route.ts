@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const sources = configuredSources("RP_GLOBAL_JOB_SOURCES");
   const results = [];
   for (const source of sources) {
-    try { results.push(await ingestGlobalJobs(source, owner.id)); }
+    try { results.push(await ingestGlobalJobs(source, owner.id, { maxItems: 10 })); }
     catch (error) { results.push({ sourceUrl: source, error: error instanceof Error ? error.message : "Erreur inconnue" }); }
   }
 
