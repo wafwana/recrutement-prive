@@ -5,6 +5,9 @@ import { analyzeExternalOffer } from "@/lib/sourcing/offer-analyzer";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { extractOfferContactEmail, generateExternalOfferOutreach, sendExternalOfferOutreach } from "@/lib/sourcing/outreach";
 import { translateJobOfferToFrench } from "@/lib/jobs/translation";
+import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
+
+const MAX_OFFERS_PER_SOURCE_RUN = 10;
 
 const normalize = (value: string) =>
   value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -69,7 +72,13 @@ export async function GET(request: Request) {
     for (const sourceUrl of sources) {
       try {
         const items = await fetchGlobalJobs(sourceUrl);
-        for (const item of items) {
+        const batchKey = `sourcing:enterprise-batch:${company.companyId}:${encodeURIComponent(sourceUrl)}`;
+        const offset = await readBatchOffset(batchKey, items.length);
+        const batch = items.length > MAX_OFFERS_PER_SOURCE_RUN
+          ? Array.from({ length: MAX_OFFERS_PER_SOURCE_RUN }, (_, index) => items[(offset + index) % items.length])
+          : items;
+        let processedInBatch = 0;
+        for (const item of batch) {
           if (!item.country || !selectedCountries.has(normalize(item.country))) continue;
           offers++;
 
@@ -265,6 +274,8 @@ export async function GET(request: Request) {
             },
           });
 
+          processedInBatch++;
+
           if (
             outreach?.recipientEmail &&
             process.env.RP_AUTO_OUTREACH_ENABLED === "true"
@@ -285,6 +296,9 @@ export async function GET(request: Request) {
               });
             }
           }
+        }
+        if (items.length > 0 && processedInBatch > 0) {
+          await writeBatchOffset(batchKey, offset + processedInBatch, items.length);
         }
       } catch (error) {
         errors.push({
