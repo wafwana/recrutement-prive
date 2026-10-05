@@ -22,7 +22,8 @@
     "test:cv-intelligence": "node --import tsx --test tests/cv-intelligence-fixtures.test.ts",
     "test:owner-compatibility": "node --import tsx --test tests/owner-compatibility.test.ts",
     "test:migration-check": "node --import tsx --test tests/migration-check.test.ts",
-    "test:internal-messaging": "node --import tsx --test tests/internal-messaging-unit.test.ts tests/internal-messaging-and-document-privacy.test.ts"
+    "test:internal-messaging": "node --import tsx --test tests/internal-messaging-unit.test.ts tests/internal-messaging-and-document-privacy.test.ts",
+    "test:trusted-video": "node --import tsx --test tests/trusted-video-security.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
