@@ -12,7 +12,7 @@ const images = {
   confidence: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&fm=jpg&q=88&w=1400",
 };
 
-const nav = [["nav_home", "#accueil"], ["nav_cabinet", "#cabinet"], ["nav_enterprises", "#entreprises"], ["nav_candidates", "#candidats"], ["nav_tech", "#technologie"], ["nav_contact", "#contact"]] as const;
+const nav = [["nav_home", "#accueil"], ["nav_cabinet", "/qui-sommes-nous"], ["nav_enterprises", "#entreprises"], ["nav_candidates", "#candidats"], ["nav_tech", "#technologie"], ["nav_contact", "#contact"]] as const;
 const reasons = [["⌯", "reason_matching_title", "reason_matching_text"], ["▣", "reason_project_title", "reason_project_text"], ["♙", "reason_longterm_title", "reason_longterm_text"], ["◎", "reason_global_title", "reason_global_text"]] as const;
 const assurances = [["assurance_ai_title", "assurance_ai_text"], ["assurance_human_title", "assurance_human_text"], ["assurance_private_title", "assurance_private_text"], ["assurance_global_title", "assurance_global_text"]] as const;
 const featureCards = [["feature_talents_eyebrow", images.talents, "feature_talents_title", "feature_talents_text", "feature_talents_cta", "#candidats"], ["feature_enterprise_eyebrow", images.enterprise, "feature_enterprise_title", "feature_enterprise_text", "feature_enterprise_cta", "#entreprises"], ["feature_ai_eyebrow", images.intelligence, "feature_ai_title", "feature_ai_text", "feature_ai_cta", "#technologie"], ["feature_confidence_eyebrow", images.confidence, "feature_confidence_title", "feature_confidence_text", "feature_confidence_cta", "#contact"]] as const;
