@@ -19,14 +19,11 @@ export default async function OwnerPartenairesPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const session = await auth();
-  if (!session?.user?.id || !["OWNER", "ADMIN", "CONSULTANT"].includes(session.user.role || "")) {
+  if (!session?.user?.id || session.user.role !== "OWNER") {
     redirect("/connexion");
   }
 
-  if (!(await hasPermission(session.user.id, session.user.role, "PARTNERS_MANAGE"))) {
-    const fallbackRedirect = session.user.role === "ADMIN" ? "/espace/admin" : session.user.role === "CONSULTANT" ? "/espace/consultant" : "/espace";
-    redirect(fallbackRedirect);
-  }
+  if (!(await hasPermission(session.user.id, session.user.role, "PARTNERS_MANAGE"))) redirect("/espace");
 
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : "";
