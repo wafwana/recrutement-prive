@@ -240,9 +240,10 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
     take: 1000,
   });
 
+  const batch = candidates.slice(0, maxItems);
   let created = 0;
   let updated = 0;
-  for (const candidate of candidates) {
+  for (const candidate of batch) {
     const candidateSkills = Array.isArray(candidate.skills)
       ? candidate.skills.filter((v): v is string => typeof v === "string").map((v) => v.toLowerCase())
       : [];
@@ -319,7 +320,8 @@ export type CandidateSourcingFilter = {
   jobId?: string;
 };
 
-async function ingestPlatformCvthequeCandidates(actorUserId: string) {
+async function ingestPlatformCvthequeCandidates(actorUserId: string, options?: { maxItems?: number }) {
+  const maxItems = Math.min(20, Math.max(1, options?.maxItems ?? 10));
   const candidates = await prisma.candidateProfile.findMany({
     where: { status: "ACTIVE" },
     include: { user: { select: { name: true } } },
@@ -370,21 +372,23 @@ async function ingestPlatformCvthequeCandidates(actorUserId: string) {
     }
   }
 
-  return { fetched: candidates.length, created, updated };
+  return { fetched: batch.length, sourceTotal: candidates.length, batchLimit: maxItems, created, updated };
 }
 
 export async function ingestGlobalCandidates(params: {
   sourceUrl?: string;
   filter?: CandidateSourcingFilter;
   actorUserId: string;
+  maxItems?: number;
 }) {
   const { sourceUrl, filter, actorUserId } = params;
+  const maxItems = Math.min(20, Math.max(1, params.maxItems ?? 10));
   const sources = sourceUrl && /^https:\/\//i.test(sourceUrl)
     ? [sourceUrl]
     : await getConfiguredSourcesAsync("RP_GLOBAL_CANDIDATE_SOURCES");
 
   if (!sources.length) {
-    const internal = await ingestPlatformCvthequeCandidates(actorUserId);
+    const internal = await ingestPlatformCvthequeCandidates(actorUserId, { maxItems });
     await prisma.auditLog.create({
       data: {
         actorUserId,
@@ -405,12 +409,16 @@ export async function ingestGlobalCandidates(params: {
       fallbackSource: "PLATFORM_CVTHEQUE",
       message: "Aucune source externe configurée : la CVthèque interne alimente le sourcing candidat et le matching.",
       fetched: internal.fetched,
+      sourceTotal: internal.sourceTotal,
+      batchLimit: internal.batchLimit,
       created: internal.created,
       updated: internal.updated,
       matched: 0,
       results: [{
         sourceUrl: "PLATFORM_CVTHEQUE",
         fetched: internal.fetched,
+        sourceTotal: internal.sourceTotal,
+        batchLimit: internal.batchLimit,
         created: internal.created,
         updated: internal.updated,
         matched: 0,
@@ -429,18 +437,23 @@ export async function ingestGlobalCandidates(params: {
   let totalCreated = 0;
   let totalUpdated = 0;
   let totalMatched = 0;
-  const results: Array<{ sourceUrl: string; fetched: number; created: number; updated: number; matched: number; error?: string }> = [];
+  const results: Array<{ sourceUrl: string; fetched: number; sourceTotal: number; batchLimit: number; created: number; updated: number; matched: number; error?: string }> = [];
 
   const sourceCollectedAt = new Date();
 
   for (const source of sources) {
     try {
       const candidates = await fetchGlobalCandidates(source);
+      const batchKey = `sourcing:global-candidates-batch:${encodeURIComponent(source)}`;
+      const offset = await readBatchOffset(batchKey, candidates.length);
+      const batch = candidates.length > maxItems
+        ? Array.from({ length: maxItems }, (_, index) => candidates[(offset + index) % candidates.length])
+        : candidates;
       let created = 0;
       let updated = 0;
       let matched = 0;
 
-      for (const candidate of candidates) {
+      for (const candidate of batch) {
         if (filter?.query) {
           const q = filter.query.toLowerCase();
           const matchTitle = (candidate.headline || "").toLowerCase().includes(q);
@@ -537,16 +550,22 @@ export async function ingestGlobalCandidates(params: {
         }
       }
 
-      totalFetched += candidates.length;
+      if (candidates.length > 0 && batch.length > 0) {
+        await writeBatchOffset(batchKey, offset + batch.length, candidates.length);
+      }
+
+      totalFetched += batch.length;
       totalCreated += created;
       totalUpdated += updated;
       totalMatched += matched;
 
-      results.push({ sourceUrl: source, fetched: candidates.length, created, updated, matched });
+      results.push({ sourceUrl: source, fetched: batch.length, sourceTotal: candidates.length, batchLimit: maxItems, created, updated, matched });
     } catch (err) {
       results.push({
         sourceUrl: source,
         fetched: 0,
+        sourceTotal: 0,
+        batchLimit: maxItems,
         created: 0,
         updated: 0,
         matched: 0,
@@ -565,6 +584,7 @@ export async function ingestGlobalCandidates(params: {
       details: {
         activeSourcesCount: sources.length,
         fetched: totalFetched,
+        batchLimit: maxItems,
         created: totalCreated,
         updated: totalUpdated,
         matched: totalMatched,
@@ -577,6 +597,7 @@ export async function ingestGlobalCandidates(params: {
     ok: true,
     activeSourcesCount: sources.length,
     fetched: totalFetched,
+    batchLimit: maxItems,
     created: totalCreated,
     updated: totalUpdated,
     matched: totalMatched,
