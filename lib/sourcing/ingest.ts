@@ -19,12 +19,14 @@ export async function markExpiredGlobalJobs() {
   return updated.count;
 }
 
-export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
+export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, options?: { maxItems?: number }) {
   const items = await fetchGlobalJobs(sourceUrl);
+  const maxItems = Math.min(20, Math.max(1, options?.maxItems ?? 20));
+  const batch = items.length > maxItems ? items.slice(0, maxItems) : items;
   let created = 0, updated = 0, qualified = 0, matched = 0, expired = 0;
   const now = new Date();
 
-  for (const item of items) {
+  for (const item of batch) {
     const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
     const closingAt = item.closingAt ? new Date(item.closingAt) : null;
     const isExpired = Boolean(closingAt && closingAt < now);
@@ -115,11 +117,11 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
       actorRole: "SYSTEM",
       action: "GLOBAL_JOB_SOURCING",
       targetType: "EXTERNAL_JOB_SOURCE",
-      details: { sourceUrl, fetched: items.length, created, updated, qualified, matched, expired, sweptExpired },
+      details: { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired },
     },
   });
 
-  return { sourceUrl, fetched: items.length, created, updated, qualified, matched, expired, sweptExpired };
+  return { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired };
 }
 
 async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string) {
