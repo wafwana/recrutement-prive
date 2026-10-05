@@ -25,6 +25,7 @@ export async function GET(request: Request) {
         select: { id: true, analysis: true },
       },
     },
+    take: 1000,
   });
 
   const jobs = await prisma.job.findMany({
@@ -309,7 +310,7 @@ export async function GET(request: Request) {
         actorRole: "SYSTEM",
         action: "CV_AUTOMATIC_REMATCH",
         targetType: "CV_LIBRARY",
-        details: { candidatesChecked: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched },
+        details: { candidatesChecked: candidateBatch.length, candidateSourceTotal: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched },
       },
     });
   }
