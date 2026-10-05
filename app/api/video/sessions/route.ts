@@ -71,6 +71,7 @@ async function getSession(sessionId: string, userId: string) {
 function publicSession(session: NonNullable<Awaited<ReturnType<typeof getSession>>>, userId: string) {
   if (!session) return null;
   const isA = session.createdByUserId === userId;
+  const isCandidate = session.presentation.candidateUserId === userId;
   return {
     id: session.id,
     status: session.status,
@@ -78,8 +79,8 @@ function publicSession(session: NonNullable<Awaited<ReturnType<typeof getSession
     startedAt: session.startedAt,
     endedAt: session.endedAt,
     role: isA ? "INITIATOR" : "PARTICIPANT",
-    localAlias: isA ? session.presentation.candidateAlias : session.presentation.companyAlias,
-    remoteAlias: isA ? session.presentation.companyAlias : session.presentation.candidateAlias,
+    localAlias: isCandidate ? session.presentation.candidateAlias : session.presentation.companyAlias,
+    remoteAlias: isCandidate ? session.presentation.companyAlias : session.presentation.candidateAlias,
     remoteOffer: !isA ? session.offer : null,
     remoteAnswer: isA ? session.answer : null,
     remoteCandidates: isA ? (Array.isArray(session.candidateB) ? session.candidateB : []) : (Array.isArray(session.candidateA) ? session.candidateA : []),
