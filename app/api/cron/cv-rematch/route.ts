@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { analyzeCvDocument } from "@/lib/cv/analyzer";
 import { buildCandidateFolder } from "@/lib/cv/folders";
+import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
         select: { id: true, analysis: true },
       },
     },
+    take: 1000,
   });
 
   const jobs = await prisma.job.findMany({
@@ -32,15 +34,22 @@ export async function GET(request: Request) {
       jobCategory: { select: { code: true } },
       subCategory: { select: { code: true } },
     },
-    take: 1000,
+    take: 200,
   });
 
-  const externalOffers = await prisma.externalJobOpportunity.findMany({ where: { status: { not: "REJECTED" } }, take: 5000 });
+  const externalOffers = await prisma.externalJobOpportunity.findMany({ where: { status: { not: "REJECTED" } }, orderBy: { sourceCollectedAt: "desc" }, take: 500 });
+
+  const candidateBatchKey = "cv-rematch:candidates";
+  const candidateOffset = await readBatchOffset(candidateBatchKey, candidates.length);
+  const candidateBatchLimit = 10;
+  const candidateBatch = candidates.length > candidateBatchLimit
+    ? Array.from({ length: candidateBatchLimit }, (_, index) => candidates[(candidateOffset + index) % candidates.length])
+    : candidates;
 
   const intakeQueue = await prisma.cvIntake.findMany({
     where: { status: "A_ANALYSER" },
     orderBy: { createdAt: "asc" },
-    take: 50,
+    take: 10,
   });
 
   let intakeAnalyzed = 0;
@@ -195,7 +204,7 @@ export async function GET(request: Request) {
 
 
 
-  for (const candidate of candidates) {
+  for (const candidate of candidateBatch) {
     const subCategoryCodes = Array.isArray(candidate.subCategoryIds)
       ? candidate.subCategoryIds
           .filter((value): value is string => typeof value === "string")
@@ -301,10 +310,14 @@ export async function GET(request: Request) {
         actorRole: "SYSTEM",
         action: "CV_AUTOMATIC_REMATCH",
         targetType: "CV_LIBRARY",
-        details: { candidatesChecked: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched },
+        details: { candidatesChecked: candidateBatch.length, candidateSourceTotal: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched },
       },
     });
   }
 
-  return NextResponse.json({ ok: true, candidatesChecked: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched });
+  if (candidates.length > 0 && candidateBatch.length > 0) {
+    await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidates.length);
+  }
+
+  return NextResponse.json({ ok: true, candidatesChecked: candidateBatch.length, candidateSourceTotal: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched });
 }
