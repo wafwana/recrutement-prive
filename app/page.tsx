@@ -84,6 +84,22 @@ export default function HomePage() {
       <div className="rp-hero-image" role="img" aria-label={t("hero_image_alt")} style={{ backgroundImage: `url(${images.hero})` }} />
     </section>
 
+    <section id="cabinet" className="rp-about" aria-labelledby="cabinet-title">
+      <div className="rp-about-intro">
+        <SectionHeading><h2>{t("about_eyebrow")}</h2></SectionHeading>
+        <h2 id="cabinet-title">{t("about_title")}</h2>
+        <p className="rp-about-lead">{t("about_lead")}</p>
+      </div>
+      <div className="rp-about-grid">
+        <article><span>01</span><h3>{t("about_approach_title")}</h3><p>{t("about_approach_text")}</p></article>
+        <article><span>02</span><h3>{t("about_search_title")}</h3><p>{t("about_search_text")}</p></article>
+        <article><span>03</span><h3>{t("about_confidentiality_title")}</h3><p>{t("about_confidentiality_text")}</p></article>
+      </div>
+      <div className="rp-about-signature">
+        <strong>{t("about_signature_title")}</strong>
+        <p>{t("about_signature_text")}</p>
+      </div>
+    </section>
     <section id="secteurs" className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-20">
       <SectionHeading><h2>Secteurs d’activité <span>&amp; métiers</span></h2></SectionHeading>
       <p className="mx-auto mt-4 max-w-3xl text-center text-sm leading-7 text-white/50">Aperçu public des principaux secteurs. L’accès aux métiers, sous-métiers et fonctionnalités complètes est réservé aux utilisateurs inscrits.</p>
