@@ -150,7 +150,7 @@ async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string
       skills: true, experienceYears: true, categoryCode: true, subCategoryCode: true, source: true,
     },
     orderBy: { sourceCollectedAt: "desc" },
-    take: 1000,
+    take: 250,
   });
 
   const matches = offers
@@ -221,7 +221,7 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
     },
     select: { skills: true, categoryCode: true, subCategoryCode: true },
     orderBy: { sourceCollectedAt: "desc" },
-    take: 500,
+    take: 200,
   });
 
   const demand = new Map<string, number>();
@@ -240,9 +240,16 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
     take: 1000,
   });
 
+  const candidateBatchKey = "sourcing:proactive-pool-batch";
+  const candidateOffset = await readBatchOffset(candidateBatchKey, candidates.length);
+  const candidateBatchLimit = 10;
+  const candidateBatch = candidates.length > candidateBatchLimit
+    ? Array.from({ length: candidateBatchLimit }, (_, index) => candidates[(candidateOffset + index) % candidates.length])
+    : candidates;
+
   let created = 0;
   let updated = 0;
-  for (const candidate of candidates) {
+  for (const candidate of candidateBatch) {
     const candidateSkills = Array.isArray(candidate.skills)
       ? candidate.skills.filter((v): v is string => typeof v === "string").map((v) => v.toLowerCase())
       : [];
@@ -292,6 +299,10 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
     }
   }
 
+  if (candidates.length > 0 && candidateBatch.length > 0) {
+    await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidates.length);
+  }
+
   await prisma.auditLog.create({
     data: {
       actorUserId,
@@ -301,7 +312,9 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
       details: {
         mode: "PROACTIVE_TALENT_POOL",
         demandSignals: topDemand.slice(0, 20).map(([skill, count]) => ({ skill, count })),
-        candidatesEvaluated: candidates.length,
+        candidatesEvaluated: candidateBatch.length,
+        candidateSourceTotal: candidates.length,
+        batchLimit: candidateBatchLimit,
         created,
         updated,
         humanValidated: false,
@@ -309,7 +322,7 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
     },
   });
 
-  return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidates.length, created, updated };
+  return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidateBatch.length, candidateSourceTotal: candidates.length, batchLimit: candidateBatchLimit, created, updated };
 }
 
 export type CandidateSourcingFilter = {
