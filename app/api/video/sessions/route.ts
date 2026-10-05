@@ -176,6 +176,7 @@ export async function PUT(request: Request) {
   const existing = await prisma.videoSession.findFirst({
     where: { presentationId: presentation.id, status: { in: ["CREATED", "JOINING", "OFFER_READY", "ACTIVE"] }, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
+    include: { presentation: { select: { id: true, candidateUserId: true, companyUserId: true, candidateAlias: true, companyAlias: true, state: true, anonymousMessagingEnabled: true } } },
   });
   if (existing) return NextResponse.json({ session: publicSession(existing, sessionUser.user.id) }, { status: 200 });
 
