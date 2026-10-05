@@ -110,7 +110,7 @@ export default async function AdminPage() {
           )}
           {canManagePartners && (
             <Link
-              href="/espace/owner/partenaires"
+              href="/espace/admin/partenaires"
               className="border border-white/20 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/80 hover:border-white/40"
             >
               Partenaires &amp; Sources
