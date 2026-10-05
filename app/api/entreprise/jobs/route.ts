@@ -154,7 +154,13 @@ export async function POST(request: Request) {
       await tx.recruitmentHistory.create({ data: { jobId: created.id, actorUserId: access.userId, action: "JOB_CREATED", toStatus: created.status, details: attachment ? { attachmentName: attachment.name, attachmentSize: attachment.size } : undefined } });
       return created;
     });
-    if (job.status === "OPEN") await matchOpenJobCandidates(job.id, access.userId, "COMPANY");
+    if (job.status === "OPEN") {
+      try {
+        await matchOpenJobCandidates(job.id, access.userId, "COMPANY");
+      } catch (matchingError) {
+        console.error("[company-job] immediate matching failed after job creation", matchingError);
+      }
+    }
     return NextResponse.json(job, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Impossible de créer l'offre";
