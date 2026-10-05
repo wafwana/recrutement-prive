@@ -112,6 +112,25 @@ export default function HomePage() {
         <article><span>05</span><h3>{t("about_security_title")}</h3><p>{t("about_security_text")}</p></article>
         <article><span>06</span><h3>{t("about_result_title")}</h3><p>{t("about_result_text")}</p></article>
       </div>
+      <div className="rp-about-team">
+        <div className="rp-about-team-copy">
+          <span className="rp-about-team-kicker">{t("about_team_eyebrow")}</span>
+          <h3>{t("about_team_title")}</h3>
+          <p>{t("about_team_text")}</p>
+        </div>
+        <div className="rp-about-team-grid">
+          <article><strong>01</strong><h4>{t("about_team_research_title")}</h4><p>{t("about_team_research_text")}</p></article>
+          <article><strong>02</strong><h4>{t("about_team_ai_title")}</h4><p>{t("about_team_ai_text")}</p></article>
+          <article><strong>03</strong><h4>{t("about_team_expertise_title")}</h4><p>{t("about_team_expertise_text")}</p></article>
+          <article><strong>04</strong><h4>{t("about_team_followup_title")}</h4><p>{t("about_team_followup_text")}</p></article>
+        </div>
+      </div>
+      <div className="rp-about-try">
+        <span>{t("about_try_eyebrow")}</span>
+        <h3>{t("about_try_title")}</h3>
+        <p>{t("about_try_text")}</p>
+        <div><ArrowButton href="#entreprises">{t("about_try_company")}</ArrowButton><ArrowButton href="#candidats" outline>{t("about_try_candidate")}</ArrowButton></div>
+      </div>
     <section id="secteurs" className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-20">
       <SectionHeading><h2>Secteurs d’activité <span>&amp; métiers</span></h2></SectionHeading>
       <p className="mx-auto mt-4 max-w-3xl text-center text-sm leading-7 text-white/50">Aperçu public des principaux secteurs. L’accès aux métiers, sous-métiers et fonctionnalités complètes est réservé aux utilisateurs inscrits.</p>
