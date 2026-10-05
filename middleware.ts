@@ -8,6 +8,7 @@ const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === "true";
 const PUBLIC_PATHS = new Set([
   "/",
   "/offres",
+  "/qui-sommes-nous",
   "/connexion",
   "/maintenance",
   "/mot-de-passe-oublie",
