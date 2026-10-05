@@ -8,11 +8,7 @@ import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    if (candidates.length > 0 && candidateBatch.length > 0) {
-    await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidates.length);
-  }
-
-  return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+    return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   }
 
   const candidates = await prisma.candidateProfile.findMany({
@@ -52,7 +48,7 @@ export async function GET(request: Request) {
   const intakeQueue = await prisma.cvIntake.findMany({
     where: { status: "A_ANALYSER" },
     orderBy: { createdAt: "asc" },
-    take: 50,
+    take: 10,
   });
 
   let intakeAnalyzed = 0;
@@ -318,5 +314,9 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.json({ ok: true, candidatesChecked: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched });
+  if (candidates.length > 0 && candidateBatch.length > 0) {
+    await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidates.length);
+  }
+
+  return NextResponse.json({ ok: true, candidatesChecked: candidateBatch.length, candidateSourceTotal: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched });
 }
