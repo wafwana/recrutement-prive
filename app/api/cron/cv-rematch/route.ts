@@ -3,11 +3,16 @@ import { prisma } from "@/lib/prisma";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { analyzeCvDocument } from "@/lib/cv/analyzer";
 import { buildCandidateFolder } from "@/lib/cv/folders";
+import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+    if (candidates.length > 0 && candidateBatch.length > 0) {
+    await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidates.length);
+  }
+
+  return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   }
 
   const candidates = await prisma.candidateProfile.findMany({
@@ -32,10 +37,17 @@ export async function GET(request: Request) {
       jobCategory: { select: { code: true } },
       subCategory: { select: { code: true } },
     },
-    take: 1000,
+    take: 200,
   });
 
-  const externalOffers = await prisma.externalJobOpportunity.findMany({ where: { status: { not: "REJECTED" } }, take: 5000 });
+  const externalOffers = await prisma.externalJobOpportunity.findMany({ where: { status: { not: "REJECTED" } }, orderBy: { sourceCollectedAt: "desc" }, take: 500 });
+
+  const candidateBatchKey = "cv-rematch:candidates";
+  const candidateOffset = await readBatchOffset(candidateBatchKey, candidates.length);
+  const candidateBatchLimit = 10;
+  const candidateBatch = candidates.length > candidateBatchLimit
+    ? Array.from({ length: candidateBatchLimit }, (_, index) => candidates[(candidateOffset + index) % candidates.length])
+    : candidates;
 
   const intakeQueue = await prisma.cvIntake.findMany({
     where: { status: "A_ANALYSER" },
@@ -195,7 +207,7 @@ export async function GET(request: Request) {
 
 
 
-  for (const candidate of candidates) {
+  for (const candidate of candidateBatch) {
     const subCategoryCodes = Array.isArray(candidate.subCategoryIds)
       ? candidate.subCategoryIds
           .filter((value): value is string => typeof value === "string")
