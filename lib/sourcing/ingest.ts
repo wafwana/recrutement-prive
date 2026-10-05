@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { fetchGlobalJobs, fetchGlobalCandidates, configuredSources, getConfiguredSourcesAsync } from "@/lib/sourcing/global";
 import { qualifyAndMatchExternalOffer } from "@/lib/jobs/offer-pipeline";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
+import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 
 export async function markExpiredGlobalJobs() {
   const now = new Date();
@@ -19,12 +20,18 @@ export async function markExpiredGlobalJobs() {
   return updated.count;
 }
 
-export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
+export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, options?: { maxItems?: number }) {
   const items = await fetchGlobalJobs(sourceUrl);
+  const maxItems = Math.min(20, Math.max(1, options?.maxItems ?? 20));
+  const batchKey = `sourcing:global-jobs-batch:${encodeURIComponent(sourceUrl)}`;
+  const offset = await readBatchOffset(batchKey, items.length);
+  const batch = items.length > maxItems
+    ? Array.from({ length: maxItems }, (_, index) => items[(offset + index) % items.length])
+    : items;
   let created = 0, updated = 0, qualified = 0, matched = 0, expired = 0;
   const now = new Date();
 
-  for (const item of items) {
+  for (const item of batch) {
     const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
     const closingAt = item.closingAt ? new Date(item.closingAt) : null;
     const isExpired = Boolean(closingAt && closingAt < now);
@@ -107,6 +114,8 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
     }
   }
 
+  if (items.length > 0 && batch.length > 0) await writeBatchOffset(batchKey, offset + batch.length, items.length);
+
   const sweptExpired = await markExpiredGlobalJobs();
 
   await prisma.auditLog.create({
@@ -115,11 +124,11 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
       actorRole: "SYSTEM",
       action: "GLOBAL_JOB_SOURCING",
       targetType: "EXTERNAL_JOB_SOURCE",
-      details: { sourceUrl, fetched: items.length, created, updated, qualified, matched, expired, sweptExpired },
+      details: { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired },
     },
   });
 
-  return { sourceUrl, fetched: items.length, created, updated, qualified, matched, expired, sweptExpired };
+  return { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired };
 }
 
 async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string) {
