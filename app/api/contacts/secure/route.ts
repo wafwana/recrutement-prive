@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
   const parsed = actionSchema.safeParse(raw);
   if (!parsed.success) return NextResponse.json({ error: "Action invalide" }, { status: 400 });
-  const meeting = await participant(parsed.data.meetingId, session.user.id);
+  const meeting = await participant(parsed.data.meetingId);
   if (!meeting) return NextResponse.json({ error: "Contact introuvable" }, { status: 404 });
   if (meeting.presentation.candidateUserId !== session.user.id && meeting.presentation.companyUserId !== session.user.id) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
