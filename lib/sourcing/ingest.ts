@@ -340,10 +340,11 @@ async function ingestPlatformCvthequeCandidates(actorUserId: string, options?: {
     take: 1000,
   });
 
+  const candidateBatch = candidates.slice(0, maxItems);
   let created = 0;
   let updated = 0;
 
-  for (const candidate of candidates) {
+  for (const candidate of candidateBatch) {
     const externalId = `platform:${candidate.id}`;
     const data = {
       source: "PLATFORM_CVTHEQUE",
