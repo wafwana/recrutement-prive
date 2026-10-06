@@ -62,11 +62,9 @@ export function isPublicIpAddress(address: string): boolean {
     if (expanded.length !== 8) return false;
     const full = expanded.map((part) => Number.parseInt(part || "0", 16));
     const first = full[0];
-    // Only global-unicast 2000::/3 is allowed.
     if ((first & 0xe000) !== 0x2000) return false;
-    // Reject IANA special-purpose allocations and transition mechanisms.
     if (first === 0x2001 && (full[1] <= 0x01ff || full[1] === 0x0db8)) return false;
-    if (first === 0x2002) return false; // 6to4 can encapsulate private IPv4 destinations
+    if (first === 0x2002) return false;
     return true;
   }
   return false;
@@ -74,18 +72,35 @@ export function isPublicIpAddress(address: string): boolean {
 
 /**
  * Resolve every DNS answer and reject the hostname if any answer is non-public.
- * Call immediately before each outbound request and after every redirect.
+ * Return a concrete IP/family pair for the pinned HTTPS request.
  */
-export async function assertPublicDnsHost(hostname: string): Promise<{ address: string; family: number }> {
+export async function assertPublicDnsHost(hostname: string): Promise<{ address: string; family: 4 | 6 }> {
   if (isIP(hostname)) {
-    if (!isPublicIpAddress(hostname)) throw new Error("Source DNS resolved to a non-public address (SSRF).");
-    return { address: hostname, family: isIP(hostname) };
+    const family = isIP(hostname);
+    if (!isPublicIpAddress(hostname) || (family !== 4 && family !== 6)) {
+      throw new Error("Source DNS resolved to a non-public address (SSRF).");
+    }
+    return { address: hostname, family };
   }
+
   let records: Array<{ address: string; family: number }>;
-  try { records = await lookup(hostname, { all: true, verbatim: true }); }
-  catch { throw new Error("Source hostname could not be resolved safely."); }
-  if (!records.length || records.some((record) => !isPublicIpAddress(record.address))) {
-    throw new Error("Source DNS resolved to a private, reserved, or non-routable address (SSRF).");
+  try {
+    records = await lookup(hostname, { all: true, verbatim: true });
+  } catch {
+    throw new Error("Source hostname could not be resolved safely.");
   }
-  return records[0];
+
+  const validRecords = records
+    .filter((record) => typeof record?.address === "string" && isIP(record.address) > 0)
+    .map((record) => ({ address: record.address, family: isIP(record.address) }))
+    .filter((record): record is { address: string; family: 4 | 6 } =>
+      (record.family === 4 || record.family === 6) && isPublicIpAddress(record.address),
+    );
+
+  if (!validRecords.length || validRecords.length !== records.length) {
+    throw new Error("Source DNS resolved to a private, reserved, non-routable, or invalid address (SSRF).");
+  }
+
+  // Prefer IPv4 for compatibility with public APIs while keeping DNS pinning.
+  return validRecords.find((record) => record.family === 4) ?? validRecords[0];
 }
