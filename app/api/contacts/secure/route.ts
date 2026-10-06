@@ -73,6 +73,7 @@ export async function POST(request: Request) {
     }
   }
   if (parsed.data.action === "consent") {
+    if (!["CONFIRMED", "ACTIVE"].includes(meeting.status)) return NextResponse.json({ error: "Le contact doit être autorisé avant le consentement." }, { status: 409 });
     const data = meeting.presentation.candidateUserId === session.user.id ? { candidateConsentAt: parsed.data.recordingConsent ? new Date() : null } : { companyConsentAt: parsed.data.recordingConsent ? new Date() : null };
     const updated = await prisma.contactMeeting.update({ where: { id: meeting.id }, data: { ...data, recordingNoticeShown: true } });
     return NextResponse.json({ meeting: updated });
