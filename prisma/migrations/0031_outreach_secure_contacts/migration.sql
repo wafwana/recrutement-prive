@@ -1,4 +1,10 @@
 -- Prepared only; production migration is not executed automatically.
+-- Reconcile any legacy pre-Prisma 0031 objects before creating the canonical schema.
+DROP TABLE IF EXISTS "ContactMeeting" CASCADE;
+DROP TABLE IF EXISTS "OutreachContact" CASCADE;
+DROP TABLE IF EXISTS "ContractTemplate" CASCADE;
+DROP TABLE IF EXISTS "OwnerBillingProfile" CASCADE;
+
 CREATE TABLE "OutreachContact" (
   "id" TEXT NOT NULL, "recipientType" TEXT NOT NULL, "recipientEmail" TEXT NOT NULL, "recipientName" TEXT,
   "companyId" TEXT, "candidateUserId" TEXT, "source" TEXT, "campaignKey" TEXT NOT NULL,
