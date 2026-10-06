@@ -944,6 +944,24 @@ model ContactMeeting {
   @@index([candidateId, createdAt])
 }
 
+model OwnerBillingProfile {
+  id                 String   @id @default(cuid())
+  legalName          String?
+  accountHolder      String?
+  address            String?
+  postalCode         String?
+  city               String?
+  country            String   @default("FR")
+  iban               String?
+  bic                String?
+  bankName           String?
+  invoiceEmail       String?
+  paymentInstructions String?
+  currency           String   @default("EUR")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
 model ContractTemplate {
   id          String   @id @default(cuid())
   key         String   @unique
