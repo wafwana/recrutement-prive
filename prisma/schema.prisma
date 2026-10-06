@@ -893,9 +893,9 @@ model ContactMeeting {
   startedAt            DateTime?
   endedAt              DateTime?
   durationMinutes      Int      @default(30)
-  priceHt              Float    @default(99)
+  priceHt              Float    @default(82.5)
   vatRate              Float    @default(20)
-  priceTtc             Float    @default(118.80)
+  priceTtc             Float    @default(99)
   currency             String   @default("EUR")
   paymentStatus        String   @default("PENDING")
   recordingNoticeShown Boolean  @default(false)
