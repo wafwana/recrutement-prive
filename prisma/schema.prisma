@@ -104,6 +104,7 @@ model User {
   disclosureRequestsDecided AnonymousDisclosureRequest[] @relation("DisclosureDecidedBy")
   videoSessionsCreated VideoSession[] @relation("VideoSessionCreatedBy")
   sourcedCandidates SourcedCandidate[]
+  outreachContactsSent OutreachContact[] @relation("CandidateOutreach")
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
   createdAt DateTime @default(now())
@@ -136,6 +137,7 @@ model CandidateProfile {
   presentations MissionPresentation[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  contactMeetings ContactMeeting[]
 
   @@index([primaryCategoryId])
 }
@@ -217,6 +219,8 @@ model Company {
   enterpriseSourcedOffers EnterpriseSourcedOffer[]
   presentations MissionPresentation[]
   recruitmentInvoices RecruitmentInvoice[]
+  outreachContacts OutreachContact[]
+  contactMeetings ContactMeeting[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -311,6 +315,7 @@ model MissionPresentation {
   conversations Conversation[]
   disclosureRequests AnonymousDisclosureRequest[]
   videoSessions VideoSession[]
+  contactMeetings ContactMeeting[]
   recruitmentInvoices RecruitmentInvoice[]
   @@unique([applicationId, companyId])
   @@index([missionId, companyId, state])
