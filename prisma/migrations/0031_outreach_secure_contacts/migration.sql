@@ -14,7 +14,7 @@ CREATE TABLE "ContactMeeting" (
   "scheduledAt" TIMESTAMP(3), "startedAt" TIMESTAMP(3), "endedAt" TIMESTAMP(3), "durationMinutes" INTEGER NOT NULL DEFAULT 30,
   "priceHt" DOUBLE PRECISION NOT NULL DEFAULT 82.5, "vatRate" DOUBLE PRECISION NOT NULL DEFAULT 20,
   "priceTtc" DOUBLE PRECISION NOT NULL DEFAULT 99, "currency" TEXT NOT NULL DEFAULT 'EUR',
-  "paymentStatus" TEXT NOT NULL DEFAULT 'PENDING', "recordingNoticeShown" BOOLEAN NOT NULL DEFAULT false,
+  "paymentStatus" TEXT NOT NULL DEFAULT 'PENDING', "paymentMethod" TEXT, "paymentProvider" TEXT, "paymentReference" TEXT, "checkoutUrl" TEXT, "paidAt" TIMESTAMP(3), "recordingNoticeShown" BOOLEAN NOT NULL DEFAULT false,
   "candidateConsentAt" TIMESTAMP(3), "companyConsentAt" TIMESTAMP(3), "recordingStartedAt" TIMESTAMP(3),
   "recordingEndedAt" TIMESTAMP(3), "recordingRef" TEXT, "decisionRequired" BOOLEAN NOT NULL DEFAULT false,
   "decisionStatus" TEXT NOT NULL DEFAULT 'PENDING', "decisionAt" TIMESTAMP(3), "decisionNotes" TEXT,
