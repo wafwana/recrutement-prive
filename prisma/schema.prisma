@@ -916,6 +916,11 @@ model ContactMeeting {
   priceTtc             Float    @default(99)
   currency             String   @default("EUR")
   paymentStatus        String   @default("PENDING")
+  paymentMethod        String?
+  paymentProvider      String?
+  paymentReference     String?
+  checkoutUrl          String?
+  paidAt               DateTime?
   recordingNoticeShown Boolean  @default(false)
   candidateConsentAt   DateTime?
   companyConsentAt     DateTime?
