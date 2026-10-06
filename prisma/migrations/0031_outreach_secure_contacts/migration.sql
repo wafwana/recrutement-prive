@@ -41,3 +41,21 @@ ALTER TABLE "OutreachContact" ADD CONSTRAINT "OutreachContact_candidateUserId_fk
 ALTER TABLE "ContactMeeting" ADD CONSTRAINT "ContactMeeting_presentationId_fkey" FOREIGN KEY ("presentationId") REFERENCES "MissionPresentation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "ContactMeeting" ADD CONSTRAINT "ContactMeeting_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "ContactMeeting" ADD CONSTRAINT "ContactMeeting_candidateId_fkey" FOREIGN KEY ("candidateId") REFERENCES "CandidateProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE TABLE "OwnerBillingProfile" (
+  "id" TEXT NOT NULL,
+  "legalName" TEXT,
+  "accountHolder" TEXT,
+  "address" TEXT,
+  "postalCode" TEXT,
+  "city" TEXT,
+  "country" TEXT NOT NULL DEFAULT 'FR',
+  "iban" TEXT,
+  "bic" TEXT,
+  "bankName" TEXT,
+  "invoiceEmail" TEXT,
+  "paymentInstructions" TEXT,
+  "currency" TEXT NOT NULL DEFAULT 'EUR',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "OwnerBillingProfile_pkey" PRIMARY KEY ("id")
+);
