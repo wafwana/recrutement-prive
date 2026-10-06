@@ -7,7 +7,8 @@ import { PHONE_COUNTRIES } from "@/lib/phone-countries";
 type Job = { id: string; title: string; location: string | null; status: string; attachmentName?: string | null; applications: { status: string }[] };
 type Category = { id: string; code: string; name: unknown; parentId: string | null; sortOrder: number };
 type Application = { id: string; status: string; job: { id: string; title: string } };
-type SecurePresentation = { id: string; alias: string | null; missionTitle: string; state: string; completedContacts: number; decisionRequired: boolean };\ntype CompanyIdentity = { name: string; siren: string | null; siret: string | null; legalForm: string | null; apeCode: string | null; address: string | null; website: string | null; country: string | null; phonePrefix: string | null; phone: string | null; description: string | null };
+type SecurePresentation = { id: string; alias: string | null; missionTitle: string; state: string; completedContacts: number; decisionRequired: boolean };
+type CompanyIdentity = { name: string; siren: string | null; siret: string | null; legalForm: string | null; apeCode: string | null; address: string | null; website: string | null; country: string | null; phonePrefix: string | null; phone: string | null; description: string | null };
 const applicationStatuses = ["SUBMITTED", "REVIEWING", "INTERVIEW", "SHORTLISTED", "REJECTED", "HIRED"] as const;
 
 function categoryName(name: unknown) { if (typeof name === "string") return name; if (name && typeof name === "object") { const value = name as Record<string, string>; return value.fr || value.en || Object.values(value)[0] || "Catégorie"; } return "Catégorie"; }
