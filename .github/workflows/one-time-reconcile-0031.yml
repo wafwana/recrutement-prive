@@ -37,3 +37,5 @@ jobs:
         run: npx prisma migrate status
       - name: Generate Prisma client
         run: npx prisma generate
+
+# Trigger reconciliation on this explicitly authorized main push.
