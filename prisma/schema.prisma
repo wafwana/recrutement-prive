@@ -104,6 +104,7 @@ model User {
   disclosureRequestsDecided AnonymousDisclosureRequest[] @relation("DisclosureDecidedBy")
   videoSessionsCreated VideoSession[] @relation("VideoSessionCreatedBy")
   sourcedCandidates SourcedCandidate[]
+  outreachContacts OutreachContact[] @relation("CandidateOutreach")
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
   createdAt DateTime @default(now())
@@ -136,6 +137,7 @@ model CandidateProfile {
   presentations MissionPresentation[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  contactMeetings ContactMeeting[]
 
   @@index([primaryCategoryId])
 }
@@ -217,6 +219,8 @@ model Company {
   enterpriseSourcedOffers EnterpriseSourcedOffer[]
   presentations MissionPresentation[]
   recruitmentInvoices RecruitmentInvoice[]
+  outreachContacts OutreachContact[]
+  contactMeetings ContactMeeting[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -311,6 +315,7 @@ model MissionPresentation {
   conversations Conversation[]
   disclosureRequests AnonymousDisclosureRequest[]
   videoSessions VideoSession[]
+  contactMeetings ContactMeeting[]
   recruitmentInvoices RecruitmentInvoice[]
   @@unique([applicationId, companyId])
   @@index([missionId, companyId, state])
@@ -687,6 +692,24 @@ model FinancialPayoutRequest {
 }
 
 
+model OwnerBillingProfile {
+  id String @id @default(cuid())
+  legalName String?
+  accountHolder String?
+  address String?
+  postalCode String?
+  city String?
+  country String @default("FR")
+  iban String?
+  bic String?
+  bankName String?
+  invoiceEmail String?
+  paymentInstructions String?
+  currency String @default("EUR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model RecruitmentBillingRule {
   id             String   @id @default(cuid())
   jobId          String
@@ -843,6 +866,97 @@ model PartnerHistory {
   @@index([partnerId, createdAt])
 }
 
+
+model OutreachContact {
+  id                String   @id @default(cuid())
+  recipientType     String
+  recipientEmail    String
+  recipientName     String?
+  companyId         String?
+  candidateUserId   String?
+  source            String?
+  campaignKey       String
+  status            String   @default("PENDING")
+  subject           String?
+  bodySnapshot      String?
+  providerMessageId String?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  bouncedAt         DateTime?
+  complainedAt      DateTime?
+  repliedAt         DateTime?
+  convertedAt       DateTime?
+  optedOutAt        DateTime?
+  lastError         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  candidateUser User? @relation("CandidateOutreach", fields: [candidateUserId], references: [id], onDelete: SetNull)
+
+  @@unique([recipientEmail, campaignKey])
+  @@index([recipientType, status, createdAt])
+  @@index([companyId, createdAt])
+  @@index([candidateUserId, createdAt])
+}
+
+model ContactMeeting {
+  id                  String   @id @default(cuid())
+  presentationId      String
+  companyId           String
+  candidateId         String
+  channel              String   @default("MESSAGING")
+  status               String   @default("REQUESTED")
+  scheduledAt          DateTime?
+  startedAt            DateTime?
+  endedAt              DateTime?
+  durationMinutes      Int      @default(30)
+  priceHt              Float    @default(82.5)
+  vatRate              Float    @default(20)
+  priceTtc             Float    @default(99)
+  currency             String   @default("EUR")
+  paymentStatus        String   @default("PENDING")
+  paymentMethod        String?
+  paymentProvider      String?
+  paymentReference     String?
+  checkoutUrl          String?
+  paidAt               DateTime?
+  recordingNoticeShown Boolean  @default(false)
+  candidateConsentAt   DateTime?
+  companyConsentAt     DateTime?
+  recordingStartedAt   DateTime?
+  recordingEndedAt     DateTime?
+  recordingRef         String?
+  decisionRequired     Boolean  @default(false)
+  decisionStatus       String   @default("PENDING")
+  decisionAt           DateTime?
+  decisionNotes        String?
+  securityDetails      Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  presentation MissionPresentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  candidate CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([presentationId, status, scheduledAt])
+  @@index([companyId, createdAt])
+  @@index([candidateId, createdAt])
+}
+
+model ContractTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  title       String
+  audience    String
+  version     String
+  active      Boolean  @default(true)
+  body        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([audience, active])
+}
 model FinancialOutflow {
   id                    String    @id @default(cuid())
   outflowNumber         String    @unique
