@@ -30,12 +30,14 @@ export async function createSecureContactCheckout(meetingId: string, companyUser
   const params = new URLSearchParams();
   params.set("mode", "payment");
   params.set("success_url", `${process.env.NEXTAUTH_URL || ""}/espace/entreprise/paiement/succes?meetingId=${meeting.id}`);
-  params.set("cancel_url", `${process.env.NEXTAUTH_URL || ""}/espace/entreprise/presentation/${meeting.presentation.missionId}`);
+  params.set("cancel_url", `${process.env.NEXTAUTH_URL || ""}/espace/entreprise/presentation/${meeting.presentation.id}`);
   params.set("line_items[0][price_data][currency]", "eur");
   params.set("line_items[0][price_data][product_data][name]", "Contact sécurisé Recrutement Privé — 30 minutes");
   params.set("line_items[0][price_data][product_data][description]", "Entretien interne sécurisé, 30 minutes, coordonnées protégées.");
   params.set("line_items[0][price_data][unit_amount]", String(SECURE_CONTACT_AMOUNT_CENTS));
   params.set("line_items[0][quantity]", "1");
+  const companyUser = await prisma.user.findUnique({ where: { id: companyUserId }, select: { email: true } });
+  if (companyUser?.email) params.set("customer_email", companyUser.email);
   params.set("metadata[meetingId]", meeting.id);
   params.set("metadata[companyId]", meeting.presentation.companyId);
   if (method === "SEPA_DEBIT") params.set("payment_method_types[0]", "sepa_debit");
