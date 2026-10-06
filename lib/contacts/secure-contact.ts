@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
 
 export const SECURE_CONTACT_MINUTES = 30;
-export const SECURE_CONTACT_PRICE_HT = 99;
+export const SECURE_CONTACT_PRICE_HT = 82.5;
 export const SECURE_CONTACT_VAT_RATE = 20;
-export const SECURE_CONTACT_PRICE_TTC = 118.8;
+export const SECURE_CONTACT_PRICE_TTC = 99;
 export const MAX_CONTACTS_BEFORE_DECISION = 3;
 
 export async function countCompletedContacts(presentationId: string) {
