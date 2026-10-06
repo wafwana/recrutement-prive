@@ -104,7 +104,7 @@ model User {
   disclosureRequestsDecided AnonymousDisclosureRequest[] @relation("DisclosureDecidedBy")
   videoSessionsCreated VideoSession[] @relation("VideoSessionCreatedBy")
   sourcedCandidates SourcedCandidate[]
-  outreachContactsSent OutreachContact[] @relation("CandidateOutreach")
+  outreachContacts OutreachContact[] @relation("CandidateOutreach")
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
   createdAt DateTime @default(now())
@@ -874,7 +874,7 @@ model OutreachContact {
   updatedAt         DateTime @updatedAt
 
   company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  candidateUser User? @relation(fields: [candidateUserId], references: [id], onDelete: SetNull)
+  candidateUser User? @relation("CandidateOutreach", fields: [candidateUserId], references: [id], onDelete: SetNull)
 
   @@unique([recipientEmail, campaignKey])
   @@index([recipientType, status, createdAt])
