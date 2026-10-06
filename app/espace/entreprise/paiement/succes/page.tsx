@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export default function SecurePaymentSuccessPage({ searchParams }: { searchParams: Promise<{ meetingId?: string }> }) {
+export default function SecurePaymentSuccessPage() {
   return (
     <main className="min-h-screen bg-[#081625] px-6 py-16 text-white">
       <div className="mx-auto max-w-2xl border border-white/10 bg-white/[0.03] p-10">
