@@ -25,7 +25,7 @@ export default async function OwnerContactsPage() {
         <header>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-orange-600">OWNER</p>
           <h1 className="mt-2 text-3xl font-bold text-slate-900">Outreach & Contacts sécurisés</h1>
-          <p className="mt-2 max-w-3xl text-slate-600">Premier contact automatisé, délivrabilité, entretiens internes à 99 € HT / 30 min, contrats et suivi des décisions.</p>
+          <p className="mt-2 max-w-3xl text-slate-600">Premier contact automatisé, délivrabilité, entretiens internes à 99 € TTC / 30 min, contrats et suivi des décisions.</p>
         </header>
         <section className="grid gap-4 md:grid-cols-4">
           {[
@@ -49,7 +49,7 @@ export default async function OwnerContactsPage() {
           <div className="rounded-2xl border bg-white p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-slate-900">Contact sécurisé</h2>
             <ul className="mt-4 space-y-2 text-sm text-slate-700">
-              <li>• 30 minutes — 99 € HT / 118,80 € TTC.</li>
+              <li>• 30 minutes — 99 € TTC / 82,50 € HT.</li>
               <li>• Messagerie interne ou visioconférence.</li>
               <li>• Aucun échange de coordonnées autorisé.</li>
               <li>• Après 3 contacts réalisés : décision entreprise obligatoire.</li>
