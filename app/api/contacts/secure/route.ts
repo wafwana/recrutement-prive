@@ -7,6 +7,7 @@ import { assertContactEligibility, completeContactMeeting, startContactMeeting, 
 const createSchema = z.object({ presentationId: z.string().min(1), channel: z.enum(["MESSAGING","VIDEO"]).default("MESSAGING"), scheduledAt: z.string().datetime().optional() });
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("authorize"), meetingId: z.string().min(1), approve: z.boolean() }),
+  z.object({ action: z.literal("confirm_transfer"), meetingId: z.string().min(1), reference: z.string().max(120).optional() }),
   z.object({ action: z.literal("consent"), meetingId: z.string().min(1), recordingConsent: z.boolean() }),
   z.object({ action: z.literal("start"), meetingId: z.string().min(1) }),
   z.object({ action: z.literal("complete"), meetingId: z.string().min(1) }),
@@ -48,6 +49,12 @@ export async function POST(request: Request) {
   const meeting = await participant(parsed.data.meetingId);
   if (!meeting) return NextResponse.json({ error: "Contact introuvable" }, { status: 404 });
 
+  if (parsed.data.action === "confirm_transfer") {
+    if (session.user.role !== "OWNER" && !(await import("@/lib/auth/permissions")).hasPermission(session.user.id, session.user.role, "FACTURATION")) return NextResponse.json({ error: "Confirmation financière réservée à l’OWNER ou à un ADMIN habilité à la facturation." }, { status: 403 });
+    const updated = await prisma.contactMeeting.update({ where: { id: meeting.id }, data: { paymentStatus: "PAID", paidAt: new Date(), paymentProvider: "MANUAL_INVOICE", paymentReference: parsed.data.reference || meeting.paymentReference } });
+    await prisma.auditLog.create({ data: { actorUserId: session.user.id, actorRole: session.user.role || "OWNER", action: "SECURE_CONTACT_PAYMENT_CONFIRMED", targetType: "CONTACT_MEETING", targetId: meeting.id, details: { method: "BANK_TRANSFER" } } });
+    return NextResponse.json({ meeting: updated });
+  }
   if (parsed.data.action === "authorize") {
     if (session.user.role !== "OWNER" && !(await import("@/lib/auth/permissions")).hasPermission(session.user.id, session.user.role, "PRESENTATIONS_MANAGE")) return NextResponse.json({ error: "Autorisation réservée à l’OWNER ou à un ADMIN explicitement habilité." }, { status: 403 });
     if (meeting.status !== "REQUESTED") return NextResponse.json({ error: "Ce contact n’est plus en attente d’autorisation." }, { status: 409 });
