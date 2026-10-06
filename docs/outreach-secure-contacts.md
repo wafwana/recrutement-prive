@@ -5,7 +5,7 @@
 - Envoi via le service email existant (Resend), sans activation automatique en production.
 - Délivrabilité: SPF, DKIM, DMARC, ramp-up, bounces, complaints, opt-out et anti-duplication.
 - Contact uniquement via une présentation active et les canaux internes.
-- 30 minutes, 99 € HT (118,80 € TTC à 20 %), facturation/paiement avant confirmation.
+- 30 minutes, 99 € TTC (99 € TTC à 20 %), facturation/paiement avant confirmation.
 - Après 3 contacts réalisés sur une présentation, décision entreprise obligatoire.
 - Messagerie TRUST_ANONYMOUS: aliases et blocage des coordonnées, URLs, réseaux sociaux et adresses.
 - Visio TRUST: WebRTC/TURN; aucune coordonnée directe exposée.
