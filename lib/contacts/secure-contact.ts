@@ -27,6 +27,7 @@ export async function startContactMeeting(meetingId: string, actorUserId: string
   const meeting = await prisma.contactMeeting.findUnique({ where: { id: meetingId }, include: { presentation: true } });
   if (!meeting) throw new Error("Contact introuvable.");
   if (meeting.presentation.candidateUserId !== actorUserId && meeting.presentation.companyUserId !== actorUserId) throw new Error("Accès refusé.");
+  if (meeting.status !== "CONFIRMED") throw new Error("Le cabinet doit d’abord autoriser ce contact.");
   if (meeting.paymentStatus !== "PAID") throw new Error("Le contact doit être réglé avant son démarrage.");
   if (meeting.status === "COMPLETED") throw new Error("Ce contact est déjà terminé.");
   if (meeting.candidateConsentAt === null || meeting.companyConsentAt === null) {
