@@ -37,7 +37,7 @@ export async function POST(request: Request) {
         companyConsentAt: companyConsent ? new Date() : null, candidateConsentAt: candidateConsent ? new Date() : null,
         securityDetails: { aliasesOnly: true, coordinateExchangeBlocked: true, maxMinutes: 30, contactNumber: completed + 1 },
       }});
-      await prisma.auditLog.create({ data: { actorUserId: session.user.id, actorRole: session.user.role || "CANDIDAT", action: "SECURE_CONTACT_REQUESTED", targetType: "CONTACT_MEETING", targetId: meeting.id, details: { presentationId: presentation.id, channel: meeting.channel, priceHt: 99, durationMinutes: 30 } } });
+      await prisma.auditLog.create({ data: { actorUserId: session.user.id, actorRole: session.user.role || "CANDIDAT", action: "SECURE_CONTACT_REQUESTED", targetType: "CONTACT_MEETING", targetId: meeting.id, details: { presentationId: presentation.id, channel: meeting.channel, priceHt: 82.5, priceTtc: 99, durationMinutes: 30 } } });
       return NextResponse.json({ meeting }, { status: 201 });
     } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Contact impossible" }, { status: 409 }); }
   }
