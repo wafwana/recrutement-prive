@@ -934,7 +934,7 @@ model ContractTemplate {
 
   @@index([audience, active])
 }
-\nmodel FinancialOutflow {
+model FinancialOutflow {
   id                    String    @id @default(cuid())
   outflowNumber         String    @unique
   operationDate         DateTime  @default(now())
