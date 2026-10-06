@@ -46,6 +46,27 @@ export default async function CompanyScopedPage({ params }: { params: Promise<{ 
     orderBy: { updatedAt: "desc" },
   });
 
+  const securePresentationsRaw = await prisma.missionPresentation.findMany({
+    where: {
+      companyId,
+      anonymousMessagingEnabled: true,
+      state: { notIn: ["IDENTITE_DEBLOQUEE", "MISSION_TERMINEE"] },
+    },
+    include: {
+      mission: { select: { title: true } },
+      contactMeetings: { select: { status: true, decisionRequired: true } },
+    },
+    orderBy: { presentedAt: "desc" },
+  });
+  const securePresentations = securePresentationsRaw.map((presentation) => ({
+    id: presentation.id,
+    alias: presentation.companyAlias || presentation.candidateAlias,
+    missionTitle: presentation.mission.title,
+    state: presentation.state,
+    completedContacts: presentation.contactMeetings.filter((meeting) => meeting.status === "COMPLETED").length,
+    decisionRequired: presentation.contactMeetings.some((meeting) => meeting.decisionRequired),
+  }));
+
   const applications = rawApplications.map((app) => {
     const presentation = app.presentations[0];
     const unlocked = Boolean(presentation && isIdentityUnlocked(presentation.state, presentation.financialConditionStatus));
@@ -79,7 +100,7 @@ export default async function CompanyScopedPage({ params }: { params: Promise<{ 
         </div>
         <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Rôle {membership.role}</p>
       </div>
-      <CompanyDashboard jobs={jobs} applications={applications} categories={categories} companyId={companyId} sourcingCountries={sourcingCountries} company={{ name: membership.company.name, siren: membership.company.siren, siret: membership.company.siret, legalForm: membership.company.legalForm, apeCode: membership.company.apeCode, address: membership.company.address, website: membership.company.website, country: membership.company.country, phonePrefix: membership.company.phonePrefix, phone: membership.company.phone, description: membership.company.description }} />
+      <CompanyDashboard jobs={jobs} applications={applications} categories={categories} companyId={companyId} sourcingCountries={sourcingCountries} company={{ name: membership.company.name, siren: membership.company.siren, siret: membership.company.siret, legalForm: membership.company.legalForm, apeCode: membership.company.apeCode, address: membership.company.address, website: membership.company.website, country: membership.company.country, phonePrefix: membership.company.phonePrefix, phone: membership.company.phone, description: membership.company.description }} securePresentations={securePresentations} />
     </section>
   );
 }
