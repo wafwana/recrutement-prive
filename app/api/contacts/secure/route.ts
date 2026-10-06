@@ -6,6 +6,7 @@ import { assertContactEligibility, completeContactMeeting, startContactMeeting, 
 
 const createSchema = z.object({ presentationId: z.string().min(1), channel: z.enum(["MESSAGING","VIDEO"]).default("MESSAGING"), scheduledAt: z.string().datetime().optional() });
 const actionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("authorize"), meetingId: z.string().min(1), approve: z.boolean() }),
   z.object({ action: z.literal("consent"), meetingId: z.string().min(1), recordingConsent: z.boolean() }),
   z.object({ action: z.literal("start"), meetingId: z.string().min(1) }),
   z.object({ action: z.literal("complete"), meetingId: z.string().min(1) }),
@@ -29,9 +30,7 @@ export async function POST(request: Request) {
       if (presentation.companyUserId !== session.user.id) return NextResponse.json({ error: "La demande de contact sécurisé doit être initiée par l’entreprise autorisée." }, { status: 403 });
       const existingOpen = await prisma.contactMeeting.findFirst({ where: { presentationId: presentation.id, status: { in: ["REQUESTED", "CONFIRMED", "ACTIVE"] } }, select: { id: true } });
       if (existingOpen) return NextResponse.json({ error: "Un contact sécurisé est déjà ouvert pour cette présentation." }, { status: 409 });
-      const companyConsent = parsed.data.companyConsent === true;
-      const candidateConsent = parsed.data.candidateConsent === true; = parsed.data.candidateConsent === true && presentation.candidateUserId === session.user.id;
-      const meeting = await prisma.contactMeeting.create({ data: {
+            const meeting = await prisma.contactMeeting.create({ data: {
         presentationId: presentation.id, companyId: presentation.companyId, candidateId: presentation.candidateId,
         channel: parsed.data.channel, scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
         durationMinutes: SECURE_CONTACT_MINUTES, priceHt: SECURE_CONTACT_PRICE_HT, priceTtc: SECURE_CONTACT_PRICE_TTC,
@@ -50,6 +49,14 @@ export async function POST(request: Request) {
   if (!meeting) return NextResponse.json({ error: "Contact introuvable" }, { status: 404 });
   if (meeting.presentation.candidateUserId !== session.user.id && meeting.presentation.companyUserId !== session.user.id) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
+  if (parsed.data.action === "authorize") {
+    if (session.user.role !== "OWNER" && !(await import("@/lib/auth/permissions")).hasPermission(session.user.id, session.user.role, "PRESENTATIONS_MANAGE")) return NextResponse.json({ error: "Autorisation réservée à l’OWNER ou à un ADMIN explicitement habilité." }, { status: 403 });
+    if (meeting.status !== "REQUESTED") return NextResponse.json({ error: "Ce contact n’est plus en attente d’autorisation." }, { status: 409 });
+    const status = parsed.data.approve ? "CONFIRMED" : "REJECTED";
+    const updated = await prisma.contactMeeting.update({ where: { id: meeting.id }, data: { status } });
+    await prisma.auditLog.create({ data: { actorUserId: session.user.id, actorRole: session.user.role || "OWNER", action: parsed.data.approve ? "SECURE_CONTACT_AUTHORIZED" : "SECURE_CONTACT_REJECTED", targetType: "CONTACT_MEETING", targetId: meeting.id, details: { delegatedAdmin: session.user.role === "ADMIN" } } });
+    return NextResponse.json({ meeting: updated });
+  }
   if (parsed.data.action === "start") {
     try {
       const updated = await startContactMeeting(meeting.id, session.user.id);
