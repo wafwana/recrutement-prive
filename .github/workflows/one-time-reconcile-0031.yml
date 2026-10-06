@@ -1,0 +1,39 @@
+name: One-time Prisma 0031 reconciliation
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    if: ${{ contains(github.event.head_commit.message, 'reconcile Prisma 0031 production history') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Normalize production Neon URL
+        env:
+          DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: |
+          test -n "$DATABASE_URL_PRODUCTION"
+          node - <<'NODE'
+          const fs = require('fs');
+          const url = new URL(process.env.DATABASE_URL_PRODUCTION);
+          url.hostname = url.hostname.replace(/-pooler(?=\.)/, '');
+          if (!url.searchParams.has('sslmode')) url.searchParams.set('sslmode', 'require');
+          fs.appendFileSync(process.env.GITHUB_ENV, 'DATABASE_URL=' + url.toString() + '\n');
+          NODE
+      - name: Resolve 0031 as applied after schema reconciliation
+        run: npx prisma migrate resolve --applied 0031_outreach_secure_contacts
+      - name: Verify migration deployment state
+        run: npx prisma migrate status
+      - name: Generate Prisma client
+        run: npx prisma generate
