@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import SecureContactPanel from "./SecureContactPanel";
 import DecisionPanel from "./DecisionPanel";
+import PaymentPanel from "./PaymentPanel";
 
 export default async function ExecutivePresentationPage({ params }: { params: Promise<{ presentationId: string }> }) {
   const session = await auth();
@@ -77,7 +78,7 @@ export default async function ExecutivePresentationPage({ params }: { params: Pr
 
         {skills.length > 0 && <section className="mt-6 border border-white/10 p-7"><p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Expertises détectées</p><div className="mt-5 flex flex-wrap gap-2">{skills.map(skill => <span key={skill} className="border border-white/10 px-3 py-2 text-xs text-white/60">{skill}</span>)}</div></section>}
 
-        <section className="mt-10">{completed < 3 ? <SecureContactPanel presentationId={presentation.id} completed={completed} /> : <DecisionPanel meetingId={presentation.contactMeetings.find((meeting) => meeting.status === "COMPLETED" && meeting.decisionRequired)?.id || presentation.contactMeetings[0]?.id || ""} />}</section>
+        <section className="mt-10">{completed < 3 ? (() => { const latest = presentation.contactMeetings[0]; if (latest?.status === "CONFIRMED" && latest.paymentStatus !== "PAID") return <PaymentPanel meetingId={latest.id} />; return <SecureContactPanel presentationId={presentation.id} completed={completed} />; })() : <DecisionPanel meetingId={presentation.contactMeetings.find((meeting) => meeting.status === "COMPLETED" && meeting.decisionRequired)?.id || presentation.contactMeetings[0]?.id || ""} />}</section>
 
         <section className="mt-8 border border-white/10 p-7">
           <p className="text-[10px] uppercase tracking-[0.25em] text-white/35">Historique sécurisé</p>
