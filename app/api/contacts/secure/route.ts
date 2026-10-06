@@ -2,17 +2,18 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { assertContactEligibility, completeContactMeeting, SECURE_CONTACT_MINUTES, SECURE_CONTACT_PRICE_HT, SECURE_CONTACT_PRICE_TTC } from "@/lib/contacts/secure-contact";
+import { assertContactEligibility, completeContactMeeting, startContactMeeting, SECURE_CONTACT_MINUTES, SECURE_CONTACT_PRICE_HT, SECURE_CONTACT_PRICE_TTC } from "@/lib/contacts/secure-contact";
 
 const createSchema = z.object({ presentationId: z.string().min(1), channel: z.enum(["MESSAGING","VIDEO"]).default("MESSAGING"), scheduledAt: z.string().datetime().optional(), candidateConsent: z.boolean().optional(), companyConsent: z.boolean().optional() });
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("consent"), meetingId: z.string().min(1), recordingConsent: z.boolean() }),
+  z.object({ action: z.literal("start"), meetingId: z.string().min(1) }),
   z.object({ action: z.literal("complete"), meetingId: z.string().min(1) }),
   z.object({ action: z.literal("decision"), meetingId: z.string().min(1), decisionStatus: z.enum(["RECRUIT","CONTINUE","CLOSE"]), decisionNotes: z.string().max(2000).optional() }),
 ]);
 
-async function participant(meetingId: string, userId: string) {
-  return prisma.contactMeeting.findUnique({ where: { id: meetingId }, include: { presentation: { select: { candidateUserId: true, companyUserId: true, state: true } } });
+async function participant(meetingId: string) {
+  return prisma.contactMeeting.findUnique({ where: { id: meetingId }, include: { presentation: { select: { candidateUserId: true, companyUserId: true, state: true } } } });
 }
 
 export async function POST(request: Request) {
@@ -28,7 +29,6 @@ export async function POST(request: Request) {
       if (presentation.candidateUserId !== session.user.id && presentation.companyUserId !== session.user.id) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
       const companyConsent = parsed.data.companyConsent === true && presentation.companyUserId === session.user.id;
       const candidateConsent = parsed.data.candidateConsent === true && presentation.candidateUserId === session.user.id;
-      if (!companyConsent && !candidateConsent) return NextResponse.json({ error: "Le contact doit être autorisé par le participant connecté et rester soumis au consentement des deux participants avant enregistrement." }, { status: 409 });
       const meeting = await prisma.contactMeeting.create({ data: {
         presentationId: presentation.id, companyId: presentation.companyId, candidateId: presentation.candidateId,
         channel: parsed.data.channel, scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
@@ -48,6 +48,14 @@ export async function POST(request: Request) {
   if (!meeting) return NextResponse.json({ error: "Contact introuvable" }, { status: 404 });
   if (meeting.presentation.candidateUserId !== session.user.id && meeting.presentation.companyUserId !== session.user.id) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
+  if (parsed.data.action === "start") {
+    try {
+      const updated = await startContactMeeting(meeting.id, session.user.id);
+      return NextResponse.json({ meeting: updated });
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Démarrage impossible" }, { status: 409 });
+    }
+  }
   if (parsed.data.action === "consent") {
     const data = meeting.presentation.candidateUserId === session.user.id ? { candidateConsentAt: parsed.data.recordingConsent ? new Date() : null } : { companyConsentAt: parsed.data.recordingConsent ? new Date() : null };
     const updated = await prisma.contactMeeting.update({ where: { id: meeting.id }, data: { ...data, recordingNoticeShown: true } });
