@@ -4,7 +4,7 @@ export const SECURE_CONTACT_CONTRACT_TEMPLATES = [
     audience: "ENTREPRISE",
     title: "Conditions du contact sécurisé — entreprise",
     version: "1.0",
-    body: "Objet : accès à un entretien de 30 minutes via Recrutement Privé. Tarif : 99 € HT par contact. Les échanges doivent rester dans la plateforme. Toute tentative de transmission de coordonnées peut entraîner la suspension du canal.",
+    body: "Objet : accès à un entretien de 30 minutes via Recrutement Privé. Tarif : 99 € TTC par contact (82,50 € HT à 20 % de TVA). Les échanges doivent rester dans la plateforme. Toute tentative de transmission de coordonnées peut entraîner la suspension du canal.",
   },
   {
     key: "CANDIDAT_CONTACT",
