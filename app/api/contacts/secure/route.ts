@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ meeting: updated });
   }
   if (parsed.data.action === "authorize") {
-    if (session.user.role !== "OWNER" && !(await import("@/lib/auth/permissions")).hasPermission(session.user.id, session.user.role, "PRESENTATIONS_MANAGE")) return NextResponse.json({ error: "Autorisation réservée à l’OWNER ou à un ADMIN explicitement habilité." }, { status: 403 });
+    if (session.user.role !== "OWNER" && !(await import("@/lib/auth/permissions")).hasPermission(session.user.id, session.user.role, "SECURE_CONTACTS_AUTHORIZE")) return NextResponse.json({ error: "Autorisation réservée à l’OWNER ou à un ADMIN explicitement habilité." }, { status: 403 });
     if (meeting.status !== "REQUESTED") return NextResponse.json({ error: "Ce contact n’est plus en attente d’autorisation." }, { status: 409 });
     const status = parsed.data.approve ? "CONFIRMED" : "REJECTED";
     const updated = await prisma.contactMeeting.update({ where: { id: meeting.id }, data: { status } });
