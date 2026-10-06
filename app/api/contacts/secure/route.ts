@@ -47,7 +47,6 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Action invalide" }, { status: 400 });
   const meeting = await participant(parsed.data.meetingId);
   if (!meeting) return NextResponse.json({ error: "Contact introuvable" }, { status: 404 });
-  if (meeting.presentation.candidateUserId !== session.user.id && meeting.presentation.companyUserId !== session.user.id) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
   if (parsed.data.action === "authorize") {
     if (session.user.role !== "OWNER" && !(await import("@/lib/auth/permissions")).hasPermission(session.user.id, session.user.role, "PRESENTATIONS_MANAGE")) return NextResponse.json({ error: "Autorisation réservée à l’OWNER ou à un ADMIN explicitement habilité." }, { status: 403 });
@@ -57,6 +56,7 @@ export async function POST(request: Request) {
     await prisma.auditLog.create({ data: { actorUserId: session.user.id, actorRole: session.user.role || "OWNER", action: parsed.data.approve ? "SECURE_CONTACT_AUTHORIZED" : "SECURE_CONTACT_REJECTED", targetType: "CONTACT_MEETING", targetId: meeting.id, details: { delegatedAdmin: session.user.role === "ADMIN" } } });
     return NextResponse.json({ meeting: updated });
   }
+  if (meeting.presentation.candidateUserId !== session.user.id && meeting.presentation.companyUserId !== session.user.id) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   if (parsed.data.action === "start") {
     try {
       const updated = await startContactMeeting(meeting.id, session.user.id);
