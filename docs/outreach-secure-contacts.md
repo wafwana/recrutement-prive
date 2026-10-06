@@ -27,3 +27,12 @@ Ces modèles sont fonctionnels et doivent être validés juridiquement avant sig
 - Pas de candidature/contact direct créé automatiquement par le matching.
 - Envoi email idempotent; bounce/complaint/opt-out bloquent les futurs envois.
 - Aucun secret dans les logs.
+
+
+## Paiement entreprise
+
+Le contact sécurisé est facturé 99 € TTC (82,50 € HT + 20 % TVA). Trois modes sont préparés : carte bancaire via Stripe Checkout, prélèvement SEPA via Stripe, ou virement bancaire avec confirmation financière contrôlée. L'entreprise ne peut initier le paiement qu'après autorisation du cabinet. Le contact ne peut démarrer que lorsque `paymentStatus=PAID`.
+
+Variables nécessaires pour activer les paiements en ligne : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, et `NEXTAUTH_URL`. Aucun paiement réel n'est simulé en l'absence de ces variables. Le webhook Stripe vérifie sa signature avant toute écriture.
+
+Le virement bancaire reste volontairement soumis à confirmation par l'OWNER ou un ADMIN possédant la permission dédiée `FACTURATION`. L'autorisation du contact elle-même reste une permission distincte `SECURE_CONTACTS_AUTHORIZE`.
