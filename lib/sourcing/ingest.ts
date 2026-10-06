@@ -385,7 +385,7 @@ async function ingestPlatformCvthequeCandidates(actorUserId: string, options?: {
     }
   }
 
-  return { fetched: batch.length, sourceTotal: candidates.length, batchLimit: maxItems, created, updated };
+  return { fetched: candidateBatch.length, sourceTotal: candidates.length, batchLimit: maxItems, created, updated };
 }
 
 export async function ingestGlobalCandidates(params: {
