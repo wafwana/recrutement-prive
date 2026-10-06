@@ -12,7 +12,7 @@ test("secure contact commercial rules are fixed", () => {
 
 test("required secure contact contract templates exist", () => {
   const keys = SECURE_CONTACT_CONTRACT_TEMPLATES.map((item) => item.key);
-  for (const key of ["ENTREPRISE_CONTACT","CANDIDAT_CONTACT","INTERVIEW_SECURE","ANTI_CIRCUMVENTION","RECORDING_CONSENT","SECURE_CHANNEL_POLICY"]) {
+  for (const key of ["ENTREPRISE_CONTACT","CANDIDAT_CONTACT","INTERVIEW_SECURE","ANTI_CIRCUMVENTION","RECORDING_CONSENT","SECURE_CHANNEL_POLICY"] as const) {
     assert.ok(keys.includes(key));
   }
 });
