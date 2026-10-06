@@ -23,10 +23,38 @@ export async function assertContactEligibility(presentationId: string) {
   return { presentation, completed };
 }
 
+export async function startContactMeeting(meetingId: string, actorUserId: string) {
+  const meeting = await prisma.contactMeeting.findUnique({ where: { id: meetingId }, include: { presentation: true } });
+  if (!meeting) throw new Error("Contact introuvable.");
+  if (meeting.presentation.candidateUserId !== actorUserId && meeting.presentation.companyUserId !== actorUserId) throw new Error("Accès refusé.");
+  if (meeting.paymentStatus !== "PAID") throw new Error("Le contact doit être réglé avant son démarrage.");
+  if (meeting.status === "COMPLETED") throw new Error("Ce contact est déjà terminé.");
+  if (meeting.candidateConsentAt === null || meeting.companyConsentAt === null) {
+    // The meeting may start without recording. Recording is a separate, two-party consented feature.
+    return prisma.contactMeeting.update({ where: { id: meetingId }, data: { status: "ACTIVE", startedAt: meeting.startedAt ?? new Date() } });
+  }
+  return prisma.contactMeeting.update({
+    where: { id: meetingId },
+    data: { status: "ACTIVE", startedAt: meeting.startedAt ?? new Date(), recordingStartedAt: new Date() },
+  });
+}
+
 export async function completeContactMeeting(meetingId: string, actorUserId: string) {
   const meeting = await prisma.contactMeeting.findUnique({ where: { id: meetingId }, include: { presentation: true } });
   if (!meeting) throw new Error("Contact introuvable.");
   if (meeting.presentation.candidateUserId !== actorUserId && meeting.presentation.companyUserId !== actorUserId) throw new Error("Accès refusé.");
-  const updated = await prisma.contactMeeting.update({ where: { id: meetingId }, data: { status: "COMPLETED", endedAt: new Date(), decisionRequired: (await countCompletedContacts(meeting.presentationId)) + 1 >= MAX_CONTACTS_BEFORE_DECISION } });
+  if (!meeting.startedAt) throw new Error("Le contact n'a pas commencé.");
+  const now = new Date();
+  const minEnd = new Date(meeting.startedAt.getTime() + meeting.durationMinutes * 60_000);
+  if (now < minEnd) throw new Error("Le contact de 30 minutes ne peut être clôturé avant sa durée prévue.");
+  const updated = await prisma.contactMeeting.update({
+    where: { id: meetingId },
+    data: {
+      status: "COMPLETED",
+      endedAt: now,
+      recordingEndedAt: meeting.recordingStartedAt ? now : null,
+      decisionRequired: (await countCompletedContacts(meeting.presentationId)) + 1 >= MAX_CONTACTS_BEFORE_DECISION,
+    },
+  });
   return updated;
 }
