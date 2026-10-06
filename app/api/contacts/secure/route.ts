@@ -26,9 +26,11 @@ export async function POST(request: Request) {
     if (!parsed.success) return NextResponse.json({ error: "Demande invalide" }, { status: 400 });
     try {
       const { presentation, completed } = await assertContactEligibility(parsed.data.presentationId);
-      if (presentation.candidateUserId !== session.user.id && presentation.companyUserId !== session.user.id) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-      const companyConsent = parsed.data.companyConsent === true && presentation.companyUserId === session.user.id;
-      const candidateConsent = parsed.data.candidateConsent === true && presentation.candidateUserId === session.user.id;
+      if (presentation.companyUserId !== session.user.id) return NextResponse.json({ error: "La demande de contact sécurisé doit être initiée par l’entreprise autorisée." }, { status: 403 });
+      const existingOpen = await prisma.contactMeeting.findFirst({ where: { presentationId: presentation.id, status: { in: ["REQUESTED", "CONFIRMED", "ACTIVE"] } }, select: { id: true } });
+      if (existingOpen) return NextResponse.json({ error: "Un contact sécurisé est déjà ouvert pour cette présentation." }, { status: 409 });
+      const companyConsent = parsed.data.companyConsent === true;
+      const candidateConsent = parsed.data.candidateConsent === true; = parsed.data.candidateConsent === true && presentation.candidateUserId === session.user.id;
       const meeting = await prisma.contactMeeting.create({ data: {
         presentationId: presentation.id, companyId: presentation.companyId, candidateId: presentation.candidateId,
         channel: parsed.data.channel, scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
