@@ -5,8 +5,8 @@ import { SECURE_CONTACT_CONTRACT_TEMPLATES } from "../lib/contracts/secure-conta
 
 test("secure contact commercial rules are fixed", () => {
   assert.equal(SECURE_CONTACT_MINUTES, 30);
-  assert.equal(SECURE_CONTACT_PRICE_HT, 99);
-  assert.equal(SECURE_CONTACT_PRICE_TTC, 118.8);
+  assert.equal(SECURE_CONTACT_PRICE_HT, 82.5);
+  assert.equal(SECURE_CONTACT_PRICE_TTC, 99);
   assert.equal(MAX_CONTACTS_BEFORE_DECISION, 3);
 });
 
