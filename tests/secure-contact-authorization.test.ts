@@ -16,7 +16,7 @@ test("secure contact requests require cabinet authorization before activation", 
 test("authorization is OWNER-first with delegated admin capability", () => {
   const route = fs.readFileSync(path.join(root, "app/api/contacts/secure/route.ts"), "utf8");
   assert.match(route, /session\.user\.role !== "OWNER"/);
-  assert.match(route, /"PRESENTATIONS_MANAGE"/);
+  assert.match(route, /"SECURE_CONTACTS_AUTHORIZE"/);
   assert.match(route, /delegatedAdmin: session\.user\.role === "ADMIN"/);
 });
 
