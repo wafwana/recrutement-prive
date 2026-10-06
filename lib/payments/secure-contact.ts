@@ -13,7 +13,7 @@ export function isSecureContactPaymentMethod(value: string): value is SecureCont
 export async function createSecureContactCheckout(meetingId: string, companyUserId: string, method: SecureContactPaymentMethod) {
   const meeting = await prisma.contactMeeting.findUnique({
     where: { id: meetingId },
-    include: { presentation: { select: { companyUserId: true, companyId: true, missionId: true } } },
+    include: { presentation: { select: { id: true, companyUserId: true, companyId: true, missionId: true } } },
   });
   if (!meeting) throw new Error("Contact introuvable.");
   if (meeting.presentation.companyUserId !== companyUserId) throw new Error("Le paiement doit être initié par l'entreprise autorisée.");
