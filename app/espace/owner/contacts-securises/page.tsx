@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import AuthorizationQueue from "./AuthorizationQueue";
 
 const stages = [
   ["01", "Identification", "Le cabinet repère et qualifie les profils pertinents."],
@@ -14,12 +15,13 @@ const stages = [
 export default async function OwnerContactsPage() {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== "OWNER") redirect("/connexion");
-  const [pending, sent, meetings, decisions, completed] = await Promise.all([
+  const [pending, sent, meetings, decisions, completed, authorizationRows] = await Promise.all([
     prisma.outreachContact.count({ where: { status: { in: ["PENDING","QUEUED"] } } }),
     prisma.outreachContact.count({ where: { status: { in: ["SENT","DELIVERED"] } } }),
     prisma.contactMeeting.count({ where: { status: { in: ["REQUESTED","CONFIRMED","ACTIVE"] } } }),
     prisma.contactMeeting.count({ where: { decisionRequired: true } }),
     prisma.contactMeeting.count({ where: { status: "COMPLETED" } }),
+    prisma.contactMeeting.findMany({ where: { status: "REQUESTED" }, include: { presentation: { select: { candidateAlias: true } } }, orderBy: { createdAt: "asc" }, take: 50 }),
   ]);
   return (
     <main className="min-h-screen bg-[#081625] p-6 text-slate-100 md:p-10">
@@ -37,6 +39,8 @@ export default async function OwnerContactsPage() {
             <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">3 contacts → décision</span>
           </div>
         </header>
+
+        <AuthorizationQueue meetings={authorizationRows.map((meeting) => ({ id: meeting.id, alias: meeting.presentation.candidateAlias, channel: meeting.channel, createdAt: meeting.createdAt.toISOString() }))} />
 
         <section className="grid gap-4 md:grid-cols-5">
           {[["À qualifier",pending],["Délivrés",sent],["Contacts ouverts",meetings],["Contacts réalisés",completed],["Décisions attendues",decisions]].map(([label,value]) =>
