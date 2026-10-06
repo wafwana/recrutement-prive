@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { assertContactEligibility, completeContactMeeting, startContactMeeting, SECURE_CONTACT_MINUTES, SECURE_CONTACT_PRICE_HT, SECURE_CONTACT_PRICE_TTC } from "@/lib/contacts/secure-contact";
 
-const createSchema = z.object({ presentationId: z.string().min(1), channel: z.enum(["MESSAGING","VIDEO"]).default("MESSAGING"), scheduledAt: z.string().datetime().optional(), candidateConsent: z.boolean().optional(), companyConsent: z.boolean().optional() });
+const createSchema = z.object({ presentationId: z.string().min(1), channel: z.enum(["MESSAGING","VIDEO"]).default("MESSAGING"), scheduledAt: z.string().datetime().optional() });
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("consent"), meetingId: z.string().min(1), recordingConsent: z.boolean() }),
   z.object({ action: z.literal("start"), meetingId: z.string().min(1) }),
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         channel: parsed.data.channel, scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
         durationMinutes: SECURE_CONTACT_MINUTES, priceHt: SECURE_CONTACT_PRICE_HT, priceTtc: SECURE_CONTACT_PRICE_TTC,
         paymentStatus: "PENDING", recordingNoticeShown: true,
-        companyConsentAt: companyConsent ? new Date() : null, candidateConsentAt: candidateConsent ? new Date() : null,
+        companyConsentAt: null, candidateConsentAt: null,
         securityDetails: { aliasesOnly: true, coordinateExchangeBlocked: true, maxMinutes: 30, contactNumber: completed + 1 },
       }});
       await prisma.auditLog.create({ data: { actorUserId: session.user.id, actorRole: session.user.role || "CANDIDAT", action: "SECURE_CONTACT_REQUESTED", targetType: "CONTACT_MEETING", targetId: meeting.id, details: { presentationId: presentation.id, channel: meeting.channel, priceHt: 82.5, priceTtc: 99, durationMinutes: 30 } } });
