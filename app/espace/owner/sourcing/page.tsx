@@ -135,21 +135,28 @@ export default async function OwnerSourcingPage() {
             <p className="mt-2 max-w-3xl text-xs leading-6 text-white/45">La provenance est visible au niveau de la source. Le matching est une étape distincte : il rapproche une offre et des profils et affiche un score, sans confondre collecte et sélection.</p>
           </div>
         </div>
-        <div className="mt-6 grid gap-3 md:grid-cols-5">
+        <nav aria-label="Navigation du pipeline de sourcing" className="mt-6 grid gap-3 md:grid-cols-5">
           {[
-            ["01","SOURCES","Origine des données","text-[#c7a15a]"],
-            ["02","SOURCING","Collecte / détection","text-[#F97316]"],
-            ["03","QUALIFICATION","Analyse / classement","text-white"],
-            ["04","MATCHING","Offre ↔ candidat","text-[#F97316]"],
-            ["05","VIVIER","Profils retenus","text-[#c7a15a]"],
-          ].map(([step,title,desc,color]) => (
-            <div key={step} className="border border-white/10 bg-[#111] p-4">
+            ["01","SOURCES","Origine des données","/espace/owner/sourcing/sources","text-[#c7a15a]"],
+            ["02","SOURCING","Collecte / détection","/espace/owner/sourcing/sourcing","text-[#F97316]"],
+            ["03","QUALIFICATION","Analyse / classement","/espace/owner/sourcing/qualification","text-white"],
+            ["04","MATCHING","Offre ↔ candidat","/espace/owner/sourcing/matching","text-[#F97316]"],
+            ["05","VIVIER","Profils retenus","/espace/owner/offres-vivier","text-[#c7a15a]"],
+          ].map(([step,title,desc,href,color]) => (
+            <a
+              key={step}
+              href={href}
+              className="group scroll-mt-28 border border-white/10 bg-[#111] p-4 transition hover:-translate-y-0.5 hover:border-[#c7a15a]/60 hover:bg-[#151515] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7a15a]"
+            >
               <p className="text-[10px] tracking-[0.18em] text-white/25">{step}</p>
               <p className={`mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] ${color}`}>{title}</p>
               <p className="mt-2 text-xs leading-5 text-white/45">{desc}</p>
-            </div>
+              <p className="mt-3 text-[9px] uppercase tracking-[0.16em] text-white/25 transition group-hover:text-white/60">
+                "Ouvrir la vue →"
+              </p>
+            </a>
           ))}
-        </div>
+        </nav>
       </section>
 
       {/* Main Content Sections */}
