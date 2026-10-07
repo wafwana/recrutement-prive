@@ -177,7 +177,7 @@ export default function CandidateSourcingClient({
   return (
     <div className="space-y-8">
       {/* Sources management box */}
-      <div className="border border-white/10 bg-[#111] p-5 space-y-4">
+      <div id="pipeline-sources" className="scroll-mt-28 border border-white/10 bg-[#111] p-5 space-y-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <h3 className="text-sm font-medium text-white">Gestion des sources candidats HTTPS</h3>
@@ -266,6 +266,14 @@ export default function CandidateSourcingClient({
         du staff RP.
       </div>
 
+      {/* Sourcing controls */}
+      <div id="pipeline-sourcing" className="scroll-mt-28 border border-white/10 bg-[#111] p-4">
+        <p className="text-[10px] uppercase tracking-[0.22em] text-[#F97316]">02 · Sourcing</p>
+        <p className="mt-1 text-xs leading-5 text-white/45">
+          Définissez les critères de collecte puis lancez un sourcing manuel. Le moteur automatique continue de fonctionner selon sa planification.
+        </p>
+      </div>
+
       {/* Filters and Search Bar */}
       <div className="grid grid-cols-1 gap-4 border border-white/10 bg-[#111] p-5 md:grid-cols-5">
         <div>
@@ -336,8 +344,17 @@ export default function CandidateSourcingClient({
 
       {runMessage && <p className="text-xs text-[#c7a15a]">{runMessage}</p>}
 
-      {/* Candidate List Table */}
-      <div className="overflow-hidden border border-white/10">
+      {/* Qualification */}
+      <section id="pipeline-qualification" className="scroll-mt-28 border border-white/10 bg-[#0d0d0d] p-5">
+        <p className="text-[10px] uppercase tracking-[0.22em] text-white/45">03 · Qualification</p>
+        <h3 className="mt-2 font-serif text-xl text-white">Profils à analyser et classer</h3>
+        <p className="mt-2 text-xs leading-5 text-white/45">
+          Utilisez les filtres ci-dessus pour examiner les profils, leur provenance, leurs compétences et leur statut de traitement avant validation RP.
+        </p>
+      </section>
+
+      {/* Candidate List Table / Matching */}
+      <div id="pipeline-matching" className="scroll-mt-28 overflow-hidden border border-white/10">
         <div className="grid grid-cols-1 border-b border-white/10 bg-[#111] px-5 py-4 text-[10px] uppercase tracking-[0.16em] text-white/35 md:grid-cols-[2fr_1.2fr_1.2fr_1fr_1.2fr]">
           <span>Profil / Intitulé</span>
           <span>Localisation</span>
