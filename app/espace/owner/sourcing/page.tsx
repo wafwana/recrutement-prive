@@ -137,10 +137,10 @@ export default async function OwnerSourcingPage() {
         </div>
         <nav aria-label="Navigation du pipeline de sourcing" className="mt-6 grid gap-3 md:grid-cols-5">
           {[
-            ["01","SOURCES","Origine des données","#pipeline-sources","text-[#c7a15a]"],
-            ["02","SOURCING","Collecte / détection","#pipeline-sourcing","text-[#F97316]"],
-            ["03","QUALIFICATION","Analyse / classement","#pipeline-qualification","text-white"],
-            ["04","MATCHING","Offre ↔ candidat","#pipeline-matching","text-[#F97316]"],
+            ["01","SOURCES","Origine des données","/espace/owner/sourcing/sources","text-[#c7a15a]"],
+            ["02","SOURCING","Collecte / détection","/espace/owner/sourcing/sourcing","text-[#F97316]"],
+            ["03","QUALIFICATION","Analyse / classement","/espace/owner/sourcing/qualification","text-white"],
+            ["04","MATCHING","Offre ↔ candidat","/espace/owner/sourcing/matching","text-[#F97316]"],
             ["05","VIVIER","Profils retenus","/espace/owner/offres-vivier","text-[#c7a15a]"],
           ].map(([step,title,desc,href,color]) => (
             <a
@@ -152,7 +152,7 @@ export default async function OwnerSourcingPage() {
               <p className={`mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] ${color}`}>{title}</p>
               <p className="mt-2 text-xs leading-5 text-white/45">{desc}</p>
               <p className="mt-3 text-[9px] uppercase tracking-[0.16em] text-white/25 transition group-hover:text-white/60">
-                {title === "VIVIER" ? "Ouvrir la vue →" : "Accéder directement ↓"}
+                "Ouvrir la vue →"
               </p>
             </a>
           ))}
