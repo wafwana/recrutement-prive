@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
+import BackButton from "@/components/navigation/BackButton";
 
 export default async function SourcingMatchingPage() {
   const session = await auth();
@@ -11,6 +12,7 @@ export default async function SourcingMatchingPage() {
   const candidates = await prisma.sourcedCandidate.findMany({ where: { matchingScore: { not: null } }, orderBy: [{ matchingScore: "desc" }], take: 100, select: { id: true, name: true, headline: true, location: true, skills: true, matchingScore: true, source: true } });
   const average = candidates.length ? Math.round(candidates.reduce((sum, c) => sum + (c.matchingScore || 0), 0) / candidates.length) : null;
   return <section className="mx-auto w-[min(1280px,calc(100%-40px))] py-12 md:py-20">
+    <BackButton fallback="/espace/owner/sourcing" />
     <p className="text-[10px] uppercase tracking-[0.35em] text-[#F97316]">04 · Matching</p>
     <h1 className="mt-3 font-serif text-4xl text-white">Correspondances candidats ↔ offres</h1>
     <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">Visualisez les profils pour lesquels le moteur a déjà calculé une correspondance. Le score priorise l'analyse humaine et ne déclenche aucune prise de contact automatique.</p>
