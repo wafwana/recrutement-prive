@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
+import BackButton from "@/components/navigation/BackButton";
 
 export default async function SourcingQualificationPage() {
   const session = await auth();
@@ -10,6 +11,7 @@ export default async function SourcingQualificationPage() {
   if (!(await hasPermission(session.user.id, session.user.role, "SOURCING"))) redirect(fallback);
   const candidates = await prisma.sourcedCandidate.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, headline: true, location: true, skills: true, status: true, matchingScore: true, source: true } });
   return <section className="mx-auto w-[min(1280px,calc(100%-40px))] py-12 md:py-20">
+    <BackButton fallback="/espace/owner/sourcing" />
     <p className="text-[10px] uppercase tracking-[0.35em] text-white/45">03 · Qualification</p>
     <h1 className="mt-3 font-serif text-4xl text-white">Qualification des profils</h1>
     <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">Visualisez les profils réellement présents dans le sourcing, avec statut, compétences, provenance et score lorsqu'un matching existe.</p>
