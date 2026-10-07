@@ -70,8 +70,21 @@ export default async function OwnerPage() {
       {owner && <div className="mt-6 border border-[#c7a15a]/20 bg-[#111] px-5 py-4 text-xs text-white/45">Compte Owner actif : <span className="text-white/75">{owner.name || "Owner Recrutement Privé"}</span> · {owner.email}</div>}
 
       <div className="mt-10 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
-        {[["Candidats", candidates],["CV / documents", documents],["Entreprises", companies.length],["Offres ouvertes", openJobs],["Candidatures", applications.length],["Profils sourcés", sourcedCandidates.length],["Matching ≥ 80", highMatches],["Paramètres système", settings]].map(([label, value]) => (
-          <div key={String(label)} className="bg-[#111] p-6"><span className="text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</span><p className="mt-4 font-serif text-3xl text-[#c7a15a]">{value}</p></div>
+        {[
+          ["Candidats", candidates, "/espace/documents/cv-library", "Ouvrir la bibliothèque CV"],
+          ["CV / documents", documents, "/espace/documents", "Ouvrir les documents"],
+          ["Entreprises", companies.length, "/espace/owner/entreprises", "Ouvrir les entreprises"],
+          ["Offres ouvertes", openJobs, "/espace/owner/offres", "Ouvrir les offres"],
+          ["Candidatures", applications.length, "/espace/owner/cv-matching", "Ouvrir le suivi"],
+          ["Profils sourcés", sourcedCandidates.length, "/espace/owner/sourcing", "Ouvrir le sourcing"],
+          ["Matching ≥ 80", highMatches, "/espace/owner/cv-matching", "Ouvrir le matching"],
+          ["Paramètres système", settings, "/owner/permissions", "Ouvrir les permissions"],
+        ].map(([label, value, href, action]) => (
+          <Link key={String(label)} href={String(href)} className="group block bg-[#111] p-6 transition hover:bg-[#151515] focus:outline-none focus:ring-1 focus:ring-[#c7a15a]">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</span>
+            <p className="mt-4 font-serif text-3xl text-[#c7a15a]">{value}</p>
+            <span className="mt-3 block text-[9px] uppercase tracking-[0.14em] text-white/25 transition group-hover:text-[#c7a15a]">{action} →</span>
+          </Link>
         ))}
       </div>
 
