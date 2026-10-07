@@ -67,8 +67,7 @@ export default async function CandidatPage() {
         {stats.map(([label, value, description]) => (
           <div key={label} className="bg-[#111] p-7">
             <span className="text-[10px] uppercase tracking-[0.22em] text-white/40">{label}</span>
-            <p className="mt-6 font-serif text-3xl text-[#c7a15a]">{value}</p>
-            <p className="mt-3 text-sm text-white/45">{description}</p>
+            {label === "Dossiers" ? <Link href="/espace/candidat/candidatures" className="block group"><p className="mt-6 font-serif text-3xl text-[#c7a15a]">{value}</p><p className="mt-3 text-sm text-white/45">{description}</p><span className="mt-3 block text-[9px] uppercase tracking-[0.14em] text-white/25 group-hover:text-[#c7a15a]">Ouvrir les candidatures →</span></Link> : <><p className="mt-6 font-serif text-3xl text-[#c7a15a]">{value}</p><p className="mt-3 text-sm text-white/45">{description}</p></>}
           </div>
         ))}
       </div>
