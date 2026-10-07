@@ -131,36 +131,36 @@ export default async function AdminPage() {
       </div>
 
       {/* Summary KPI grid - displays ONLY KPIs for authorized modules */}
-      <div className="mt-12 grid gap-px bg-white/10 md:grid-cols-4">
+      <div id="admin-kpis" className="mt-12 grid gap-px bg-white/10 md:grid-cols-4">
         {(canViewCandidates || isOwner) && (
-          <div className="bg-[#111] p-7">
+          <Link href="#candidats" className="bg-[#111] p-7 transition hover:bg-[#171717]">
             <span className="text-[10px] uppercase tracking-[0.22em] text-white/40">Utilisateurs / Candidates</span>
-            <p className="mt-6 font-serif text-4xl text-[#c7a15a]">{users.length}</p>
-          </div>
+            <p className="mt-6 font-serif text-4xl text-[#c7a15a]">{users.length}</p><span className="mt-3 block text-[10px] uppercase tracking-[0.14em] text-white/30">Voir les utilisateurs →</span>
+          </Link>
         )}
         {(canManageCompanies || isOwner) && (
-          <div className="bg-[#111] p-7">
+          <Link href="#entreprises" className="bg-[#111] p-7 transition hover:bg-[#171717]">
             <span className="text-[10px] uppercase tracking-[0.22em] text-white/40">Entreprises</span>
-            <p className="mt-6 font-serif text-4xl text-[#c7a15a]">{companies.length}</p>
-          </div>
+            <p className="mt-6 font-serif text-4xl text-[#c7a15a]">{companies.length}</p><span className="mt-3 block text-[10px] uppercase tracking-[0.14em] text-white/30">Voir les entreprises →</span>
+          </Link>
         )}
         {(canManageJobs || isOwner) && (
-          <div className="bg-[#111] p-7">
+          <Link href="#offres" className="bg-[#111] p-7 transition hover:bg-[#171717]">
             <span className="text-[10px] uppercase tracking-[0.22em] text-white/40">Offres Ouvertes</span>
-            <p className="mt-6 font-serif text-4xl text-[#c7a15a]">{openJobs}</p>
-          </div>
+            <p className="mt-6 font-serif text-4xl text-[#c7a15a]">{openJobs}</p><span className="mt-3 block text-[10px] uppercase tracking-[0.14em] text-white/30">Voir les offres →</span>
+          </Link>
         )}
         {(canViewReporting || isOwner) && (
-          <div className="bg-[#111] p-7">
+          <Link href="#candidatures" className="bg-[#111] p-7 transition hover:bg-[#171717]">
             <span className="text-[10px] uppercase tracking-[0.22em] text-white/40">Candidatures</span>
-            <p className="mt-6 font-serif text-4xl text-[#c7a15a]">{applications.length}</p>
-          </div>
+            <p className="mt-6 font-serif text-4xl text-[#c7a15a]">{applications.length}</p><span className="mt-3 block text-[10px] uppercase tracking-[0.14em] text-white/30">Voir le reporting →</span>
+          </Link>
         )}
       </div>
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[1.05fr_.95fr]">
         {(canViewReporting || isOwner) && (
-          <section className="border border-white/10 p-8">
+          <section id="candidatures" className="border border-white/10 p-8">
             <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Reporting</p>
             <h2 className="mt-3 font-serif text-2xl">Répartition des candidatures</h2>
             <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -179,7 +179,7 @@ export default async function AdminPage() {
         )}
 
         {(canViewCandidates || isOwner) && (
-          <section className="border border-white/10 p-8">
+          <section id="candidats" className="border border-white/10 p-8">
             <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Utilisateurs</p>
             <div className="mt-6 space-y-3">
               {users.slice(0, 12).map((user) => (
@@ -197,7 +197,7 @@ export default async function AdminPage() {
       </div>
 
       {(canManageJobs || isOwner) && (
-        <div className="mt-10 border border-white/10 p-8">
+        <div id="offres" className="mt-10 border border-white/10 p-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Activité récente</p>
@@ -218,6 +218,18 @@ export default async function AdminPage() {
           </div>
         </div>
       )}
+      {(canManageCompanies || isOwner) && (
+        <section id="entreprises" className="mt-10 border border-white/10 p-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div><p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Entreprises</p><h2 className="mt-3 font-serif text-2xl">Comptes entreprises</h2></div>
+            <span className="text-[10px] uppercase tracking-[0.16em] text-white/30">{companies.length} compte(s)</span>
+          </div>
+          <div className="mt-6 grid gap-3 md:grid-cols-2">
+            {companies.slice(0,20).map((company) => <article key={company.id} className="border border-white/10 p-5"><div className="flex items-center justify-between gap-3"><p className="font-serif text-lg">{company.name}</p><span className="text-[10px] uppercase tracking-[0.14em] text-white/35">{company._count.jobs} offre(s)</span></div><p className="mt-2 text-xs text-white/40">{company._count.members} membre(s) · {company.siret || "SIRET non renseigné"}</p></article>)}
+          </div>
+        </section>
+      )}
+
     </section>
   );
 }
