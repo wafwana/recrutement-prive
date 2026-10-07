@@ -1,0 +1,10 @@
+import { redirect } from "next/navigation";
+import { requireConsultantAccess } from "@/lib/consultant-access";
+import { prisma } from "@/lib/prisma";
+import Link from "next/link";
+
+export default async function ConsultantSourcingPage(){
+ const access=await requireConsultantAccess().catch(()=>null); if(!access) redirect("/connexion");
+ const candidates=await prisma.sourcedCandidate.findMany({where:{createdByUserId:access.userId},orderBy:{updatedAt:"desc"},take:100,select:{id,name,headline,location,status,matchingScore,source,skills,experienceYears}});
+ return <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-12 md:w-[min(1180px,calc(100%-72px))]"><p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Espace consultant · Sourcing</p><h1 className="mt-4 font-serif text-4xl sm:text-5xl">File de sourcing.</h1><p className="mt-4 max-w-2xl text-sm leading-7 text-white/50">Profils détectés par le consultant, provenance, statut et score de matching.</p><Link href="/espace/consultant" className="mt-6 inline-block border border-white/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-white/60">← Retour</Link><div className="mt-10 space-y-3">{candidates.map(c=><article key={c.id} className="border border-white/10 bg-[#111] p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-serif text-xl">{c.name||"Profil sans nom"}</p><p className="mt-1 text-xs text-white/40">{c.headline||"Profil professionnel"} · {c.location||"Localisation inconnue"}</p><p className="mt-3 text-[10px] uppercase tracking-[0.14em] text-[#c7a15a]">Source · {c.source} · {c.status}</p></div><div className="text-right"><p className="font-serif text-2xl text-[#c7a15a]">{c.matchingScore??"—"}/100</p><span className="text-[10px] uppercase tracking-[0.14em] text-white/35">{c.experienceYears??"—"} ans</span></div></div></article>)}{candidates.length===0&&<div className="border border-white/10 p-6 text-sm text-white/45">Aucun profil sourcé dans votre périmètre.</div>}</div></section>
+}
