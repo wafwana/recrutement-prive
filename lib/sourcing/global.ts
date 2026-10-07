@@ -118,7 +118,13 @@ async function requestPinnedHttps(url: URL, init: RequestInit, address: string, 
       method: "GET",
       headers: Object.fromEntries(headers.entries()),
       servername: url.hostname,
-      lookup: (_hostname, _options, callback) => callback(null, address, family),
+      lookup: (_hostname, options, callback) => {
+        if (options && typeof options === "object" && "all" in options && options.all) {
+          callback(null, [{ address, family }]);
+        } else {
+          callback(null, address, family);
+        }
+      },
     }, (incoming) => {
       const chunks: Buffer[] = [];
       incoming.on("data", (chunk: Buffer | string) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
