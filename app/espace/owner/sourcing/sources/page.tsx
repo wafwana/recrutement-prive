@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getConfiguredSourcesAsync } from "@/lib/sourcing/global";
-import BackButton from "@/components/navigation/BackButton";
 
 export default async function SourcingSourcesPage() {
   const session = await auth();
@@ -14,7 +13,6 @@ export default async function SourcingSourcesPage() {
     getConfiguredSourcesAsync("RP_GLOBAL_JOB_SOURCES"),
   ]);
   return <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-12 md:py-20">
-    <BackButton fallback="/espace/owner/sourcing" />
     <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">01 · Sources</p>
     <h1 className="mt-3 font-serif text-4xl text-white">Sources autorisées</h1>
     <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">Visualisez les origines réellement configurées pour alimenter le sourcing RP.</p>
