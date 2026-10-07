@@ -75,6 +75,31 @@ export default async function OwnerPage() {
         ))}
       </div>
 
+      <section className="mt-10 border border-white/10 bg-[#0b0f14] p-7">
+        <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Lecture immédiate du moteur</p>
+        <h2 className="mt-3 font-serif text-2xl">Sources ≠ Sourcing ≠ Matching</h2>
+        <div className="mt-6 grid gap-3 md:grid-cols-5">
+          {[
+            ["SOURCES","Origine","Sources externes, partenaires, CVthèque","border-[#c7a15a]/40 text-[#c7a15a]"],
+            ["SOURCING","Collecte","Détection et import de données","border-[#F97316]/40 text-[#F97316]"],
+            ["QUALIFICATION","Analyse","Tri, traduction, classification","border-white/15 text-white/70"],
+            ["MATCHING","Rapprochement","Offre ↔ candidat + score","border-[#F97316]/50 text-[#F97316]"],
+            ["VIVIER","Sélection","Profils et offres exploitables","border-[#c7a15a]/40 text-[#c7a15a]"],
+          ].map(([title,eyebrow,desc,classes]) => (
+            <div key={title} className={`border bg-[#111] p-4 ${classes}`}>
+              <p className="text-[9px] uppercase tracking-[0.14em] opacity-60">{eyebrow}</p>
+              <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em]">{title}</p>
+              <p className="mt-2 text-xs leading-5 text-white/45">{desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link href="/espace/owner/sourcing" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Voir les sources & le sourcing →</Link>
+          <Link href="/espace/owner/cv-matching" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Voir le matching →</Link>
+          <Link href="/espace/owner/offres-vivier" className="border border-white/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-white/60">Voir le vivier →</Link>
+        </div>
+      </section>
+
       <div className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_.9fr]">
         <section className="border border-white/10 p-7">
           <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Progression fonctionnelle</p>

@@ -127,6 +127,31 @@ export default async function OwnerSourcingPage() {
         </div>
       </div>
 
+      <section className="mt-10 border border-white/10 bg-[#0b0f14] p-6">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.28em] text-[#c7a15a]">Chaîne opérationnelle</p>
+            <h2 className="mt-2 font-serif text-2xl text-white">Chaque étape a maintenant son rôle.</h2>
+            <p className="mt-2 max-w-3xl text-xs leading-6 text-white/45">La provenance est visible au niveau de la source. Le matching est une étape distincte : il rapproche une offre et des profils et affiche un score, sans confondre collecte et sélection.</p>
+          </div>
+        </div>
+        <div className="mt-6 grid gap-3 md:grid-cols-5">
+          {[
+            ["01","SOURCES","Origine des données","text-[#c7a15a]"],
+            ["02","SOURCING","Collecte / détection","text-[#F97316]"],
+            ["03","QUALIFICATION","Analyse / classement","text-white"],
+            ["04","MATCHING","Offre ↔ candidat","text-[#F97316]"],
+            ["05","VIVIER","Profils retenus","text-[#c7a15a]"],
+          ].map(([step,title,desc,color]) => (
+            <div key={step} className="border border-white/10 bg-[#111] p-4">
+              <p className="text-[10px] tracking-[0.18em] text-white/25">{step}</p>
+              <p className={`mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] ${color}`}>{title}</p>
+              <p className="mt-2 text-xs leading-5 text-white/45">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Main Content Sections */}
       <div className="mt-12 space-y-16">
         {/* SECTION 1: Sourcing Candidats */}
@@ -183,8 +208,8 @@ export default async function OwnerSourcingPage() {
               <span>Offre</span>
               <span>Entreprise</span>
               <span>Localisation</span>
-              <span>Catégorie</span>
-              <span>Source & Statut</span>
+              <span>Qualification</span>
+              <span>Source / provenance</span>
             </div>
 
             <div className="divide-y divide-white/10">
@@ -192,7 +217,10 @@ export default async function OwnerSourcingPage() {
                 <article key={offer.id} className="grid grid-cols-1 gap-3 px-5 py-5 md:grid-cols-[2fr_1.1fr_1fr_1fr_1fr] md:items-center">
                   <div>
                     <p className="text-sm font-medium text-white/85">{typeof offer.translations === "object" && offer.translations !== null && "fr" in offer.translations && typeof (offer.translations as Record<string, unknown>).fr === "object" && (offer.translations as Record<string, unknown>).fr !== null && "titleFr" in ((offer.translations as Record<string, unknown>).fr as Record<string, unknown>) ? String(((offer.translations as Record<string, unknown>).fr as Record<string, unknown>).titleFr || offer.title) : offer.title}</p>
-                    <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/40">{offer.status}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="border border-white/10 bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-white/45">SOURCING · {offer.status}</span>
+                      {offer.source && <span className="border border-[#c7a15a]/30 bg-[#c7a15a]/5 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-[#c7a15a]">SOURCE · {offer.source}</span>}
+                    </div>
                   </div>
                   <p className="text-xs text-white/55">{offer.companyName || "Entreprise non renseignée"}</p>
                   <p className="text-xs text-white/55">{[offer.city, offer.country].filter(Boolean).join(", ") || "—"}</p>
@@ -201,13 +229,15 @@ export default async function OwnerSourcingPage() {
                     {offer.subCategoryCode ? ` · ${offer.subCategoryCode}` : ""}
                   </p>
                   <div className="text-xs">
+                    <p className="mb-2 text-[9px] uppercase tracking-[0.14em] text-white/30">Provenance directe</p>
                     {offer.sourceUrl ? (
                       <a href={offer.sourceUrl} target="_blank" rel="noreferrer" className="text-[#F97316] hover:underline">
-                        Voir la source
+                        Voir la source ↗
                       </a>
                     ) : (
                       <span className="text-white/30">{offer.source}</span>
                     )}
+                    {offer.source && <p className="mt-1 text-[10px] text-white/45">Source : {offer.source}</p>}
                     {offer.publishedAt && (
                       <p className="mt-1 text-[10px] text-white/25">{new Date(offer.publishedAt).toLocaleDateString("fr-FR")}</p>
                     )}
