@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { CollaboratorActivityTracker } from "@/components/activity/CollaboratorActivityTracker";
 import ContextBackButton from "@/components/navigation/ContextBackButton";
+import ContextBackButton from "@/components/navigation/ContextBackButton";
 
 const navigation = [
   { href: "/espace/candidat", label: "Candidat", role: "CANDIDAT" },
