@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import BackButton from "@/components/navigation/BackButton";
 
 export default function SourcingExecutionPage() {
   const [query, setQuery] = useState("");
@@ -19,7 +18,6 @@ export default function SourcingExecutionPage() {
     finally { setRunning(false); }
   }
   return <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-12 md:py-20">
-    <BackButton fallback="/espace/owner/sourcing" />
     <p className="text-[10px] uppercase tracking-[0.35em] text-[#F97316]">02 · Sourcing</p>
     <h1 className="mt-3 font-serif text-4xl text-white">Collecte des profils candidats</h1>
     <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">Cette vue correspond réellement à l'étape de collecte : choisissez un critère et observez le résultat du passage du moteur.</p>
