@@ -35,10 +35,11 @@ export async function POST(request: Request) {
   try {
     const payload = await request.text();
     const resend = new Resend(apiKey);
-    const headers = new Headers();
-    headers.set("svix-id", request.headers.get("svix-id") ?? "");
-    headers.set("svix-timestamp", request.headers.get("svix-timestamp") ?? "");
-    headers.set("svix-signature", request.headers.get("svix-signature") ?? "");
+    const headers = {
+      id: request.headers.get("svix-id") ?? "",
+      timestamp: request.headers.get("svix-timestamp") ?? "",
+      signature: request.headers.get("svix-signature") ?? "",
+    };
 
     const event = resend.webhooks.verify({
       payload,
