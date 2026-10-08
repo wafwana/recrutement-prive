@@ -209,7 +209,11 @@ export async function POST(request: Request) {
       if (!json || typeof json !== "object") throw new Error("invalid");
       body = json as Record<string, unknown>;
       const ht = Number(body.amountHt);
-      const rate = Number(body.amountTvaRate || 0);
+      const legacyTva = body.amountTva !== undefined ? Number(body.amountTva) : 0;
+      const rate = body.amountTvaRate !== undefined
+        ? Number(body.amountTvaRate)
+        : (ht > 0 ? (legacyTva / ht) * 100 : 0);
+      body.amountTvaRate = rate;
       body.amountTva = Math.round((ht * rate / 100) * 100) / 100;
       body.amountTtc = Math.round((ht + Number(body.amountTva)) * 100) / 100;
     }
