@@ -151,7 +151,14 @@ export async function POST(request: Request) {
         });
       }
 
-      if (user.candidat) {
+      if (user.role !== "CANDIDAT") {
+        // Never attach a manual CV to an existing non-candidate identity.
+        // Keep the CV intake record unlinked so the Owner can resolve it explicitly.
+        console.warn("[owner cv intake] existing non-candidate identity; leaving CV unlinked", {
+          candidateEmail,
+          existingRole: user.role,
+        });
+      } else if (user.candidat) {
         candidate = user.candidat;
       } else {
         const primaryCategory = analysis?.primaryCategoryCode
