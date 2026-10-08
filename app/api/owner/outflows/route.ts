@@ -3,6 +3,7 @@ import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createOrSyncOutflow, exportOutflowsToCsv, OutflowOriginModule, OutflowStatus } from "@/lib/accounting/outflow-service";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 
 type AuthResult =
   | { user: { id: string; role: string; name?: string | null; email?: string | null }; status: 200 }
@@ -50,6 +51,7 @@ const createOutflowSchema = z.object({
     "AUTRE",
   ]).default("AUTRE"),
   amountHt: z.number().min(0, "Montant HT positif ou nul requis"),
+  amountTvaRate: z.number().min(0).max(100, "Taux TVA invalide").default(0),
   amountTva: z.number().min(0, "Montant TVA positif ou nul requis").default(0),
   amountTtc: z.number().positive("Montant TTC positif requis"),
   currency: z.string().default("EUR"),
@@ -137,7 +139,7 @@ export async function GET(request: Request) {
     const pendingDocsCount = outflows.filter((item) => item.status === "A_COMPLETER" || !item.category || (!item.documentUrl && !item.documentId)).length;
 
     return NextResponse.json({
-      outflows,
+      outflows: outflows.map(({ documentData: _documentData, ...outflow }) => outflow),
       summary: {
         count: outflows.length,
         totalHt,
@@ -163,11 +165,60 @@ export async function POST(request: Request) {
   }
   const owner = authCheck.user;
 
-  let body: unknown;
+  let body: Record<string, unknown>;
+  let documentData: Buffer | null = null;
+  let documentName: string | null = null;
+  let documentMimeType: string | null = null;
+  let documentId: string | null = null;
+
   try {
-    body = await request.json();
+    const contentType = request.headers.get("content-type") || "";
+    if (contentType.includes("multipart/form-data")) {
+      const form = await request.formData();
+      const file = form.get("document");
+      if (file instanceof File && file.size > 0) {
+        if (file.size > 10 * 1024 * 1024) {
+          return NextResponse.json({ error: "La pièce justificative ne doit pas dépasser 10 Mo." }, { status: 400 });
+        }
+        const allowed = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+        const mime = file.type.toLowerCase();
+        if (!allowed.has(mime)) {
+          return NextResponse.json({ error: "Format refusé. Utilisez uniquement PDF, JPG, JPEG, PNG ou WEBP." }, { status: 400 });
+        }
+        const bytes = Buffer.from(await file.arrayBuffer());
+        const signatureOk =
+          (mime === "application/pdf" && bytes.subarray(0, 4).toString() === "%PDF") ||
+          (mime === "image/jpeg" && bytes[0] === 0xff && bytes[1] === 0xd8) ||
+          (mime === "image/png" && bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) ||
+          (mime === "image/webp" && bytes.subarray(0, 4).toString() === "RIFF" && bytes.subarray(8, 12).toString() === "WEBP");
+        if (!signatureOk) {
+          return NextResponse.json({ error: "Le contenu du fichier ne correspond pas à son format déclaré." }, { status: 400 });
+        }
+        documentData = bytes;
+        documentName = file.name;
+        documentMimeType = mime;
+        documentId = `OUTFLOW-FILE-${randomUUID()}`;
+      }
+      body = Object.fromEntries(form.entries());
+      body.amountHt = Number(body.amountHt);
+      body.amountTvaRate = Number(body.amountTvaRate || 0);
+      body.amountTva = Math.round((Number(body.amountHt) * Number(body.amountTvaRate) / 100) * 100) / 100;
+      body.amountTtc = Math.round((Number(body.amountHt) + Number(body.amountTva)) * 100) / 100;
+    } else {
+      const json = await request.json();
+      if (!json || typeof json !== "object") throw new Error("invalid");
+      body = json as Record<string, unknown>;
+      const ht = Number(body.amountHt);
+      const legacyTva = body.amountTva !== undefined ? Number(body.amountTva) : 0;
+      const rate = body.amountTvaRate !== undefined
+        ? Number(body.amountTvaRate)
+        : (ht > 0 ? (legacyTva / ht) * 100 : 0);
+      body.amountTvaRate = rate;
+      body.amountTva = Math.round((ht * rate / 100) * 100) / 100;
+      body.amountTtc = Math.round((ht + Number(body.amountTva)) * 100) / 100;
+    }
   } catch {
-    return NextResponse.json({ error: "Corps JSON invalide." }, { status: 400 });
+    return NextResponse.json({ error: "Corps de requête invalide." }, { status: 400 });
   }
 
   const parsed = createOutflowSchema.safeParse(body);
@@ -187,6 +238,7 @@ export async function POST(request: Request) {
       category: parsed.data.category || null,
       originModule: parsed.data.originModule as OutflowOriginModule,
       amountHt: parsed.data.amountHt,
+      amountTvaRate: parsed.data.amountTvaRate,
       amountTva: parsed.data.amountTva,
       amountTtc: parsed.data.amountTtc,
       currency: parsed.data.currency,
@@ -194,7 +246,10 @@ export async function POST(request: Request) {
       paymentSource: parsed.data.paymentSource || null,
       referenceNumber: parsed.data.referenceNumber || null,
       documentUrl: parsed.data.documentUrl || null,
-      documentId: parsed.data.documentId || null,
+      documentId: documentId || parsed.data.documentId || null,
+      documentName,
+      documentMimeType,
+      documentData,
       createdById: owner.id,
       authorizedById: owner.id,
       operationDate: parsed.data.operationDate ? new Date(parsed.data.operationDate) : new Date(),
@@ -221,8 +276,10 @@ export async function POST(request: Request) {
       },
     });
 
+    const { documentData: _documentData, ...outflowResponse } = outflow;
+
     return NextResponse.json(
-      { outflow, message: "Sortie d'argent enregistrée avec succès dans le registre comptable." },
+      { outflow: outflowResponse, message: "Sortie d'argent enregistrée avec succès dans le registre comptable." },
       { status: 201 }
     );
   } catch (error: unknown) {

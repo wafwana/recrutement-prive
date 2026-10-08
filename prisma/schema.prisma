@@ -969,6 +969,7 @@ model FinancialOutflow {
   category              String?
   originModule          String    @default("AUTRE") // PAIE, PRESTATAIRE, FRAIS_PRO, REMBOURSEMENT, FOURNISSEUR, PRELEVEMENT_OWNER, AUTRE
   amountHt              Float
+  amountTvaRate         Float     @default(0)
   amountTva             Float     @default(0)
   amountTtc             Float
   currency              String    @default("EUR")
@@ -977,6 +978,9 @@ model FinancialOutflow {
   referenceNumber       String?   // Ref facture, bulletin, contrat, etc.
   documentUrl           String?
   documentId            String?
+  documentName          String?
+  documentMimeType      String?
+  documentData          Bytes?
   createdById           String
   authorizedById        String?
   status                String    @default("A_COMPLETER") // PREVU, AUTORISE, PAYE, RAPPROCHE, A_COMPLETER, ANNULE
