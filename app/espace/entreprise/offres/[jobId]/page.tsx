@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
+import { presentCandidateToCompany } from "../actions";
 import { isIdentityUnlocked } from "@/lib/mission-lock";
 import ApplicationStatusForm from "./ApplicationStatusForm";
 import MissionEditForm from "./MissionEditForm";
@@ -20,7 +21,7 @@ export default async function CompanyJobPage({ params }: { params: Promise<{ job
     where: { id: jobId, companyId: access.companyId },
     include: {
       applications: {
-        where: { presentations: { some: { companyId: access.companyId } } },
+        where: {},
         include: {
           candidate: {
             include: {
@@ -47,7 +48,7 @@ export default async function CompanyJobPage({ params }: { params: Promise<{ job
           <p className="mt-3 text-sm text-white/45">{companyJob.location || "Localisation à préciser"}</p>
           <MissionEditForm job={companyJob} />
         </div>
-        <p className="text-sm text-white/45">{companyJob.applications.length} candidat(s) présenté(s)</p>
+        <p className="text-sm text-white/45">{companyJob.applications.length} candidature(s)</p>
       </div>
 
       {companyJob.attachmentName && (
@@ -82,7 +83,15 @@ export default async function CompanyJobPage({ params }: { params: Promise<{ job
                       <div>
                         <div className="flex items-center gap-3">
                           <h2 className="font-serif text-xl text-white">{displayName}</h2>
-                          {!unlocked && (
+                          {!presentation && (
+                      <form action={presentCandidateToCompany.bind(null, application.id)} className="mt-4">
+                        <button type="submit" className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a]">
+                          Présenter ce candidat →
+                        </button>
+                      </form>
+                    )}
+
+                    {!unlocked && presentation && (
                             <span className="border border-[#c7a15a]/30 bg-[#c7a15a]/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.15em] text-[#c7a15a]">
                               Présentation Confidentielle
                             </span>
@@ -129,11 +138,13 @@ export default async function CompanyJobPage({ params }: { params: Promise<{ job
                       </p>
                     )}
 
-                    <ApplicationStatusForm
-                      applicationId={application.id}
-                      currentStatus={application.status}
-                      currentNotes={application.notes}
-                    />
+                    {presentation && (
+                      <ApplicationStatusForm
+                        applicationId={application.id}
+                        currentStatus={application.status}
+                        currentNotes={application.notes}
+                      />
+                    )}
                   </article>
                 );
               })
