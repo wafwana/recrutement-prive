@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { assertContactEligibility, completeContactMeeting, startContactMeeting, SECURE_CONTACT_MINUTES, SECURE_CONTACT_PRICE_HT, SECURE_CONTACT_PRICE_TTC } from "@/lib/contacts/secure-contact";
 
 const createSchema = z.object({ presentationId: z.string().min(1), channel: z.enum(["MESSAGING","VIDEO"]).default("MESSAGING"), scheduledAt: z.string().datetime().optional() });
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
     const requiredKeys = meeting.presentation.companyUserId === session.user.id
       ? ["ENTREPRISE_CONTACT", "INTERVIEW_SECURE", "ANTI_CIRCUMVENTION", "SECURE_CHANNEL_POLICY"]
       : ["CANDIDAT_CONTACT", "INTERVIEW_SECURE", "ANTI_CIRCUMVENTION", "SECURE_CHANNEL_POLICY"];
-    if (!requiredKeys.every((key) => parsed.data.contractKeys.includes(key))) {
+    if (!requiredKeys.every((key) => ("contractKeys" in parsed.data ? parsed.data.contractKeys : []).includes(key))) {
       return NextResponse.json({ error: "Tous les documents contractuels requis doivent être acceptés." }, { status: 400 });
     }
     const security = (meeting.securityDetails && typeof meeting.securityDetails === "object" && !Array.isArray(meeting.securityDetails))
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
     };
     const updated = await prisma.contactMeeting.update({
       where: { id: meeting.id },
-      data: { securityDetails: { ...security, contractAcceptances: nextAcceptances } },
+      data: { securityDetails: { ...security, contractAcceptances: nextAcceptances } as Prisma.InputJsonValue },
     });
     await prisma.auditLog.create({
       data: {
