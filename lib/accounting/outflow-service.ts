@@ -37,6 +37,7 @@ export interface CreateOrSyncOutflowInput {
   category?: string | null;
   originModule?: OutflowOriginModule;
   amountHt: number;
+  amountTvaRate?: number;
   amountTva?: number;
   amountTtc: number;
   currency?: string;
@@ -45,6 +46,9 @@ export interface CreateOrSyncOutflowInput {
   referenceNumber?: string | null;
   documentUrl?: string | null;
   documentId?: string | null;
+  documentName?: string | null;
+  documentMimeType?: string | null;
+  documentData?: Buffer | null;
   createdById: string;
   authorizedById?: string | null;
   operationDate?: Date;
@@ -129,6 +133,9 @@ export async function createOrSyncOutflow(input: CreateOrSyncOutflowInput) {
     });
   }
 
+  const amountTva = input.amountTva ?? 0;
+  const amountTvaRate = input.amountTvaRate ?? (input.amountHt > 0 ? (amountTva / input.amountHt) * 100 : 0);
+
   const effectiveStatus = evaluateOutflowStatus(
     input.status || "PAYE",
     input.category,
@@ -159,7 +166,8 @@ export async function createOrSyncOutflow(input: CreateOrSyncOutflowInput) {
         category: input.category || null,
         originModule: input.originModule || "AUTRE",
         amountHt: input.amountHt,
-        amountTva: input.amountTva ?? 0,
+        amountTvaRate,
+        amountTva,
         amountTtc: input.amountTtc,
         currency: input.currency || "EUR",
         paymentMethod: input.paymentMethod || "VIREMENT",
@@ -167,6 +175,9 @@ export async function createOrSyncOutflow(input: CreateOrSyncOutflowInput) {
         referenceNumber: input.referenceNumber || null,
         documentUrl: input.documentUrl || null,
         documentId: input.documentId || null,
+        documentName: input.documentName || null,
+        documentMimeType: input.documentMimeType || null,
+        documentData: input.documentData || null,
         createdById: input.createdById,
         authorizedById: input.authorizedById || input.createdById,
         status: effectiveStatus,
@@ -205,6 +216,7 @@ export async function createOrSyncOutflow(input: CreateOrSyncOutflowInput) {
         category: input.category !== undefined ? input.category : existing.category,
         originModule: input.originModule ?? existing.originModule,
         amountHt: input.amountHt ?? existing.amountHt,
+        amountTvaRate: input.amountTvaRate !== undefined ? input.amountTvaRate : existing.amountTvaRate,
         amountTva: input.amountTva !== undefined ? input.amountTva : existing.amountTva,
         amountTtc: input.amountTtc ?? existing.amountTtc,
         currency: input.currency ?? existing.currency,
@@ -213,6 +225,9 @@ export async function createOrSyncOutflow(input: CreateOrSyncOutflowInput) {
         referenceNumber: input.referenceNumber !== undefined ? input.referenceNumber : existing.referenceNumber,
         documentUrl: input.documentUrl !== undefined ? input.documentUrl : existing.documentUrl,
         documentId: input.documentId !== undefined ? input.documentId : existing.documentId,
+        documentName: input.documentName !== undefined ? input.documentName : existing.documentName,
+        documentMimeType: input.documentMimeType !== undefined ? input.documentMimeType : existing.documentMimeType,
+        documentData: input.documentData !== undefined ? input.documentData : existing.documentData,
         authorizedById: input.authorizedById || existing.authorizedById,
         paymentDate: input.paymentDate !== undefined ? input.paymentDate : existing.paymentDate,
         status: effectiveStatus,
