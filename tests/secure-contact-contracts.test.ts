@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { SECURE_CONTACT_MINUTES, SECURE_CONTACT_PRICE_HT, SECURE_CONTACT_PRICE_TTC, MAX_CONTACTS_BEFORE_DECISION } from "../lib/contacts/secure-contact";
 import { SECURE_CONTACT_CONTRACT_TEMPLATES } from "../lib/contracts/secure-contact-templates";
 
@@ -16,6 +18,8 @@ test("required secure contact contract templates exist", () => {
     assert.ok(keys.includes(key));
   }
 });
+
+const read = (file: string) => fs.readFileSync(path.resolve(file), "utf8");
 
 test("contract acceptance gates payment and candidate contact start", () => {
   const route = read("app/api/contacts/secure/route.ts");
