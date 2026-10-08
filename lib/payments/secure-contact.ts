@@ -18,6 +18,13 @@ export async function createSecureContactCheckout(meetingId: string, companyUser
   if (!meeting) throw new Error("Contact introuvable.");
   if (meeting.presentation.companyUserId !== companyUserId) throw new Error("Le paiement doit être initié par l'entreprise autorisée.");
   if (meeting.status !== "CONFIRMED") throw new Error("Le cabinet doit d'abord autoriser ce contact.");
+  const security = (meeting.securityDetails && typeof meeting.securityDetails === "object" && !Array.isArray(meeting.securityDetails))
+    ? meeting.securityDetails as Record<string, unknown>
+    : {};
+  const acceptances = security.contractAcceptances && typeof security.contractAcceptances === "object" && !Array.isArray(security.contractAcceptances)
+    ? security.contractAcceptances as Record<string, unknown>
+    : {};
+  if (!acceptances[companyUserId]) throw new Error("Les conditions contractuelles du contact doivent être acceptées avant le règlement.");
   if (meeting.paymentStatus === "PAID") return meeting;
   if (method === "BANK_TRANSFER") {
     return prisma.contactMeeting.update({
