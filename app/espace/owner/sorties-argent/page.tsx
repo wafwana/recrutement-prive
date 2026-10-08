@@ -470,7 +470,16 @@ export default function RegistreSortiesPage() {
                   </td>
 
                   <td className="p-3 text-center">
-                    {item.documentUrl ? (
+                    {item.documentId?.startsWith("OUTFLOW-FILE-") ? (
+                      <a
+                        href={`/api/owner/outflows/${item.id}/document`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-emerald-400 underline hover:text-emerald-300 text-[10px]"
+                      >
+                        {item.documentName || "Voir pièce"}
+                      </a>
+                    ) : item.documentUrl ? (
                       <a
                         href={item.documentUrl}
                         target="_blank"
