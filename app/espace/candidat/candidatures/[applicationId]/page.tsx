@@ -69,7 +69,8 @@ export default async function CandidateApplicationDetail({
     if (!current) return;
     const security = current.securityDetails && typeof current.securityDetails === "object" && !Array.isArray(current.securityDetails) ? current.securityDetails as Record<string, unknown> : {};
     const acceptances = security.contractAcceptances && typeof security.contractAcceptances === "object" && !Array.isArray(security.contractAcceptances) ? security.contractAcceptances as Record<string, unknown> : {};
-    await prisma.contactMeeting.update({ where: { id: current.id }, data: { securityDetails: { ...security, contractAcceptances: { ...acceptances, [actor.user.id]: { role: "CANDIDAT", keys: ["CANDIDAT_CONTACT","INTERVIEW_SECURE","ANTI_CIRCUMVENTION","SECURE_CHANNEL_POLICY"], acceptedAt: new Date().toISOString() } } } } });
+    const nextSecurity = { ...security, contractAcceptances: { ...acceptances, [actor.user.id]: { role: "CANDIDAT", keys: ["CANDIDAT_CONTACT","INTERVIEW_SECURE","ANTI_CIRCUMVENTION","SECURE_CHANNEL_POLICY"], acceptedAt: new Date().toISOString() } } };
+    await prisma.contactMeeting.update({ where: { id: current.id }, data: { securityDetails: nextSecurity as Prisma.InputJsonValue } });
     await prisma.auditLog.create({ data: { actorUserId: actor.user.id, actorRole: "CANDIDAT", action: "SECURE_CONTACT_CONTRACTS_ACCEPTED", targetType: "CONTACT_MEETING", targetId: current.id, details: { source: "candidate_application" } } });
   }
 
