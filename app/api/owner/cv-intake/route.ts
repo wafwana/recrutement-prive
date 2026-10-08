@@ -51,6 +51,7 @@ export async function GET(request: Request) {
       candidateName: true, candidateEmail: true, docType: true, folderPath: true,
       analysis: true, matching: true, analyzedAt: true, status: true, candidateId: true,
       createdAt: true, updatedAt: true,
+      candidate: { select: { id: true, preferences: true, user: { select: { name: true, email: true } } } },
     },
   });
   return NextResponse.json({
