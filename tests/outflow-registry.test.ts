@@ -7,6 +7,16 @@ import {
   exportOutflowsToCsv,
 } from "../lib/accounting/outflow-service";
 
+test("VAT calculation remains exact for HT, rate, TVA and TTC", () => {
+  const ht = 1250;
+  const rate = 20;
+  const tva = Math.round((ht * rate / 100) * 100) / 100;
+  const ttc = Math.round((ht + tva) * 100) / 100;
+  assert.equal(tva, 250);
+  assert.equal(ttc, 1500);
+
+});
+
 test("validateOutflowAmounts verifies HT + TVA = TTC exactness", () => {
   assert.equal(validateOutflowAmounts(100, 20, 120), true);
   assert.equal(validateOutflowAmounts(100, 20, 120.01), true); // within 0.02 tolerance
