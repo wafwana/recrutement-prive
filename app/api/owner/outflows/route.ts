@@ -272,8 +272,10 @@ export async function POST(request: Request) {
       },
     });
 
+    const { documentData: _documentData, ...outflowResponse } = outflow;
+
     return NextResponse.json(
-      { outflow, message: "Sortie d'argent enregistrée avec succès dans le registre comptable." },
+      { outflow: outflowResponse, message: "Sortie d'argent enregistrée avec succès dans le registre comptable." },
       { status: 201 }
     );
   } catch (error: unknown) {
