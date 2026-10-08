@@ -29,6 +29,13 @@ export async function startContactMeeting(meetingId: string, actorUserId: string
   if (meeting.presentation.candidateUserId !== actorUserId && meeting.presentation.companyUserId !== actorUserId) throw new Error("Accès refusé.");
   if (meeting.status !== "CONFIRMED") throw new Error("Le cabinet doit d’abord autoriser ce contact.");
   if (meeting.paymentStatus !== "PAID") throw new Error("Le contact doit être réglé avant son démarrage.");
+  const security = (meeting.securityDetails && typeof meeting.securityDetails === "object" && !Array.isArray(meeting.securityDetails))
+    ? meeting.securityDetails as Record<string, unknown>
+    : {};
+  const acceptances = security.contractAcceptances && typeof security.contractAcceptances === "object" && !Array.isArray(security.contractAcceptances)
+    ? security.contractAcceptances as Record<string, unknown>
+    : {};
+  if (!acceptances[meeting.presentation.candidateUserId || ""]) throw new Error("Le candidat doit accepter les conditions contractuelles avant le démarrage du contact.");
   if (meeting.candidateConsentAt === null || meeting.companyConsentAt === null) {
     // The meeting may start without recording. Recording is a separate, two-party consented feature.
     return prisma.contactMeeting.update({ where: { id: meetingId }, data: { status: "ACTIVE", startedAt: meeting.startedAt ?? new Date() } });
