@@ -885,6 +885,11 @@ model OutreachContact {
   bouncedAt         DateTime?
   complainedAt      DateTime?
   repliedAt         DateTime?
+  replyFromEmail    String?
+  replySubject      String?
+  replyBody         String?
+  replyProviderMessageId String?
+  replyReceivedAt   DateTime?
   convertedAt       DateTime?
   optedOutAt        DateTime?
   lastError         String?
