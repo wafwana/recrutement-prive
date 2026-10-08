@@ -168,7 +168,7 @@ export async function POST(request: Request) {
             location: analysis?.location || null,
             country: analysis?.country || null,
             phone: analysis?.phone || null,
-            skills: analysis ? { explicit: analysis.explicitSkills, normalized: analysis.skills } : null,
+            skills: analysis ? { explicit: analysis.explicitSkills, normalized: analysis.skills } : undefined,
             experienceYears: analysis?.experienceYears ?? null,
             primaryCategoryId: primaryCategory?.id || null,
             subCategoryIds: subCategories.map((item) => item.id),
