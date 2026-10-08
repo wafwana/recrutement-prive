@@ -2,7 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
-import { presentCandidateToCompany } from "../actions";
+import { presentCandidateToCompany } from "../../actions";
 import { isIdentityUnlocked } from "@/lib/mission-lock";
 import ApplicationStatusForm from "./ApplicationStatusForm";
 import MissionEditForm from "./MissionEditForm";
