@@ -16,6 +16,13 @@ export type CvExperience = {
 };
 
 export type CvAnalysis = {
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  location: string | null;
+  country: string | null;
   headline: string | null;
   summary: string | null;
   improvedSummary: string | null;
@@ -40,6 +47,13 @@ const schema = {
   type: "object",
   additionalProperties: false,
   properties: {
+    firstName: { type: ["string", "null"] },
+    lastName: { type: ["string", "null"] },
+    email: { type: ["string", "null"] },
+    phone: { type: ["string", "null"] },
+    address: { type: ["string", "null"] },
+    location: { type: ["string", "null"] },
+    country: { type: ["string", "null"] },
     headline: { type: ["string", "null"] },
     summary: { type: ["string", "null"] },
     improvedSummary: { type: ["string", "null"] },
@@ -60,6 +74,13 @@ const schema = {
     confidence: { type: "number" },
   },
   required: [
+    "firstName",
+    "lastName",
+    "email",
+    "phone",
+    "address",
+    "location",
+    "country",
     "headline",
     "summary",
     "improvedSummary",
@@ -120,7 +141,7 @@ export async function analyzeCvDocument(input: {
     .join("\n");
 
   const promptText = `Analyse ce CV pour le moteur de recrutement Recrutement Privé.
-Extrais uniquement des informations professionnelles utiles au recrutement.
+Extrais uniquement les informations professionnelles utiles au recrutement. Lorsque le document contient des coordonnées directement affichées par le candidat, extrais aussi le prénom, nom, e-mail, téléphone, adresse, ville/localisation et pays. Ces coordonnées doivent être reprises telles qu’elles apparaissent, sans les inventer ni les compléter.
 Ne déduis pas de données sensibles non nécessaires et ne crée aucune expérience ou compétence absente du document.
 Sépare les faits explicitement présents du positionnement suggéré. Détermine aussi un niveau de carrière uniquement lorsqu'il est étayé par le CV (SPECIALISTE, MANAGER, CADRE, HAUT_CADRE, DIRECTION), sinon NON_SPECIFIE, et fournis une preuve courte. Pour chaque expérience, conserve un élément de preuve textuel court. Extrait aussi formations et certifications. improvedSummary peut reformuler et mieux présenter les faits, mais ne doit ajouter aucun fait absent du CV.
 Retourne les compétences normalisées, l'expérience totale approximative en années si elle est explicitement estimable, le métier principal et les sous-domaines.
@@ -148,6 +169,13 @@ ${taxonomyText || "Aucune taxonomie fournie."}`;
 
   const parsed = response.data;
   return {
+    firstName: typeof parsed.firstName === "string" ? parsed.firstName.trim() || null : null,
+    lastName: typeof parsed.lastName === "string" ? parsed.lastName.trim() || null : null,
+    email: typeof parsed.email === "string" && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(parsed.email.trim()) ? parsed.email.trim().toLowerCase() : null,
+    phone: typeof parsed.phone === "string" ? parsed.phone.trim() || null : null,
+    address: typeof parsed.address === "string" ? parsed.address.trim() || null : null,
+    location: typeof parsed.location === "string" ? parsed.location.trim() || null : null,
+    country: typeof parsed.country === "string" ? parsed.country.trim() || null : null,
     headline: typeof parsed.headline === "string" ? parsed.headline.trim() || null : null,
     summary: typeof parsed.summary === "string" ? parsed.summary.trim() || null : null,
     improvedSummary: typeof parsed.improvedSummary === "string" ? parsed.improvedSummary.trim() || null : null,
