@@ -332,15 +332,41 @@ export type CandidateSourcingFilter = {
   jobId?: string;
 };
 
-async function ingestPlatformCvthequeCandidates(actorUserId: string, options?: { maxItems?: number }) {
+async function ingestPlatformCvthequeCandidates(
+  actorUserId: string,
+  options?: { maxItems?: number; filter?: CandidateSourcingFilter },
+) {
   const maxItems = Math.min(20, Math.max(1, options?.maxItems ?? 10));
+  const filter = options?.filter;
   const candidates = await prisma.candidateProfile.findMany({
     where: { status: "ACTIVE" },
     include: { user: { select: { name: true } } },
     take: 1000,
   });
 
-  const candidateBatch = candidates.slice(0, maxItems);
+  const filteredCandidates = candidates.filter((candidate) => {
+    if (filter?.query) {
+      const q = filter.query.toLowerCase().trim();
+      const matchHeadline = (candidate.headline || "").toLowerCase().includes(q);
+      const matchSkills = (Array.isArray(candidate.skills) ? candidate.skills : [])
+        .some((skill) => typeof skill === "string" && skill.toLowerCase().includes(q));
+      if (!matchHeadline && !matchSkills) return false;
+    }
+    if (filter?.country) {
+      const target = filter.country.toLowerCase().trim();
+      const location = [candidate.country, candidate.location].filter(Boolean).join(" ").toLowerCase();
+      if (!location.includes(target)) return false;
+    }
+    if (filter?.skills?.length) {
+      const candidateSkills = (Array.isArray(candidate.skills) ? candidate.skills : [])
+        .filter((skill): skill is string => typeof skill === "string")
+        .map((skill) => skill.toLowerCase());
+      if (!filter.skills.some((skill) => candidateSkills.includes(skill.toLowerCase()))) return false;
+    }
+    return true;
+  });
+
+  const candidateBatch = filteredCandidates.slice(0, maxItems);
   let created = 0;
   let updated = 0;
 
@@ -401,7 +427,7 @@ export async function ingestGlobalCandidates(params: {
     : await getConfiguredSourcesAsync("RP_GLOBAL_CANDIDATE_SOURCES");
 
   if (!sources.length) {
-    const internal = await ingestPlatformCvthequeCandidates(actorUserId, { maxItems });
+    const internal = await ingestPlatformCvthequeCandidates(actorUserId, { maxItems, filter });
     await prisma.auditLog.create({
       data: {
         actorUserId,
@@ -450,40 +476,47 @@ export async function ingestGlobalCandidates(params: {
   let totalCreated = 0;
   let totalUpdated = 0;
   let totalMatched = 0;
-  const results: Array<{ sourceUrl: string; fetched: number; sourceTotal: number; batchLimit: number; created: number; updated: number; matched: number; error?: string }> = [];
+  const results: Array<{ sourceUrl: string; fetched: number; sourceTotal: number; filteredTotal?: number; batchLimit: number; created: number; updated: number; matched: number; error?: string }> = [];
 
   const sourceCollectedAt = new Date();
 
   for (const source of sources) {
     try {
       const candidates = await fetchGlobalCandidates(source);
-      const batchKey = `sourcing:global-candidates-batch:${encodeURIComponent(source)}`;
-      const offset = await readBatchOffset(batchKey, candidates.length);
-      const batch = candidates.length > maxItems
-        ? Array.from({ length: maxItems }, (_, index) => candidates[(offset + index) % candidates.length])
-        : candidates;
+      const filteredCandidates = candidates.filter((candidate) => {
+        if (filter?.query) {
+          const q = filter.query.toLowerCase().trim();
+          const matchHeadline = (candidate.headline || "").toLowerCase().includes(q);
+          const matchSkills = (candidate.skills || []).some((skill) => skill.toLowerCase().includes(q));
+          if (!matchHeadline && !matchSkills) return false;
+        }
+        if (filter?.country) {
+          const target = filter.country.toLowerCase().trim();
+          const location = [candidate.country, candidate.location].filter(Boolean).join(" ").toLowerCase();
+          if (!location.includes(target)) return false;
+        }
+        if (filter?.skills?.length) {
+          const candidateSkills = (candidate.skills || []).map((skill) => skill.toLowerCase());
+          if (!filter.skills.some((skill) => candidateSkills.includes(skill.toLowerCase()))) return false;
+        }
+        return true;
+      });
+      const filterKey = JSON.stringify({
+        query: filter?.query?.trim().toLowerCase() || "",
+        country: filter?.country?.trim().toLowerCase() || "",
+        skills: [...(filter?.skills || [])].map((skill) => skill.trim().toLowerCase()).filter(Boolean).sort(),
+        jobId: filter?.jobId || "",
+      });
+      const batchKey = `sourcing:global-candidates-batch:${encodeURIComponent(source)}:${encodeURIComponent(filterKey)}`;
+      const offset = await readBatchOffset(batchKey, filteredCandidates.length);
+      const batch = filteredCandidates.length > maxItems
+        ? Array.from({ length: maxItems }, (_, index) => filteredCandidates[(offset + index) % filteredCandidates.length])
+        : filteredCandidates;
       let created = 0;
       let updated = 0;
       let matched = 0;
 
       for (const candidate of batch) {
-        if (filter?.query) {
-          const q = filter.query.toLowerCase();
-          const matchTitle = (candidate.headline || "").toLowerCase().includes(q);
-          const matchSkills = (candidate.skills || []).some((s) => s.toLowerCase().includes(q));
-          if (!matchTitle && !matchSkills) continue;
-        }
-
-        if (filter?.country && candidate.country) {
-          if (candidate.country.toLowerCase() !== filter.country.toLowerCase()) continue;
-        }
-
-        if (filter?.skills && filter.skills.length > 0) {
-          const candidateSkills = (candidate.skills || []).map((s) => s.toLowerCase());
-          const hasSkill = filter.skills.some((reqSkill) => candidateSkills.includes(reqSkill.toLowerCase()));
-          if (!hasSkill) continue;
-        }
-
         let score: number | null = null;
         let matchDetails: Prisma.InputJsonValue | undefined = undefined;
 
@@ -563,8 +596,8 @@ export async function ingestGlobalCandidates(params: {
         }
       }
 
-      if (candidates.length > 0 && batch.length > 0) {
-        await writeBatchOffset(batchKey, offset + batch.length, candidates.length);
+      if (filteredCandidates.length > 0 && batch.length > 0) {
+        await writeBatchOffset(batchKey, offset + batch.length, filteredCandidates.length);
       }
 
       totalFetched += batch.length;
@@ -572,7 +605,16 @@ export async function ingestGlobalCandidates(params: {
       totalUpdated += updated;
       totalMatched += matched;
 
-      results.push({ sourceUrl: source, fetched: batch.length, sourceTotal: candidates.length, batchLimit: maxItems, created, updated, matched });
+      results.push({
+        sourceUrl: source,
+        fetched: batch.length,
+        sourceTotal: candidates.length,
+        filteredTotal: filteredCandidates.length,
+        batchLimit: maxItems,
+        created,
+        updated,
+        matched,
+      });
     } catch (err) {
       results.push({
         sourceUrl: source,
