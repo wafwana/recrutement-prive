@@ -27,11 +27,11 @@ export async function GET(
     return NextResponse.json({ error: "Pièce justificative introuvable." }, { status: 404 });
   }
 
-  return new NextResponse(outflow.documentData, {
+  return new NextResponse(Buffer.from(outflow.documentData), {
     status: 200,
     headers: {
       "Content-Type": outflow.documentMimeType || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${(outflow.documentName || "justificatif").replace(/["\\\\\r\n]/g, "_")}"`,
+      "Content-Disposition": `inline; filename="${(outflow.documentName || "justificatif").replace(/["\\\\\\r\\n]/g, "_")}"`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },
