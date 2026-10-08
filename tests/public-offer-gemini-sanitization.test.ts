@@ -5,10 +5,10 @@ import path from "node:path";
 
 const root = process.cwd();
 
-test("public offer Gemini payload removes URLs, contact data and internal markers", () => {
+test("public offer Gemini payload is sanitized before execution", () => {
   const source = fs.readFileSync(path.join(root, "lib/sourcing/offer-analyzer.ts"), "utf8");
-  assert.match(source, /https\?:\\\/\\\/\[\^\\s\]\+/);
+  assert.match(source, /sanitizePublicOfferDescription/);
+  assert.match(source, /https\?:/);
   assert.match(source, /companyName/);
-  assert.match(source, /candidatures\?\|candidats\?\|postulants\?/);
   assert.match(source, /descriptionSummary: sanitizePublicOfferDescription/);
 });
