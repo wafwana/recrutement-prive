@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     const event = resend.webhooks.verify({
       payload,
       headers,
-      secret,
+      webhookSecret: secret,
     });
 
     if (event.type !== "email.received") {
