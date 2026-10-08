@@ -16,3 +16,16 @@ test("required secure contact contract templates exist", () => {
     assert.ok(keys.includes(key));
   }
 });
+
+test("contract acceptance gates payment and candidate contact start", () => {
+  const route = read("app/api/contacts/secure/route.ts");
+  const payments = read("lib/payments/secure-contact.ts");
+  const contacts = read("lib/contacts/secure-contact.ts");
+  const paymentPanel = read("app/espace/entreprise/presentation/[presentationId]/PaymentPanel.tsx");
+  const candidatePage = read("app/espace/candidat/candidatures/[applicationId]/page.tsx");
+  assert.match(route, /SECURE_CONTACT_CONTRACTS_ACCEPTED/);
+  assert.match(payments, /Les conditions contractuelles du contact doivent être acceptées/);
+  assert.match(contacts, /Le candidat doit accepter les conditions contractuelles/);
+  assert.match(paymentPanel, /ENTREPRISE_CONTACT/);
+  assert.match(candidatePage, /acceptCandidateTerms/);
+});
