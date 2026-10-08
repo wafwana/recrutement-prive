@@ -12,6 +12,7 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start"), meetingId: z.string().min(1) }),
   z.object({ action: z.literal("complete"), meetingId: z.string().min(1) }),
   z.object({ action: z.literal("decision"), meetingId: z.string().min(1), decisionStatus: z.enum(["RECRUIT","CONTINUE","CLOSE"]), decisionNotes: z.string().max(2000).optional() }),
+  z.object({ action: z.literal("accept_terms"), meetingId: z.string().min(1), contractKeys: z.array(z.string().min(1)).min(1).max(10) }),
 ]);
 
 async function participant(meetingId: string) {
@@ -64,6 +65,41 @@ export async function POST(request: Request) {
     return NextResponse.json({ meeting: updated });
   }
   if (meeting.presentation.candidateUserId !== session.user.id && meeting.presentation.companyUserId !== session.user.id) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+
+  if (parsed.data.action === "accept_terms") {
+    if (!["REQUESTED", "CONFIRMED", "ACTIVE"].includes(meeting.status)) return NextResponse.json({ error: "Les conditions ne peuvent plus être acceptées sur ce contact." }, { status: 409 });
+    const requiredKeys = meeting.presentation.companyUserId === session.user.id
+      ? ["ENTREPRISE_CONTACT", "INTERVIEW_SECURE", "ANTI_CIRCUMVENTION", "SECURE_CHANNEL_POLICY"]
+      : ["CANDIDAT_CONTACT", "INTERVIEW_SECURE", "ANTI_CIRCUMVENTION", "SECURE_CHANNEL_POLICY"];
+    if (!requiredKeys.every((key) => parsed.data.contractKeys.includes(key))) {
+      return NextResponse.json({ error: "Tous les documents contractuels requis doivent être acceptés." }, { status: 400 });
+    }
+    const security = (meeting.securityDetails && typeof meeting.securityDetails === "object" && !Array.isArray(meeting.securityDetails))
+      ? meeting.securityDetails as Record<string, unknown>
+      : {};
+    const acceptances = security.contractAcceptances && typeof security.contractAcceptances === "object" && !Array.isArray(security.contractAcceptances)
+      ? security.contractAcceptances as Record<string, unknown>
+      : {};
+    const nextAcceptances = {
+      ...acceptances,
+      [session.user.id]: { role: session.user.role, keys: requiredKeys, acceptedAt: new Date().toISOString() },
+    };
+    const updated = await prisma.contactMeeting.update({
+      where: { id: meeting.id },
+      data: { securityDetails: { ...security, contractAcceptances: nextAcceptances } },
+    });
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: session.user.id,
+        actorRole: session.user.role || "CANDIDAT",
+        action: "SECURE_CONTACT_CONTRACTS_ACCEPTED",
+        targetType: "CONTACT_MEETING",
+        targetId: meeting.id,
+        details: { contractKeys: requiredKeys },
+      },
+    });
+    return NextResponse.json({ meeting: updated });
+  }
   if (parsed.data.action === "start") {
     try {
       const updated = await startContactMeeting(meeting.id, session.user.id);
