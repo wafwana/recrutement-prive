@@ -5,8 +5,14 @@ import Link from "next/link";
 import ProfileForm from "./ProfileForm";
 import DocumentManager from "./DocumentManager";
 import ApplicationsList from "./ApplicationsList";
+import CandidateJobApplication from "./CandidateJobApplication";
+import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 
-export default async function CandidatPage() {
+type Props = {
+  searchParams: Promise<{ jobId?: string }>;
+};
+
+export default async function CandidatPage({ searchParams }: Props) {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -16,6 +22,8 @@ export default async function CandidatPage() {
   if (session.user.role !== "CANDIDAT") {
     redirect("/espace");
   }
+
+  const { jobId } = await searchParams;
 
   const [profile, categories] = await Promise.all([
     prisma.candidateProfile.findUnique({ where: { userId: session.user.id } }),
@@ -47,6 +55,66 @@ export default async function CandidatPage() {
       })
     : [];
 
+  let selectedJob: {
+    id: string;
+    title: string;
+    location: string | null;
+    description: string | null;
+    requiredSkills: unknown;
+    requiredExperienceYears: number | null;
+    missionType: string | null;
+    jobCategory: { code: string } | null;
+    subCategory: { code: string } | null;
+  } | null = null;
+
+  if (jobId) {
+    selectedJob = await prisma.job.findFirst({
+      where: { id: jobId, status: "OPEN" },
+      select: {
+        id: true,
+        title: true,
+        location: true,
+        description: true,
+        requiredSkills: true,
+        requiredExperienceYears: true,
+        missionType: true,
+        jobCategory: { select: { code: true } },
+        subCategory: { select: { code: true } },
+      },
+    });
+  }
+
+  const selectedApplication = selectedJob && profile
+    ? await prisma.application.findUnique({
+        where: { candidateId_jobId: { candidateId: profile.id, jobId: selectedJob.id } },
+        select: { id: true },
+      })
+    : null;
+
+  const selectedMatch = selectedJob
+    ? matchCandidateToJob(
+        {
+          skills: Array.isArray(profile?.skills) ? profile.skills.filter((value): value is string => typeof value === "string") : [],
+          experienceYears: profile?.experienceYears ?? null,
+          headline: profile?.headline ?? null,
+          bio: profile?.bio ?? null,
+          location: profile?.location ?? null,
+          country: profile?.country ?? null,
+          primaryCategoryCode: null,
+          subCategoryCodes: [],
+        },
+        {
+          requiredSkills: selectedJob.requiredSkills,
+          requiredExperienceYears: selectedJob.requiredExperienceYears,
+          title: selectedJob.title,
+          description: selectedJob.description,
+          location: selectedJob.location,
+          categoryCode: selectedJob.jobCategory?.code ?? null,
+          subCategoryCode: selectedJob.subCategory?.code ?? null,
+        },
+      ).score
+    : null;
+
   const stats = [
     ["Profil", profile?.headline ? "Complété" : "À compléter", "Votre présentation professionnelle"],
     ["Dossiers", String(applications.length), "Suivi par Recrutement Privé"],
@@ -68,10 +136,33 @@ export default async function CandidatPage() {
         {stats.map(([label, value, description]) => (
           <div key={label} className="bg-[#111] p-7">
             <span className="text-[10px] uppercase tracking-[0.22em] text-white/40">{label}</span>
-            {label === "Dossiers" ? <Link href="/espace/candidat/candidatures" className="block group"><p className="mt-6 font-serif text-3xl text-[#c7a15a]">{value}</p><p className="mt-3 text-sm text-white/45">{description}</p><span className="mt-3 block text-[9px] uppercase tracking-[0.14em] text-white/25 group-hover:text-[#c7a15a]">Ouvrir les candidatures →</span></Link> : <><p className="mt-6 font-serif text-3xl text-[#c7a15a]">{value}</p><p className="mt-3 text-sm text-white/45">{description}</p></>}
+            {label === "Dossiers" ? (
+              <Link href="/espace/candidat/candidatures" className="block group">
+                <p className="mt-6 font-serif text-3xl text-[#c7a15a]">{value}</p>
+                <p className="mt-3 text-sm text-white/45">{description}</p>
+                <span className="mt-3 block text-[9px] uppercase tracking-[0.14em] text-white/25 group-hover:text-[#c7a15a]">Ouvrir les candidatures →</span>
+              </Link>
+            ) : (
+              <>
+                <p className="mt-6 font-serif text-3xl text-[#c7a15a]">{value}</p>
+                <p className="mt-3 text-sm text-white/45">{description}</p>
+              </>
+            )}
           </div>
         ))}
       </div>
+
+      {selectedJob && (
+        <div className="mt-10">
+          <CandidateJobApplication
+            jobId={selectedJob.id}
+            title={selectedJob.title}
+            location={selectedJob.location}
+            score={selectedMatch}
+            alreadyApplied={Boolean(selectedApplication)}
+          />
+        </div>
+      )}
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-8">
