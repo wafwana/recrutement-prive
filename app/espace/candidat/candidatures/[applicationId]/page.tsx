@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 
 const labels: Record<string, string> = {
   SUBMITTED: "Candidature envoyée",
