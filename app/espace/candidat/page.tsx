@@ -6,6 +6,7 @@ import ProfileForm from "./ProfileForm";
 import DocumentManager from "./DocumentManager";
 import ApplicationsList from "./ApplicationsList";
 import CandidateJobApplication from "./CandidateJobApplication";
+import CandidateJobMatches from "./CandidateJobMatches";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 
 type Props = {
@@ -83,6 +84,62 @@ export default async function CandidatPage({ searchParams }: Props) {
       },
     });
   }
+
+  const openJobs = profile
+    ? await prisma.job.findMany({
+        where: { status: "OPEN" },
+        select: {
+          id: true,
+          title: true,
+          location: true,
+          description: true,
+          requiredSkills: true,
+          requiredExperienceYears: true,
+          company: { select: { name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      })
+    : [];
+
+  const candidateForMatching = {
+    skills: Array.isArray(profile?.skills) ? profile.skills.filter((value): value is string => typeof value === "string") : [],
+    experienceYears: profile?.experienceYears ?? null,
+    headline: profile?.headline ?? null,
+    bio: profile?.bio ?? null,
+    location: profile?.location ?? null,
+    country: profile?.country ?? null,
+    primaryCategoryCode: null,
+    subCategoryCodes: [],
+  };
+
+  const candidateMatches = profile
+    ? openJobs
+        .map((job) => {
+          const match = matchCandidateToJob(candidateForMatching, {
+            requiredSkills: job.requiredSkills,
+            requiredExperienceYears: job.requiredExperienceYears,
+            title: job.title,
+            description: job.description,
+            location: job.location,
+            categoryCode: null,
+            subCategoryCode: null,
+          });
+          return {
+            jobId: job.id,
+            title: job.title,
+            companyName: job.company.name,
+            location: job.location,
+            score: match.score,
+            matchedSkills: match.matchedSkills,
+            missingSkills: match.missingSkills,
+            reasons: match.reasons,
+          };
+        })
+        .filter((match) => match.score >= 25)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 20)
+    : [];
 
   const selectedApplication = selectedJob && profile
     ? await prisma.application.findUnique({
@@ -163,6 +220,8 @@ export default async function CandidatPage({ searchParams }: Props) {
           />
         </div>
       )}
+
+      <CandidateJobMatches matches={candidateMatches} />
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-8">
