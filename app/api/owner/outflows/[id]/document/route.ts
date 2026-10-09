@@ -27,7 +27,8 @@ export async function GET(
     return NextResponse.json({ error: "Pièce justificative introuvable." }, { status: 404 });
   }
 
-  return new NextResponse(outflow.documentData, {
+  const body = new Uint8Array(outflow.documentData).buffer as ArrayBuffer;
+  return new NextResponse(body, {
     status: 200,
     headers: {
       "Content-Type": outflow.documentMimeType || "application/octet-stream",
