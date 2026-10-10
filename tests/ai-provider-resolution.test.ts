@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getActiveAiProvider } from "@/lib/ai/client";
+import { getGeminiModel } from "@/lib/ai/gemini";
 
 const original = {
   provider: process.env.AI_PROVIDER,
   gemini: process.env.GEMINI_API_KEY,
   openai: process.env.OPENAI_API_KEY,
+  geminiModel: process.env.GEMINI_MODEL,
 };
 
 function resetEnv() {
@@ -18,6 +20,7 @@ test.after(() => {
   if (original.provider === undefined) delete process.env.AI_PROVIDER; else process.env.AI_PROVIDER = original.provider;
   if (original.gemini === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = original.gemini;
   if (original.openai === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = original.openai;
+  if (original.geminiModel === undefined) delete process.env.GEMINI_MODEL; else process.env.GEMINI_MODEL = original.geminiModel;
 });
 
 test("AI provider resolution is fail-closed", () => {
@@ -43,4 +46,12 @@ test("AI provider resolution is fail-closed", () => {
 
   process.env.OPENAI_API_KEY = "test-openai";
   assert.equal(getActiveAiProvider(), "openai");
+});
+
+
+test("Gemini uses a current economical default model and respects an explicit override", () => {
+  delete process.env.GEMINI_MODEL;
+  assert.equal(getGeminiModel(), "gemini-3.5-flash-lite");
+  process.env.GEMINI_MODEL = "gemini-3.8-flash";
+  assert.equal(getGeminiModel(), "gemini-3.8-flash");
 });
