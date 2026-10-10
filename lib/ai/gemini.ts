@@ -10,6 +10,40 @@ import { safeLogError, safeLogInfo } from "./privacy";
  * - Does NOT log raw request payloads, prompts, CV/offer text, or raw API response bodies.
  * - Uses generic error messages with minimal technical status codes.
  */
+/** Convert JSON Schema into the restricted Gemini Schema format. */
+export function toGeminiResponseSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  const normalize = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(normalize);
+    if (!value || typeof value !== "object") return value;
+    const input = value as Record<string, unknown>;
+    const output: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(input)) {
+      // Gemini's Schema API does not accept JSON Schema's additionalProperties keyword.
+      if (key === "additionalProperties") continue;
+      if (key === "type") {
+        if (Array.isArray(child)) {
+          const types = child.filter((item): item is string => typeof item === "string");
+          const concrete = types.find((item) => item !== "null");
+          if (concrete) {
+            output.type = concrete.toUpperCase();
+            if (types.includes("null")) output.nullable = true;
+          }
+        } else if (typeof child === "string") {
+          output.type = child.toUpperCase();
+        }
+        continue;
+      }
+      if (key === "properties" && child && typeof child === "object" && !Array.isArray(child)) {
+        output.properties = Object.fromEntries(Object.entries(child as Record<string, unknown>).map(([name, property]) => [name, normalize(property)]));
+        continue;
+      }
+      output[key] = normalize(child);
+    }
+    return output;
+  };
+  return normalize(schema) as Record<string, unknown>;
+}
+
 export function getGeminiModel(): string {
   return process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
 }
@@ -48,8 +82,8 @@ export async function callGeminiStructured<T>(
   const payload = {
     contents: [{ parts }],
     generationConfig: {
-      response_mime_type: "application/json",
-      response_schema: request.jsonSchema,
+      responseMimeType: "application/json",
+      responseSchema: toGeminiResponseSchema(request.jsonSchema),
     },
   };
 
