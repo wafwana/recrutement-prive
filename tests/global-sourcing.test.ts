@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { configuredSources, fetchGlobalJobs } from "@/lib/sourcing/global";
 import { assertPublicDnsHost, isPublicIpAddress, isSafeHttpsUrl } from "@/lib/security/ssrf";
+import { sanitizeAndValidateGeminiPayload } from "@/lib/ai/privacy";
+import { getGeminiModel } from "@/lib/ai/gemini";
+import { sanitizePublicOfferDescription } from "@/lib/sourcing/offer-analyzer";
 
 test("configuredSources accepte uniquement des URLs HTTPS", () => {
   process.env.RP_GLOBAL_JOB_SOURCES = JSON.stringify([
@@ -48,4 +51,54 @@ test("SSRF address classifier blocks private, link-local, mapped-private and spe
 
 test("SSRF DNS guard rejects loopback and private host resolution", async () => {
   await assert.rejects(() => assertPublicDnsHost("localhost"), /non-public|private|reserved/i);
+});
+
+
+test("Gemini public-offer sanitizer strips URLs and contact data before inspection", () => {
+  const result = sanitizeAndValidateGeminiPayload({
+    title: "Senior Engineer https://jobs.example.com/123",
+    location: "Paris",
+    descriptionSummary: "Build APIs. website: https://example.com/app Contact recrutement@example.com",
+  });
+  assert.equal(result.allowed, true);
+  assert.ok(result.sanitizedPrompt);
+  assert.doesNotMatch(result.sanitizedPrompt || "", /https?:\/\/|@|website\s*:/i);
+});
+
+test("Gemini public-offer sanitizer still blocks candidate and confidential markers", () => {
+  const candidate = sanitizeAndValidateGeminiPayload({
+    title: "Poste ingénieur",
+    location: "Paris",
+    descriptionSummary: "Le candidat possède une expérience professionnelle.",
+  });
+  assert.equal(candidate.allowed, false);
+
+  const confidential = sanitizeAndValidateGeminiPayload({
+    title: "Directeur",
+    location: "Paris",
+    descriptionSummary: "Projet strictement confidentiel.",
+  });
+  assert.equal(confidential.allowed, false);
+});
+
+
+test("Gemini offer sanitization removes company name case-insensitively from title and summary", () => {
+  const title = sanitizePublicOfferDescription("Senior Engineer — ACME GROUP", "Acme Group");
+  const summary = sanitizePublicOfferDescription("Role at acme group. Apply at https://acme.example/jobs", "ACME GROUP");
+  assert.doesNotMatch(title, /acme group/i);
+  assert.doesNotMatch(summary, /acme group|https?:\/\//i);
+});
+
+
+test("Gemini defaults to a current economical model unless explicitly configured", () => {
+  const originalModel = process.env.GEMINI_MODEL;
+  try {
+    delete process.env.GEMINI_MODEL;
+    assert.equal(getGeminiModel(), "gemini-3.5-flash-lite");
+    process.env.GEMINI_MODEL = "gemini-3.8-flash";
+    assert.equal(getGeminiModel(), "gemini-3.8-flash");
+  } finally {
+    if (originalModel === undefined) delete process.env.GEMINI_MODEL;
+    else process.env.GEMINI_MODEL = originalModel;
+  }
 });

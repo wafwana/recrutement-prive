@@ -20,14 +20,14 @@ export type ExternalOfferAnalysis = {
   confidence: number;
 };
 
-function sanitizePublicOfferDescription(value: string | null | undefined, companyName?: string | null): string {
+export function sanitizePublicOfferDescription(value: string | null | undefined, companyName?: string | null): string {
   let text = (value || "").replace(/https?:\/\/[^\s]+/gi, " ");
   text = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, " ");
   text = text.replace(/(?:(?:\+|00)\d{1,3}[\s.-]?)?(?:0|\(0\))[1-9](?:[\s.-]?\d{2}){4}|\+\d{10,13}/g, " ");
   text = text.replace(/\b(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|c[a-z0-9]{24}|(?:usr_|cand_|job_|comp_|pres_)[a-zA-Z0-9_-]+)\b/gi, " ");
   if (companyName?.trim()) {
-    const company = companyName.trim().toLowerCase();
-    text = text.split(company).join(" ");
+    const escapedCompany = companyName.trim().replace(/[.*+?^$()|[\]\\]/g, "\\$&");
+    text = text.replace(new RegExp(escapedCompany, "gi"), " ");
   }
   text = text
     .replace(/\b(candidatures?|candidats?|postulants?)\b/gi, "profils")
@@ -80,7 +80,7 @@ export async function analyzeExternalOffer(input: {
     jsonSchemaName: "external_offer_analysis",
     jsonSchema: schema as any,
     geminiAllowedFields: {
-      title: input.title,
+      title: sanitizePublicOfferDescription(input.title, input.companyName),
       location: genericLocation,
       descriptionSummary: sanitizePublicOfferDescription(input.description, input.companyName),
     },
