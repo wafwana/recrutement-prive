@@ -35,9 +35,12 @@ export async function createSecureContactCheckout(meetingId: string, companyUser
   const secret = process.env.STRIPE_SECRET_KEY;
   if (!secret) throw new Error("Le paiement en ligne n'est pas encore activé. Utilisez le virement bancaire ou contactez le cabinet.");
   const params = new URLSearchParams();
+  // Stripe requires absolute redirect URLs. AUTH_URL is preferred; the canonical
+  // production domain is a safe fallback when the deployment has no base URL var.
+  const appUrl = (process.env.AUTH_URL || process.env.NEXTAUTH_URL || "https://www.recrutement-prive.com").replace(/\\/$/, "");
   params.set("mode", "payment");
-  params.set("success_url", `${process.env.NEXTAUTH_URL || ""}/espace/entreprise/paiement/succes?meetingId=${meeting.id}`);
-  params.set("cancel_url", `${process.env.NEXTAUTH_URL || ""}/espace/entreprise/presentation/${meeting.presentation.id}`);
+  params.set("success_url", `${appUrl}/espace/entreprise/paiement/succes?meetingId=${encodeURIComponent(meeting.id)}`);
+  params.set("cancel_url", `${appUrl}/espace/entreprise/presentation/${encodeURIComponent(meeting.presentation.id)}`);
   params.set("line_items[0][price_data][currency]", "eur");
   params.set("line_items[0][price_data][product_data][name]", "Contact sécurisé Recrutement Privé — 30 minutes");
   params.set("line_items[0][price_data][product_data][description]", "Entretien interne sécurisé, 30 minutes, coordonnées protégées.");
