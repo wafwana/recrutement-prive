@@ -76,7 +76,7 @@ export async function callGeminiStructured<T>(
   }
 
   const textContent = request.systemPrompt
-    ? `${request.systemPrompt}\\n\\n${request.userPrompt}`
+    ? `${request.systemPrompt}\n\n${request.userPrompt}`
     : request.userPrompt;
   parts.push({ text: textContent });
 
