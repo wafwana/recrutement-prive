@@ -77,7 +77,6 @@ export async function GET(request: Request) {
         const batch = items.length > MAX_OFFERS_PER_SOURCE_RUN
           ? Array.from({ length: MAX_OFFERS_PER_SOURCE_RUN }, (_, index) => items[(offset + index) % items.length])
           : items;
-        let processedInBatch = 0;
         for (const item of batch) {
           if (!item.country || !selectedCountries.has(normalize(item.country))) continue;
           offers++;
@@ -274,8 +273,6 @@ export async function GET(request: Request) {
             },
           });
 
-          processedInBatch++;
-
           if (
             outreach?.recipientEmail &&
             process.env.RP_AUTO_OUTREACH_ENABLED === "true"
@@ -297,8 +294,10 @@ export async function GET(request: Request) {
             }
           }
         }
-        if (items.length > 0 && processedInBatch > 0) {
-          await writeBatchOffset(batchKey, offset + processedInBatch, items.length);
+        // Advance over every scanned source item, including offers filtered out by country.
+        // Otherwise a country filter can pin the batch cursor forever on the same items.
+        if (items.length > 0 && batch.length > 0) {
+          await writeBatchOffset(batchKey, offset + batch.length, items.length);
         }
       } catch (error) {
         errors.push({
