@@ -37,7 +37,7 @@ export async function createSecureContactCheckout(meetingId: string, companyUser
   const params = new URLSearchParams();
   // Stripe requires absolute redirect URLs. AUTH_URL is preferred; the canonical
   // production domain is a safe fallback when the deployment has no base URL var.
-  const appUrl = (process.env.AUTH_URL || process.env.NEXTAUTH_URL || "https://www.recrutement-prive.com").replace(/\\/$/, "");
+  const appUrl = (process.env.AUTH_URL || process.env.NEXTAUTH_URL || "https://www.recrutement-prive.com").replace(/\/$/, "");
   params.set("mode", "payment");
   params.set("success_url", `${appUrl}/espace/entreprise/paiement/succes?meetingId=${encodeURIComponent(meeting.id)}`);
   params.set("cancel_url", `${appUrl}/espace/entreprise/presentation/${encodeURIComponent(meeting.presentation.id)}`);
