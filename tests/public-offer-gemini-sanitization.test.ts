@@ -11,4 +11,5 @@ test("public offer Gemini payload is sanitized before execution", () => {
   assert.match(source, /https\?:/);
   assert.match(source, /companyName/);
   assert.match(source, /descriptionSummary: sanitizePublicOfferDescription/);
+  assert.match(source, /curriculum\\s\+vitae\|CV/);
 });

@@ -30,6 +30,7 @@ export function sanitizePublicOfferDescription(value: string | null | undefined,
     text = text.replace(new RegExp(escapedCompany, "gi"), " ");
   }
   text = text
+    .replace(/\b(?:curriculum\s+vitae|CV)\b/gi, "dossier professionnel")
     .replace(/\b(candidatures?|candidats?|postulants?)\b/gi, "profils")
     .replace(/\b(expérience\s+professionnelle)\b/gi, "parcours professionnel")
     .replace(/\b(date\s+de\s+naissance|situation\s+familiale|né\(e\)\s+le)\b/gi, " ");
