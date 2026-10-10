@@ -48,3 +48,19 @@ test("governance: granular permissions are OWNER-controlled and ADMINs do not in
   assert.match(route, /session\.user\.role === ["']OWNER["']/);
   assert.match(route, /\["ADMIN", "CONSULTANT"\]/);
 });
+
+test("OWNER dashboard compatibility route redirects to the canonical cockpit", () => {
+  const compatibilityPage = read("app/owner/page.tsx");
+  assert.match(compatibilityPage, /redirect\(["']\/espace\/owner["']\)/);
+});
+
+test("OWNER permissions route remains separate from the dashboard compatibility redirect", () => {
+  const permissionsPage = read("app/owner/permissions/page.tsx");
+  assert.match(permissionsPage, /Permissions ADMIN \/ CONSULTANT/);
+  assert.doesNotMatch(permissionsPage, /redirect\(["']\/espace\/owner["']\)/);
+});
+
+test("OWNER access gate: unauthorized access still redirects to sign-in", () => {
+  const ownerPage = read("app/espace/owner/page.tsx");
+  assert.match(ownerPage, /if \(!session\?\.user\?\.id \|\| role !== ["']OWNER["']\) redirect\(["']\/connexion["']\)/);
+});
