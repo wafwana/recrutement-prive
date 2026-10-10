@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { configuredSources, fetchGlobalJobs } from "@/lib/sourcing/global";
 import { assertPublicDnsHost, isPublicIpAddress, isSafeHttpsUrl } from "@/lib/security/ssrf";
 import { sanitizeAndValidateGeminiPayload } from "@/lib/ai/privacy";
+import { getGeminiModel } from "@/lib/ai/gemini";
 import { sanitizePublicOfferDescription } from "@/lib/sourcing/offer-analyzer";
 
 test("configuredSources accepte uniquement des URLs HTTPS", () => {
@@ -86,4 +87,18 @@ test("Gemini offer sanitization removes company name case-insensitively from tit
   const summary = sanitizePublicOfferDescription("Role at acme group. Apply at https://acme.example/jobs", "ACME GROUP");
   assert.doesNotMatch(title, /acme group/i);
   assert.doesNotMatch(summary, /acme group|https?:\/\//i);
+});
+
+
+test("Gemini defaults to a current economical model unless explicitly configured", () => {
+  const originalModel = process.env.GEMINI_MODEL;
+  try {
+    delete process.env.GEMINI_MODEL;
+    assert.equal(getGeminiModel(), "gemini-3.5-flash-lite");
+    process.env.GEMINI_MODEL = "gemini-3.8-flash";
+    assert.equal(getGeminiModel(), "gemini-3.8-flash");
+  } finally {
+    if (originalModel === undefined) delete process.env.GEMINI_MODEL;
+    else process.env.GEMINI_MODEL = originalModel;
+  }
 });
