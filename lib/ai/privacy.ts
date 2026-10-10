@@ -124,6 +124,14 @@ function sanitizeAllowedPublicText(value: string | null | undefined): string {
     .replace(/\b(?:companyName|contactEmail|sourceUrl|companySiret|rawText|siret|siren|website|url)\s*[:=][^\n]*/gi, " ")
     .replace(/\b(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|c[a-z0-9]{24}|(?:usr_|cand_|job_|comp_|pres_)[a-zA-Z0-9_-]+)\b/gi, " ")
     .replace(/\s+/g, " ")
+    // Normalize generic job-ad vocabulary only in explicitly allowlisted public-offer fields.
+    .replace(/\b(curriculum\s+vitae|cv)\b/gi, "dossier professionnel")
+    .replace(/\b(candidatures?|candidats?|postulants?)\b/gi, "profils")
+    .replace(/\bexpérience\s+professionnelle\b/gi, "parcours professionnel")
+    .replace(/\bmon\s+parcours\b/gi, "parcours")
+    .replace(/\bdiplômes?\s+obtenus?\b/gi, "qualifications")
+    .replace(/\bpermis\s+de\s+conduire\b/gi, "permis")
+    .replace(/\b(situation\s+familiale|date\s+de\s+naissance|né\(e\)\s+le)\b/gi, " ")
     .trim()
     .slice(0, 6000);
 }
