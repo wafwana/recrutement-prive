@@ -10,6 +10,18 @@ import { safeLogError, safeLogInfo } from "./privacy";
  * - Does NOT log raw request payloads, prompts, CV/offer text, or raw API response bodies.
  * - Uses generic error messages with minimal technical status codes.
  */
+/** Build the GenerateContent structured-output configuration using Google's REST shape. */
+export function buildGeminiGenerationConfig(schema: Record<string, unknown>) {
+  return {
+    responseFormat: {
+      text: {
+        mimeType: "application/json",
+        schema,
+      },
+    },
+  };
+}
+
 export function getGeminiModel(): string {
   return process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
 }
@@ -47,10 +59,7 @@ export async function callGeminiStructured<T>(
 
   const payload = {
     contents: [{ parts }],
-    generationConfig: {
-      response_mime_type: "application/json",
-      response_schema: request.jsonSchema,
-    },
+    generationConfig: buildGeminiGenerationConfig(request.jsonSchema),
   };
 
   try {

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getActiveAiProvider } from "@/lib/ai/client";
-import { getGeminiModel } from "@/lib/ai/gemini";
+import { buildGeminiGenerationConfig, getGeminiModel } from "@/lib/ai/gemini";
 
 const original = {
   provider: process.env.AI_PROVIDER,
@@ -54,4 +54,21 @@ test("Gemini uses a current economical default model and respects an explicit ov
   assert.equal(getGeminiModel(), "gemini-3.5-flash-lite");
   process.env.GEMINI_MODEL = "gemini-3.8-flash";
   assert.equal(getGeminiModel(), "gemini-3.8-flash");
+});
+
+
+test("Gemini structured output uses the documented GenerateContent REST envelope", () => {
+  const schema = {
+    type: "object",
+    properties: { years: { type: ["number", "null"] } },
+    required: ["years"],
+  };
+  assert.deepEqual(buildGeminiGenerationConfig(schema), {
+    responseFormat: {
+      text: {
+        mimeType: "application/json",
+        schema,
+      },
+    },
+  });
 });
