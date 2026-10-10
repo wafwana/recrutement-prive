@@ -52,7 +52,6 @@ test("governance: granular permissions are OWNER-controlled and ADMINs do not in
 test("OWNER dashboard compatibility route redirects to the canonical cockpit", () => {
   const compatibilityPage = read("app/owner/page.tsx");
   assert.match(compatibilityPage, /redirect\(["']\/espace\/owner["']\)/);
-  assert.match(compatibilityPage, /redirect\(["']\/espace\/owner["']\)/);
 });
 
 test("OWNER permissions route remains separate from the dashboard compatibility redirect", () => {
