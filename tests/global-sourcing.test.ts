@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { configuredSources, fetchGlobalJobs } from "@/lib/sourcing/global";
 import { assertPublicDnsHost, isPublicIpAddress, isSafeHttpsUrl } from "@/lib/security/ssrf";
 import { sanitizeAndValidateGeminiPayload } from "@/lib/ai/privacy";
+import { sanitizePublicOfferDescription } from "@/lib/sourcing/offer-analyzer";
 
 test("configuredSources accepte uniquement des URLs HTTPS", () => {
   process.env.RP_GLOBAL_JOB_SOURCES = JSON.stringify([
@@ -77,4 +78,12 @@ test("Gemini public-offer sanitizer still blocks candidate and confidential mark
     descriptionSummary: "Projet strictement confidentiel.",
   });
   assert.equal(confidential.allowed, false);
+});
+
+
+test("Gemini offer sanitization removes company name case-insensitively from title and summary", () => {
+  const title = sanitizePublicOfferDescription("Senior Engineer — ACME GROUP", "Acme Group");
+  const summary = sanitizePublicOfferDescription("Role at acme group. Apply at https://acme.example/jobs", "ACME GROUP");
+  assert.doesNotMatch(title, /acme group/i);
+  assert.doesNotMatch(summary, /acme group|https?:\/\//i);
 });
