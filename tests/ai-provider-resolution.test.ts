@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getActiveAiProvider } from "@/lib/ai/client";
-import { getGeminiModel } from "@/lib/ai/gemini";
+import { getGeminiModel, toGeminiResponseSchema } from "@/lib/ai/gemini";
 
 const original = {
   provider: process.env.AI_PROVIDER,
@@ -54,4 +54,27 @@ test("Gemini uses a current economical default model and respects an explicit ov
   assert.equal(getGeminiModel(), "gemini-3.5-flash-lite");
   process.env.GEMINI_MODEL = "gemini-3.8-flash";
   assert.equal(getGeminiModel(), "gemini-3.8-flash");
+});
+
+
+test("Gemini response schema uses API-compatible types and nullable fields", () => {
+  const normalized = toGeminiResponseSchema({
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      title: { type: "string" },
+      years: { type: ["number", "null"] },
+      skills: { type: "array", items: { type: "string" } },
+    },
+    required: ["title", "years", "skills"],
+  });
+  assert.deepEqual(normalized, {
+    type: "OBJECT",
+    properties: {
+      title: { type: "STRING" },
+      years: { type: "NUMBER", nullable: true },
+      skills: { type: "ARRAY", items: { type: "STRING" } },
+    },
+    required: ["title", "years", "skills"],
+  });
 });
