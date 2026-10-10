@@ -10,6 +10,10 @@ import { safeLogError, safeLogInfo } from "./privacy";
  * - Does NOT log raw request payloads, prompts, CV/offer text, or raw API response bodies.
  * - Uses generic error messages with minimal technical status codes.
  */
+export function getGeminiModel(): string {
+  return process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
+}
+
 export async function callGeminiStructured<T>(
   request: AiStructuredRequest<T>
 ): Promise<T | null> {
@@ -19,7 +23,7 @@ export async function callGeminiStructured<T>(
     return null;
   }
 
-  const model = request.modelOverride || process.env.GEMINI_MODEL || "gemini-1.5-flash";
+  const model = request.modelOverride || getGeminiModel();
   // Use endpoint WITHOUT key query parameter to protect against URL log leaks
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
