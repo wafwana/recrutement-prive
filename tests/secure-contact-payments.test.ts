@@ -11,6 +11,9 @@ test("secure contact payment supports card, SEPA and bank transfer", () => {
   assert.match(service, /SECURE_CONTACT_AMOUNT_CENTS = 9900/);
   assert.match(service, /paymentStatus: "AWAITING_TRANSFER"/);
   assert.match(service, /STRIPE_SECRET_KEY/);
+  assert.ok(service.includes("https://www.recrutement-prive.com"));
+  assert.match(service, /success_url/);
+  assert.ok(service.includes("AUTH_URL || process.env.NEXTAUTH_URL"));
 });
 
 test("payment is company initiated and provider-confirmed before meeting can start", () => {
