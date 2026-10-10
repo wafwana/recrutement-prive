@@ -7,11 +7,49 @@ import { safeLogError, safeLogInfo } from "./privacy";
  * Never log raw prompts, source text, CV data, or API response bodies.
  */
 
-/** Use the documented GenerateContent REST fields for JSON-schema output. */
+/**
+ * Gemini's structured-output schema accepts JSON Schema subsets. Convert
+ * nullable union types (for example ["string", "null"]) into anyOf, which
+ * is supported by the GenerateContent schema format.
+ */
+export function normalizeGeminiJsonSchema(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeGeminiJsonSchema);
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const source = value as Record<string, unknown>;
+  const normalized: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(source)) {
+    if (key === "type" && Array.isArray(child)) {
+      const types = child.filter((type): type is string => typeof type === "string");
+      if (types.includes("null")) {
+        const nonNullTypes = types.filter((type) => type !== "null");
+        normalized.anyOf = [
+          ...nonNullTypes.map((type) => ({ type })),
+          { type: "null" },
+        ];
+      } else {
+        normalized[key] = types.length === 1 ? types[0] : types;
+      }
+      continue;
+    }
+    normalized[key] = normalizeGeminiJsonSchema(child);
+  }
+  return normalized;
+}
+
+/** Use the documented GenerateContent REST responseFormat schema. */
 export function buildGeminiGenerationConfig(schema: Record<string, unknown>) {
   return {
-    responseMimeType: "application/json",
-    responseJsonSchema: schema,
+    responseFormat: {
+      text: {
+        mimeType: "application/json",
+        schema: normalizeGeminiJsonSchema(schema),
+      },
+    },
   };
 }
 
@@ -38,7 +76,7 @@ export async function callGeminiStructured<T>(
   }
 
   const textContent = request.systemPrompt
-    ? `${request.systemPrompt}\n\n${request.userPrompt}`
+    ? `${request.systemPrompt}\\n\\n${request.userPrompt}`
     : request.userPrompt;
   parts.push({ text: textContent });
 
