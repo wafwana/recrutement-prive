@@ -2,28 +2,23 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildGeminiGenerationConfig, normalizeGeminiJsonSchema } from "../lib/ai/gemini";
 
-test("Gemini structured output uses the documented REST responseFormat shape", () => {
-  const config = buildGeminiGenerationConfig({
+test("Gemini structured output uses the documented GenerateContent REST JSON fields", () => {
+  const schema = {
     type: "object",
     properties: { title: { type: "string" } },
     required: ["title"],
-  });
+  };
+
+  const config = buildGeminiGenerationConfig(schema);
 
   assert.deepEqual(config, {
-    responseFormat: {
-      text: {
-        mimeType: "application/json",
-        schema: {
-          type: "object",
-          properties: { title: { type: "string" } },
-          required: ["title"],
-        },
-      },
-    },
+    responseMimeType: "application/json",
+    responseJsonSchema: schema,
   });
+  assert.equal("responseFormat" in config, false);
 });
 
-test("Gemini schema normalizer converts nullable type unions into anyOf", () => {
+test("Gemini schema normalizer converts nullable type unions into supported anyOf", () => {
   const normalized = normalizeGeminiJsonSchema({
     type: "object",
     properties: {
