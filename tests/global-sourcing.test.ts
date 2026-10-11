@@ -1,10 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { configuredSources, fetchGlobalJobs } from "@/lib/sourcing/global";
+import { configuredSources, fetchGlobalJobs, fetchGlobalCandidates, shouldFallbackToInternalCandidatePool } from "@/lib/sourcing/global";
 import { assertPublicDnsHost, isPublicIpAddress, isSafeHttpsUrl } from "@/lib/security/ssrf";
 import { sanitizeAndValidateGeminiPayload } from "@/lib/ai/privacy";
 import { getGeminiModel } from "@/lib/ai/gemini";
 import { sanitizePublicOfferDescription } from "@/lib/sourcing/offer-analyzer";
+
+test("candidate sourcing falls back internally only when every external source failed", () => {
+  assert.equal(shouldFallbackToInternalCandidatePool([]), false);
+  assert.equal(shouldFallbackToInternalCandidatePool([{ fetched: 0 }]), false);
+  assert.equal(shouldFallbackToInternalCandidatePool([{ error: "HTTP 403" }]), true);
+  assert.equal(shouldFallbackToInternalCandidatePool([{ error: "HTTP 403" }, { error: "HTTP 429" }]), true);
+  assert.equal(shouldFallbackToInternalCandidatePool([{ error: "HTTP 403" }, { fetched: 3 }]), false);
+});
 
 test("configuredSources accepte uniquement des URLs HTTPS", () => {
   process.env.RP_GLOBAL_JOB_SOURCES = JSON.stringify([
@@ -14,7 +22,6 @@ test("configuredSources accepte uniquement des URLs HTTPS", () => {
 });
 
 test("fetchGlobalCandidates sends a descriptive User-Agent and normalizes public profiles", async () => {
-  const { fetchGlobalCandidates } = await import("@/lib/sourcing/global");
   let capturedHeaders: Headers | undefined;
   const candidates = await fetchGlobalCandidates("https://example.com/users.json", async (_url, init) => {
     capturedHeaders = new Headers(init?.headers);
