@@ -41,15 +41,11 @@ export function normalizeGeminiJsonSchema(value: unknown): unknown {
   return normalized;
 }
 
-/** Use the documented GenerateContent REST responseFormat schema. */
+/** Use GenerateContent REST JSON mode with the JSON Schema field. */
 export function buildGeminiGenerationConfig(schema: Record<string, unknown>) {
   return {
-    responseFormat: {
-      text: {
-        mimeType: "application/json",
-        schema: normalizeGeminiJsonSchema(schema),
-      },
-    },
+    responseMimeType: "application/json",
+    responseJsonSchema: normalizeGeminiJsonSchema(schema),
   };
 }
 

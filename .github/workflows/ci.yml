@@ -50,6 +50,8 @@ jobs:
       - run: npm ci
       - name: OWNER compatibility gate — FIRST verification
         run: npm run test:owner-compatibility
+      - name: Verify Gemini structured-output schema contract
+        run: npm run test:gemini-schema-normalization
       - run: npx prisma generate
       - run: npx prisma migrate deploy
       - name: Validate migration history 0011-0014 after local deploy
