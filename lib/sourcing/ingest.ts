@@ -445,7 +445,7 @@ export async function ingestGlobalCandidates(params: {
           activeSourcesCount: 0,
           fallbackSource: "PLATFORM_CVTHEQUE",
           ...internal,
-          matched: 0,
+          matched: internal.matched,
         },
       },
     });
@@ -459,7 +459,7 @@ export async function ingestGlobalCandidates(params: {
       batchLimit: internal.batchLimit,
       created: internal.created,
       updated: internal.updated,
-      matched: 0,
+      matched: internal.matched,
       results: [{
         sourceUrl: "PLATFORM_CVTHEQUE",
         fetched: internal.fetched,
@@ -467,7 +467,7 @@ export async function ingestGlobalCandidates(params: {
         batchLimit: internal.batchLimit,
         created: internal.created,
         updated: internal.updated,
-        matched: 0,
+        matched: internal.matched,
       }],
     };
   }
