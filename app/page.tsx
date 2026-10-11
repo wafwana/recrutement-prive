@@ -64,7 +64,7 @@ export default function HomePage() {
   return <main className="rp-home">
     <header className="rp-header">
       <a href="#accueil" className="rp-brand" aria-label="Recrutement Privé - accueil"><span className="rp-logo">RP</span><span className="rp-brand-copy"><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></a>
-      <nav className="rp-nav" aria-label="Navigation principale">{nav.map(([key, href], index) => <a key={key} href={href} className={index === 0 ? "active" : ""}>{t(key)}</a>)}</nav>
+      <nav className="rp-nav" aria-label="Navigation principale">{nav.map(([key, href], index) => <a key={key} href={href} className={[index === 0 ? "active" : "", key === "nav_cabinet" ? "rp-nav-about" : ""].filter(Boolean).join(" ")}>{t(key)}</a>)}</nav>
       <div className="rp-header-actions"><LanguageSelector /><a className="rp-login" href="/espace"><span aria-hidden="true">●</span> {t("nav_connected_space")}</a></div>
     </header>
 
