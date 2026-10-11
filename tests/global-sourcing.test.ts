@@ -1,16 +1,40 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { configuredSources, fetchGlobalJobs } from "@/lib/sourcing/global";
+import { configuredSources, fetchGlobalJobs, fetchGlobalCandidates, shouldFallbackToInternalCandidatePool } from "@/lib/sourcing/global";
 import { assertPublicDnsHost, isPublicIpAddress, isSafeHttpsUrl } from "@/lib/security/ssrf";
 import { sanitizeAndValidateGeminiPayload } from "@/lib/ai/privacy";
 import { getGeminiModel } from "@/lib/ai/gemini";
 import { sanitizePublicOfferDescription } from "@/lib/sourcing/offer-analyzer";
+
+test("candidate sourcing falls back internally only when every external source failed", () => {
+  assert.equal(shouldFallbackToInternalCandidatePool([]), false);
+  assert.equal(shouldFallbackToInternalCandidatePool([{}]), false);
+  assert.equal(shouldFallbackToInternalCandidatePool([{ error: "HTTP 403" }]), true);
+  assert.equal(shouldFallbackToInternalCandidatePool([{ error: "HTTP 403" }, { error: "HTTP 429" }]), true);
+  assert.equal(shouldFallbackToInternalCandidatePool([{ error: "HTTP 403" }, {}]), false);
+});
 
 test("configuredSources accepte uniquement des URLs HTTPS", () => {
   process.env.RP_GLOBAL_JOB_SOURCES = JSON.stringify([
     "https://example.com/jobs.json", "http://insecure.example/jobs.json", "not-a-url",
   ]);
   assert.deepEqual(configuredSources("RP_GLOBAL_JOB_SOURCES"), ["https://example.com/jobs.json"]);
+});
+
+test("fetchGlobalCandidates sends a descriptive User-Agent and normalizes public profiles", async () => {
+  let capturedHeaders: Headers | undefined;
+  const candidates = await fetchGlobalCandidates("https://example.com/users.json", async (_url, init) => {
+    capturedHeaders = new Headers(init?.headers);
+    return new Response(JSON.stringify([{ id: 42, login: "public-profile", html_url: "https://example.com/public-profile", bio: "Engineer" }]), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  assert.equal(capturedHeaders?.get("user-agent"), "RecrutementPriveSourcing/1.0 (https://www.recrutement-prive.com)");
+  assert.equal(capturedHeaders?.get("x-github-api-version"), "2022-11-28");
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0]?.externalId, "42");
+  assert.equal(candidates[0]?.headline, "Engineer");
 });
 
 test("fetchGlobalJobs normalise un flux JSON autorisé", async () => {

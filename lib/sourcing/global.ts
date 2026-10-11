@@ -13,6 +13,12 @@ export type GlobalCandidateItem = {
 const text = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value.trim() : undefined;
 
+const identifier = (value: unknown): string | undefined => {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isSafeInteger(value)) return String(value);
+  return undefined;
+};
+
 const number = (value: unknown): number | undefined => {
   if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
   if (typeof value === "string" && /^\d+$/.test(value.trim())) return Number(value);
@@ -49,7 +55,7 @@ function normalizeCandidate(value: unknown, source: string, index: number): Glob
   const r = asRecord(value);
   if (!r || r.type === "Organization") return null;
   return {
-    externalId: text(r.externalId ?? r.id ?? r.profileId ?? r.user_id) ?? source + ":" + index,
+    externalId: identifier(r.externalId ?? r.id ?? r.profileId ?? r.user_id) ?? source + ":" + index,
     source,
     sourceProfileUrl: text(r.sourceProfileUrl ?? r.profileUrl ?? r.html_url ?? r.link ?? r.url),
     name: text(r.name ?? r.login ?? r.display_name),
@@ -88,8 +94,12 @@ export async function fetchGlobalJobs(sourceUrl: string, requester?: PinnedSourc
   return parseXmlItems(body, sourceUrl);
 }
 
+export function shouldFallbackToInternalCandidatePool(results: Array<{ error?: string }>): boolean {
+  return results.length > 0 && results.every((result) => Boolean(result.error));
+}
+
 export async function fetchGlobalCandidates(sourceUrl: string, requester?: PinnedSourceRequester): Promise<GlobalCandidateItem[]> {
-  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json" }, cache: "no-store" }, requester);
+  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json", "user-agent": "RecrutementPriveSourcing/1.0 (https://www.recrutement-prive.com)", "x-github-api-version": "2022-11-28" }, cache: "no-store" }, requester);
   if (!response.ok) throw new Error(`Source candidates inaccessible: HTTP ${response.status}`);
   const parsed = JSON.parse(await response.text()) as unknown;
   const root = asRecord(parsed);
