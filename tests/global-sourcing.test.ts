@@ -8,10 +8,10 @@ import { sanitizePublicOfferDescription } from "@/lib/sourcing/offer-analyzer";
 
 test("candidate sourcing falls back internally only when every external source failed", () => {
   assert.equal(shouldFallbackToInternalCandidatePool([]), false);
-  assert.equal(shouldFallbackToInternalCandidatePool([{ fetched: 0 }]), false);
+  assert.equal(shouldFallbackToInternalCandidatePool([{}]), false);
   assert.equal(shouldFallbackToInternalCandidatePool([{ error: "HTTP 403" }]), true);
   assert.equal(shouldFallbackToInternalCandidatePool([{ error: "HTTP 403" }, { error: "HTTP 429" }]), true);
-  assert.equal(shouldFallbackToInternalCandidatePool([{ error: "HTTP 403" }, { fetched: 3 }]), false);
+  assert.equal(shouldFallbackToInternalCandidatePool([{ error: "HTTP 403" }, {}]), false);
 });
 
 test("configuredSources accepte uniquement des URLs HTTPS", () => {
