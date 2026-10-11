@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { fetchGlobalJobs, fetchGlobalCandidates, configuredSources, getConfiguredSourcesAsync } from "@/lib/sourcing/global";
+import { fetchGlobalJobs, fetchGlobalCandidates, configuredSources, getConfiguredSourcesAsync, shouldFallbackToInternalCandidatePool } from "@/lib/sourcing/global";
 import { qualifyAndMatchExternalOffer } from "@/lib/jobs/offer-pipeline";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
@@ -637,7 +637,7 @@ export async function ingestGlobalCandidates(params: {
   }
 
   // If every external source fails, keep sourcing useful by falling back to the internal CV library.
-  const externalSourcesAllFailed = results.length > 0 && results.every((result) => Boolean(result.error));
+  const externalSourcesAllFailed = shouldFallbackToInternalCandidatePool(results);
   let fallback: Awaited<ReturnType<typeof ingestPlatformCvthequeCandidates>> | null = null;
   if (externalSourcesAllFailed) {
     fallback = await ingestPlatformCvthequeCandidates(actorUserId, { maxItems, filter });
