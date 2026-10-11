@@ -68,20 +68,18 @@ export default function HomePage() {
       <div className="rp-header-actions"><LanguageSelector /><a className="rp-login" href="/espace"><span aria-hidden="true">●</span> {t("nav_connected_space")}</a></div>
     </header>
 
-    <section id="accueil" className="rp-hero">
+    <section id="accueil" className="rp-hero rp-hero-reference">
       <div className="rp-hero-copy">
-        <div className="rp-hero-kicker">{t("hero_kicker")}</div>
-        <h1>Le recrutement d'excellence,<br />guidé par l'humain et renforcé<br /><span>par l'intelligence artificielle.</span></h1>
-        <p>Nous connectons les entreprises aux meilleurs profils et accompagnons<br className="desktop-only" /> les candidats vers le succès.</p>
-        <p className="rp-hero-privacy">Recrutement Privé ne vend pas les coordonnées des candidats,<br />Recrutement Privé organise des mises en relation qualifiées, après<br />validation de l'intéret de l'entreprise et du candidat.</p>
-        <div className="rp-actions"><ArrowButton href="#candidats">▣ &nbsp; {t("hero_cv_btn")} &nbsp; →</ArrowButton><ArrowButton href="#entreprises" outline>● &nbsp; {t("hero_recruit_btn")} &nbsp; →</ArrowButton></div>
-        <div className="rp-hero-values" aria-label="Engagements clés">
-          <div><strong>☆</strong><span><b>Expertise</b><small>métiers et secteurs</small></span></div>
-          <div><strong>♧</strong><span><b>Accompagnement</b><small>sur-mesure</small></span></div>
-          <div><strong>⌁</strong><span><b>Résultats</b><small>durables</small></span></div>
+        <div className="rp-hero-kicker">CABINET DE RECRUTEMENT</div>
+        <h1>Le talent n’a pas de frontières.</h1>
+        <p className="rp-hero-statement">Nous connectons les entreprises<br className="rp-hero-desktop-break" /> aux compétences qui font avancer leurs projets<br className="rp-hero-desktop-break" /> en alliant expertise humaine<br className="rp-hero-desktop-break" /> et intelligence artificielle.</p>
+        <div className="rp-actions">
+          <ArrowButton href="#candidats">▤ &nbsp; {t("hero_cv_btn")} &nbsp; →</ArrowButton>
+          <ArrowButton href="#entreprises" outline>● &nbsp; {t("hero_recruit_btn")} &nbsp; →</ArrowButton>
         </div>
+        <p className="rp-hero-privacy">Des mises en relation qualifiées, dans le respect de la confidentialité des candidats et des entreprises.</p>
       </div>
-      <div className="rp-hero-image" role="img" aria-label={t("hero_image_alt")} style={{ backgroundImage: `url(${images.hero})` }} />
+      <div className="rp-hero-image rp-hero-reference-image" role="img" aria-label={t("hero_image_alt")} style={{ backgroundImage: `url(${images.hero})` }} />
     </section>
 
     <section id="secteurs" className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-20">
