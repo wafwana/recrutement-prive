@@ -13,6 +13,23 @@ test("configuredSources accepte uniquement des URLs HTTPS", () => {
   assert.deepEqual(configuredSources("RP_GLOBAL_JOB_SOURCES"), ["https://example.com/jobs.json"]);
 });
 
+test("fetchGlobalCandidates sends a descriptive User-Agent and normalizes public profiles", async () => {
+  const { fetchGlobalCandidates } = await import("@/lib/sourcing/global");
+  let capturedHeaders: Headers | undefined;
+  const candidates = await fetchGlobalCandidates("https://example.com/users.json", async (_url, init) => {
+    capturedHeaders = new Headers(init?.headers);
+    return new Response(JSON.stringify([{ id: 42, login: "public-profile", html_url: "https://example.com/public-profile", bio: "Engineer" }]), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  assert.equal(capturedHeaders?.get("user-agent"), "RecrutementPriveSourcing/1.0 (https://www.recrutement-prive.com)");
+  assert.equal(capturedHeaders?.get("x-github-api-version"), "2022-11-28");
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0]?.externalId, "42");
+  assert.equal(candidates[0]?.headline, "Engineer");
+});
+
 test("fetchGlobalJobs normalise un flux JSON autorisé", async () => {
   const jobs = await fetchGlobalJobs("https://example.com/jobs.json", async () => new Response(JSON.stringify({
     jobs: [{ id: "job-1", title: "Senior Engineer", company: "Example", country: "India", skills: ["TypeScript", "PostgreSQL"], experienceYears: 5 }],
