@@ -47,6 +47,8 @@ jobs:
           npx tsx scripts/check-migration-0010.ts
       - name: Verify OWNER compatibility FIRST
         run: npm run test:owner-compatibility
+      - name: Verify Gemini structured-output schema contract
+        run: npm run test:gemini-schema-normalization
       - name: Verify core non-regression
         run: |
           npm run test:mission-lock
