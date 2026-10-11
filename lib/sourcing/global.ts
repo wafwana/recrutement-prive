@@ -13,6 +13,12 @@ export type GlobalCandidateItem = {
 const text = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value.trim() : undefined;
 
+const identifier = (value: unknown): string | undefined => {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isSafeInteger(value)) return String(value);
+  return undefined;
+};
+
 const number = (value: unknown): number | undefined => {
   if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
   if (typeof value === "string" && /^\d+$/.test(value.trim())) return Number(value);
@@ -49,7 +55,7 @@ function normalizeCandidate(value: unknown, source: string, index: number): Glob
   const r = asRecord(value);
   if (!r || r.type === "Organization") return null;
   return {
-    externalId: text(r.externalId ?? r.id ?? r.profileId ?? r.user_id) ?? source + ":" + index,
+    externalId: identifier(r.externalId ?? r.id ?? r.profileId ?? r.user_id) ?? source + ":" + index,
     source,
     sourceProfileUrl: text(r.sourceProfileUrl ?? r.profileUrl ?? r.html_url ?? r.link ?? r.url),
     name: text(r.name ?? r.login ?? r.display_name),
