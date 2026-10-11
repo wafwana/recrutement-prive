@@ -89,7 +89,7 @@ export async function fetchGlobalJobs(sourceUrl: string, requester?: PinnedSourc
 }
 
 export async function fetchGlobalCandidates(sourceUrl: string, requester?: PinnedSourceRequester): Promise<GlobalCandidateItem[]> {
-  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json" }, cache: "no-store" }, requester);
+  const response = await fetchSafeSource(sourceUrl, { headers: { accept: "application/json", "user-agent": "RecrutementPriveSourcing/1.0 (https://www.recrutement-prive.com)", "x-github-api-version": "2022-11-28" }, cache: "no-store" }, requester);
   if (!response.ok) throw new Error(`Source candidates inaccessible: HTTP ${response.status}`);
   const parsed = JSON.parse(await response.text()) as unknown;
   const root = asRecord(parsed);
