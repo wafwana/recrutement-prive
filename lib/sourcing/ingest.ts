@@ -369,6 +369,7 @@ async function ingestPlatformCvthequeCandidates(
   const candidateBatch = filteredCandidates.slice(0, maxItems);
   let created = 0;
   let updated = 0;
+  let matched = 0;
 
   for (const candidate of candidateBatch) {
     const externalId = `platform:${candidate.id}`;
@@ -402,16 +403,22 @@ async function ingestPlatformCvthequeCandidates(
           updatedAt: new Date(),
         },
       });
+      if (!isFinished) {
+        const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
+        matched += rematch.matches;
+      }
       updated++;
     } else {
-      await prisma.sourcedCandidate.create({
+      const saved = await prisma.sourcedCandidate.create({
         data: { ...data, externalId, status: "DETECTED" },
       });
+      const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(saved.id);
+      matched += rematch.matches;
       created++;
     }
   }
 
-  return { fetched: candidateBatch.length, sourceTotal: candidates.length, batchLimit: maxItems, created, updated };
+  return { fetched: candidateBatch.length, sourceTotal: candidates.length, batchLimit: maxItems, created, updated, matched };
 }
 
 export async function ingestGlobalCandidates(params: {
@@ -629,12 +636,32 @@ export async function ingestGlobalCandidates(params: {
     }
   }
 
+  // If every external source fails, keep sourcing useful by falling back to the internal CV library.
+  const externalSourcesAllFailed = results.length > 0 && results.every((result) => Boolean(result.error));
+  let fallback: Awaited<ReturnType<typeof ingestPlatformCvthequeCandidates>> | null = null;
+  if (externalSourcesAllFailed) {
+    fallback = await ingestPlatformCvthequeCandidates(actorUserId, { maxItems, filter });
+    totalFetched += fallback.fetched;
+    totalCreated += fallback.created;
+    totalUpdated += fallback.updated;
+    totalMatched += fallback.matched;
+    results.push({
+      sourceUrl: "PLATFORM_CVTHEQUE",
+      fetched: fallback.fetched,
+      sourceTotal: fallback.sourceTotal,
+      batchLimit: fallback.batchLimit,
+      created: fallback.created,
+      updated: fallback.updated,
+      matched: fallback.matched,
+    });
+  }
+
   await prisma.auditLog.create({
     data: {
       actorUserId,
       actorRole: "SYSTEM",
       action: "GLOBAL_CANDIDATE_SOURCING",
-      targetType: targetJob ? "JOB" : "GLOBAL_CANDIDATE_SOURCING",
+      targetType: fallback ? "PLATFORM_CVTHEQUE_FALLBACK" : targetJob ? "JOB" : "GLOBAL_CANDIDATE_SOURCING",
       targetId: targetJob?.id || null,
       details: {
         activeSourcesCount: sources.length,
@@ -643,6 +670,8 @@ export async function ingestGlobalCandidates(params: {
         created: totalCreated,
         updated: totalUpdated,
         matched: totalMatched,
+        fallbackSource: fallback ? "PLATFORM_CVTHEQUE" : null,
+        externalSourcesAllFailed,
         results,
       },
     },
@@ -656,6 +685,8 @@ export async function ingestGlobalCandidates(params: {
     created: totalCreated,
     updated: totalUpdated,
     matched: totalMatched,
+    fallbackSource: fallback ? "PLATFORM_CVTHEQUE" : null,
+    externalSourcesAllFailed,
     results,
   };
 }
