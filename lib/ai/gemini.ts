@@ -8,9 +8,12 @@ import { safeLogError, safeLogInfo } from "./privacy";
  */
 
 /**
- * Gemini's structured-output schema accepts JSON Schema subsets. Convert
- * nullable union types (for example ["string", "null"]) into anyOf, which
- * is supported by the GenerateContent schema format.
+ * Walk the JSON schema without rewriting its semantics.
+ *
+ * Gemini's GenerateContent structured-output schema explicitly supports
+ * nullable types as { type: ["string", "null"] }. Rewriting these unions to
+ * anyOf is not a safe compatibility transformation and can cause HTTP 400
+ * responses from the API. Preserve type arrays exactly.
  */
 export function normalizeGeminiJsonSchema(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -23,25 +26,12 @@ export function normalizeGeminiJsonSchema(value: unknown): unknown {
   const source = value as Record<string, unknown>;
   const normalized: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(source)) {
-    if (key === "type" && Array.isArray(child)) {
-      const types = child.filter((type): type is string => typeof type === "string");
-      if (types.includes("null")) {
-        const nonNullTypes = types.filter((type) => type !== "null");
-        normalized.anyOf = [
-          ...nonNullTypes.map((type) => ({ type })),
-          { type: "null" },
-        ];
-      } else {
-        normalized[key] = types.length === 1 ? types[0] : types;
-      }
-      continue;
-    }
     normalized[key] = normalizeGeminiJsonSchema(child);
   }
   return normalized;
 }
 
-/** Use GenerateContent REST JSON mode with the JSON Schema field. */
+/** Use GenerateContent REST JSON mode with the documented JSON Schema field. */
 export function buildGeminiGenerationConfig(schema: Record<string, unknown>) {
   return {
     responseMimeType: "application/json",

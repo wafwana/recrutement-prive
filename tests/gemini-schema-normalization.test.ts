@@ -18,22 +18,20 @@ test("Gemini structured output uses the documented GenerateContent REST JSON fie
   assert.equal("responseFormat" in config, false);
 });
 
-test("Gemini schema normalizer converts nullable type unions into supported anyOf", () => {
-  const normalized = normalizeGeminiJsonSchema({
+test("Gemini schema normalization preserves documented nullable type arrays", () => {
+  const schema = {
     type: "object",
     properties: {
       years: { type: ["number", "null"] },
       language: { type: ["string", "null"] },
       skills: { type: "array", items: { type: "string" } },
     },
-  });
+  };
+  const normalized = normalizeGeminiJsonSchema(schema);
 
-  assert.deepEqual(normalized, {
-    type: "object",
-    properties: {
-      years: { anyOf: [{ type: "number" }, { type: "null" }] },
-      language: { anyOf: [{ type: "string" }, { type: "null" }] },
-      skills: { type: "array", items: { type: "string" } },
-    },
-  });
+  assert.deepEqual(normalized, schema);
+  assert.deepEqual(
+    buildGeminiGenerationConfig(schema).responseJsonSchema,
+    schema,
+  );
 });
