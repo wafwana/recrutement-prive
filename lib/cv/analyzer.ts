@@ -1,12 +1,25 @@
 import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
 // pdf-parse v2 uses PDFParse with explicit in-memory data.
 // next.config.ts externalizes pdf-parse so production Node can resolve its worker dependencies.
-import { PDFParse } from "pdf-parse";
+import { DOMMatrix, ImageData, Path2D } from "@napi-rs/canvas";
 import mammoth from "mammoth";
 
 async function parsePdfText(buffer: Buffer): Promise<string | null> {
-  let parser: PDFParse | undefined;
+  let parser: { getText: () => Promise<{ text: string }>; destroy: () => Promise<void> } | undefined;
   try {
+    // pdfjs-dist v5 expects browser canvas globals in some serverless Node runtimes.
+    // Install Node-native implementations before loading pdf-parse; static imports
+    // would evaluate pdfjs-dist too early, before these globals exist.
+    const runtime = globalThis as typeof globalThis & {
+      DOMMatrix?: typeof DOMMatrix;
+      ImageData?: typeof ImageData;
+      Path2D?: typeof Path2D;
+    };
+    runtime.DOMMatrix ??= DOMMatrix;
+    runtime.ImageData ??= ImageData;
+    runtime.Path2D ??= Path2D;
+
+    const { PDFParse } = await import("pdf-parse");
     parser = new PDFParse({ data: buffer });
     const result = await parser.getText();
     return result.text ? result.text.trim() : null;
