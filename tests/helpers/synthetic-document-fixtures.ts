@@ -9,10 +9,9 @@ function crc32(buf: Buffer): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-// Valid single-file DOCX package with the content type and root relationship required by OOXML.
 export function createDocxFixture(text: string): Buffer {
   const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const xml = Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t xml:space="preserve">${escaped}</w:t></w:r></w:p><w:sectPr/></w:body></w:document>`);
+  const xml = Buffer.from(\`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t xml:space="preserve">\${escaped}</w:t></w:r></w:p><w:sectPr/></w:body></w:document>\`);
   const files: Array<[string, Buffer]> = [
     ["[Content_Types].xml", Buffer.from('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')],
     ["_rels/.rels", Buffer.from('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>')],
@@ -46,24 +45,24 @@ export function createDocxFixture(text: string): Buffer {
 }
 
 export function createPdfFixture(text: string): Buffer {
-  const escapedText = text.replace(/[()\\]/g, "\\$&");
+  const escapedText = text.replace(/[()\\\\]/g, "\\\\$&");
   const stream = \`BT /F1 12 Tf 40 100 Td (\${escapedText}) Tj ET\`;
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    \`<< /Length \${Buffer.byteLength(stream)} >>\nstream\n\${stream}\nendstream\`,
+    \`<< /Length \${Buffer.byteLength(stream)} >>\\nstream\\n\${stream}\\nendstream\`,
   ];
-  let pdf = "%PDF-1.4\n";
+  let pdf = "%PDF-1.4\\n";
   const offsets: number[] = [0];
   for (let i = 0; i < objects.length; i++) {
     offsets.push(Buffer.byteLength(pdf, "binary"));
-    pdf += \`\${i + 1} 0 obj\n\${objects[i]}\nendobj\n\`;
+    pdf += \`\${i + 1} 0 obj\\n\${objects[i]}\\nendobj\\n\`;
   }
   const xrefOffset = Buffer.byteLength(pdf, "binary");
-  pdf += \`xref\n0 \${objects.length + 1}\n0000000000 65535 f \n\`;
-  for (const offset of offsets.slice(1)) pdf += \`\${String(offset).padStart(10, "0")} 00000 n \n\`;
-  pdf += \`trailer << /Size \${objects.length + 1} /Root 1 0 R >>\nstartxref\n\${xrefOffset}\n%%EOF\n\`;
+  pdf += \`xref\\n0 \${objects.length + 1}\\n0000000000 65535 f \\n\`;
+  for (const offset of offsets.slice(1)) pdf += \`\${String(offset).padStart(10, "0")} 00000 n \\n\`;
+  pdf += \`trailer << /Size \${objects.length + 1} /Root 1 0 R >>\\nstartxref\\n\${xrefOffset}\\n%%EOF\\n\`;
   return Buffer.from(pdf, "binary");
 }
