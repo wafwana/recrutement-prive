@@ -9,7 +9,9 @@ function crc32(buf: Buffer): number {
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
+
 export function createDocxFixture(text: string): Buffer {
+  const paragraphs = escaped.split(String.fromCharCode(10));
   const paragraphs = escaped.split(String.fromCharCode(10));
   const xml = Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs.map((line) => `<w:p><w:r><w:t xml:space="preserve">${line}</w:t></w:r></w:p>`).join("")}</w:body></w:document>`);
   const files = [
