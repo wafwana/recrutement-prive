@@ -110,6 +110,9 @@ export default async function OwnerSourcingPage() {
         </div>
         <div className="flex flex-col items-end gap-3">
           <div className="flex flex-wrap justify-end gap-2">
+            <a href="/espace/owner/sourcing/pays" className="border border-[#F97316] px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316] hover:bg-[#F97316]/10">
+              Pays par entreprise
+            </a>
             <a href="/espace/owner/offres-vivier" className="border border-[#c7a15a] px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a] hover:bg-[#c7a15a]/10">
               Vivier des offres
             </a>
