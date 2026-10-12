@@ -6,6 +6,7 @@ import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { extractOfferContactEmail, generateExternalOfferOutreach, sendExternalOfferOutreach } from "@/lib/sourcing/outreach";
 import { translateJobOfferToFrench } from "@/lib/jobs/translation";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
+import { selectEnterpriseOfferBatch } from "@/lib/sourcing/enterprise-batch";
 
 const MAX_OFFERS_PER_SOURCE_RUN = 10;
 
@@ -74,9 +75,7 @@ export async function GET(request: Request) {
         const items = await fetchGlobalJobs(sourceUrl);
         const batchKey = `sourcing:enterprise-batch:${company.companyId}:${encodeURIComponent(sourceUrl)}`;
         const offset = await readBatchOffset(batchKey, items.length);
-        const batch = items.length > MAX_OFFERS_PER_SOURCE_RUN
-          ? Array.from({ length: MAX_OFFERS_PER_SOURCE_RUN }, (_, index) => items[(offset + index) % items.length])
-          : items;
+        const { batch, nextOffset } = selectEnterpriseOfferBatch(items, offset, MAX_OFFERS_PER_SOURCE_RUN);
         for (const item of batch) {
           if (!item.country || !selectedCountries.has(normalize(item.country))) continue;
           offers++;
@@ -297,7 +296,7 @@ export async function GET(request: Request) {
         // Advance over every scanned item, including offers filtered out by country.
         // Upserts are idempotent, so a failed batch safely retries from its prior offset.
         if (items.length > 0 && batch.length > 0) {
-          await writeBatchOffset(batchKey, offset + batch.length, items.length);
+          await writeBatchOffset(batchKey, nextOffset, items.length);
         }
       } catch (error) {
         errors.push({
