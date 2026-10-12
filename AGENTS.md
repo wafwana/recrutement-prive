@@ -10,14 +10,24 @@ Ces règles s'appliquent à tout agent, contributeur ou automatisation qui inter
 - Ne pas remplacer, supprimer ou contourner une fonctionnalité existante sans nécessité démontrée et sans vérifier les dépendances et la non-régression.
 - Si une fonction équivalente existe déjà, la compléter ou la corriger au lieu de la dupliquer.
 
-## 2. Priorité et périmètre
+## 2. Rattachement obligatoire des nouvelles options aux dossiers existants
+
+- Toute nouvelle option, fonctionnalité, filtre, action ou évolution métier doit d'abord être rattachée au socle fonctionnel et au dossier/sous-dossier existant qui correspond à son usage.
+- Rechercher d'abord la taxonomie, les secteurs, métiers, spécialités, dossiers et sous-dossiers déjà disponibles. Réutiliser leurs identifiants et leur hiérarchie, et brancher l'option sur les interfaces, API, données, permissions, historiques et flux existants concernés.
+- Une nouvelle option ne doit pas devenir une plateforme, un module autonome, un moteur, une CVthèque, un vivier ou une interface parallèle lorsqu'elle peut être intégrée au système existant.
+- Si aucun dossier ou sous-dossier pertinent n'existe réellement, créer le dossier et les sous-dossiers nécessaires de façon complète et cohérente, dans la hiérarchie existante. Cela inclut, selon le besoin, la taxonomie, la navigation, les droits d'accès, le rattachement des données, les états, l'historique, la recherche, le classement, les tests et les traductions prises en charge.
+- Avant de créer un dossier ou sous-dossier, vérifier qu'il n'existe pas déjà sous un autre libellé, alias, synonyme ou identifiant. Préférer la réutilisation et la déduplication à la création de doublons.
+- Si un dossier est créé, il doit être réellement utilisable de bout en bout : visible aux rôles autorisés, correctement relié aux données et aux actions existantes, couvert par les permissions serveur et les tests pertinents. Ne pas créer un simple dossier vide ou une entrée de navigation sans fonctionnement réel.
+- Conserver une taxonomie cohérente : un élément peut avoir un métier principal et des spécialités secondaires, sans dupliquer le profil ou le CV. Préserver l'origine des données et permettre la correction humaine lorsque la classification est incertaine.
+
+## 3. Priorité et périmètre
 
 - Prioriser la résolution des travaux déjà engagés, des blocages de production et des régressions avant d'ajouter des évolutions secondaires.
 - Avant de commencer, vérifier les issues, pull requests, branches et changements en cours liés au besoin ; identifier les travaux déjà réalisés, en cours, bloqués, obsolètes ou redondants.
 - Respecter le cahier des charges et les décisions précédentes. Ne pas relancer un chantier à zéro ni abandonner silencieusement un travail en cours.
 - Réaliser la demande de bout en bout dans le périmètre convenu : implémentation, tests, contrôles de sécurité, vérification de déploiement et validation fonctionnelle lorsque l'environnement le permet. Ne pas s'arrêter à un simple rapport ou à une moitié de solution.
 
-## 3. OWNER, ADMIN, autorisations et données
+## 4. OWNER, ADMIN, autorisations et données
 
 - Ne jamais modifier, supprimer, rétrograder, réinitialiser ou compromettre le compte OWNER ni ses privilèges.
 - Maintenir une séparation stricte entre OWNER et ADMIN. Un ADMIN ne doit pas pouvoir modifier les permissions OWNER, contourner les contrôles d'accès ou accéder aux données et fonctions réservées à OWNER.
@@ -25,14 +35,14 @@ Ces règles s'appliquent à tout agent, contributeur ou automatisation qui inter
 - Préserver l'isolation entre entreprises, la confidentialité des candidats, les règles de consentement et les protections des données personnelles. Ne jamais exposer publiquement les coordonnées ou CV privés des candidats.
 - Ne jamais inscrire de secrets, mots de passe, clés API ou données personnelles sensibles dans le code, les journaux, les commits ou les notifications.
 
-## 4. Base de données, migrations et production
+## 5. Base de données, migrations et production
 
 - Ne jamais lancer une migration de production ou une opération destructive avant d'avoir vérifié l'état réel du schéma, l'historique des migrations, les données concernées et la stratégie de récupération.
 - Les migrations doivent être justifiées, minimales, compatibles avec les données existantes et accompagnées des contrôles appropriés. Ne pas créer de nouvelle table ou de nouveau modèle si un modèle existant peut répondre au besoin sans compromettre l'intégrité.
 - Préserver les données de production et les points de restauration. Avant toute opération à risque, prévoir et vérifier une sauvegarde ou un point de restauration approprié.
 - Ne pas déclarer une fonctionnalité opérationnelle sur la seule base d'une compilation ou d'un déploiement réussi : vérifier le parcours réel lorsque les accès le permettent.
 
-## 5. Vérifications obligatoires avant livraison
+## 6. Vérifications obligatoires avant livraison
 
 - Examiner le diff et confirmer que les changements sont limités au besoin et ne dupliquent pas l'architecture.
 - Exécuter les tests pertinents, le typecheck, le build et les contrôles CI disponibles ; ajouter ou adapter des tests de non-régression pour les parcours touchés.
@@ -40,7 +50,7 @@ Ces règles s'appliquent à tout agent, contributeur ou automatisation qui inter
 - Pour les changements de production, distinguer clairement : code fusionné, CI validée, déploiement READY et parcours fonctionnel réellement testé.
 - Ne jamais annoncer un test, une correction, une fusion, une sauvegarde ou une mise en production comme réussi sans preuve vérifiable. Indiquer précisément tout blocage restant et poursuivre sa résolution dans le périmètre autorisé.
 
-## 6. Méthode de travail
+## 7. Méthode de travail
 
 - Préférer le changement minimal, réversible et testable qui complète le socle existant.
 - Ne pas introduire de dépendance, de refonte, de migration ou de système parallèle sans justification technique concrète.
