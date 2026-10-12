@@ -1,8 +1,6 @@
 "use client";
 
 import BackButton from "@/components/navigation/BackButton";
-
-
 import { useEffect, useMemo, useState } from "react";
 
 type Analysis = {
@@ -51,6 +49,8 @@ export default function RealCvRegistryPage() {
   const [candidateName, setCandidateName] = useState("");
   const [candidateEmail, setCandidateEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [batchAnalyzing, setBatchAnalyzing] = useState(false);
   const [message, setMessage] = useState("");
 
   async function load() {
@@ -90,7 +90,40 @@ export default function RealCvRegistryPage() {
     }
   }
 
+  async function triggerSingleAnalysis(cvId: string) {
+    setAnalyzingId(cvId);
+    setMessage("");
+    try {
+      const res = await fetch(`/api/owner/cv-intake/${cvId}/analyze`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Analyse impossible.");
+      setMessage(`Analyse terminée pour : ${data.document?.name || "CV"}`);
+      await load();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Analyse impossible.");
+    } finally {
+      setAnalyzingId(null);
+    }
+  }
+
+  async function triggerBatchAnalysis() {
+    setBatchAnalyzing(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/owner/cv-intake/batch-analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ limit: 20 }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Analyse par lot impossible.");
+      setMessage(`Analyse par lot terminée : ${data.processedCount} CV traités sur ${data.totalPending} en attente.`);
+      await load();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Analyse par lot impossible.");
+    } finally {
+      setBatchAnalyzing(false);
+    }
+  }
+
   const visible = useMemo(() => folder ? items.filter((item) => item.folderPath === folder) : items, [items, folder]);
+  const pendingCount = useMemo(() => items.filter((item) => item.status === "A_ANALYSER").length, [items]);
 
   return (
     <section className="mx-auto w-[min(1280px,calc(100%-40px))] py-12 md:py-20">
@@ -116,13 +149,20 @@ export default function RealCvRegistryPage() {
         {message ? <p className="mt-4 border border-white/10 px-4 py-3 text-xs text-white/60">{message}</p> : null}
       </div>
 
-      <div className="mt-8 grid gap-3 md:grid-cols-[1fr_320px_auto]">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load()} placeholder="Rechercher un CV, candidat ou dossier…" className="border border-white/10 bg-[#111] px-4 py-3 text-sm text-white outline-none" />
-        <select value={folder} onChange={(e) => setFolder(e.target.value)} className="border border-white/10 bg-[#111] px-4 py-3 text-sm text-white outline-none">
-          <option value="">Tous les dossiers ({items.length})</option>
-          {folders.map((item) => <option key={item} value={item}>{item}</option>)}
-        </select>
-        <button onClick={() => load().catch((e) => setMessage(e.message))} className="border border-white/15 px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-white/60">Actualiser</button>
+      <div className="mt-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="grid flex-1 gap-3 md:grid-cols-[1fr_320px_auto]">
+          <input value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load()} placeholder="Rechercher un CV, candidat ou dossier…" className="border border-white/10 bg-[#111] px-4 py-3 text-sm text-white outline-none" />
+          <select value={folder} onChange={(e) => setFolder(e.target.value)} className="border border-white/10 bg-[#111] px-4 py-3 text-sm text-white outline-none">
+            <option value="">Tous les dossiers ({items.length})</option>
+            {folders.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <button onClick={() => load().catch((e) => setMessage(e.message))} className="border border-white/15 px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-white/60">Actualiser</button>
+        </div>
+        {pendingCount > 0 ? (
+          <button disabled={batchAnalyzing} onClick={triggerBatchAnalysis} className="border border-amber-500/50 bg-amber-500/10 px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-amber-300 hover:bg-amber-500/20 disabled:opacity-40">
+            {batchAnalyzing ? "Analyse en cours…" : `Analyser les ${pendingCount} CV en attente`}
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-8 space-y-4">
@@ -133,13 +173,22 @@ export default function RealCvRegistryPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-base font-medium text-white">{cv.name}</h2>
                   <span className="bg-emerald-500/10 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-emerald-300">Original verrouillé</span>
-                  <span className="bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-white/50">{cv.status}</span>
+                  <span className={`px-2 py-1 text-[9px] uppercase tracking-[0.12em] ${cv.status === "ANALYSE_OK" ? "bg-blue-500/10 text-blue-300" : "bg-amber-500/10 text-amber-300"}`}>{cv.status}</span>
                 </div>
                 <p className="mt-2 text-xs font-mono text-[#c7a15a]">{cv.folderPath}</p>
                 <p className="mt-2 text-xs text-white/35">Introduit par {cv.senderEmail} ({cv.senderRole}) · {new Date(cv.createdAt).toLocaleString("fr-FR")}</p>
                 <p className="mt-1 text-[10px] text-white/25">SHA-256 : {cv.originalSha256}</p>
               </div>
-              <a href={`/api/owner/cv-intake/${cv.id}/original`} target="_blank" rel="noreferrer" className="border border-white/15 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/65">Original ↗</a>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  disabled={analyzingId === cv.id}
+                  onClick={() => triggerSingleAnalysis(cv.id)}
+                  className="border border-[#c7a15a]/50 bg-[#c7a15a]/10 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a] hover:bg-[#c7a15a]/20 disabled:opacity-40"
+                >
+                  {analyzingId === cv.id ? "Analyse…" : cv.analysis ? "Relancer l'analyse" : "Analyser ce CV"}
+                </button>
+                <a href={`/api/owner/cv-intake/${cv.id}/original`} target="_blank" rel="noreferrer" className="border border-white/15 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/65">Original ↗</a>
+              </div>
             </div>
 
             {cv.analysis ? (
