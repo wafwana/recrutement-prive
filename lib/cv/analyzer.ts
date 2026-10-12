@@ -9,6 +9,14 @@ async function parsePdfText(buffer: Buffer): Promise<string | null> {
       const res = await fn(buffer);
       return res?.text ? res.text.trim() : null;
     }
+    if (pdfParse && typeof pdfParse.PDFParse === "function") {
+      const parser = new pdfParse.PDFParse({
+        data: new Uint8Array(buffer),
+        verbosity: 0,
+      });
+      const res = await parser.getText();
+      return res?.text ? res.text.trim() : null;
+    }
   } catch {}
   return null;
 }
