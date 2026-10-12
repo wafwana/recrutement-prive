@@ -49,7 +49,8 @@
     "resend": "6.32.1",
     "server-only": "0.0.1",
     "mammoth": "^1.13.0",
-    "pdf-parse": "^2.4.5"
+    "pdf-parse": "^2.4.5",
+    "@napi-rs/canvas": "0.1.80"
   },
   "devDependencies": {
     "typescript": "5.9.2",
