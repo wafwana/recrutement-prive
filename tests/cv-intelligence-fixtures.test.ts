@@ -3,6 +3,31 @@ import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import path from "node:path";
 import { analyzeCvDocument, buildCvFileContent, extractTextFromCvBuffer, parseCvTextLocally, type CvTaxonomyItem } from "../lib/cv/analyzer";
+import { validateUploadedDocument } from "../lib/security/file-validation";
+
+test("CV intake upload accepts synthetic TXT/MD only for the CV-specific allowlist and rejects malformed text", async () => {
+  const cvAllowed = new Set([
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "image/jpeg",
+    "text/plain",
+    "text/markdown",
+  ]);
+  const txt = new File(["CV TEST\nCompétences: Python, SQL"], "synthetic-cv.txt", { type: "text/plain" });
+  const md = new File(["# CV TEST\nSkills: Python, SQL"], "synthetic-cv.md", { type: "text/markdown" });
+  const binaryText = new File([new Uint8Array([0xff, 0xfe, 0x00, 0x00])], "synthetic-cv.txt", { type: "text/plain" });
+  const mismatchedName = new File(["CV TEST"], "synthetic-cv.bin", { type: "text/plain" });
+  const empty = new File(["   \n"], "synthetic-cv.txt", { type: "text/plain" });
+
+  assert.equal((await validateUploadedDocument(txt, { allowedTypes: cvAllowed })).ok, true);
+  assert.equal((await validateUploadedDocument(md, { allowedTypes: cvAllowed })).ok, true);
+  assert.equal((await validateUploadedDocument(binaryText, { allowedTypes: cvAllowed })).ok, false);
+  assert.equal((await validateUploadedDocument(mismatchedName, { allowedTypes: cvAllowed })).ok, false);
+  assert.equal((await validateUploadedDocument(empty, { allowedTypes: cvAllowed })).ok, false);
+  assert.equal((await validateUploadedDocument(txt)).ok, false, "The generic document deposit must not expand supported types");
+});
+
 
 // Fixtures synthétiques : aucune donnée personnelle réelle.
 const FIXTURES = [

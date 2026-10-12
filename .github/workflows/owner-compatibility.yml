@@ -57,6 +57,7 @@ jobs:
           npm run test:company-flow
           npm run test:trusted-video
           npm run test:taxonomy-cv-protection
+          npm run test:cv-intelligence
           npm run typecheck
       - name: Build after OWNER gate
         run: npm run build
