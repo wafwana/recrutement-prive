@@ -64,11 +64,7 @@ test("Gemini structured output uses the documented GenerateContent REST envelope
     required: ["years"],
   };
   assert.deepEqual(buildGeminiGenerationConfig(schema), {
-    responseFormat: {
-      text: {
-        mimeType: "application/json",
-        schema,
-      },
-    },
+    responseMimeType: "application/json",
+    responseJsonSchema: schema,
   });
 });
