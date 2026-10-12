@@ -189,3 +189,51 @@ test(
     }
   },
 );
+
+
+test("PDF and DOCX extraction use the installed parsers on synthetic fixtures", async () => {
+  const { deflateRawSync } = await import("node:zlib");
+
+  // A minimal valid PDF with a single text drawing operation. No personal data.
+  const pdfStream = "BT /F1 12 Tf 40 100 Td (CV TEST PDF Python SQL) Tj ET";
+  const pdfBytes = Buffer.from([
+    "%PDF-1.4\n",
+    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
+    "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n",
+    "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n",
+    "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n",
+    "5 0 obj << /Length " + Buffer.byteLength(pdfStream) + " >> stream\n" + pdfStream + "\nendstream endobj\n",
+    "trailer << /Root 1 0 R >>\n%%EOF\n"
+  ].join(""));
+
+  // Build a deterministic DOCX package using only synthetic text and ZIP local headers.
+  const { createDocxFixture } = await import("./helpers/synthetic-document-fixtures");
+  const docxBytes = createDocxFixture("CV TEST DOCX\nPython SQL");
+  const pdfText = await extractTextFromCvBuffer(pdfBytes, "application/pdf", "synthetic.pdf");
+  const docxText = await extractTextFromCvBuffer(
+    docxBytes,
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "synthetic.docx"
+  );
+  assert.match(pdfText || "", /CV TEST PDF Python SQL/);
+  assert.match(docxText || "", /CV TEST DOCX/);
+  assert.equal(await extractTextFromCvBuffer(Buffer.from("Synthetic résumé\nPython"), "text/plain", "synthetic.txt"), "Synthetic résumé\nPython");
+  assert.equal(await extractTextFromCvBuffer(Buffer.from("# Synthetic résumé\nSQL"), "text/markdown", "synthetic.md"), "# Synthetic résumé\nSQL");
+
+  const local = parseCvTextLocally(pdfText || "", TAXONOMY);
+  assert.equal(local.firstName, null);
+  assert.deepEqual(local.skills, ["Python", "SQL"]);
+  assert.equal(local.experienceYears, null);
+});
+
+test("Unsupported, empty and corrupt document data returns controlled null", async () => {
+  assert.equal(await extractTextFromCvBuffer(Buffer.alloc(0), "application/pdf", "empty.pdf"), null);
+  assert.equal(await extractTextFromCvBuffer(Buffer.from("not a pdf"), "application/pdf", "bad.pdf"), null);
+  assert.equal(await extractTextFromCvBuffer(Buffer.from("not a docx"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "bad.docx"), null);
+  assert.equal(await extractTextFromCvBuffer(Buffer.from([0, 1, 2, 3]), "application/octet-stream", "payload.bin"), null);
+});
+
+test("MIME type checks for local extractor are case-insensitive and extension is fallback only", async () => {
+  const text = Buffer.from("CV TEST\nPython");
+  assert.equal(await extractTextFromCvBuffer(text, "TEXT/PLAIN", "synthetic.txt"), "CV TEST\nPython");
+});
