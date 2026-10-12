@@ -192,16 +192,8 @@ test(
 
 
 test("PDF extraction uses the installed pdf-parse v2 parser on a synthetic fixture", async () => {
-  const pdfStream = "BT /F1 12 Tf 40 100 Td (CV TEST PDF Python SQL) Tj ET";
-  const pdfBytes = Buffer.from([
-    "%PDF-1.4\\n",
-    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\\n",
-    "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\\n",
-    "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\\n",
-    "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\\n",
-    "5 0 obj << /Length " + Buffer.byteLength(pdfStream) + " >> stream\\n" + pdfStream + "\\nendstream endobj\\n",
-    "trailer << /Root 1 0 R >>\\n%%EOF\\n"
-  ].join(""));
+  const { createPdfFixture } = await import("./helpers/synthetic-document-fixtures");
+  const pdfBytes = createPdfFixture("CV TEST PDF Python SQL");
   const pdfText = await extractTextFromCvBuffer(pdfBytes, "application/pdf", "synthetic.pdf");
   assert.match(pdfText || "", /CV TEST PDF Python SQL/);
   const local = parseCvTextLocally(pdfText || "", TAXONOMY);
