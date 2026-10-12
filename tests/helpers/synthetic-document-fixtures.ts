@@ -58,13 +58,13 @@ export function createPdfFixture(text: string): Buffer {
   const offsets: number[] = [0];
   for (let i = 0; i < objects.length; i++) {
     offsets.push(Buffer.byteLength(pdf, "binary"));
-    pdf += (i + 1) + " 0 obj\n" + objects[i] + "\nendobj\n";
+    pdf += String(i + 1) + " 0 obj\n" + objects[i] + "\nendobj\n";
   }
   const xrefOffset = Buffer.byteLength(pdf, "binary");
-  pdf += "xref\n0 " + (objects.length + 1) + "\n0000000000 65535 f \n";
+  pdf += "xref\n0 " + String(objects.length + 1) + "\n0000000000 65535 f \n";
   for (const offset of offsets.slice(1)) {
     pdf += String(offset).padStart(10, "0") + " 00000 n \n";
   }
-  pdf += "trailer << /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefOffset + "\n%%EOF\n";
+  pdf += "trailer << /Size " + String(objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + String(xrefOffset) + "\n%%EOF\n";
   return Buffer.from(pdf, "binary");
 }
