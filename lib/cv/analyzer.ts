@@ -206,99 +206,71 @@ export function buildCvFileContent(input: {
 /**
  * Deterministic local text-based CV parser that extracts structured facts without external AI network calls.
  */
-export function parseCvTextLocally(
-  rawText: string,
-  taxonomy: CvTaxonomyItem[]
-): CvAnalysis {
-  const lines = rawText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  const headline = lines.length > 0 ? lines[0].slice(0, 160) : null;
-  const summary = lines.length > 1 ? lines.slice(1, 4).join(" ").slice(0, 500) : headline;
-
-  // Common technical & professional skill keywords
-  const commonSkills = [
-    "JavaScript", "TypeScript", "Python", "Java", "C++", "C#", "PHP", "Ruby", "Go", "Rust", "Swift", "Kotlin",
-    "React", "Vue", "Angular", "Next.js", "Node.js", "Express", "Django", "Spring", "Laravel",
-    "SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis", "Prisma",
-    "AWS", "Azure", "GCP", "Docker", "Kubernetes", "DevOps", "CI/CD", "Git",
-    "Agile", "Scrum", "Management", "Recrutement", "Finance", "Comptabilité", "Audit", "Sourcing", "Vente", "B2B",
+/**
+ * Deterministic local parser. It only returns data backed by literal text in the CV;
+ * missing identity, education, certifications and experience details stay empty.
+ */
+export function parseCvTextLocally(rawText: string, taxonomy: CvTaxonomyItem[]): CvAnalysis {
+  const lines = rawText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const lower = rawText.toLocaleLowerCase();
+  const skillTerms = [
+    "JavaScript", "TypeScript", "Python", "Java", "C++", "C#", "PHP", "Ruby", "Go", "Rust",
+    "Swift", "Kotlin", "React", "Vue", "Angular", "Next.js", "Node.js", "Express", "Django",
+    "Spring", "Laravel", "SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis", "Prisma", "AWS",
+    "Azure", "GCP", "Docker", "Kubernetes", "DevOps", "CI/CD", "Git", "Agile", "Scrum",
+    "Management", "Recrutement", "Finance", "Comptabilité", "Audit", "Sourcing", "Vente", "B2B",
+    "machine learning", "pandas", "scikit-learn", "API", "CRM", "IFRS", "contrôle interne",
+    "gestion de projet", "avant-vente", "Talent Acquisition", "grands comptes"
   ];
-
-  const lowerText = rawText.toLowerCase();
-
-  const explicitSkills = commonSkills.filter((skill) => {
+  const explicitSkills = skillTerms.filter((skill) => {
     const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return new RegExp("\\b" + escaped + "\\b", "i").test(rawText);
   });
-
-  // Extract experience years
-  let experienceYears: number | null = null;
-  const expMatch = lowerText.match(/(\d{1,2})\s*(?:ans?|années?)\s*(?:d['’]expérience|expérienc?e)/i);
-  if (expMatch) {
-    experienceYears = parseInt(expMatch[1], 10);
-  } else {
-    // Check year ranges like 2018-2023 or 2018 – 2024
-    const years = [...rawText.matchAll(/\b(19\d\d|20\d\d)\b/g)].map((m) => parseInt(m[1], 10));
-    if (years.length >= 2) {
-      const minYear = Math.min(...years);
-      const maxYear = Math.max(...years);
-      const diff = maxYear - minYear;
-      if (diff >= 1 && diff <= 50) {
-        experienceYears = diff;
-      }
-    }
-  }
-
-  // Languages extraction
-  const languageKeywords = ["Français", "Anglais", "Espagnol", "Allemand", "Italien", "Arabe", "Néerlandais", "Chinois"];
-  const languages = languageKeywords.filter((lang) =>
-    new RegExp(`\\b${lang}\\b`, "i").test(rawText)
+  const languageTerms = ["Français", "Anglais", "Espagnol", "Allemand", "Italien", "Arabe", "Néerlandais", "Chinois"];
+  const languages = languageTerms.filter((language) =>
+    new RegExp("\\b" + language + "\\b", "i").test(rawText)
   );
-
-  // Taxonomy matching
+  let experienceYears: number | null = null;
+  const experienceMatch = rawText.match(/\b(\d{1,2})\s*(?:ans?|années?)\s*(?:d[’\x27]expérience|expérience)\b/i);
+  if (experienceMatch) {
+    const parsedYears = Number(experienceMatch[1]);
+    if (parsedYears >= 0 && parsedYears <= 60) experienceYears = parsedYears;
+  }
+  if (experienceYears === null) {
+    const ranges = [...rawText.matchAll(/\b(19\d{2}|20\d{2})\s*[-–—]\s*(19\d{2}|20\d{2}|présent|aujourd’hui|today)\b/gi)];
+    const durations = ranges.map((match) => {
+      const startYear = Number(match[1]);
+      const endYear = /^(présent|aujourd’hui|today)$/i.test(match[2]) ? new Date().getFullYear() : Number(match[2]);
+      return endYear >= startYear && endYear - startYear <= 60 ? endYear - startYear : null;
+    }).filter((value): value is number => value !== null);
+    if (durations.length) experienceYears = Math.max(...durations);
+  }
   let primaryCategoryCode: string | null = null;
   const subCategoryCodes: string[] = [];
-
   for (const item of taxonomy) {
     if (!item.code) continue;
-    const nameMatch = item.name && lowerText.includes(item.name.toLowerCase());
-    const codeMatch = lowerText.includes(item.code.toLowerCase());
-
+    const nameMatch = Boolean(item.name) && lower.includes(item.name.toLocaleLowerCase());
+    const codeMatch = new RegExp("(^|[^a-z0-9_])" + item.code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").toLocaleLowerCase() + "([^a-z0-9_]|$)", "i").test(rawText);
     if (nameMatch || codeMatch) {
       if (item.parentCode) {
-        subCategoryCodes.push(item.code);
+        if (!subCategoryCodes.includes(item.code)) subCategoryCodes.push(item.code);
         if (!primaryCategoryCode) primaryCategoryCode = item.parentCode;
-      } else if (!primaryCategoryCode) {
-        primaryCategoryCode = item.code;
-      }
+      } else if (!primaryCategoryCode) primaryCategoryCode = item.code;
     }
   }
-
+  const headline = lines.find((line) => !/^CV\s+TEST\b/i.test(line))?.slice(0, 160) ?? null;
+  const summary = lines.length > 1 ? lines.slice(1, 4).join(" ").slice(0, 500) || null : null;
+  const hasDirectFacts = explicitSkills.length > 0 || languages.length > 0 || experienceYears !== null || primaryCategoryCode !== null;
   return {
-    headline,
-    summary,
-    improvedSummary: summary,
-    skills: explicitSkills,
-    explicitSkills,
-    experienceYears,
-    experiences: [],
-    education: [],
-    certifications: [],
-    languages,
-    primaryCategoryCode,
-    subCategoryCodes,
-    alternativeCategoryCodes: [],
-    suggestedPositioning: explicitSkills.slice(0, 3),
-    careerLevel: "NON_SPECIFIE",
-    careerLevelEvidence: null,
-    suggestedFolder: primaryCategoryCode ? `CANDIDATS/${primaryCategoryCode}` : "CANDIDATS/A_CLASSER/CV",
-    confidence: explicitSkills.length > 0 || primaryCategoryCode ? 0.6 : 0.3,
+    firstName: null, lastName: null, email: null, phone: null, address: null, location: null, country: null,
+    headline, summary, improvedSummary: summary,
+    skills: explicitSkills, explicitSkills, experienceYears, experiences: [], education: [], certifications: [], languages,
+    primaryCategoryCode, subCategoryCodes, alternativeCategoryCodes: [],
+    suggestedPositioning: explicitSkills.slice(0, 3), careerLevel: "NON_SPECIFIE", careerLevelEvidence: null,
+    suggestedFolder: primaryCategoryCode ? "CANDIDATS/" + primaryCategoryCode : "CANDIDATS/A_CLASSER/CV",
+    confidence: hasDirectFacts ? 0.6 : 0.1,
   };
 }
-
 export async function analyzeCvDocument(input: {
   fileName: string;
   mimeType: string;
