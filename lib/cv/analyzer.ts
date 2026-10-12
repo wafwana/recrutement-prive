@@ -1,4 +1,80 @@
 import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
+// Dynamic import or CJS interop for pdf-parse and mammoth
+async function parsePdfText(buffer: Buffer): Promise<string | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require("pdf-parse");
+    const fn = typeof pdfParse === "function" ? pdfParse : pdfParse.default;
+    if (typeof fn === "function") {
+      const res = await fn(buffer);
+      return res?.text ? res.text.trim() : null;
+    }
+  } catch {}
+  return null;
+}
+
+async function parseDocxText(buffer: Buffer): Promise<string | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mammoth = require("mammoth");
+    if (mammoth && typeof mammoth.extractRawText === "function") {
+      const res = await mammoth.extractRawText({ buffer });
+      return res?.value ? res.value.trim() : null;
+    }
+  } catch {}
+  return null;
+}
+
+/**
+ * Extract plain text content from buffer for supported text/plain, PDF, DOCX or markdown byte streams.
+ */
+export async function extractTextFromCvBuffer(
+  buffer: Buffer,
+  mimeType: string,
+  fileName: string
+): Promise<string | null> {
+  if (!buffer || buffer.length === 0) return null;
+
+  const lowerName = fileName.toLowerCase();
+
+  // Plain text or markdown
+  if (
+    mimeType.includes("text/plain") ||
+    mimeType.includes("text/markdown") ||
+    lowerName.endsWith(".txt") ||
+    lowerName.endsWith(".md")
+  ) {
+    const raw = buffer.toString("utf-8").trim();
+    return raw.length > 0 ? raw : null;
+  }
+
+  // PDF
+  if (mimeType.includes("pdf") || lowerName.endsWith(".pdf")) {
+    return parsePdfText(buffer);
+  }
+
+  // DOCX
+  if (
+    mimeType.includes("wordprocessingml") ||
+    mimeType.includes("msword") ||
+    lowerName.endsWith(".docx")
+  ) {
+    return parseDocxText(buffer);
+  }
+
+  // Fallback: UTF-8 plain text string extraction for text buffers
+  try {
+    const str = buffer.toString("utf-8");
+    const printableChars = str.replace(/[^\x20-\x7E\xA0-\xFF\n\r\t]/g, "");
+    if (printableChars.length >= 20 && printableChars.length / str.length > 0.6) {
+      return printableChars.trim();
+    }
+  } catch {}
+
+  return null;
+}
+
+
 
 export type CvTaxonomyItem = {
   code: string;
@@ -127,6 +203,74 @@ export function buildCvFileContent(input: {
   };
 }
 
+/**
+ * Deterministic local text-based CV parser that extracts structured facts without external AI network calls.
+ */
+/**
+ * Deterministic local parser. It only returns data backed by literal text in the CV;
+ * missing identity, education, certifications and experience details stay empty.
+ */
+export function parseCvTextLocally(rawText: string, taxonomy: CvTaxonomyItem[]): CvAnalysis {
+  const lines = rawText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const lower = rawText.toLocaleLowerCase();
+  const skillTerms = [
+    "JavaScript", "TypeScript", "Python", "Java", "C++", "C#", "PHP", "Ruby", "Go", "Rust",
+    "Swift", "Kotlin", "React", "Vue", "Angular", "Next.js", "Node.js", "Express", "Django",
+    "Spring", "Laravel", "SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis", "Prisma", "AWS",
+    "Azure", "GCP", "Docker", "Kubernetes", "DevOps", "CI/CD", "Git", "Agile", "Scrum",
+    "Management", "Recrutement", "Finance", "Comptabilité", "Audit", "Sourcing", "Vente", "B2B",
+    "machine learning", "pandas", "scikit-learn", "API", "CRM", "IFRS", "contrôle interne",
+    "gestion de projet", "avant-vente", "Talent Acquisition", "grands comptes"
+  ];
+  const explicitSkills = skillTerms.filter((skill) => {
+    const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp("\\b" + escaped + "\\b", "i").test(rawText);
+  });
+  const languageTerms = ["Français", "Anglais", "Espagnol", "Allemand", "Italien", "Arabe", "Néerlandais", "Chinois"];
+  const languages = languageTerms.filter((language) =>
+    new RegExp("\\b" + language + "\\b", "i").test(rawText)
+  );
+  let experienceYears: number | null = null;
+  const experienceMatch = rawText.match(/\b(\d{1,2})\s*(?:ans?|années?)\s*(?:d[’\x27]expérience|expérience)\b/i);
+  if (experienceMatch) {
+    const parsedYears = Number(experienceMatch[1]);
+    if (parsedYears >= 0 && parsedYears <= 60) experienceYears = parsedYears;
+  }
+  if (experienceYears === null) {
+    const ranges = [...rawText.matchAll(/\b(19\d{2}|20\d{2})\s*[-–—]\s*(19\d{2}|20\d{2}|présent|aujourd’hui|today)\b/gi)];
+    const durations = ranges.map((match) => {
+      const startYear = Number(match[1]);
+      const endYear = /^(présent|aujourd’hui|today)$/i.test(match[2]) ? new Date().getFullYear() : Number(match[2]);
+      return endYear >= startYear && endYear - startYear <= 60 ? endYear - startYear : null;
+    }).filter((value): value is number => value !== null);
+    if (durations.length) experienceYears = Math.max(...durations);
+  }
+  let primaryCategoryCode: string | null = null;
+  const subCategoryCodes: string[] = [];
+  for (const item of taxonomy) {
+    if (!item.code) continue;
+    const nameMatch = Boolean(item.name) && lower.includes(item.name.toLocaleLowerCase());
+    const codeMatch = new RegExp("(^|[^a-z0-9_])" + item.code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").toLocaleLowerCase() + "([^a-z0-9_]|$)", "i").test(rawText);
+    if (nameMatch || codeMatch) {
+      if (item.parentCode) {
+        if (!subCategoryCodes.includes(item.code)) subCategoryCodes.push(item.code);
+        if (!primaryCategoryCode) primaryCategoryCode = item.parentCode;
+      } else if (!primaryCategoryCode) primaryCategoryCode = item.code;
+    }
+  }
+  const headline = lines.find((line) => !/^CV\s+TEST\b/i.test(line))?.slice(0, 160) ?? null;
+  const summary = lines.length > 1 ? lines.slice(1, 4).join(" ").slice(0, 500) || null : null;
+  const hasDirectFacts = explicitSkills.length > 0 || languages.length > 0 || experienceYears !== null || primaryCategoryCode !== null;
+  return {
+    firstName: null, lastName: null, email: null, phone: null, address: null, location: null, country: null,
+    headline, summary, improvedSummary: summary,
+    skills: explicitSkills, explicitSkills, experienceYears, experiences: [], education: [], certifications: [], languages,
+    primaryCategoryCode, subCategoryCodes, alternativeCategoryCodes: [],
+    suggestedPositioning: explicitSkills.slice(0, 3), careerLevel: "NON_SPECIFIE", careerLevelEvidence: null,
+    suggestedFolder: primaryCategoryCode ? "CANDIDATS/" + primaryCategoryCode : "CANDIDATS/A_CLASSER/CV",
+    confidence: hasDirectFacts ? 0.6 : 0.1,
+  };
+}
 export async function analyzeCvDocument(input: {
   fileName: string;
   mimeType: string;
@@ -134,7 +278,10 @@ export async function analyzeCvDocument(input: {
   taxonomy: CvTaxonomyItem[];
 }): Promise<CvAnalysis | null> {
   const provider = getActiveAiProvider();
-  if (!provider) return null;
+  if (!provider) {
+    const text = await extractTextFromCvBuffer(input.buffer, input.mimeType, input.fileName);
+    return text ? parseCvTextLocally(text, input.taxonomy) : null;
+  }
 
   const taxonomyText = input.taxonomy
     .map((item) => `${item.code} — ${item.name}${item.parentCode ? ` (parent: ${item.parentCode})` : ""}`)
