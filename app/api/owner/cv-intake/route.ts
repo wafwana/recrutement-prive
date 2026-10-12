@@ -11,6 +11,12 @@ import { hashToken } from "@/lib/password-crypto";
 import { sendEmail } from "@/lib/email/service";
 import { getAppBaseUrl } from "@/lib/url";
 
+const CV_INTAKE_ALLOWED_TYPES = new Set([
+  ...Array.from(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg"]),
+  "text/plain",
+  "text/markdown",
+]);
+
 function scoreJob(analysis: Awaited<ReturnType<typeof analyzeCvDocument>>, job: { id: string; title: string; requiredSkills: unknown; requiredExperienceYears: number | null; jobCategoryId: string | null; subCategoryId: string | null }) {
   if (!analysis) return 0;
   const candidateSkills = new Set(analysis.skills.map((skill) => skill.toLowerCase()));
@@ -73,7 +79,7 @@ export async function POST(request: Request) {
     const file = formData.get("file");
     if (!file || typeof file === "string") return NextResponse.json({ error: "Aucun CV fourni." }, { status: 400 });
 
-    const fileCheck = await validateUploadedDocument(file);
+    const fileCheck = await validateUploadedDocument(file, { allowedTypes: CV_INTAKE_ALLOWED_TYPES });
     if (!fileCheck.ok) return NextResponse.json({ error: fileCheck.error || "Fichier non conforme." }, { status: 400 });
 
     const buffer = Buffer.from(await file.arrayBuffer());
