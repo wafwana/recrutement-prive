@@ -17,7 +17,7 @@ function parseCountries(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value
     .filter((item): item is string => typeof item === "string")
-    .map((item) => item.trim().replace(/\\s+/g, " "))
+    .map((item) => item.trim().replace(/\s+/g, " "))
     .filter((item) => item.length >= 2 && item.length <= 100))].slice(0, 50);
 }
 
