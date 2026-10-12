@@ -1,28 +1,29 @@
 import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
-// Dynamic import or CJS interop for pdf-parse and mammoth
+import mammoth from "mammoth";
+import { PDFParse } from "pdf-parse";
+
+// PDFParse v2 is class-based: use its getText API and always release the document.
 async function parsePdfText(buffer: Buffer): Promise<string | null> {
+  const parser = new PDFParse({ data: buffer });
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require("pdf-parse");
-    const fn = typeof pdfParse === "function" ? pdfParse : pdfParse.default;
-    if (typeof fn === "function") {
-      const res = await fn(buffer);
-      return res?.text ? res.text.trim() : null;
-    }
-  } catch {}
-  return null;
+    const result = await parser.getText();
+    const text = typeof result?.text === "string" ? result.text.trim() : "";
+    return text || null;
+  } catch {
+    return null;
+  } finally {
+    await parser.destroy().catch(() => undefined);
+  }
 }
 
 async function parseDocxText(buffer: Buffer): Promise<string | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mammoth = require("mammoth");
-    if (mammoth && typeof mammoth.extractRawText === "function") {
-      const res = await mammoth.extractRawText({ buffer });
-      return res?.value ? res.value.trim() : null;
-    }
-  } catch {}
-  return null;
+    const result = await mammoth.extractRawText({ buffer });
+    const text = typeof result?.value === "string" ? result.value.trim() : "";
+    return text || null;
+  } catch {
+    return null;
+  }
 }
 
 /**
