@@ -10,11 +10,7 @@ async function parsePdfText(buffer: Buffer): Promise<string | null> {
     // pdfjs-dist v5 expects browser canvas globals in some serverless Node runtimes.
     // Install Node-native implementations before loading pdf-parse; static imports
     // would evaluate pdfjs-dist too early, before these globals exist.
-    const runtime = globalThis as typeof globalThis & {
-      DOMMatrix?: typeof DOMMatrix;
-      ImageData?: typeof ImageData;
-      Path2D?: typeof Path2D;
-    };
+    const runtime = globalThis as unknown as Record<string, unknown>;
     runtime.DOMMatrix ??= DOMMatrix;
     runtime.ImageData ??= ImageData;
     runtime.Path2D ??= Path2D;
