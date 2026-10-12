@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { fetchGlobalJobs, fetchGlobalCandidates, configuredSources } from "@/lib/sourcing/global";
 import { qualifyAndMatchExternalOffer } from "@/lib/jobs/offer-pipeline";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
+import { buildCandidateFolder } from "@/lib/cv/folders";
 
 export async function markExpiredGlobalJobs() {
   const now = new Date();
@@ -127,6 +128,8 @@ export type CandidateSourcingFilter = {
   skills?: string[];
   country?: string;
   jobId?: string;
+  sectorCode?: string;
+  professionCode?: string;
 };
 
 export async function ingestGlobalCandidates(params: {
@@ -163,6 +166,17 @@ export async function ingestGlobalCandidates(params: {
   let totalCreated = 0;
   let totalUpdated = 0;
   let totalMatched = 0;
+  let targetFolder: string | undefined = undefined;
+
+  if (filter?.sectorCode || filter?.professionCode) {
+    targetFolder = buildCandidateFolder({
+      sectorCode: filter.sectorCode,
+      professionCode: filter.professionCode,
+      year: new Date().getFullYear(),
+      documentKind: "CV",
+    });
+  }
+
   const results: Array<{ sourceUrl: string; fetched: number; created: number; updated: number; matched: number; error?: string }> = [];
 
   const sourceCollectedAt = new Date();
@@ -233,9 +247,14 @@ export async function ingestGlobalCandidates(params: {
           status: initialStatus,
           matchingScore: score,
           matchingDetails: matchDetails,
-          notes: candidate.country ? `Pays source : ${candidate.country}` : undefined,
+          notes: [
+            candidate.country ? `Pays source : ${candidate.country}` : null,
+            targetFolder ? `Dossier cible : ${targetFolder}` : null,
+          ].filter(Boolean).join(" · ") || undefined,
           createdByUserId: actorUserId,
         };
+
+        let createdSourcedCandidateId: string | null = null;
 
         if (candidate.externalId) {
           const existing = await prisma.sourcedCandidate.findUnique({
@@ -255,16 +274,40 @@ export async function ingestGlobalCandidates(params: {
                 updatedAt: new Date(),
               },
             });
+            createdSourcedCandidateId = existing.id;
             updated++;
           } else {
-            await prisma.sourcedCandidate.create({
+            const createdRec = await prisma.sourcedCandidate.create({
               data: { ...data, externalId: candidate.externalId },
+              select: { id: true },
             });
+            createdSourcedCandidateId = createdRec.id;
             created++;
           }
         } else {
-          await prisma.sourcedCandidate.create({ data });
+          const createdRec = await prisma.sourcedCandidate.create({
+            data,
+            select: { id: true },
+          });
+          createdSourcedCandidateId = createdRec.id;
           created++;
+        }
+
+        // Notify Owner prior to classification/placement
+        if (targetFolder && createdSourcedCandidateId) {
+          try {
+            await prisma.ownerNotification.create({
+              data: {
+                title: "Nouveau candidat sourcé pour la taxonomie",
+                message: `Profil "${candidate.headline || candidate.name || "Candidat"}" sourcé depuis ${candidate.source}. Dossier de destination : ${targetFolder}. Provenance : ${sourceCollectedAt.toISOString()}`,
+                documentId: createdSourcedCandidateId,
+                senderName: "Moteur Sourcing",
+                senderRole: "SYSTEM",
+              },
+            });
+          } catch (notifErr) {
+            console.warn("[ingestGlobalCandidates] Could not create owner notification:", notifErr);
+          }
         }
       }
 
@@ -311,6 +354,7 @@ export async function ingestGlobalCandidates(params: {
     created: totalCreated,
     updated: totalUpdated,
     matched: totalMatched,
+    targetFolder,
     results,
   };
 }

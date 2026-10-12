@@ -27,6 +27,8 @@ export async function POST(request: Request) {
     : undefined;
 
   const jobId = typeof body.jobId === "string" && body.jobId ? body.jobId : undefined;
+  const sectorCode = typeof body.sectorCode === "string" ? body.sectorCode : undefined;
+  const professionCode = typeof body.professionCode === "string" ? body.professionCode : undefined;
   const query = typeof body.query === "string" ? body.query : undefined;
   const country = typeof body.country === "string" ? body.country : undefined;
   const skills = Array.isArray(body.skills)
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
 
   const result = await ingestGlobalCandidates({
     sourceUrl,
-    filter: { query, skills, country, jobId },
+    filter: { query, skills, country, jobId, sectorCode, professionCode },
     actorUserId: actor,
   });
 

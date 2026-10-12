@@ -8,6 +8,7 @@ import { buildProfessionRoot } from "@/lib/cv/folders";
 import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
 import { getStrongProfilesForProfession } from "@/lib/taxonomy/strong-profiles";
 import BackButton from "@/components/navigation/BackButton";
+import LancerRechercheModal from "./LancerRechercheModal";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -332,7 +333,12 @@ export default async function OwnerMetiersPage({ searchParams }: { searchParams:
                   <h2 className="mt-2 font-serif text-2xl text-white">{sector.name.fr}</h2>
                   <p className="mt-1 text-xs text-white/30">{sector.positioning.fr}</p>
                 </div>
-                <div className="text-left md:text-right">
+                <div className="flex flex-col items-start gap-2 md:items-end">
+                  <LancerRechercheModal
+                    sectorCode={sector.code}
+                    sectorName={sector.name.fr}
+                    buttonLabel="Lancer une recherche secteur"
+                  />
                   <p className="text-[10px] uppercase tracking-[0.14em] text-white/30">
                     {professions.length} métier{professions.length > 1 ? "s" : ""} affiché
                     {professions.length > 1 ? "s" : ""}
@@ -405,14 +411,13 @@ export default async function OwnerMetiersPage({ searchParams }: { searchParams:
                       </div>
 
                       <div className="mt-5 flex items-center justify-between gap-3">
-                        <span
-                          className={
-                            "text-[10px] uppercase tracking-[0.14em] " +
-                            (count ? "text-[#c7a15a]" : "text-white/35")
-                          }
-                        >
-                          {count ? "Ouvrir le dossier →" : "Dossier disponible →"}
-                        </span>
+                        <LancerRechercheModal
+                          sectorCode={sector.code}
+                          sectorName={sector.name.fr}
+                          professionCode={profession.code}
+                          professionName={profession.name.fr}
+                          buttonLabel="Lancer une recherche"
+                        />
                         <span className="text-[9px] uppercase tracking-[0.12em] text-white/20">
                           {count ? "alimenté" : "vide"}
                         </span>
