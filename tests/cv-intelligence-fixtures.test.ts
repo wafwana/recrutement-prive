@@ -55,6 +55,36 @@ test("CV fixtures: contenu professionnel et secteurs attendus", async () => {
   }
 });
 
+test("Local CV parser extracts facts deterministically when AI provider is absent", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+
+  try {
+    delete process.env.AI_PROVIDER;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+
+    for (const fixture of FIXTURES) {
+      const buffer = await readFile(path.join(process.cwd(), "tests/fixtures/cv", fixture.file));
+      const analysis = await analyzeCvDocument({
+        fileName: fixture.file,
+        mimeType: "text/plain",
+        buffer,
+        taxonomy: TAXONOMY,
+      });
+
+      assert.ok(analysis, `Local analysis failed for ${fixture.file}`);
+      assert.ok(analysis.skills.length > 0, `Skills should be extracted for ${fixture.file}`);
+      assert.ok(analysis.confidence > 0, `Confidence should be positive for ${fixture.file}`);
+    }
+  } finally {
+    if (originalProvider) process.env.AI_PROVIDER = originalProvider; else delete process.env.AI_PROVIDER;
+    if (originalOpenAiKey) process.env.OPENAI_API_KEY = originalOpenAiKey; else delete process.env.OPENAI_API_KEY;
+    if (originalGeminiKey) process.env.GEMINI_API_KEY = originalGeminiKey; else delete process.env.GEMINI_API_KEY;
+  }
+});
+
 test(
   "CV fixtures: analyse IA optionnelle et secteurs alternatifs",
   { skip: process.env.RUN_LIVE_CV_ANALYSIS !== "1" },

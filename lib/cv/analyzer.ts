@@ -1,4 +1,29 @@
 import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
+// Dynamic import or CJS interop for pdf-parse and mammoth
+async function parsePdfText(buffer: Buffer): Promise<string | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require("pdf-parse");
+    const fn = typeof pdfParse === "function" ? pdfParse : pdfParse.default;
+    if (typeof fn === "function") {
+      const res = await fn(buffer);
+      return res?.text ? res.text.trim() : null;
+    }
+  } catch {}
+  return null;
+}
+
+async function parseDocxText(buffer: Buffer): Promise<string | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mammoth = require("mammoth");
+    if (mammoth && typeof mammoth.extractRawText === "function") {
+      const res = await mammoth.extractRawText({ buffer });
+      return res?.value ? res.value.trim() : null;
+    }
+  } catch {}
+  return null;
+}
 
 export type CvTaxonomyItem = {
   code: string;
@@ -106,6 +131,150 @@ export function buildCvFileContent(input: {
   };
 }
 
+/**
+ * Extract plain text content from buffer for supported text/plain, PDF, DOCX or markdown byte streams.
+ */
+export async function extractTextFromCvBuffer(
+  buffer: Buffer,
+  mimeType: string,
+  fileName: string
+): Promise<string | null> {
+  if (!buffer || buffer.length === 0) return null;
+
+  const lowerName = fileName.toLowerCase();
+
+  // Plain text or markdown
+  if (
+    mimeType.includes("text/plain") ||
+    mimeType.includes("text/markdown") ||
+    lowerName.endsWith(".txt") ||
+    lowerName.endsWith(".md")
+  ) {
+    const raw = buffer.toString("utf-8").trim();
+    return raw.length > 0 ? raw : null;
+  }
+
+  // PDF
+  if (mimeType.includes("pdf") || lowerName.endsWith(".pdf")) {
+    return parsePdfText(buffer);
+  }
+
+  // DOCX
+  if (
+    mimeType.includes("wordprocessingml") ||
+    mimeType.includes("msword") ||
+    lowerName.endsWith(".docx")
+  ) {
+    return parseDocxText(buffer);
+  }
+
+  // Fallback: UTF-8 plain text string extraction for text buffers
+  try {
+    const str = buffer.toString("utf-8");
+    const printableChars = str.replace(/[^\x20-\x7E\xA0-\xFF\n\r\t]/g, "");
+    if (printableChars.length >= 20 && printableChars.length / str.length > 0.6) {
+      return printableChars.trim();
+    }
+  } catch {}
+
+  return null;
+}
+
+/**
+ * Deterministic local text-based CV parser that extracts structured facts without external AI network calls.
+ */
+export function parseCvTextLocally(
+  rawText: string,
+  taxonomy: CvTaxonomyItem[]
+): CvAnalysis {
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const headline = lines.length > 0 ? lines[0].slice(0, 160) : null;
+  const summary = lines.length > 1 ? lines.slice(1, 4).join(" ").slice(0, 500) : headline;
+
+  // Common technical & professional skill keywords
+  const commonSkills = [
+    "JavaScript", "TypeScript", "Python", "Java", "C++", "C#", "PHP", "Ruby", "Go", "Rust", "Swift", "Kotlin",
+    "React", "Vue", "Angular", "Next.js", "Node.js", "Express", "Django", "Spring", "Laravel",
+    "SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis", "Prisma",
+    "AWS", "Azure", "GCP", "Docker", "Kubernetes", "DevOps", "CI/CD", "Git",
+    "Agile", "Scrum", "Management", "Recrutement", "Finance", "Comptabilité", "Audit", "Sourcing", "Vente", "B2B",
+  ];
+
+  const lowerText = rawText.toLowerCase();
+
+  const explicitSkills = commonSkills.filter((skill) =>
+    new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(rawText)
+  );
+
+  // Extract experience years
+  let experienceYears: number | null = null;
+  const expMatch = lowerText.match(/(\d{1,2})\s*(?:ans?|années?)\s*(?:d['’]expérience|expérienc?e)/i);
+  if (expMatch) {
+    experienceYears = parseInt(expMatch[1], 10);
+  } else {
+    // Check year ranges like 2018-2023 or 2018 – 2024
+    const years = [...rawText.matchAll(/\b(19\d\d|20\d\d)\b/g)].map((m) => parseInt(m[1], 10));
+    if (years.length >= 2) {
+      const minYear = Math.min(...years);
+      const maxYear = Math.max(...years);
+      const diff = maxYear - minYear;
+      if (diff >= 1 && diff <= 50) {
+        experienceYears = diff;
+      }
+    }
+  }
+
+  // Languages extraction
+  const languageKeywords = ["Français", "Anglais", "Espagnol", "Allemand", "Italien", "Arabe", "Néerlandais", "Chinois"];
+  const languages = languageKeywords.filter((lang) =>
+    new RegExp(`\\b${lang}\\b`, "i").test(rawText)
+  );
+
+  // Taxonomy matching
+  let primaryCategoryCode: string | null = null;
+  const subCategoryCodes: string[] = [];
+
+  for (const item of taxonomy) {
+    if (!item.code) continue;
+    const nameMatch = item.name && lowerText.includes(item.name.toLowerCase());
+    const codeMatch = lowerText.includes(item.code.toLowerCase());
+
+    if (nameMatch || codeMatch) {
+      if (item.parentCode) {
+        subCategoryCodes.push(item.code);
+        if (!primaryCategoryCode) primaryCategoryCode = item.parentCode;
+      } else if (!primaryCategoryCode) {
+        primaryCategoryCode = item.code;
+      }
+    }
+  }
+
+  return {
+    headline,
+    summary,
+    improvedSummary: summary,
+    skills: explicitSkills,
+    explicitSkills,
+    experienceYears,
+    experiences: [],
+    education: [],
+    certifications: [],
+    languages,
+    primaryCategoryCode,
+    subCategoryCodes,
+    alternativeCategoryCodes: [],
+    suggestedPositioning: explicitSkills.slice(0, 3),
+    careerLevel: "NON_SPECIFIE",
+    careerLevelEvidence: null,
+    suggestedFolder: primaryCategoryCode ? `CANDIDATS/${primaryCategoryCode}` : "CANDIDATS/A_CLASSER/CV",
+    confidence: explicitSkills.length > 0 || primaryCategoryCode ? 0.6 : 0.3,
+  };
+}
+
 export async function analyzeCvDocument(input: {
   fileName: string;
   mimeType: string;
@@ -113,7 +282,15 @@ export async function analyzeCvDocument(input: {
   taxonomy: CvTaxonomyItem[];
 }): Promise<CvAnalysis | null> {
   const provider = getActiveAiProvider();
-  if (!provider) return null;
+
+  // If no AI provider is configured, fall back to deterministic local parsing if text is readable
+  if (!provider) {
+    const text = await extractTextFromCvBuffer(input.buffer, input.mimeType, input.fileName);
+    if (text) {
+      return parseCvTextLocally(text, input.taxonomy);
+    }
+    return null;
+  }
 
   const taxonomyText = input.taxonomy
     .map((item) => `${item.code} — ${item.name}${item.parentCode ? ` (parent: ${item.parentCode})` : ""}`)
