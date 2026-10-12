@@ -179,6 +179,31 @@ async function main() {
     assert.ok(audit, "CV import must produce an audit entry");
     assert.equal((audit.details as Record<string, unknown>).analysisGenerated, true);
 
+    // Simulate one of the legacy failed records and verify OWNER can reprocess it locally.
+    await prisma.cvIntake.update({
+      where: { id: persisted.id },
+      data: {
+        status: "NON_ANALYSE",
+        analysis: { sourceFactsOnly: true, error: "synthetic legacy provider failure" },
+        analyzedAt: null,
+      },
+    });
+    const retryResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/reprocess`, {
+      method: "POST",
+      headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [persisted.id] }),
+    });
+    assert.equal(retryResponse.status, 200, `OWNER local reprocessing failed: ${(await retryResponse.clone().text()).slice(0, 500)}`);
+    const retryBody = await retryResponse.json() as { ok: boolean; externalAiCalled: boolean; originalFilesModified: boolean; results: Array<{ id: string; status: string }> };
+    assert.equal(retryBody.ok, true);
+    assert.equal(retryBody.externalAiCalled, false, "Reprocessing must not call an external AI provider");
+    assert.equal(retryBody.originalFilesModified, false);
+    assert.equal(retryBody.results[0]?.status, "ANALYSE_OK");
+    const retried = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
+    assert.ok(retried?.analyzedAt, "Successful reprocessing must set analyzedAt");
+    assert.equal(retried?.originalSha256, sha256, "Reprocessing must preserve the original file hash");
+    assert.equal(retried?.status, "ANALYSE_OK");
+
     // Read-only check of the OWNER outflows API against the fully migrated CI schema.
     const outflowsResponse = await fetch(`${BASE_URL}/api/owner/outflows`, {
       headers: { Cookie: cookieHeader(jar) },
