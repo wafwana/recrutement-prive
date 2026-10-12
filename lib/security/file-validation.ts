@@ -29,7 +29,7 @@ export async function validateUploadedDocument(file: File, options: { allowedTyp
     }
     try {
       const text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
-      if (!text.trim() || /\u0000|[\u0001-\u0008\u000B\u000C\u000E-\u001F]/.test(text)) {
+      if (!text.trim() || /\x00|[\x01-\x08\x0B\x0C\x0E-\x1F]/.test(text)) {
         return { ok: false as const, error: "Le contenu texte est vide ou contient des octets non autorisés." };
       }
       return { ok: true as const };
