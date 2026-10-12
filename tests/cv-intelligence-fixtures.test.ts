@@ -85,6 +85,75 @@ test("Local CV parser extracts facts deterministically when AI provider is absen
   }
 });
 
+test("Local CV parser handles empty, corrupt, or unsupported binary buffers gracefully without throwing", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+
+  try {
+    delete process.env.AI_PROVIDER;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+
+    // Empty buffer
+    const emptyRes = await analyzeCvDocument({
+      fileName: "empty.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.alloc(0),
+      taxonomy: TAXONOMY,
+    });
+    assert.equal(emptyRes, null, "Empty buffer should return null without throwing");
+
+    // Corrupted pseudo-binary
+    const corruptRes = await analyzeCvDocument({
+      fileName: "corrupt.docx",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: Buffer.from("INVALID_BINARY_STREAM_CONTENT_NON_ZIP"),
+      taxonomy: TAXONOMY,
+    });
+    assert.equal(corruptRes, null, "Corrupt binary stream should return null without throwing");
+  } finally {
+    if (originalProvider) process.env.AI_PROVIDER = originalProvider; else delete process.env.AI_PROVIDER;
+    if (originalOpenAiKey) process.env.OPENAI_API_KEY = originalOpenAiKey; else delete process.env.OPENAI_API_KEY;
+    if (originalGeminiKey) process.env.GEMINI_API_KEY = originalGeminiKey; else delete process.env.GEMINI_API_KEY;
+  }
+});
+
+test("Zero AI network calls during local CV parsing when AI provider is unconfigured", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+
+  let fetchCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCount++;
+    throw new Error("NETWORK_CALL_UNEXPECTED: Local CV analysis must never make network calls!");
+  }) as typeof globalThis.fetch;
+
+  try {
+    delete process.env.AI_PROVIDER;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+
+    const buffer = await readFile(path.join(process.cwd(), "tests/fixtures/cv/CV-01-ingenieur-data-ia.txt"));
+    const analysis = await analyzeCvDocument({
+      fileName: "CV-01-ingenieur-data-ia.txt",
+      mimeType: "text/plain",
+      buffer,
+      taxonomy: TAXONOMY,
+    });
+
+    assert.ok(analysis);
+    assert.equal(fetchCount, 0, "Network fetch count must remain 0 during local CV parsing!");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalProvider) process.env.AI_PROVIDER = originalProvider; else delete process.env.AI_PROVIDER;
+    if (originalOpenAiKey) process.env.OPENAI_API_KEY = originalOpenAiKey; else delete process.env.OPENAI_API_KEY;
+    if (originalGeminiKey) process.env.GEMINI_API_KEY = originalGeminiKey; else delete process.env.GEMINI_API_KEY;
+  }
+});
+
 test(
   "CV fixtures: analyse IA optionnelle et secteurs alternatifs",
   { skip: process.env.RUN_LIVE_CV_ANALYSIS !== "1" },
