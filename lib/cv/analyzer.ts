@@ -1,13 +1,15 @@
 import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
 // pdf-parse v2 uses PDFParse with explicit in-memory data.
 // next.config.ts externalizes pdf-parse so production Node can resolve its worker dependencies.
+// Load the Node worker/canvas adapter before pdf-parse to prevent DOMMatrix crashes on Vercel.
+import { CanvasFactory } from "pdf-parse/worker";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 
 async function parsePdfText(buffer: Buffer): Promise<string | null> {
   let parser: PDFParse | undefined;
   try {
-    parser = new PDFParse({ data: buffer });
+    parser = new PDFParse({ data: buffer, CanvasFactory });
     const result = await parser.getText();
     return result.text ? result.text.trim() : null;
   } catch (error) {
