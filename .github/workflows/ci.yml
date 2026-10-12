@@ -67,6 +67,13 @@ jobs:
       - run: npm run test:taxonomy-cv-protection
       - run: npm run test:cv-intelligence
       - run: npm run test:global-sourcing
+      - run: npm run test:enterprise-sourcing-batch
+      - run: npm run test:ai-provider
+      - run: npm run test:internal-messaging
+      - run: npm run test:secure-contact
+      - run: npm run test:secure-contact-authorization
+      - run: npm run test:secure-contact-payments
+      - run: npm run test:executive-search
       - run: npx tsx tests/candidate-integration.ts
       - run: npx tsx tests/final-validation.ts
       - run: npx tsx tests/offer-attachment-validation.ts
