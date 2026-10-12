@@ -4,7 +4,7 @@ const isProduction = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
   // pdf-parse v2 relies on Node runtime module resolution; keep it out of the Next.js server bundle.
-  serverExternalPackages: ["pdf-parse"],
+  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas"],
   reactStrictMode: true,
   experimental: {
     serverActions: {
