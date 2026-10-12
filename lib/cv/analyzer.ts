@@ -229,9 +229,10 @@ export function parseCvTextLocally(
 
   const lowerText = rawText.toLowerCase();
 
-  const explicitSkills = commonSkills.filter((skill) =>
-    new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\export async function analyzeCvDocument(input: {")}\\b`, "i").test(rawText)
-  );
+  const explicitSkills = commonSkills.filter((skill) => {
+    const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp("\\b" + escaped + "\\b", "i").test(rawText);
+  });
 
   // Extract experience years
   let experienceYears: number | null = null;
