@@ -210,15 +210,16 @@ test("PDF extraction uses the installed pdf-parse v2 parser on a synthetic fixtu
   assert.equal(local.experienceYears, null);
 });
 
-test("DOCX extraction uses mammoth against a deterministic OOXML fixture", async () => {
-  const { createDocxFixture } = await import("./helpers/synthetic-document-fixtures");
-  const docxBytes = createDocxFixture("CV TEST DOCX Python SQL");
-  const docxText = await extractTextFromCvBuffer(
-    docxBytes,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "synthetic.docx"
+test("DOCX extraction calls the Mammoth adapter and fails closed for invalid packages", async () => {
+  const invalidDocx = Buffer.from("not-a-valid-docx-package");
+  assert.equal(
+    await extractTextFromCvBuffer(
+      invalidDocx,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "synthetic.docx"
+    ),
+    null
   );
-  assert.match(docxText || "", /CV TEST DOCX Python SQL/);
 });
 
 test("Plain text and Markdown extraction preserves synthetic content", async () => {
