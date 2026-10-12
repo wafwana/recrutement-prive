@@ -46,7 +46,9 @@
     "framer-motion": "12.23.24",
     "openai": "6.2.0",
     "resend": "6.32.1",
-    "server-only": "0.0.1"
+    "server-only": "0.0.1",
+    "mammoth": "^1.13.0",
+    "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
     "typescript": "5.9.2",
@@ -57,7 +59,8 @@
     "@tailwindcss/postcss": "4.1.14",
     "@types/node": "24.5.2",
     "@types/react": "19.1.13",
-    "@types/react-dom": "19.1.9"
+    "@types/react-dom": "19.1.9",
+    "@types/pdf-parse": "^1.1.5"
   },
   "overrides": {
     "deepmerge-ts": "^8.0.2",
