@@ -169,6 +169,29 @@ test("Local text extraction handles empty and unsupported inputs safely", async 
   assert.equal(await extractTextFromCvBuffer(Buffer.from("# Skills\nPython"), "text/markdown", "skills.md"), "# Skills\nPython");
 });
 
+test("Actual synthetic PDF and DOCX extractors work without an AI provider", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  try {
+    delete process.env.AI_PROVIDER;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    const pdf = await readFile(path.join(process.cwd(), "tests/fixtures/cv/synthetic-cv.pdf"));
+    const pdfText = await extractTextFromCvBuffer(pdf, "application/pdf", "synthetic-cv.pdf");
+    assert.ok(pdfText?.includes("SYNTHETIC CV TEST"));
+    assert.ok(pdfText?.includes("Python, SQL"));
+    const docx = await readFile(path.join(process.cwd(), "tests/fixtures/cv/synthetic-cv.docx"));
+    const docxText = await extractTextFromCvBuffer(docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "synthetic-cv.docx");
+    assert.ok(docxText?.includes("SYNTHETIC CV DOCX"));
+    assert.ok(docxText?.includes("TypeScript and Python"));
+  } finally {
+    if (originalProvider) process.env.AI_PROVIDER = originalProvider; else delete process.env.AI_PROVIDER;
+    if (originalOpenAiKey) process.env.OPENAI_API_KEY = originalOpenAiKey; else delete process.env.OPENAI_API_KEY;
+    if (originalGeminiKey) process.env.GEMINI_API_KEY = originalGeminiKey; else delete process.env.GEMINI_API_KEY;
+  }
+});
+
 test(
   "CV fixtures: analyse IA optionnelle et secteurs alternatifs",
   { skip: process.env.RUN_LIVE_CV_ANALYSIS !== "1" },

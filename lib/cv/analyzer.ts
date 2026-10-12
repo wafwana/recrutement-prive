@@ -1,28 +1,29 @@
 import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
-// Dynamic import or CJS interop for pdf-parse and mammoth
+// pdf-parse v2 uses PDFParse with explicit in-memory data. This API is compatible
+// with Next.js server bundling and avoids the legacy CJS dynamic-dependency warning.
+import { PDFParse } from "pdf-parse";
+import mammoth from "mammoth";
+
 async function parsePdfText(buffer: Buffer): Promise<string | null> {
+  let parser: PDFParse | undefined;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require("pdf-parse");
-    const fn = typeof pdfParse === "function" ? pdfParse : pdfParse.default;
-    if (typeof fn === "function") {
-      const res = await fn(buffer);
-      return res?.text ? res.text.trim() : null;
-    }
-  } catch {}
-  return null;
+    parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    return result.text ? result.text.trim() : null;
+  } catch {
+    return null;
+  } finally {
+    await parser?.destroy().catch(() => undefined);
+  }
 }
 
 async function parseDocxText(buffer: Buffer): Promise<string | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mammoth = require("mammoth");
-    if (mammoth && typeof mammoth.extractRawText === "function") {
-      const res = await mammoth.extractRawText({ buffer });
-      return res?.value ? res.value.trim() : null;
-    }
-  } catch {}
-  return null;
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value ? result.value.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
