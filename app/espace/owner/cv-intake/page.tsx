@@ -198,7 +198,7 @@ export default function RealCvRegistryPage() {
                   <p className="mt-2 text-xs text-white/65">{(cv.matching?.suggestedMatches || cv.analysis.suggestedMatches || []).slice(0, 5).map((m) => `${m.title} (${m.score}/100)`).join(" · ") || "Aucune offre ouverte correspondante actuellement."}</p>
                 </div>
               </div>
-            ) : <p className="mt-5 text-sm text-white/40">Analyse non disponible : le CV reste conservé et classé en attente.{cv.analysis?.error ? ` Motif : ${cv.analysis.error}` : ""}</p>}
+            ) : <p className="mt-5 text-sm text-white/40">Analyse non disponible : le CV reste conservé et classé en attente.</p>}
           </article>
         ))}
         {!visible.length ? <p className="border border-white/10 p-6 text-sm text-white/40">Aucun CV réel intégré.</p> : null}
