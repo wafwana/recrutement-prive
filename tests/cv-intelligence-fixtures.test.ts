@@ -155,18 +155,18 @@ test("Zero AI network calls during local CV parsing when AI provider is unconfig
 });
 
 test("Local deterministic parser returns no invented identity or experience facts", () => {
-  const parsed = parseCvTextLocally("CV TEST\\nCompétences: Python, SQL\\nLangues: français, anglais", TAXONOMY);
-  assert.equal(parsed.firstName, undefined);
+  const parsed = parseCvTextLocally("CV TEST\nCompétences: Python, SQL\nLangues: français, anglais", TAXONOMY);
+  assert.equal(parsed.firstName, null);
   assert.equal(parsed.experienceYears, null);
   assert.deepEqual(parsed.skills, ["Python", "SQL"]);
   assert.deepEqual(parsed.languages, ["Français", "Anglais"]);
-  assert.deepEqual(parsed, parseCvTextLocally("CV TEST\\nCompétences: Python, SQL\\nLangues: français, anglais", TAXONOMY));
+  assert.deepEqual(parsed, parseCvTextLocally("CV TEST\nCompétences: Python, SQL\nLangues: français, anglais", TAXONOMY));
 });
 
 test("Local text extraction handles empty and unsupported inputs safely", async () => {
   assert.equal(await extractTextFromCvBuffer(Buffer.alloc(0), "application/pdf", "empty.pdf"), null);
   assert.equal(await extractTextFromCvBuffer(Buffer.from([0, 1, 2, 3]), "application/octet-stream", "binary.bin"), null);
-  assert.equal(await extractTextFromCvBuffer(Buffer.from("# Skills\\nPython"), "text/markdown", "skills.md"), "# Skills\\nPython");
+  assert.equal(await extractTextFromCvBuffer(Buffer.from("# Skills\nPython"), "text/markdown", "skills.md"), "# Skills\nPython");
 });
 
 test(
