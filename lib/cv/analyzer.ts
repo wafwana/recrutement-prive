@@ -1,6 +1,6 @@
 import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
-// pdf-parse v2 uses PDFParse with explicit in-memory data. This API is compatible
-// with Next.js server bundling and avoids the legacy CJS dynamic-dependency warning.
+// pdf-parse v2 uses PDFParse with explicit in-memory data.
+// next.config.ts externalizes pdf-parse so production Node can resolve its worker dependencies.
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 
@@ -10,7 +10,12 @@ async function parsePdfText(buffer: Buffer): Promise<string | null> {
     parser = new PDFParse({ data: buffer });
     const result = await parser.getText();
     return result.text ? result.text.trim() : null;
-  } catch {
+  } catch (error) {
+    // Log only the parser error class; never log the uploaded CV or extracted text.
+    console.warn(
+      "[cv pdf extraction] parser failed",
+      error instanceof Error ? error.name : "UnknownError",
+    );
     return null;
   } finally {
     await parser?.destroy().catch(() => undefined);
