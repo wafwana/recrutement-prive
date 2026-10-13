@@ -329,6 +329,71 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
   return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidateBatch.length, candidateSourceTotal, batchLimit: candidateBatchLimit, created, updated };
 }
 
+export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 100) {
+  const take = Math.min(100, Math.max(1, Math.trunc(maxItems)));
+  const intakes = await prisma.cvIntake.findMany({
+    where: { status: "ANALYSE_OK", candidateId: null },
+    orderBy: [{ analyzedAt: "desc" }, { createdAt: "desc" }],
+    take,
+    select: { id: true, candidateName: true, analysis: true, analyzedAt: true, updatedAt: true },
+  });
+
+  const candidateIds: string[] = [];
+  const createdCandidateIds: string[] = [];
+  let skipped = 0;
+
+  for (const intake of intakes) {
+    const analysis = intake.analysis && typeof intake.analysis === "object" && !Array.isArray(intake.analysis)
+      ? intake.analysis as Record<string, unknown>
+      : null;
+    if (!analysis || !Array.isArray(analysis.skills) || !Array.isArray(analysis.subCategoryCodes) ||
+        !Object.prototype.hasOwnProperty.call(analysis, "primaryCategoryCode")) {
+      skipped++;
+      continue;
+    }
+
+    const externalId = `cv-intake:${intake.id}`;
+    const existing = await prisma.sourcedCandidate.findUnique({
+      where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
+      select: { id: true, status: true },
+    });
+    const finished = Boolean(existing && ["VALIDATED", "REJECTED", "ARCHIVED", "CONTACTED"].includes(existing.status));
+    const skills = analysis.skills.filter((value): value is string => typeof value === "string");
+    const locationParts = [analysis.location, analysis.country].filter((value): value is string => typeof value === "string" && Boolean(value.trim()));
+    const data = {
+      source: "PLATFORM_CV_INTAKE",
+      sourceProfileUrl: null,
+      sourceCollectedAt: intake.analyzedAt || intake.updatedAt,
+      name: intake.candidateName || null,
+      headline: typeof analysis.headline === "string" ? analysis.headline : null,
+      location: locationParts.join(", ") || null,
+      skills: skills as unknown as Prisma.InputJsonValue,
+      experienceYears: typeof analysis.experienceYears === "number" && Number.isFinite(analysis.experienceYears)
+        ? Math.max(0, Math.min(60, Math.trunc(analysis.experienceYears)))
+        : null,
+      matchingDetails: {
+        mode: "ANALYZED_CV_INTAKE",
+        cvAnalyzed: true,
+        humanValidated: false,
+        analyzedAt: intake.analyzedAt?.toISOString() || null,
+      } as unknown as Prisma.InputJsonValue,
+      notes: "CV importé en interne et analysé localement. Consentement en attente ; validation humaine obligatoire ; aucun contact automatique.",
+      createdByUserId: actorUserId,
+    };
+
+    const saved = await prisma.sourcedCandidate.upsert({
+      where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
+      create: { ...data, externalId, status: "DETECTED" },
+      update: { ...data, status: finished ? existing!.status : "DETECTED", updatedAt: new Date() },
+      select: { id: true },
+    });
+    candidateIds.push(saved.id);
+    if (!existing) createdCandidateIds.push(saved.id);
+  }
+
+  return { candidateIds, createdCandidateIds, sourceTotal: intakes.length, synced: candidateIds.length, skipped };
+}
+
 export type CandidateSourcingFilter = {
   query?: string;
   skills?: string[];
