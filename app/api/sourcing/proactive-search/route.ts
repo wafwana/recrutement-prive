@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     // Analyzed CV intakes without a candidate account remain searchable without inventing a profile link.
     const cvIntakeSync = await ingestAnalyzedCvIntakes(actor.userId, 100);
     const internalPool = await prisma.sourcedCandidate.findMany({
-      where: { source: "PLATFORM_CVTHEQUE", status: { notIn: ["REJECTED", "ARCHIVED", "CONTACTED"] } },
+      where: { source: "PLATFORM_CVTHEQUE", status: { notIn: ["REJECTED", "CONTACTED"] } },
       orderBy: [{ matchingScore: "desc" }, { updatedAt: "desc" }],
       take: 100,
       select: { id: true },
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     const createdCandidateIds = new Set([...(ingestion.createdCandidateIds || []), ...cvIntakeSync.createdCandidateIds]);
     const candidates = candidateIds.length
       ? await prisma.sourcedCandidate.findMany({
-          where: { id: { in: candidateIds }, status: { notIn: ["REJECTED", "ARCHIVED"] } },
+          where: { id: { in: candidateIds }, status: { not: "REJECTED" } },
           select: { id: true, externalId: true, source: true, headline: true, location: true, skills: true, status: true, sourceProfileUrl: true },
         })
       : [];
