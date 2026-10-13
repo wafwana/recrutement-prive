@@ -19,6 +19,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "test:global-sourcing": "node --import tsx --test tests/global-sourcing.test.ts",
+    "test:sourcing-candidate-status": "node --import tsx --test tests/sourcing-candidate-status.test.ts",
     "test:proactive-search": "node --import tsx --test tests/proactive-search-taxonomy.test.ts",
     "test:enterprise-sourcing-batch": "node --import tsx --test tests/enterprise-sourcing-batch.test.ts",
     "test:enterprise-candidate-matches": "node --import tsx --test tests/enterprise-candidate-matches.test.ts",

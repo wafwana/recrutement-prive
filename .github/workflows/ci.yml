@@ -70,6 +70,7 @@ jobs:
       - run: npm run test:cv-rematch-batch-window
       - run: npm run test:cron-schedule
       - run: npm run test:global-sourcing
+      - run: npm run test:sourcing-candidate-status
       - run: npm run test:proactive-search
       - run: npm run test:enterprise-sourcing-batch
       - run: npm run test:enterprise-candidate-matches
