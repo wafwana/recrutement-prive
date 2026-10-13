@@ -39,6 +39,8 @@ export function buildGeminiGenerationConfig(schema: Record<string, unknown>) {
   };
 }
 
+export const GEMINI_REQUEST_TIMEOUT_MS = 15_000;
+
 export function getGeminiModel(): string {
   return process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
 }
@@ -76,6 +78,7 @@ export async function callGeminiStructured<T>(
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS),
     });
     if (!res.ok) {
       safeLogError("GEMINI", `Erreur de communication API (HTTP ${res.status}).`);
