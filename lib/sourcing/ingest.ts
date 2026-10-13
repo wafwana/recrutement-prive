@@ -357,7 +357,7 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 10
       where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
       select: { id: true, status: true },
     });
-    const finished = Boolean(existing && ["VALIDATED", "REJECTED", "ARCHIVED", "CONTACTED"].includes(existing.status));
+    const finished = Boolean(existing && ["VALIDATED", "REJECTED", "CONTACTED"].includes(existing.status));
     const skills = analysis.skills.filter((value): value is string => typeof value === "string");
     const locationParts = [analysis.location, analysis.country].filter((value): value is string => typeof value === "string" && Boolean(value.trim()));
     const data = {
