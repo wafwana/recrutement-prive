@@ -97,3 +97,57 @@ test("Gemini structured calls use a bounded request timeout with synthetic data"
     else process.env.GEMINI_API_KEY = originalKey;
   }
 });
+
+
+test("Gemini retries one transient HTTP 503 and succeeds without exposing request data", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.GEMINI_API_KEY;
+  const originalProvider = process.env.AI_PROVIDER;
+  let calls = 0;
+  process.env.GEMINI_API_KEY = "synthetic-test-key";
+  globalThis.fetch = (async () => {
+    calls++;
+    if (calls === 1) return new Response("unavailable", { status: 503 });
+    return new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: JSON.stringify({ ok: true }) }] } }],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  try {
+    const result = await callGeminiStructured<{ ok: boolean }>({
+      userPrompt: "Synthetic retry test only.",
+      jsonSchemaName: "synthetic_retry_test",
+      jsonSchema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] },
+      context: { classification: "MOCK_DATA", isMockData: true },
+    });
+    assert.deepEqual(result, { ok: true });
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalKey;
+    if (originalProvider === undefined) delete process.env.AI_PROVIDER; else process.env.AI_PROVIDER = originalProvider;
+  }
+});
+
+test("Gemini defers instead of retrying when Retry-After exceeds the bounded budget", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.GEMINI_API_KEY;
+  let calls = 0;
+  process.env.GEMINI_API_KEY = "synthetic-test-key";
+  globalThis.fetch = (async () => {
+    calls++;
+    return new Response("temporarily unavailable", { status: 503, headers: { "retry-after": "5" } });
+  }) as typeof fetch;
+  try {
+    const result = await callGeminiStructured<{ ok: boolean }>({
+      userPrompt: "Synthetic deferred retry test only.",
+      jsonSchemaName: "synthetic_deferred_retry_test",
+      jsonSchema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] },
+      context: { classification: "MOCK_DATA", isMockData: true },
+    });
+    assert.equal(result, null);
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalKey;
+  }
+});
