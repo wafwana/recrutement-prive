@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 
     // Always include the existing internal sourcing pool, even when public sources are healthy.
     // Analyzed CV intakes without a candidate account remain searchable without inventing a profile link.
-    const cvIntakeSync = await ingestAnalyzedCvIntakes(actor.userId, 100);
+    const cvIntakeSync = await ingestAnalyzedCvIntakes(actor.userId, 20);
     const internalPool = await prisma.sourcedCandidate.findMany({
       where: { source: "PLATFORM_CVTHEQUE", status: { notIn: ["REJECTED", "CONTACTED"] } },
       orderBy: [{ matchingScore: "desc" }, { updatedAt: "desc" }],
@@ -282,7 +282,7 @@ export async function POST(request: Request) {
           matched: ingestion.matched,
           fallbackSource: ingestion.fallbackSource || null,
           externalSourcesAllFailed: ingestion.externalSourcesAllFailed || false,
-          internalCvIntakes: { sourceTotal: cvIntakeSync.sourceTotal, synced: cvIntakeSync.synced, skipped: cvIntakeSync.skipped, matched: cvIntakeSync.matched, resultsIncluded: classified.filter((item) => item.candidate.source === "PLATFORM_CV_INTAKE").length },
+          internalCvIntakes: { sourceTotal: cvIntakeSync.sourceTotal, batchFetched: cvIntakeSync.batchFetched, synced: cvIntakeSync.synced, skipped: cvIntakeSync.skipped, matched: cvIntakeSync.matched, resultsIncluded: classified.filter((item) => item.candidate.source === "PLATFORM_CV_INTAKE").length },
           sources: ingestion.results || [],
           resultCount: classified.length,
           classifiedCount: classified.filter((item) => item.isClassified).length,
