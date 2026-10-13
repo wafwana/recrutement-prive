@@ -7,6 +7,8 @@ import { extractOfferContactEmail, generateExternalOfferOutreach, sendExternalOf
 import { translateJobOfferToFrench } from "@/lib/jobs/translation";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 import { selectEnterpriseOfferBatch } from "@/lib/sourcing/enterprise-batch";
+import { selectBatchWindow } from "@/lib/sourcing/batch-window";
+import { mergeEnterpriseCandidateMatches } from "@/lib/sourcing/enterprise-candidate-matches";
 
 const MAX_OFFERS_PER_SOURCE_RUN = 10;
 const MAX_SOURCE_PAIRS_PER_RUN = 2;
@@ -55,13 +57,10 @@ export async function GET(request: Request) {
   }));
   const validCodes = new Set(taxonomy.map((row) => row.code));
 
-  const candidates = await prisma.candidateProfile.findMany({
-    where: { status: "ACTIVE" },
-    include: {
-      primaryCategory: { select: { code: true } },
-    },
-    take: 1000,
-  });
+  const candidateWhere = { status: "ACTIVE" as const };
+  const candidateSourceTotal = await prisma.candidateProfile.count({ where: candidateWhere });
+  const candidateBatchLimit = 1000;
+  let candidateProfilesEvaluated = 0;
   const categoryRows = await prisma.jobCategory.findMany({ select: { id: true, code: true } });
   const categoryCodes = new Map(categoryRows.map((row) => [row.id, row.code]));
 
@@ -208,8 +207,25 @@ export async function GET(request: Request) {
               })
             : null;
 
-          const activeCandidates = candidates;
-          const candidateMatches = inScope
+          const candidateBatchKey = `sourcing:enterprise-candidate-batch:${company.companyId}:${externalJob.id}`;
+          const candidateOffset = inScope
+            ? await readBatchOffset(candidateBatchKey, candidateSourceTotal)
+            : 0;
+          const candidateWindow = inScope
+            ? selectBatchWindow(candidateSourceTotal, candidateOffset, candidateBatchLimit)
+            : { skip: 0, take: 0, nextOffset: 0 };
+          const activeCandidates = candidateWindow.take > 0
+            ? await prisma.candidateProfile.findMany({
+                where: candidateWhere,
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                skip: candidateWindow.skip,
+                take: candidateWindow.take,
+                include: { primaryCategory: { select: { code: true } } },
+              })
+            : [];
+          candidateProfilesEvaluated += activeCandidates.length;
+
+          const batchCandidateMatches = inScope
             ? activeCandidates
                 .map((candidate) => {
                   const subCategoryCodes = Array.isArray(candidate.subCategoryIds)
@@ -247,8 +263,18 @@ export async function GET(request: Request) {
                     reasons: result.reasons,
                   };
                 })
-                .sort((a, b) => b.score - a.score)
+                .sort((a, b) => b.score - a.score || a.candidateId.localeCompare(b.candidateId))
                 .slice(0, 20)
+            : [];
+
+          const existingEnterpriseOffer = inScope && candidateSourceTotal > 0
+            ? await prisma.enterpriseSourcedOffer.findUnique({
+                where: { companyId_externalJobId: { companyId: company.companyId, externalJobId: externalJob.id } },
+                select: { matching: true },
+              })
+            : null;
+          const candidateMatches = inScope && candidateSourceTotal > 0
+            ? mergeEnterpriseCandidateMatches(existingEnterpriseOffer?.matching, batchCandidateMatches)
             : [];
 
           if (inScope) {
@@ -283,6 +309,10 @@ export async function GET(request: Request) {
               outreachStatus: outreach ? (outreach.recipientEmail ? "READY" : "NO_EMAIL") : "NOT_PREPARED",
             },
           });
+
+          if (inScope && candidateSourceTotal > 0 && activeCandidates.length > 0) {
+            await writeBatchOffset(candidateBatchKey, candidateOffset + activeCandidates.length, candidateSourceTotal);
+          }
 
           if (
             outreach?.recipientEmail &&
@@ -333,10 +363,10 @@ export async function GET(request: Request) {
         actorRole: "SYSTEM",
         action: "ENTERPRISE_AUTOMATED_OFFER_SOURCING",
         targetType: "ENTERPRISE_SOURCING",
-        details: { companies: companies.length, sources: sources.length, offers, qualified, matches, errors },
+        details: { companies: companies.length, sources: sources.length, offers, qualified, matches, errors, candidateSourceTotal, candidateProfilesEvaluated, candidateBatchLimit },
       },
     });
   }
 
-  return NextResponse.json({ ok: true, companies: companies.length, sources: sources.length, offers, qualified, matches, errors });
+  return NextResponse.json({ ok: true, companies: companies.length, sources: sources.length, offers, qualified, matches, errors, candidateSourceTotal, candidateProfilesEvaluated, candidateBatchLimit });
 }
