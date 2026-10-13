@@ -29,7 +29,7 @@ export default async function ProactiveSearchHistoryPage({ searchParams }: { sea
     ? {}
     : { createdByUserId: session.user.id };
 
-  const [searches, selected] = await Promise.all([
+  const [searches, selected, notifications] = await Promise.all([
     prisma.proactiveSearch.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -51,6 +51,11 @@ export default async function ProactiveSearchHistoryPage({ searchParams }: { sea
           },
         })
       : Promise.resolve(null),
+    prisma.ownerNotification.findMany({
+      where: { senderName: "Sourcing proactif" },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
   ]);
 
   const summary = asRecord(selected?.sourceSummary);
@@ -88,6 +93,25 @@ export default async function ProactiveSearchHistoryPage({ searchParams }: { sea
               </Link>
             ))}
             {searches.length === 0 && <p className="border border-dashed border-white/15 p-6 text-sm text-white/40">Aucune recherche enregistrée. Lance une recherche depuis un secteur ou un métier.</p>}
+          </div>
+          <div className="mt-6 border-t border-white/10 pt-5">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-[10px] uppercase tracking-[0.16em] text-white/45">Notifications de nouveaux profils</h3>
+              <span className="text-[10px] text-white/30">{notifications.length}</span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {notifications.map((notification) => (
+                <article key={notification.id} className="border border-white/10 bg-[#080808] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-xs text-white/80">{notification.title}</p>
+                    <span className="text-[9px] uppercase text-[#F97316]">{notification.status}</span>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-white/45">{notification.message}</p>
+                  <p className="mt-2 text-[10px] text-white/25">{new Date(notification.createdAt).toLocaleString("fr-FR")}</p>
+                </article>
+              ))}
+              {notifications.length === 0 && <p className="text-xs text-white/35">Aucune nouvelle notification de sourcing.</p>}
+            </div>
           </div>
         </section>
 
