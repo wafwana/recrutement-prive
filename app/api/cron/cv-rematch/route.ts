@@ -325,10 +325,10 @@ export async function GET(request: Request) {
         data: {
           headline: candidate.headline || cvAnalysis.headline || undefined,
           bio: candidate.bio || cvAnalysis.improvedSummary || cvAnalysis.summary || undefined,
-          skills: currentSkills.length ? candidate.skills : cvAnalysis.skills,
+          skills: currentSkills.length ? currentSkills as string[] : cvAnalysis.skills,
           experienceYears: candidate.experienceYears ?? cvAnalysis.experienceYears,
           primaryCategoryId: candidate.primaryCategoryId || primary?.id || undefined,
-          subCategoryIds: currentSubCategories.length ? candidate.subCategoryIds : (primary ? subCategories.map((row) => row.id) : undefined),
+          subCategoryIds: currentSubCategories.length ? currentSubCategories as string[] : (primary ? subCategories.map((row) => row.id) : undefined),
         },
       });
 
