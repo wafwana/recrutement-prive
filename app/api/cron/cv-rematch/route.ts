@@ -236,17 +236,25 @@ export async function GET(request: Request) {
     );
     if (suggestedFolder === intake.folderPath || suggestedFolder.startsWith("CANDIDATS/A_CLASSER/")) continue;
 
-    await prisma.cvIntake.update({
-      where: { id: intake.id },
-      data: { folderPath: suggestedFolder },
-    });
-    if (intake.candidateId) {
-      await prisma.candidateDocument.updateMany({
-        where: { candidateId: intake.candidateId, name: intake.originalName, docType: "CV" },
-        data: { folderPath: suggestedFolder },
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.cvIntake.update({
+          where: { id: intake.id },
+          data: { folderPath: suggestedFolder },
+        });
+        if (intake.candidateId) {
+          await tx.candidateDocument.updateMany({
+            where: { candidateId: intake.candidateId, name: intake.originalName, docType: "CV" },
+            data: { folderPath: suggestedFolder },
+          });
+        }
       });
+      foldersReclassified++;
+    } catch (error) {
+      // Keep the batch moving; the persisted cursor will revisit this row on
+      // the next cycle. Never log CV contents or candidate contact details.
+      console.warn("[cv folder reclassification] update failed", error instanceof Error ? error.name : "UnknownError");
     }
-    foldersReclassified++;
   }
 
   if (reclassificationTotal > 0 && reclassificationQueue.length > 0) {
