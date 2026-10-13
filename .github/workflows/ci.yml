@@ -67,6 +67,7 @@ jobs:
       - run: npm run test:taxonomy-cv-protection
       - run: npm run test:cv-intelligence
       - run: npm run test:global-sourcing
+      - run: npm run test:proactive-search
       - run: npm run test:enterprise-sourcing-batch
       - run: npm run test:ai-provider
       - run: npm run test:internal-messaging

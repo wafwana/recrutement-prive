@@ -104,6 +104,7 @@ model User {
   disclosureRequestsDecided AnonymousDisclosureRequest[] @relation("DisclosureDecidedBy")
   videoSessionsCreated VideoSession[] @relation("VideoSessionCreatedBy")
   sourcedCandidates SourcedCandidate[]
+  proactiveSearches ProactiveSearch[]
   outreachContacts OutreachContact[] @relation("CandidateOutreach")
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
@@ -412,11 +413,58 @@ model SourcedCandidate {
   notes String?
   createdByUserId String
   createdBy User @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  proactiveSearchResults ProactiveSearchResult[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([status, createdAt])
   @@index([source])
   @@unique([source, externalId], map: "sourced_candidate_source_external_id_key")
+}
+
+model ProactiveSearch {
+  id String @id @default(cuid())
+  title String
+  sectorCode String
+  professionCode String?
+  query String?
+  country String?
+  skills Json?
+  criteria Json?
+  status String @default("PENDING")
+  createdByUserId String
+  startedAt DateTime?
+  completedAt DateTime?
+  lastError String?
+  sourceSummary Json?
+  createdBy User @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  results ProactiveSearchResult[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, createdAt])
+  @@index([sectorCode, professionCode, createdAt])
+  @@index([createdByUserId, createdAt])
+}
+
+model ProactiveSearchResult {
+  id String @id @default(cuid())
+  searchId String
+  sourcedCandidateId String
+  source String
+  primarySectorCode String?
+  primaryProfessionCode String?
+  secondaryMatches Json?
+  score Int?
+  confidence String @default("LOW")
+  rationale String?
+  cvStatus String @default("NOT_PROVIDED")
+  status String @default("DETECTED")
+  search ProactiveSearch @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  sourcedCandidate SourcedCandidate @relation(fields: [sourcedCandidateId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([searchId, sourcedCandidateId])
+  @@index([sourcedCandidateId])
+  @@index([searchId, status])
 }
 
 model RecruitmentHistory {
