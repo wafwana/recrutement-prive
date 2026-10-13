@@ -43,3 +43,25 @@ test("enterprise batch clamps negative and oversized offsets", () => {
   assert.deepEqual(selectEnterpriseOfferBatch(["a", "b", "c"], -1, 1), { batch: ["c"], nextOffset: 0 });
   assert.deepEqual(selectEnterpriseOfferBatch(["a", "b", "c"], 10, 1), { batch: ["b"], nextOffset: 2 });
 });
+
+
+test("enterprise sourcing source-pair cursor rotates in bounded groups without starving later companies", () => {
+  const pairs = [
+    "company-a:source-a",
+    "company-a:source-b",
+    "company-b:source-a",
+    "company-b:source-b",
+    "company-c:source-a",
+  ];
+  const first = selectEnterpriseOfferBatch(pairs, 0, 2);
+  assert.deepEqual(first.batch, ["company-a:source-a", "company-a:source-b"]);
+  assert.equal(first.nextOffset, 2);
+
+  const second = selectEnterpriseOfferBatch(pairs, first.nextOffset, 2);
+  assert.deepEqual(second.batch, ["company-b:source-a", "company-b:source-b"]);
+  assert.equal(second.nextOffset, 4);
+
+  const third = selectEnterpriseOfferBatch(pairs, second.nextOffset, 2);
+  assert.deepEqual(third.batch, ["company-c:source-a", "company-a:source-a"]);
+  assert.equal(third.nextOffset, 1);
+});
