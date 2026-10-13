@@ -110,6 +110,33 @@ test("Local CV parser extracts facts deterministically when AI provider is absen
   }
 });
 
+test("Gemini-configured CV analysis stays local and never uploads a real CV", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+
+  try {
+    process.env.AI_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+    delete process.env.OPENAI_API_KEY;
+
+    const analysis = await analyzeCvDocument({
+      fileName: "synthetic-cv.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("CV TEST\\nCompétences: Python, SQL, gestion de projet"),
+      taxonomy: TAXONOMY,
+    });
+
+    assert.ok(analysis, "Gemini-configured CV intake should fall back to local analysis");
+    assert.ok(analysis.skills.some((skill) => skill.toLowerCase() === "python"));
+    assert.ok(analysis.confidence > 0);
+  } finally {
+    if (originalProvider === undefined) delete process.env.AI_PROVIDER; else process.env.AI_PROVIDER = originalProvider;
+    if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = originalOpenAiKey;
+    if (originalGeminiKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalGeminiKey;
+  }
+});
+
 test("Local CV parser handles empty, corrupt, or unsupported binary buffers gracefully without throwing", async () => {
   const originalProvider = process.env.AI_PROVIDER;
   const originalOpenAiKey = process.env.OPENAI_API_KEY;
