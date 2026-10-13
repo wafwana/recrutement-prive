@@ -341,6 +341,7 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 10
   const candidateIds: string[] = [];
   const createdCandidateIds: string[] = [];
   let skipped = 0;
+  let matched = 0;
 
   for (const intake of intakes) {
     const analysis = intake.analysis && typeof intake.analysis === "object" && !Array.isArray(intake.analysis)
@@ -355,7 +356,7 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 10
     const externalId = `cv-intake:${intake.id}`;
     const existing = await prisma.sourcedCandidate.findUnique({
       where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
-      select: { id: true, status: true },
+      select: { id: true, status: true, matchingDetails: true },
     });
     const finished = Boolean(existing && ["VALIDATED", "REJECTED", "CONTACTED"].includes(existing.status));
     const skills = analysis.skills.filter((value): value is string => typeof value === "string");
@@ -389,9 +390,16 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 10
     });
     candidateIds.push(saved.id);
     if (!existing) createdCandidateIds.push(saved.id);
+    const previousDetails = existing?.matchingDetails && typeof existing.matchingDetails === "object" && !Array.isArray(existing.matchingDetails)
+      ? existing.matchingDetails as Record<string, unknown>
+      : {};
+    if (!Array.isArray(previousDetails.matchedOffers) || typeof previousDetails.rematchedAt !== "string") {
+      const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(saved.id);
+      matched += rematch.matches;
+    }
   }
 
-  return { candidateIds, createdCandidateIds, sourceTotal: intakes.length, synced: candidateIds.length, skipped };
+  return { candidateIds, createdCandidateIds, sourceTotal: intakes.length, synced: candidateIds.length, skipped, matched };
 }
 
 export type CandidateSourcingFilter = {
