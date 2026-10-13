@@ -286,7 +286,11 @@ export async function analyzeCvDocument(input: {
   taxonomy: CvTaxonomyItem[];
 }): Promise<CvAnalysis | null> {
   const provider = getActiveAiProvider();
-  if (!provider) {
+
+  // Gemini Free must never receive a real CV, its attachment, or extracted candidate PII.
+  // Keep CV extraction and classification local for Gemini; use an external provider only
+  // when OpenAI has been explicitly selected and configured by the platform owner.
+  if (!provider || provider === "gemini") {
     const text = await extractTextFromCvBuffer(input.buffer, input.mimeType, input.fileName);
     return text ? parseCvTextLocally(text, input.taxonomy) : null;
   }
