@@ -45,3 +45,10 @@ test("enterprise sourcing refreshes duplicate candidates and ignores malformed p
 test("enterprise sourcing can clear the match list when the candidate pool is empty", () => {
   assert.deepEqual(mergeEnterpriseCandidateMatches([], [], 20), []);
 });
+
+test("enterprise sourcing removes a stale match when a reevaluated candidate falls outside the batch top 20", () => {
+  const existing = [match("candidate-a", 95), match("candidate-b", 80)];
+  const merged = mergeEnterpriseCandidateMatches(existing, [match("candidate-b", 85)], 20, ["candidate-a", "candidate-b"]);
+
+  assert.deepEqual(merged.map((item) => [item.candidateId, item.score]), [["candidate-b", 85]]);
+});
