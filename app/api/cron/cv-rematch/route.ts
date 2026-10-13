@@ -4,6 +4,7 @@ import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { analyzeCvDocument } from "@/lib/cv/analyzer";
 import { buildCandidateFolder } from "@/lib/cv/folders";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
+import { selectBatchWindow } from "@/lib/sourcing/batch-window";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -11,22 +12,32 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   }
 
-  const candidates = await prisma.candidateProfile.findMany({
-    where: {
-      status: "ACTIVE",
-      documents: { some: { docType: "CV" } },
-    },
-    include: {
-      primaryCategory: { select: { code: true } },
-      documents: {
-        where: { docType: "CV" },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { id: true, analysis: true },
-      },
-    },
-    take: 1000,
-  });
+  const candidateWhere = {
+    status: "ACTIVE" as const,
+    documents: { some: { docType: "CV" as const } },
+  };
+  const candidateSourceTotal = await prisma.candidateProfile.count({ where: candidateWhere });
+  const candidateBatchKey = "cv-rematch:candidates";
+  const candidateOffset = await readBatchOffset(candidateBatchKey, candidateSourceTotal);
+  const candidateBatchLimit = 10;
+  const candidateWindow = selectBatchWindow(candidateSourceTotal, candidateOffset, candidateBatchLimit);
+  const candidateBatch = candidateWindow.take > 0
+    ? await prisma.candidateProfile.findMany({
+        where: candidateWhere,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: candidateWindow.skip,
+        take: candidateWindow.take,
+        include: {
+          primaryCategory: { select: { code: true } },
+          documents: {
+            where: { docType: "CV" },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { id: true, analysis: true },
+          },
+        },
+      })
+    : [];
 
   const jobs = await prisma.job.findMany({
     where: { status: "OPEN" },
@@ -38,13 +49,6 @@ export async function GET(request: Request) {
   });
 
   const externalOffers = await prisma.externalJobOpportunity.findMany({ where: { status: { not: "REJECTED" } }, orderBy: { sourceCollectedAt: "desc" }, take: 500 });
-
-  const candidateBatchKey = "cv-rematch:candidates";
-  const candidateOffset = await readBatchOffset(candidateBatchKey, candidates.length);
-  const candidateBatchLimit = 10;
-  const candidateBatch = candidates.length > candidateBatchLimit
-    ? Array.from({ length: candidateBatchLimit }, (_, index) => candidates[(candidateOffset + index) % candidates.length])
-    : candidates;
 
   const intakeQueue = await prisma.cvIntake.findMany({
     where: { status: "A_ANALYSER" },
@@ -310,14 +314,14 @@ export async function GET(request: Request) {
         actorRole: "SYSTEM",
         action: "CV_AUTOMATIC_REMATCH",
         targetType: "CV_LIBRARY",
-        details: { candidatesChecked: candidateBatch.length, candidateSourceTotal: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched },
+        details: { candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched },
       },
     });
   }
 
-  if (candidates.length > 0 && candidateBatch.length > 0) {
-    await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidates.length);
+  if (candidateSourceTotal > 0 && candidateBatch.length > 0) {
+    await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidateSourceTotal);
   }
 
-  return NextResponse.json({ ok: true, candidatesChecked: candidateBatch.length, candidateSourceTotal: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched });
+  return NextResponse.json({ ok: true, candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched });
 }
