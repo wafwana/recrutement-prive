@@ -348,16 +348,18 @@ export async function GET(request: Request) {
       }
     }
 
-    const skills = cvAnalysis?.skills?.length ? cvAnalysis.skills : candidate.skills;
+    const skills = cvAnalysis ? cvAnalysis.skills : candidate.skills;
     const headline = candidate.headline || cvAnalysis?.headline || null;
     const bio = candidate.bio || cvAnalysis?.improvedSummary || cvAnalysis?.summary || null;
     const experienceYears = candidate.experienceYears ?? cvAnalysis?.experienceYears ?? null;
-    const primaryCategoryCode = candidate.primaryCategory?.code || taxonomySelection.primaryCategoryCode;
-    const subCategoryCodes = Array.isArray(candidate.subCategoryIds) && candidate.subCategoryIds.length
-      ? candidate.subCategoryIds
-          .filter((value): value is string => typeof value === "string")
-          .map((value) => categoryCodes.get(value) || value)
-      : taxonomySelection.subCategoryCodes;
+    const primaryCategoryCode = taxonomySelection.primaryCategoryCode || candidate.primaryCategory?.code;
+    const subCategoryCodes = cvAnalysis
+      ? taxonomySelection.subCategoryCodes
+      : Array.isArray(candidate.subCategoryIds) && candidate.subCategoryIds.length
+        ? candidate.subCategoryIds
+            .filter((value): value is string => typeof value === "string")
+            .map((value) => categoryCodes.get(value) || value)
+        : [];
 
     const matches = [
       ...jobs.map((job) => {
