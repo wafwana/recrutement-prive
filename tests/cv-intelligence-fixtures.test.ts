@@ -123,7 +123,7 @@ test("Gemini-configured CV analysis stays local and never uploads a real CV", as
     const analysis = await analyzeCvDocument({
       fileName: "synthetic-cv.txt",
       mimeType: "text/plain",
-      buffer: Buffer.from("CV TEST\\nCompétences: Python, SQL, gestion de projet"),
+      buffer: Buffer.from("CV TEST\nCompétences: Python, SQL, gestion de projet"),
       taxonomy: TAXONOMY,
     });
 
