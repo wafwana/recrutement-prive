@@ -370,6 +370,8 @@ async function ingestPlatformCvthequeCandidates(
   let created = 0;
   let updated = 0;
   let matched = 0;
+  const candidateIds: string[] = [];
+  const createdCandidateIds: string[] = [];
 
   for (const candidate of candidateBatch) {
     const externalId = `platform:${candidate.id}`;
@@ -408,6 +410,7 @@ async function ingestPlatformCvthequeCandidates(
         matched += rematch.matches;
       }
       updated++;
+      candidateIds.push(existing.id);
     } else {
       const saved = await prisma.sourcedCandidate.create({
         data: { ...data, externalId, status: "DETECTED" },
@@ -415,10 +418,12 @@ async function ingestPlatformCvthequeCandidates(
       const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(saved.id);
       matched += rematch.matches;
       created++;
+      candidateIds.push(saved.id);
+      createdCandidateIds.push(saved.id);
     }
   }
 
-  return { fetched: candidateBatch.length, sourceTotal: candidates.length, batchLimit: maxItems, created, updated, matched };
+  return { fetched: candidateBatch.length, sourceTotal: candidates.length, batchLimit: maxItems, created, updated, matched, candidateIds, createdCandidateIds };
 }
 
 export async function ingestGlobalCandidates(params: {
@@ -460,6 +465,8 @@ export async function ingestGlobalCandidates(params: {
       created: internal.created,
       updated: internal.updated,
       matched: internal.matched,
+      candidateIds: internal.candidateIds,
+      createdCandidateIds: internal.createdCandidateIds,
       results: [{
         sourceUrl: "PLATFORM_CVTHEQUE",
         fetched: internal.fetched,
@@ -483,6 +490,8 @@ export async function ingestGlobalCandidates(params: {
   let totalCreated = 0;
   let totalUpdated = 0;
   let totalMatched = 0;
+  const candidateIds: string[] = [];
+  const createdCandidateIds: string[] = [];
   const results: Array<{ sourceUrl: string; fetched: number; sourceTotal: number; filteredTotal?: number; batchLimit: number; created: number; updated: number; matched: number; error?: string }> = [];
 
   const sourceCollectedAt = new Date();
@@ -589,17 +598,22 @@ export async function ingestGlobalCandidates(params: {
             });
             if (!isFinished) await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
             updated++;
+            candidateIds.push(existing.id);
           } else {
             const createdCandidate = await prisma.sourcedCandidate.create({
               data: { ...data, externalId: candidate.externalId },
             });
             await rematchSourcedCandidateAgainstQualifiedOffers(createdCandidate.id);
             created++;
+            candidateIds.push(createdCandidate.id);
+            createdCandidateIds.push(createdCandidate.id);
           }
         } else {
           const createdCandidate = await prisma.sourcedCandidate.create({ data });
           await rematchSourcedCandidateAgainstQualifiedOffers(createdCandidate.id);
           created++;
+          candidateIds.push(createdCandidate.id);
+          createdCandidateIds.push(createdCandidate.id);
         }
       }
 
@@ -645,6 +659,8 @@ export async function ingestGlobalCandidates(params: {
     totalCreated += fallback.created;
     totalUpdated += fallback.updated;
     totalMatched += fallback.matched;
+    candidateIds.push(...fallback.candidateIds);
+    createdCandidateIds.push(...fallback.createdCandidateIds);
     results.push({
       sourceUrl: "PLATFORM_CVTHEQUE",
       fetched: fallback.fetched,
@@ -685,6 +701,8 @@ export async function ingestGlobalCandidates(params: {
     created: totalCreated,
     updated: totalUpdated,
     matched: totalMatched,
+    candidateIds,
+    createdCandidateIds,
     fallbackSource: fallback ? "PLATFORM_CVTHEQUE" : null,
     externalSourcesAllFailed,
     results,
