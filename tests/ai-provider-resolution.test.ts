@@ -146,6 +146,15 @@ test("Gemini defers instead of retrying when Retry-After exceeds the bounded bud
     });
     assert.equal(result, null);
     assert.equal(calls, 1);
+
+    const second = await callGeminiStructured<{ ok: boolean }>({
+      userPrompt: "Synthetic deferred retry test only.",
+      jsonSchemaName: "synthetic_deferred_retry_test",
+      jsonSchema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] },
+      context: { classification: "MOCK_DATA", isMockData: true },
+    });
+    assert.equal(second, null);
+    assert.equal(calls, 1, "cooldown prevents additional calls while Gemini is unavailable");
   } finally {
     globalThis.fetch = originalFetch;
     if (originalKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalKey;
