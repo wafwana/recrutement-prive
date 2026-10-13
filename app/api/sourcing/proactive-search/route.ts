@@ -14,6 +14,8 @@ const searchSchema = z.object({
   query: z.string().trim().max(160).optional(),
   country: z.string().trim().max(100).optional(),
   skills: z.array(z.string().trim().min(1).max(100)).max(30).optional(),
+}).refine((value) => Boolean(value.query || value.professionCode || value.skills?.length), {
+  message: "Indique au moins un métier, une compétence ou un synonyme.",
 });
 
 async function requireSourcingActor() {
