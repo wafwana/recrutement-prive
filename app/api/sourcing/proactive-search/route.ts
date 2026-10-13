@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
 import { classifyProactiveCandidate } from "@/lib/sourcing/proactive-classification";
-import { ingestGlobalCandidates } from "@/lib/sourcing/ingest";
+import { ingestAnalyzedCvIntakes, ingestGlobalCandidates } from "@/lib/sourcing/ingest";
 
 const searchSchema = z.object({
   sectorCode: z.string().trim().min(1).max(100),
@@ -94,11 +94,20 @@ export async function POST(request: Request) {
       },
     });
 
-    const candidateIds = [...new Set(ingestion.candidateIds || [])];
-    const createdCandidateIds = new Set(ingestion.createdCandidateIds || []);
+    // Always include the existing internal sourcing pool, even when public sources are healthy.
+    // Analyzed CV intakes without a candidate account remain searchable without inventing a profile link.
+    const cvIntakeSync = await ingestAnalyzedCvIntakes(actor.userId, 100);
+    const internalPool = await prisma.sourcedCandidate.findMany({
+      where: { source: "PLATFORM_CVTHEQUE", status: { notIn: ["REJECTED", "ARCHIVED", "CONTACTED"] } },
+      orderBy: [{ matchingScore: "desc" }, { updatedAt: "desc" }],
+      take: 100,
+      select: { id: true },
+    });
+    const candidateIds = [...new Set([...(ingestion.candidateIds || []), ...cvIntakeSync.candidateIds, ...internalPool.map((candidate) => candidate.id)])];
+    const createdCandidateIds = new Set([...(ingestion.createdCandidateIds || []), ...cvIntakeSync.createdCandidateIds]);
     const candidates = candidateIds.length
       ? await prisma.sourcedCandidate.findMany({
-          where: { id: { in: candidateIds } },
+          where: { id: { in: candidateIds }, status: { notIn: ["REJECTED", "ARCHIVED"] } },
           select: { id: true, externalId: true, source: true, headline: true, skills: true, status: true, sourceProfileUrl: true },
         })
       : [];
@@ -107,6 +116,17 @@ export async function POST(request: Request) {
       .filter((candidate) => candidate.source === "PLATFORM_CVTHEQUE" && candidate.externalId?.startsWith("platform:"))
       .map((candidate) => candidate.externalId!.slice("platform:".length))
       .filter(Boolean))];
+    const cvIntakeIds = [...new Set(candidates
+      .filter((candidate) => candidate.source === "PLATFORM_CV_INTAKE" && candidate.externalId?.startsWith("cv-intake:"))
+      .map((candidate) => candidate.externalId!.slice("cv-intake:".length))
+      .filter(Boolean))];
+    const cvIntakes = cvIntakeIds.length
+      ? await prisma.cvIntake.findMany({
+          where: { id: { in: cvIntakeIds }, status: "ANALYSE_OK", candidateId: null },
+          select: { id: true, analysis: true, analyzedAt: true },
+        })
+      : [];
+    const cvIntakeById = new Map(cvIntakes.map((intake) => [intake.id, intake]));
     const internalProfiles = internalProfileIds.length
       ? await prisma.candidateProfile.findMany({
           where: { id: { in: internalProfileIds } },
@@ -128,28 +148,42 @@ export async function POST(request: Request) {
         ? candidate.externalId.slice("platform:".length)
         : null;
       const document = profileId ? internalCvByProfileId.get(profileId) : null;
-      const storedAnalysis = document?.analysis && typeof document.analysis === "object" && !Array.isArray(document.analysis)
+      const intakeId = candidate.source === "PLATFORM_CV_INTAKE" && candidate.externalId?.startsWith("cv-intake:")
+        ? candidate.externalId.slice("cv-intake:".length)
+        : null;
+      const intake = intakeId ? cvIntakeById.get(intakeId) : null;
+      const cvRecord = intake?.analysis && typeof intake.analysis === "object" && !Array.isArray(intake.analysis)
+        ? intake.analysis as Record<string, unknown>
+        : null;
+      const documentRecord = document?.analysis && typeof document.analysis === "object" && !Array.isArray(document.analysis)
         ? document.analysis as Record<string, unknown>
         : null;
+      const storedAnalysis = candidate.source === "PLATFORM_CV_INTAKE" ? cvRecord : documentRecord;
+      const analysisTimestamp = candidate.source === "PLATFORM_CV_INTAKE" ? intake?.analyzedAt : document?.analyzedAt;
       const cvAnalyzed = Boolean(
-        document?.analyzedAt &&
+        analysisTimestamp &&
         storedAnalysis &&
         Array.isArray(storedAnalysis.skills) &&
         Array.isArray(storedAnalysis.subCategoryCodes) &&
         Object.prototype.hasOwnProperty.call(storedAnalysis, "primaryCategoryCode"),
       );
-      return {
-        candidate,
+      const analyzedSubcategories = Array.isArray(storedAnalysis?.subCategoryCodes)
+        ? storedAnalysis.subCategoryCodes.filter((value): value is string => typeof value === "string")
+        : [];
+      const cvTaxonomyMatches = Boolean(
+        cvAnalyzed &&
+        (storedAnalysis?.primaryCategoryCode === sector.code ||
+          analyzedSubcategories.some((code) => sector.subcategories.some((item) => item.code === code))),
+      );
+      const classification = classifyProactiveCandidate({
+        sector,
+        profession,
+        headline: cvAnalyzed ? (typeof storedAnalysis?.headline === "string" ? storedAnalysis.headline : null) : candidate.headline,
+        skills: cvAnalyzed ? storedAnalysis?.skills : candidate.skills,
         cvAnalyzed,
-        ...classifyProactiveCandidate({
-          sector,
-          profession,
-          headline: cvAnalyzed ? (typeof storedAnalysis?.headline === "string" ? storedAnalysis.headline : null) : candidate.headline,
-          skills: cvAnalyzed ? storedAnalysis?.skills : candidate.skills,
-          cvAnalyzed,
-        }),
-      };
-    });
+      });
+      return { candidate, cvAnalyzed, cvTaxonomyMatches, ...classification };
+    }).filter((item) => item.candidate.source !== "PLATFORM_CV_INTAKE" || item.isClassified || item.cvTaxonomyMatches);
 
     // Notify the internal team about newly discovered profiles before creating their classification records.
     for (const item of classified) {
