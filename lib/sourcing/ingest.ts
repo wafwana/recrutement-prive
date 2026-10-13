@@ -4,6 +4,7 @@ import { fetchGlobalJobs, fetchGlobalCandidates, configuredSources, getConfigure
 import { qualifyAndMatchExternalOffer } from "@/lib/jobs/offer-pipeline";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
+import { selectBatchWindow } from "@/lib/sourcing/batch-window";
 
 export async function markExpiredGlobalJobs() {
   const now = new Date();
@@ -234,18 +235,21 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
   }
   const topDemand = [...demand.entries()].sort((a, b) => b[1] - a[1]).slice(0, 50);
 
-  const candidates = await prisma.candidateProfile.findMany({
-    where: { status: "ACTIVE" },
-    include: { user: { select: { name: true } } },
-    take: 1000,
-  });
-
+  const candidateWhere = { status: "ACTIVE" as const };
+  const candidateSourceTotal = await prisma.candidateProfile.count({ where: candidateWhere });
   const candidateBatchKey = "sourcing:proactive-pool-batch";
-  const candidateOffset = await readBatchOffset(candidateBatchKey, candidates.length);
+  const candidateOffset = await readBatchOffset(candidateBatchKey, candidateSourceTotal);
   const candidateBatchLimit = 10;
-  const candidateBatch = candidates.length > candidateBatchLimit
-    ? Array.from({ length: candidateBatchLimit }, (_, index) => candidates[(candidateOffset + index) % candidates.length])
-    : candidates;
+  const candidateWindow = selectBatchWindow(candidateSourceTotal, candidateOffset, candidateBatchLimit);
+  const candidateBatch = candidateWindow.take > 0
+    ? await prisma.candidateProfile.findMany({
+        where: candidateWhere,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: candidateWindow.skip,
+        take: candidateWindow.take,
+        include: { user: { select: { name: true } } },
+      })
+    : [];
 
   let created = 0;
   let updated = 0;
@@ -299,8 +303,8 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
     }
   }
 
-  if (candidates.length > 0 && candidateBatch.length > 0) {
-    await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidates.length);
+  if (candidateSourceTotal > 0 && candidateBatch.length > 0) {
+    await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidateSourceTotal);
   }
 
   await prisma.auditLog.create({
@@ -313,7 +317,7 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
         mode: "PROACTIVE_TALENT_POOL",
         demandSignals: topDemand.slice(0, 20).map(([skill, count]) => ({ skill, count })),
         candidatesEvaluated: candidateBatch.length,
-        candidateSourceTotal: candidates.length,
+        candidateSourceTotal,
         batchLimit: candidateBatchLimit,
         created,
         updated,
@@ -322,7 +326,7 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
     },
   });
 
-  return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidateBatch.length, candidateSourceTotal: candidates.length, batchLimit: candidateBatchLimit, created, updated };
+  return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidateBatch.length, candidateSourceTotal, batchLimit: candidateBatchLimit, created, updated };
 }
 
 export type CandidateSourcingFilter = {
