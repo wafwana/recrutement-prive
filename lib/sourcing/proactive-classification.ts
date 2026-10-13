@@ -28,6 +28,7 @@ export function classifyProactiveCandidate(input: {
   profession?: TaxonomyProfession;
   headline?: string | null;
   skills?: unknown;
+  cvAnalyzed?: boolean;
 }): ProactiveClassification {
   const headline = normalize(input.headline || "");
   const candidateSkills = Array.isArray(input.skills)
@@ -54,10 +55,16 @@ export function classifyProactiveCandidate(input: {
   const targetProfession = matched?.profession;
   const isClassified = confidence !== "LOW" && Boolean(targetProfession);
   const rationale = titleMatch
-    ? "Le titre public du profil correspond au métier recherché."
+    ? input.cvAnalyzed
+      ? "Le titre extrait du CV analysé correspond au métier recherché."
+      : "Le titre public du profil correspond au métier recherché ; CV non vérifié."
     : skillMatch
-      ? "Une compétence déclarée correspond au métier recherché ; CV non vérifié."
-      : "Correspondance insuffisante sur les champs publics disponibles : à qualifier.";
+      ? input.cvAnalyzed
+        ? "Une compétence extraite du CV analysé correspond au métier recherché."
+        : "Une compétence déclarée correspond au métier recherché ; CV non vérifié."
+      : input.cvAnalyzed
+        ? "Le CV a été analysé localement, mais les éléments extraits ne suffisent pas à confirmer ce métier : à qualifier."
+        : "Correspondance insuffisante sur les champs publics disponibles : à qualifier.";
 
   return {
     targetProfession,

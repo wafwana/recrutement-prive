@@ -279,6 +279,16 @@ export function parseCvTextLocally(rawText: string, taxonomy: CvTaxonomyItem[]):
     confidence: hasDirectFacts ? 0.6 : 0.1,
   };
 }
+export async function analyzeCvDocumentLocally(input: {
+  fileName: string;
+  mimeType: string;
+  buffer: Buffer;
+  taxonomy: CvTaxonomyItem[];
+}): Promise<CvAnalysis | null> {
+  const text = await extractTextFromCvBuffer(input.buffer, input.mimeType, input.fileName);
+  return text ? parseCvTextLocally(text, input.taxonomy) : null;
+}
+
 export async function analyzeCvDocument(input: {
   fileName: string;
   mimeType: string;
@@ -288,11 +298,10 @@ export async function analyzeCvDocument(input: {
   const provider = getActiveAiProvider();
 
   // Gemini Free must never receive a real CV, its attachment, or extracted candidate PII.
-  // Keep CV extraction and classification local for Gemini; use an external provider only
-  // when OpenAI has been explicitly selected and configured by the platform owner.
+  // The rematching cron can also call the local-only entrypoint explicitly so batch
+  // analysis never sends candidate documents to an external provider.
   if (!provider || provider === "gemini") {
-    const text = await extractTextFromCvBuffer(input.buffer, input.mimeType, input.fileName);
-    return text ? parseCvTextLocally(text, input.taxonomy) : null;
+    return analyzeCvDocumentLocally(input);
   }
 
   const taxonomyText = input.taxonomy

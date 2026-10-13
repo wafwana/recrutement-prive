@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
-import { analyzeCvDocument } from "@/lib/cv/analyzer";
+import { analyzeCvDocument, analyzeCvDocumentLocally, type CvAnalysis } from "@/lib/cv/analyzer";
 import { buildCandidateFolderFromAnalysis, resolveCvTaxonomySelection } from "@/lib/cv/folders";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 import { selectBatchWindow } from "@/lib/sourcing/batch-window";
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
             where: { docType: "CV" },
             orderBy: { createdAt: "desc" },
             take: 1,
-            select: { id: true, analysis: true },
+            select: { id: true, name: true, fileData: true, type: true, analysis: true, analyzedAt: true, folderPath: true },
           },
         },
       })
@@ -264,24 +265,114 @@ export async function GET(request: Request) {
 
 
 
+  let cvAnalyzed = 0;
+  let cvAnalysisFailed = 0;
   for (const candidate of candidateBatch) {
-    const subCategoryCodes = Array.isArray(candidate.subCategoryIds)
-      ? candidate.subCategoryIds
-          .filter((value): value is string => typeof value === "string")
-          .map((value) => categoryCodes.get(value) || value)
-      : [];
+    const document = candidate.documents[0];
+    if (!document) continue;
+
+    const existingAnalysis =
+      document.analysis && typeof document.analysis === "object" && !Array.isArray(document.analysis)
+        ? document.analysis as Record<string, unknown>
+        : {};
+    const hasStructuredAnalysis =
+      Array.isArray(existingAnalysis.skills) &&
+      Array.isArray(existingAnalysis.subCategoryCodes) &&
+      Object.prototype.hasOwnProperty.call(existingAnalysis, "primaryCategoryCode");
+
+    let cvAnalysis: CvAnalysis | null = hasStructuredAnalysis
+      ? existingAnalysis as unknown as CvAnalysis
+      : null;
+
+    // Analyze existing candidate-library CVs in bounded batches using local parsing only.
+    // This path must never send a real CV or candidate PII to Gemini/OpenAI.
+    if (!cvAnalysis && document.fileData) {
+      const lowerName = document.name.toLowerCase();
+      const mimeType = document.type ||
+        (lowerName.endsWith(".pdf") ? "application/pdf" :
+          lowerName.endsWith(".docx") ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" :
+          lowerName.endsWith(".txt") || lowerName.endsWith(".md") ? "text/plain" : "application/octet-stream");
+      try {
+        cvAnalysis = await analyzeCvDocumentLocally({
+          fileName: document.name,
+          mimeType,
+          buffer: Buffer.from(document.fileData),
+          taxonomy: taxonomyItems,
+        });
+        if (cvAnalysis) cvAnalyzed++;
+        else cvAnalysisFailed++;
+      } catch (error) {
+        cvAnalysisFailed++;
+        console.warn("[cv-rematch local analysis] failed", error instanceof Error ? error.name : "UnknownError");
+      }
+    }
+
+    const analysisRecord = cvAnalysis
+      ? { ...cvAnalysis, sourceFactsOnly: true }
+      : existingAnalysis;
+    const taxonomySelection = cvAnalysis
+      ? resolveCvTaxonomySelection(cvAnalysis, taxonomyItems)
+      : { primaryCategoryCode: null, subCategoryCodes: [] };
+    const primary = taxonomySelection.primaryCategoryCode
+      ? categoryRows.find((row) => row.code === taxonomySelection.primaryCategoryCode && row.parentId === null && row.isActive)
+      : null;
+    const subCategories = categoryRows.filter((row) => row.isActive && taxonomySelection.subCategoryCodes.includes(row.code));
+
+    if (cvAnalysis) {
+      const currentSkills = Array.isArray(candidate.skills) ? candidate.skills : [];
+      const currentSubCategories = Array.isArray(candidate.subCategoryIds) ? candidate.subCategoryIds : [];
+      await prisma.candidateProfile.update({
+        where: { id: candidate.id },
+        data: {
+          headline: candidate.headline || cvAnalysis.headline || undefined,
+          bio: candidate.bio || cvAnalysis.improvedSummary || cvAnalysis.summary || undefined,
+          skills: currentSkills.length ? currentSkills as string[] : cvAnalysis.skills,
+          experienceYears: candidate.experienceYears ?? cvAnalysis.experienceYears,
+          primaryCategoryId: candidate.primaryCategoryId || primary?.id || undefined,
+          subCategoryIds: currentSubCategories.length ? currentSubCategories as string[] : (primary ? subCategories.map((row) => row.id) : undefined),
+        },
+      });
+
+      if (document.folderPath.startsWith("CANDIDATS/A_CLASSER")) {
+        const suggestedFolder = buildCandidateFolderFromAnalysis(
+          cvAnalysis,
+          taxonomyItems,
+          candidate.createdAt.getFullYear(),
+          "CV",
+        );
+        if (!suggestedFolder.startsWith("CANDIDATS/A_CLASSER/")) {
+          await prisma.candidateDocument.update({
+            where: { id: document.id },
+            data: { folderPath: suggestedFolder, analysis: analysisRecord as Prisma.InputJsonValue, analyzedAt: document.analyzedAt || new Date() },
+          });
+        }
+      }
+    }
+
+    const skills = cvAnalysis ? cvAnalysis.skills : candidate.skills;
+    const headline = candidate.headline || cvAnalysis?.headline || null;
+    const bio = candidate.bio || cvAnalysis?.improvedSummary || cvAnalysis?.summary || null;
+    const experienceYears = candidate.experienceYears ?? cvAnalysis?.experienceYears ?? null;
+    const primaryCategoryCode = taxonomySelection.primaryCategoryCode || candidate.primaryCategory?.code;
+    const subCategoryCodes = cvAnalysis
+      ? taxonomySelection.subCategoryCodes
+      : Array.isArray(candidate.subCategoryIds) && candidate.subCategoryIds.length
+        ? candidate.subCategoryIds
+            .filter((value): value is string => typeof value === "string")
+            .map((value) => categoryCodes.get(value) || value)
+        : [];
 
     const matches = [
       ...jobs.map((job) => {
         const result = matchCandidateToJob(
           {
-            skills: candidate.skills,
-            experienceYears: candidate.experienceYears,
-            headline: candidate.headline,
-            bio: candidate.bio,
+            skills,
+            experienceYears,
+            headline,
+            bio,
             location: candidate.location,
             country: candidate.country,
-            primaryCategoryCode: candidate.primaryCategory?.code,
+            primaryCategoryCode,
             subCategoryCodes,
           },
           {
@@ -307,13 +398,13 @@ export async function GET(request: Request) {
       ...externalOffers.map((offer) => {
         const result = matchCandidateToJob(
           {
-            skills: candidate.skills,
-            experienceYears: candidate.experienceYears,
-            headline: candidate.headline,
-            bio: candidate.bio,
+            skills,
+            experienceYears,
+            headline,
+            bio,
             location: candidate.location,
             country: candidate.country,
-            primaryCategoryCode: candidate.primaryCategory?.code,
+            primaryCategoryCode,
             subCategoryCodes,
           },
           {
@@ -340,22 +431,12 @@ export async function GET(request: Request) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 20);
 
-    const document = candidate.documents[0];
-    if (!document) continue;
-
-    const existingAnalysis =
-      document.analysis && typeof document.analysis === "object" && !Array.isArray(document.analysis)
-        ? document.analysis as Record<string, unknown>
-        : {};
-
     await prisma.candidateDocument.update({
       where: { id: document.id },
       data: {
-        analysis: {
-          ...existingAnalysis,
-          suggestedMatches: matches,
-          rematchedAt: new Date().toISOString(),
-        },
+        ...(cvAnalysis ? { analysis: { ...analysisRecord, suggestedMatches: matches, rematchedAt: new Date().toISOString() } as Prisma.InputJsonValue, analyzedAt: document.analyzedAt || new Date() } : {
+          analysis: { ...existingAnalysis, suggestedMatches: matches, rematchedAt: new Date().toISOString() },
+        }),
       },
     });
 
@@ -370,7 +451,7 @@ export async function GET(request: Request) {
         actorRole: "SYSTEM",
         action: "CV_AUTOMATIC_REMATCH",
         targetType: "CV_LIBRARY",
-        details: { candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched, foldersReclassified },
+        details: { candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched, foldersReclassified, cvAnalyzed, cvAnalysisFailed },
       },
     });
   }
@@ -379,5 +460,5 @@ export async function GET(request: Request) {
     await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidateSourceTotal);
   }
 
-  return NextResponse.json({ ok: true, candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched, foldersReclassified });
+  return NextResponse.json({ ok: true, candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched, foldersReclassified, cvAnalyzed, cvAnalysisFailed });
 }

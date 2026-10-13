@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import path from "node:path";
-import { analyzeCvDocument, buildCvFileContent, extractTextFromCvBuffer, parseCvTextLocally, type CvTaxonomyItem } from "../lib/cv/analyzer";
+import { analyzeCvDocument, analyzeCvDocumentLocally, buildCvFileContent, extractTextFromCvBuffer, parseCvTextLocally, type CvTaxonomyItem } from "../lib/cv/analyzer";
 import { validateUploadedDocument } from "../lib/security/file-validation";
 
 function buildSyntheticPdf(text: string): Buffer {
@@ -299,3 +299,30 @@ test(
     }
   },
 );
+
+test("Local-only CV analysis never routes a real CV to an explicitly configured external provider", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+
+  try {
+    process.env.AI_PROVIDER = "openai";
+    process.env.OPENAI_API_KEY = "synthetic-test-key";
+    delete process.env.GEMINI_API_KEY;
+
+    const analysis = await analyzeCvDocumentLocally({
+      fileName: "synthetic-cv.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("CV TEST\\nIngénieur data\\nCompétences: Python, SQL, machine learning"),
+      taxonomy: TAXONOMY,
+    });
+
+    assert.ok(analysis, "Local-only CV analysis should produce a deterministic result");
+    assert.ok(analysis.skills.some((skill) => skill.toLowerCase() === "python"));
+    assert.ok(analysis.skills.some((skill) => skill.toLowerCase() === "sql"));
+  } finally {
+    if (originalProvider === undefined) delete process.env.AI_PROVIDER; else process.env.AI_PROVIDER = originalProvider;
+    if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = originalOpenAiKey;
+    if (originalGeminiKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalGeminiKey;
+  }
+});
