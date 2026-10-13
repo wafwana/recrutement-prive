@@ -66,6 +66,7 @@ jobs:
       - run: npm run test:company-flow
       - run: npm run test:taxonomy-cv-protection
       - run: npm run test:cv-intelligence
+      - run: npm run test:cv-folder-classification
       - run: npm run test:cv-rematch-batch-window
       - run: npm run test:cron-schedule
       - run: npm run test:global-sourcing
