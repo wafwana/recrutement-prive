@@ -87,3 +87,23 @@ test("sector-level search selects a specialty only when the public profile suppo
   assert.equal(result.confidence, "MEDIUM");
   assert.equal(result.isClassified, true);
 });
+
+
+test("CV-backed proactive classification states that evidence came from the analyzed CV", () => {
+  const sector = RP_TAXONOMY.find((item) => item.code === "CASINOS_JEUX");
+  assert.ok(sector);
+  const croupier = sector.subcategories.find((item) => item.code === "CASINO_CROUPIER");
+  assert.ok(croupier);
+
+  const result = classifyProactiveCandidate({
+    sector,
+    profession: croupier,
+    headline: "Expérience professionnelle",
+    skills: ["Croupier", "Gestion de table"],
+    cvAnalyzed: true,
+  });
+
+  assert.equal(result.isClassified, true);
+  assert.equal(result.confidence, "MEDIUM");
+  assert.match(result.rationale, /CV analysé/);
+});
