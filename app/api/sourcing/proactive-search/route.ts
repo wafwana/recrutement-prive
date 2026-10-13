@@ -108,7 +108,7 @@ export async function POST(request: Request) {
     const candidates = candidateIds.length
       ? await prisma.sourcedCandidate.findMany({
           where: { id: { in: candidateIds }, status: { notIn: ["REJECTED", "ARCHIVED"] } },
-          select: { id: true, externalId: true, source: true, headline: true, skills: true, status: true, sourceProfileUrl: true },
+          select: { id: true, externalId: true, source: true, headline: true, location: true, skills: true, status: true, sourceProfileUrl: true },
         })
       : [];
 
@@ -199,6 +199,17 @@ export async function POST(request: Request) {
         return cvText.includes(normalized) || cvSkills.some((skill) => skill.toLocaleLowerCase().includes(normalized) || normalized.includes(skill.toLocaleLowerCase()));
       });
       const cvSearchCriteriaMatches = queryMatches && countryMatches && skillsMatch;
+      const profileSkills = Array.isArray(candidate.skills)
+        ? candidate.skills.filter((value): value is string => typeof value === "string")
+        : [];
+      const profileSearchText = cvAnalyzed
+        ? cvText
+        : [candidate.headline || "", ...profileSkills].join(" ").toLocaleLowerCase();
+      const profileLocation = cvAnalyzed ? cvLocation : (candidate.location || "").toLocaleLowerCase();
+      const profileQueryMatches = !explicitQuery || profileSearchText.includes(explicitQuery);
+      const profileCountryMatches = !countryTarget || profileLocation.includes(countryTarget);
+      const profileSkillsMatch = !requestedSkills.length || requestedSkills.some((requestedSkill) => profileSearchText.includes(requestedSkill.toLocaleLowerCase()));
+      const internalPoolMatchesCriteria = profileQueryMatches && profileCountryMatches && profileSkillsMatch;
       const classification = classifyProactiveCandidate({
         sector,
         profession,
@@ -206,8 +217,9 @@ export async function POST(request: Request) {
         skills: cvAnalyzed ? storedAnalysis?.skills : candidate.skills,
         cvAnalyzed,
       });
-      return { candidate, cvAnalyzed, cvTaxonomyMatches, cvSearchCriteriaMatches, ...classification };
-    }).filter((item) => item.candidate.source !== "PLATFORM_CV_INTAKE" || (item.cvSearchCriteriaMatches && (item.isClassified || item.cvTaxonomyMatches)));
+      return { candidate, cvAnalyzed, cvTaxonomyMatches, cvSearchCriteriaMatches, internalPoolMatchesCriteria, ...classification };
+    }).filter((item) => item.candidate.source !== "PLATFORM_CV_INTAKE" || (item.cvSearchCriteriaMatches && (item.isClassified || item.cvTaxonomyMatches)))
+      .filter((item) => item.candidate.source !== "PLATFORM_CVTHEQUE" || item.internalPoolMatchesCriteria);
 
     // Notify the internal team about newly discovered profiles before creating their classification records.
     for (const item of classified) {
