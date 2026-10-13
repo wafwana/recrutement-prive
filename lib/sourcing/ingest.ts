@@ -458,6 +458,7 @@ export async function ingestGlobalCandidates(params: {
       ok: true,
       activeSourcesCount: 1,
       fallbackSource: "PLATFORM_CVTHEQUE",
+      externalSourcesAllFailed: false,
       message: "Aucune source externe configurée : la CVthèque interne alimente le sourcing candidat et le matching.",
       fetched: internal.fetched,
       sourceTotal: internal.sourceTotal,
