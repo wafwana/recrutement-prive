@@ -5,6 +5,7 @@ import { qualifyAndMatchExternalOffer } from "@/lib/jobs/offer-pipeline";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 import { selectBatchWindow } from "@/lib/sourcing/batch-window";
+import { shouldPreserveSourcedCandidateStatus } from "@/lib/sourcing/candidate-status";
 
 export async function markExpiredGlobalJobs() {
   const now = new Date();
@@ -273,7 +274,7 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
       where: { source_externalId: { source: "PLATFORM_CVTHEQUE", externalId } },
       select: { id: true, status: true },
     });
-    const finished = existing && ["VALIDATED", "REJECTED", "ARCHIVED", "CONTACTED"].includes(existing.status);
+    const finished = existing && shouldPreserveSourcedCandidateStatus(existing.status);
     const data = {
       source: "PLATFORM_CVTHEQUE",
       sourceProfileUrl: null,
@@ -370,7 +371,7 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20
       where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
       select: { id: true, status: true, matchingDetails: true },
     });
-    const finished = Boolean(existing && ["VALIDATED", "REJECTED", "CONTACTED"].includes(existing.status));
+    const finished = Boolean(existing && shouldPreserveSourcedCandidateStatus(existing.status));
     const skills = analysis.skills.filter((value): value is string => typeof value === "string");
     const locationParts = [analysis.location, analysis.country].filter((value): value is string => typeof value === "string" && Boolean(value.trim()));
     const data = {
@@ -485,7 +486,7 @@ async function ingestPlatformCvthequeCandidates(
     });
 
     if (existing) {
-      const isFinished = ["VALIDATED", "REJECTED", "ARCHIVED", "CONTACTED"].includes(existing.status);
+      const isFinished = shouldPreserveSourcedCandidateStatus(existing.status);
       await prisma.sourcedCandidate.update({
         where: { id: existing.id },
         data: {
@@ -675,7 +676,7 @@ export async function ingestGlobalCandidates(params: {
           });
 
           if (existing) {
-            const isFinished = ["VALIDATED", "REJECTED", "ARCHIVED", "CONTACTED"].includes(existing.status);
+            const isFinished = shouldPreserveSourcedCandidateStatus(existing.status);
             const statusToSet = isFinished ? existing.status : data.status;
 
             await prisma.sourcedCandidate.update({
