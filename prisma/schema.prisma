@@ -98,9 +98,14 @@ model User {
   activitySessions CollaboratorActivitySession[]
   conversations ConversationParticipant[]
   sentMessages Message[]
+  candidateTrustPresentations MissionPresentation[] @relation("PresentationCandidateUser")
+  companyTrustPresentations MissionPresentation[] @relation("PresentationCompanyUser")
+  disclosureRequestsSent AnonymousDisclosureRequest[] @relation("DisclosureRequestedBy")
+  disclosureRequestsDecided AnonymousDisclosureRequest[] @relation("DisclosureDecidedBy")
+  videoSessionsCreated VideoSession[] @relation("VideoSessionCreatedBy")
   sourcedCandidates SourcedCandidate[]
-  telephonyPermission TelephonyPermission? @relation("TelephonyPermissionUser")
-  initiatedCalls CallLog[] @relation("CallLogInitiator")
+  proactiveSearches ProactiveSearch[]
+  outreachContacts OutreachContact[] @relation("CandidateOutreach")
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
   createdAt DateTime @default(now())
@@ -133,6 +138,7 @@ model CandidateProfile {
   presentations MissionPresentation[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  contactMeetings ContactMeeting[]
 
   @@index([primaryCategoryId])
 }
@@ -214,6 +220,8 @@ model Company {
   enterpriseSourcedOffers EnterpriseSourcedOffer[]
   presentations MissionPresentation[]
   recruitmentInvoices RecruitmentInvoice[]
+  outreachContacts OutreachContact[]
+  contactMeetings ContactMeeting[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -288,6 +296,11 @@ model MissionPresentation {
   candidateId String
   companyId String
   state MissionPresentationState @default(MISSION_ACTIVE)
+  anonymousMessagingEnabled Boolean @default(false)
+  candidateAlias String?
+  companyAlias String?
+  candidateUserId String?
+  companyUserId String?
   financialConditionStatus FinancialConditionStatus @default(PENDING)
   presentedAt DateTime @default(now())
   conditionConfirmedAt DateTime?
@@ -298,10 +311,31 @@ model MissionPresentation {
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   candidate CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  candidateUser User? @relation("PresentationCandidateUser", fields: [candidateUserId], references: [id], onDelete: SetNull)
+  companyUser User? @relation("PresentationCompanyUser", fields: [companyUserId], references: [id], onDelete: SetNull)
+  conversations Conversation[]
+  disclosureRequests AnonymousDisclosureRequest[]
+  videoSessions VideoSession[]
+  contactMeetings ContactMeeting[]
   recruitmentInvoices RecruitmentInvoice[]
   @@unique([applicationId, companyId])
   @@index([missionId, companyId, state])
   @@index([candidateId, companyId])
+}
+
+model AnonymousDisclosureRequest {
+  id String @id @default(cuid())
+  presentationId String
+  requestedByUserId String
+  status String @default("PENDING")
+  reason String?
+  decidedByUserId String?
+  requestedAt DateTime @default(now())
+  decidedAt DateTime?
+  presentation MissionPresentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  requestedBy User @relation("DisclosureRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+  decidedBy User? @relation("DisclosureDecidedBy", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+  @@index([presentationId, status, requestedAt])
 }
 
 model EnterpriseSourcedOffer {
@@ -379,11 +413,58 @@ model SourcedCandidate {
   notes String?
   createdByUserId String
   createdBy User @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  proactiveSearchResults ProactiveSearchResult[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([status, createdAt])
   @@index([source])
   @@unique([source, externalId], map: "sourced_candidate_source_external_id_key")
+}
+
+model ProactiveSearch {
+  id String @id @default(cuid())
+  title String
+  sectorCode String
+  professionCode String?
+  query String?
+  country String?
+  skills Json?
+  criteria Json?
+  status String @default("PENDING")
+  createdByUserId String
+  startedAt DateTime?
+  completedAt DateTime?
+  lastError String?
+  sourceSummary Json?
+  createdBy User @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  results ProactiveSearchResult[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, createdAt])
+  @@index([sectorCode, professionCode, createdAt])
+  @@index([createdByUserId, createdAt])
+}
+
+model ProactiveSearchResult {
+  id String @id @default(cuid())
+  searchId String
+  sourcedCandidateId String
+  source String
+  primarySectorCode String?
+  primaryProfessionCode String?
+  secondaryMatches Json?
+  score Int?
+  confidence String @default("LOW")
+  rationale String?
+  cvStatus String @default("NOT_PROVIDED")
+  status String @default("DETECTED")
+  search ProactiveSearch @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  sourcedCandidate SourcedCandidate @relation(fields: [sourcedCandidateId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([searchId, sourcedCandidateId])
+  @@index([sourcedCandidateId])
+  @@index([searchId, status])
 }
 
 model RecruitmentHistory {
@@ -405,11 +486,37 @@ model RecruitmentHistory {
 
 model Conversation {
   id String @id @default(cuid())
+  presentationId String?
+  mode String @default("STANDARD")
+  status String @default("ACTIVE")
+  dataExchangeLocked Boolean @default(true)
   subject String @default("Nouvelle conversation")
+  presentation MissionPresentation? @relation(fields: [presentationId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
   messages Message[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([presentationId, mode, status])
+}
+
+model VideoSession {
+  id             String       @id @default(cuid())
+  presentationId String
+  createdByUserId String
+  status         String       @default("CREATED")
+  expiresAt      DateTime
+  startedAt      DateTime?
+  endedAt        DateTime?
+  offer          Json?
+  answer         Json?
+  candidateA     Json?
+  candidateB     Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  presentation   MissionPresentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  createdBy      User          @relation("VideoSessionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  @@index([presentationId, status, expiresAt])
+  @@index([createdByUserId, createdAt])
 }
 model ConversationParticipant {
   id String @id @default(cuid())
@@ -426,6 +533,9 @@ model Message {
   conversationId String
   senderId String
   body String
+  moderationStatus String @default("ALLOWED")
+  moderationReason String?
+  metadataSanitized Boolean @default(false)
   readAt DateTime?
   archivedDocumentId String?
   archivedDocument ArchivedDocument? @relation(fields: [archivedDocumentId], references: [id], onDelete: SetNull)
@@ -630,6 +740,24 @@ model FinancialPayoutRequest {
 }
 
 
+model OwnerBillingProfile {
+  id String @id @default(cuid())
+  legalName String?
+  accountHolder String?
+  address String?
+  postalCode String?
+  city String?
+  country String @default("FR")
+  iban String?
+  bic String?
+  bankName String?
+  invoiceEmail String?
+  paymentInstructions String?
+  currency String @default("EUR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model RecruitmentBillingRule {
   id             String   @id @default(cuid())
   jobId          String
@@ -786,70 +914,102 @@ model PartnerHistory {
   @@index([partnerId, createdAt])
 }
 
-model TelephonyConfig {
-  id                   String   @id @default(cuid())
-  centralPhoneNumber   String   @default("")
-  ownerPhone           String   @default("")
-  secondaryPhone       String?
-  ringMode             String   @default("SEQUENTIAL")
-  transferDelaySeconds Int      @default(15)
-  businessHours        Json?
-  offHoursBehavior     String   @default("VOICEMAIL")
-  customIvrGreeting    String?
+
+model OutreachContact {
+  id                String   @id @default(cuid())
+  recipientType     String
+  recipientEmail    String
+  recipientName     String?
+  companyId         String?
+  candidateUserId   String?
+  source            String?
+  campaignKey       String
+  status            String   @default("PENDING")
+  subject           String?
+  bodySnapshot      String?
+  providerMessageId String?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  bouncedAt         DateTime?
+  complainedAt      DateTime?
+  repliedAt         DateTime?
+  replyFromEmail    String?
+  replySubject      String?
+  replyBody         String?
+  replyProviderMessageId String?
+  replyReceivedAt   DateTime?
+  convertedAt       DateTime?
+  optedOutAt        DateTime?
+  lastError         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  candidateUser User? @relation("CandidateOutreach", fields: [candidateUserId], references: [id], onDelete: SetNull)
+
+  @@unique([recipientEmail, campaignKey])
+  @@index([recipientType, status, createdAt])
+  @@index([companyId, createdAt])
+  @@index([candidateUserId, createdAt])
+}
+
+model ContactMeeting {
+  id                  String   @id @default(cuid())
+  presentationId      String
+  companyId           String
+  candidateId         String
+  channel              String   @default("MESSAGING")
+  status               String   @default("REQUESTED")
+  scheduledAt          DateTime?
+  startedAt            DateTime?
+  endedAt              DateTime?
+  durationMinutes      Int      @default(30)
+  priceHt              Float    @default(82.5)
+  vatRate              Float    @default(20)
+  priceTtc             Float    @default(99)
+  currency             String   @default("EUR")
+  paymentStatus        String   @default("PENDING")
+  paymentMethod        String?
+  paymentProvider      String?
+  paymentReference     String?
+  checkoutUrl          String?
+  paidAt               DateTime?
+  recordingNoticeShown Boolean  @default(false)
+  candidateConsentAt   DateTime?
+  companyConsentAt     DateTime?
+  recordingStartedAt   DateTime?
+  recordingEndedAt     DateTime?
+  recordingRef         String?
+  decisionRequired     Boolean  @default(false)
+  decisionStatus       String   @default("PENDING")
+  decisionAt           DateTime?
+  decisionNotes        String?
+  securityDetails      Json?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+
+  presentation MissionPresentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  candidate CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([presentationId, status, scheduledAt])
+  @@index([companyId, createdAt])
+  @@index([candidateId, createdAt])
 }
 
-model TelephonyPermission {
-  id                   String   @id @default(cuid())
-  userId               String   @unique
-  canMakeOutboundCalls Boolean  @default(false)
-  grantedByUserId      String
-  grantedAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  user                 User     @relation("TelephonyPermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+model ContractTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  title       String
+  audience    String
+  version     String
+  active      Boolean  @default(true)
+  body        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([audience, active])
 }
-
-model CallLog {
-  id                String            @id @default(cuid())
-  direction         String            @default("INBOUND")
-  callerNumber      String
-  callerName        String?
-  callerType        String?
-  ivrChoice         String?
-  destinationPhone  String?
-  status            String            @default("MISSED")
-  durationSeconds   Int               @default(0)
-  linkedEntityId    String?
-  linkedEntityType  String?
-  initiatorUserId   String?
-  initiatorUser     User?             @relation("CallLogInitiator", fields: [initiatorUserId], references: [id], onDelete: SetNull)
-  notes             String?
-  treatmentState    String            @default("NEW")
-  voicemail         VoicemailMessage?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-
-  @@index([direction, createdAt])
-  @@index([callerNumber])
-  @@index([treatmentState])
-}
-
-model VoicemailMessage {
-  id              String   @id @default(cuid())
-  callLogId       String   @unique
-  audioUrl        String?
-  audioData       Bytes?
-  durationSeconds Int      @default(0)
-  transcription   String?
-  status          String   @default("UNREAD")
-  callLog         CallLog  @relation(fields: [callLogId], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([status, createdAt])
-}
-
 model FinancialOutflow {
   id                    String    @id @default(cuid())
   outflowNumber         String    @unique
@@ -862,6 +1022,7 @@ model FinancialOutflow {
   category              String?
   originModule          String    @default("AUTRE") // PAIE, PRESTATAIRE, FRAIS_PRO, REMBOURSEMENT, FOURNISSEUR, PRELEVEMENT_OWNER, AUTRE
   amountHt              Float
+  amountTvaRate         Float     @default(0)
   amountTva             Float     @default(0)
   amountTtc             Float
   currency              String    @default("EUR")
@@ -870,6 +1031,9 @@ model FinancialOutflow {
   referenceNumber       String?   // Ref facture, bulletin, contrat, etc.
   documentUrl           String?
   documentId            String?
+  documentName          String?
+  documentMimeType      String?
+  documentData          Bytes?
   createdById           String
   authorizedById        String?
   status                String    @default("A_COMPLETER") // PREVU, AUTORISE, PAYE, RAPPROCHE, A_COMPLETER, ANNULE

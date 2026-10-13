@@ -11,3 +11,15 @@ test("middleware path rule checks public vs protected routes", () => {
   assert.equal(PUBLIC_PATHS.has("/espace/owner"), false);
   assert.equal(PUBLIC_PATHS.has("/espace/candidat"), false);
 });
+
+test("middleware path rule allows public visual assets without auth redirect", () => {
+  const isPublicAsset = (pathname: string) =>
+    pathname.startsWith("/visuals/") ||
+    pathname.startsWith("/favicon") ||
+    /\.(?:jpeg|webp|png|jpg|svg|ico|css|js)$/i.test(pathname);
+
+  assert.equal(isPublicAsset("/visuals/rp-global-partners.jpeg"), true);
+  assert.equal(isPublicAsset("/visuals/hero-final.webp"), true);
+  assert.equal(isPublicAsset("/favicon.ico"), true);
+  assert.equal(isPublicAsset("/espace/owner/dashboard"), false);
+});

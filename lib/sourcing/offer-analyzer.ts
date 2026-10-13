@@ -20,6 +20,22 @@ export type ExternalOfferAnalysis = {
   confidence: number;
 };
 
+export function sanitizePublicOfferDescription(value: string | null | undefined, companyName?: string | null): string {
+  let text = (value || "").replace(/https?:\/\/[^\s]+/gi, " ");
+  text = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, " ");
+  text = text.replace(/(?:(?:\+|00)\d{1,3}[\s.-]?)?(?:0|\(0\))[1-9](?:[\s.-]?\d{2}){4}|\+\d{10,13}/g, " ");
+  text = text.replace(/\b(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|c[a-z0-9]{24}|(?:usr_|cand_|job_|comp_|pres_)[a-zA-Z0-9_-]+)\b/gi, " ");
+  if (companyName?.trim()) {
+    const escapedCompany = companyName.trim().replace(/[.*+?^$()|[\]\\]/g, "\\$&");
+    text = text.replace(new RegExp(escapedCompany, "gi"), " ");
+  }
+  text = text
+    .replace(/\b(?:curriculum\s+vitae|CV)\b/gi, "dossier professionnel")
+    .replace(/\b(candidatures?|candidats?|postulants?)\b/gi, "profils")
+    .replace(/\b(expérience\s+professionnelle)\b/gi, "parcours professionnel")
+    .replace(/\b(date\s+de\s+naissance|situation\s+familiale|né\(e\)\s+le)\b/gi, " ");
+  return text.replace(/\s+/g, " ").trim().slice(0, 6000);
+}
 const schema = {
   type: "object",
   additionalProperties: false,
@@ -65,9 +81,9 @@ export async function analyzeExternalOffer(input: {
     jsonSchemaName: "external_offer_analysis",
     jsonSchema: schema as any,
     geminiAllowedFields: {
-      title: input.title,
+      title: sanitizePublicOfferDescription(input.title, input.companyName),
       location: genericLocation,
-      descriptionSummary: input.description,
+      descriptionSummary: sanitizePublicOfferDescription(input.description, input.companyName),
     },
     userPrompt: `Analyse cette offre d'emploi pour Recrutement Privé.
 Décortique le poste en titre, résumé professionnel, compétences requises, expérience, langue et taxonomie métier.

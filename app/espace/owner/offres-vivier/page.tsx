@@ -95,6 +95,24 @@ export default async function OfferPoolPage({
         </div>
       </div>
 
+      <div className="mt-8 border border-white/10 bg-[#0b0f14] p-6">
+        <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Pipeline des offres</p>
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
+          {[
+            ["SOURCE","Origine directe de l'offre","text-[#c7a15a]"],
+            ["QUALIFICATION","Analyse / traduction / classement","text-white/70"],
+            ["MATCHING","Rapprochement avec les candidats","text-[#F97316]"],
+            ["VIVIER","Offres prêtes pour le travail RP","text-[#c7a15a]"],
+          ].map(([title,desc,color]) => (
+            <div key={title} className="border border-white/10 bg-[#111] p-4">
+              <p className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${color}`}>{title}</p>
+              <p className="mt-2 text-xs leading-5 text-white/45">{desc}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 text-xs leading-6 text-white/35">La source affichée sur chaque offre indique l'origine réelle. Le statut MATCHING ne signifie pas « offre sourcée » : il indique qu'un rapprochement offre ↔ candidat a été traité.</p>
+      </div>
+
       <div className="mt-8 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-5">
         {[
           ["Offres conservées", total],
@@ -135,7 +153,7 @@ export default async function OfferPoolPage({
 
       <div className="mt-8 overflow-hidden border border-white/10">
         <div className="hidden border-b border-white/10 bg-[#111] px-5 py-4 text-[10px] uppercase tracking-[0.16em] text-white/35 md:grid md:grid-cols-[2fr_1.1fr_1fr_1fr_1fr]">
-          <span>Offre / salaire</span><span>Entreprise</span><span>Localisation</span><span>Métier</span><span>État / source</span>
+          <span>Offre / salaire</span><span>Entreprise</span><span>Localisation</span><span>Métier</span><span>État · provenance · matching</span>
         </div>
         {filtered.map((offer) => {
           const salary = parseSalary(offer.salary);

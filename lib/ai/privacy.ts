@@ -116,18 +116,34 @@ export function inspectContentForPrivacyRisks(text: string): {
  * Strips and rejects:
  * - companyName, contactEmail, sourceUrl, website, companySiret, rawText, internal IDs, tracking metadata.
  */
+function sanitizeAllowedPublicText(value: string | null | undefined): string {
+  return (value || "")
+    .replace(/https?:\/\/[^\s]+/gi, " ")
+    .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, " ")
+    .replace(/(?:(?:\+|00)\d{1,3}[\s.-]?)?(?:0|\(0\))[1-9](?:[\s.-]?\d{2}){4}|\+\d{10,13}/g, " ")
+    .replace(/\b(?:companyName|contactEmail|sourceUrl|companySiret|rawText|siret|siren|website|url)\s*[:=][^\n]*/gi, " ")
+    .replace(/\b(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|c[a-z0-9]{24}|(?:usr_|cand_|job_|comp_|pres_)[a-zA-Z0-9_-]+)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 6000);
+}
+
 export function sanitizeAndValidateGeminiPayload(
   fields?: AllowedGeminiPayloadFields | null,
   rawPrompt?: string
 ): { allowed: boolean; sanitizedPrompt?: string; reason?: string } {
-  // If structured minimal fields are provided, format strictly from allowed fields only
+  // If structured minimal fields are provided, format strictly from explicitly approved fields.
+  // Strip URLs, contact details, internal IDs, and forbidden field/value lines before inspection.
+  // Sensitive/candidate/confidential markers are still rejected below; they are never whitelisted.
   if (fields) {
-    const title = fields.title?.trim() || "";
-    const location = fields.location?.trim() || "";
-    const missionType = fields.missionType?.trim() || "";
-    const skills = Array.isArray(fields.skills) ? fields.skills.map((s) => s.trim()).filter(Boolean) : [];
+    const title = sanitizeAllowedPublicText(fields.title);
+    const location = sanitizeAllowedPublicText(fields.location);
+    const missionType = sanitizeAllowedPublicText(fields.missionType);
+    const skills = Array.isArray(fields.skills)
+      ? fields.skills.map((s) => sanitizeAllowedPublicText(s)).filter(Boolean)
+      : [];
     const experienceYears = typeof fields.experienceYears === "number" && Number.isFinite(fields.experienceYears) ? fields.experienceYears : null;
-    const descriptionSummary = fields.descriptionSummary?.trim() || "";
+    const descriptionSummary = sanitizeAllowedPublicText(fields.descriptionSummary);
 
     // Construct minimal text strictly from allowed fields
     const minimalText = [

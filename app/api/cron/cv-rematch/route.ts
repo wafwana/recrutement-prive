@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
-import { analyzeCvDocument } from "@/lib/cv/analyzer";
-import { buildCandidateFolder } from "@/lib/cv/folders";
+import { analyzeCvDocument, analyzeCvDocumentLocally, type CvAnalysis } from "@/lib/cv/analyzer";
+import { buildCandidateFolderFromAnalysis, resolveCvTaxonomySelection } from "@/lib/cv/folders";
+import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
+import { selectBatchWindow } from "@/lib/sourcing/batch-window";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -10,21 +13,32 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   }
 
-  const candidates = await prisma.candidateProfile.findMany({
-    where: {
-      status: "ACTIVE",
-      documents: { some: { docType: "CV" } },
-    },
-    include: {
-      primaryCategory: { select: { code: true } },
-      documents: {
-        where: { docType: "CV" },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { id: true, analysis: true },
-      },
-    },
-  });
+  const candidateWhere = {
+    status: "ACTIVE" as const,
+    documents: { some: { docType: "CV" as const } },
+  };
+  const candidateSourceTotal = await prisma.candidateProfile.count({ where: candidateWhere });
+  const candidateBatchKey = "cv-rematch:candidates";
+  const candidateOffset = await readBatchOffset(candidateBatchKey, candidateSourceTotal);
+  const candidateBatchLimit = 10;
+  const candidateWindow = selectBatchWindow(candidateSourceTotal, candidateOffset, candidateBatchLimit);
+  const candidateBatch = candidateWindow.take > 0
+    ? await prisma.candidateProfile.findMany({
+        where: candidateWhere,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: candidateWindow.skip,
+        take: candidateWindow.take,
+        include: {
+          primaryCategory: { select: { code: true } },
+          documents: {
+            where: { docType: "CV" },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { id: true, name: true, fileData: true, type: true, analysis: true, analyzedAt: true, folderPath: true },
+          },
+        },
+      })
+    : [];
 
   const jobs = await prisma.job.findMany({
     where: { status: "OPEN" },
@@ -32,36 +46,33 @@ export async function GET(request: Request) {
       jobCategory: { select: { code: true } },
       subCategory: { select: { code: true } },
     },
-    take: 1000,
+    take: 200,
   });
 
-  const externalOffers = await prisma.externalJobOpportunity.findMany({ where: { status: { not: "REJECTED" } }, take: 5000 });
+  const externalOffers = await prisma.externalJobOpportunity.findMany({ where: { status: { not: "REJECTED" } }, orderBy: { sourceCollectedAt: "desc" }, take: 500 });
 
   const intakeQueue = await prisma.cvIntake.findMany({
     where: { status: "A_ANALYSER" },
     orderBy: { createdAt: "asc" },
-    take: 50,
+    take: 10,
   });
 
   let intakeAnalyzed = 0;
   let intakeMatched = 0;
 
-  const categoryRows = await prisma.jobCategory.findMany({ select: { id: true, code: true } });
+  const categoryRows = await prisma.jobCategory.findMany({ select: { id: true, code: true, name: true, parentId: true, isActive: true } });
   const categoryCodes = new Map(categoryRows.map((row) => [row.id, row.code]));
+  const taxonomyItems = categoryRows.filter((row) => row.isActive).map((row) => ({
+    code: row.code,
+    name: typeof row.name === "object" && row.name !== null && "fr" in row.name
+      ? String((row.name as Record<string, unknown>).fr || row.code)
+      : typeof row.name === "string" ? row.name : row.code,
+    parentCode: row.parentId ? categoryCodes.get(row.parentId) || null : null,
+  }));
 
   let updated = 0;
   for (const intake of intakeQueue) {
-    const taxonomy = await prisma.jobCategory.findMany({
-      where: { isActive: true },
-      select: { id: true, code: true, name: true, parentId: true },
-    });
-    const taxonomyItems = taxonomy.map((row) => ({
-      code: row.code,
-      name: typeof row.name === "object" && row.name !== null && "fr" in row.name
-        ? String((row.name as Record<string, unknown>).fr || row.code)
-        : row.code,
-      parentCode: taxonomy.find((parent) => parent.id === row.parentId)?.code || null,
-    }));
+
 
     try {
       const analysis = await analyzeCvDocument({
@@ -81,8 +92,11 @@ export async function GET(request: Request) {
         continue;
       }
 
-      const primary = taxonomy.find((row) => row.code === analysis.primaryCategoryCode && row.parentId === null);
-      const subCategories = taxonomy.filter((row) => analysis.subCategoryCodes.includes(row.code) && row.parentId);
+      const taxonomySelection = resolveCvTaxonomySelection(analysis, taxonomyItems);
+      const primary = taxonomySelection.primaryCategoryCode
+        ? categoryRows.find((row) => row.code === taxonomySelection.primaryCategoryCode && row.parentId === null)
+        : null;
+      const subCategories = categoryRows.filter((row) => taxonomySelection.subCategoryCodes.includes(row.code));
       const candidateMatches = [
         ...jobs.map((job) => {
           const result = matchCandidateToJob(
@@ -130,12 +144,12 @@ export async function GET(request: Request) {
         }),
       ].filter((item) => item.score >= 25).sort((a, b) => b.score - a.score).slice(0, 20);
 
-      const suggestedFolder = buildCandidateFolder({
-        sectorCode: analysis.primaryCategoryCode,
-        professionCode: analysis.subCategoryCodes[0] || "A_VERIFIER",
-        year: intake.createdAt.getFullYear(),
-        documentKind: "CV",
-      });
+      const suggestedFolder = buildCandidateFolderFromAnalysis(
+        analysis,
+        taxonomyItems,
+        intake.createdAt.getFullYear(),
+        "CV",
+      );
 
       await prisma.cvIntake.update({
         where: { id: intake.id },
@@ -194,25 +208,171 @@ export async function GET(request: Request) {
   }
 
 
+  // Reclassify previously analyzed intake records that still use the generic
+  // folder. Cursor over the stable ANALYSE_OK set so unresolved records cannot
+  // starve later records; only generic folders are changed, preserving manual
+  // folder assignments and the original file bytes.
+  const reclassificationWhere = { status: "ANALYSE_OK" };
+  const reclassificationTotal = await prisma.cvIntake.count({ where: reclassificationWhere });
+  const reclassificationKey = "cv-intake:folder-reclassification";
+  const reclassificationOffset = await readBatchOffset(reclassificationKey, reclassificationTotal);
+  const reclassificationQueue = reclassificationTotal > 0
+    ? await prisma.cvIntake.findMany({
+        where: reclassificationWhere,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: reclassificationOffset,
+        take: 10,
+        select: { id: true, analysis: true, createdAt: true, candidateId: true, originalName: true, folderPath: true },
+      })
+    : [];
+  let foldersReclassified = 0;
 
-  for (const candidate of candidates) {
-    const subCategoryCodes = Array.isArray(candidate.subCategoryIds)
-      ? candidate.subCategoryIds
-          .filter((value): value is string => typeof value === "string")
-          .map((value) => categoryCodes.get(value) || value)
-      : [];
+  for (const intake of reclassificationQueue) {
+    if (!intake.folderPath.startsWith("CANDIDATS/A_CLASSER")) continue;
+    const suggestedFolder = buildCandidateFolderFromAnalysis(
+      intake.analysis,
+      taxonomyItems,
+      intake.createdAt.getFullYear(),
+      "CV",
+    );
+    if (suggestedFolder === intake.folderPath || suggestedFolder.startsWith("CANDIDATS/A_CLASSER/")) continue;
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.cvIntake.update({
+          where: { id: intake.id },
+          data: { folderPath: suggestedFolder },
+        });
+        if (intake.candidateId) {
+          await tx.candidateDocument.updateMany({
+            where: { candidateId: intake.candidateId, name: intake.originalName, docType: "CV" },
+            data: { folderPath: suggestedFolder },
+          });
+        }
+      });
+      foldersReclassified++;
+    } catch (error) {
+      // Keep the batch moving; the persisted cursor will revisit this row on
+      // the next cycle. Never log CV contents or candidate contact details.
+      console.warn("[cv folder reclassification] update failed", error instanceof Error ? error.name : "UnknownError");
+    }
+  }
+
+  if (reclassificationTotal > 0 && reclassificationQueue.length > 0) {
+    await writeBatchOffset(reclassificationKey, reclassificationOffset + reclassificationQueue.length, reclassificationTotal);
+  }
+
+
+
+
+  let cvAnalyzed = 0;
+  let cvAnalysisFailed = 0;
+  for (const candidate of candidateBatch) {
+    const document = candidate.documents[0];
+    if (!document) continue;
+
+    const existingAnalysis =
+      document.analysis && typeof document.analysis === "object" && !Array.isArray(document.analysis)
+        ? document.analysis as Record<string, unknown>
+        : {};
+    const hasStructuredAnalysis =
+      Array.isArray(existingAnalysis.skills) &&
+      Array.isArray(existingAnalysis.subCategoryCodes) &&
+      Object.prototype.hasOwnProperty.call(existingAnalysis, "primaryCategoryCode");
+
+    let cvAnalysis: CvAnalysis | null = hasStructuredAnalysis
+      ? existingAnalysis as unknown as CvAnalysis
+      : null;
+
+    // Analyze existing candidate-library CVs in bounded batches using local parsing only.
+    // This path must never send a real CV or candidate PII to Gemini/OpenAI.
+    if (!cvAnalysis && document.fileData) {
+      const lowerName = document.name.toLowerCase();
+      const mimeType = document.type ||
+        (lowerName.endsWith(".pdf") ? "application/pdf" :
+          lowerName.endsWith(".docx") ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" :
+          lowerName.endsWith(".txt") || lowerName.endsWith(".md") ? "text/plain" : "application/octet-stream");
+      try {
+        cvAnalysis = await analyzeCvDocumentLocally({
+          fileName: document.name,
+          mimeType,
+          buffer: Buffer.from(document.fileData),
+          taxonomy: taxonomyItems,
+        });
+        if (cvAnalysis) cvAnalyzed++;
+        else cvAnalysisFailed++;
+      } catch (error) {
+        cvAnalysisFailed++;
+        console.warn("[cv-rematch local analysis] failed", error instanceof Error ? error.name : "UnknownError");
+      }
+    }
+
+    const analysisRecord = cvAnalysis
+      ? { ...cvAnalysis, sourceFactsOnly: true }
+      : existingAnalysis;
+    const taxonomySelection = cvAnalysis
+      ? resolveCvTaxonomySelection(cvAnalysis, taxonomyItems)
+      : { primaryCategoryCode: null, subCategoryCodes: [] };
+    const primary = taxonomySelection.primaryCategoryCode
+      ? categoryRows.find((row) => row.code === taxonomySelection.primaryCategoryCode && row.parentId === null && row.isActive)
+      : null;
+    const subCategories = categoryRows.filter((row) => row.isActive && taxonomySelection.subCategoryCodes.includes(row.code));
+
+    if (cvAnalysis) {
+      const currentSkills = Array.isArray(candidate.skills) ? candidate.skills : [];
+      const currentSubCategories = Array.isArray(candidate.subCategoryIds) ? candidate.subCategoryIds : [];
+      await prisma.candidateProfile.update({
+        where: { id: candidate.id },
+        data: {
+          headline: candidate.headline || cvAnalysis.headline || undefined,
+          bio: candidate.bio || cvAnalysis.improvedSummary || cvAnalysis.summary || undefined,
+          skills: currentSkills.length ? currentSkills as string[] : cvAnalysis.skills,
+          experienceYears: candidate.experienceYears ?? cvAnalysis.experienceYears,
+          primaryCategoryId: candidate.primaryCategoryId || primary?.id || undefined,
+          subCategoryIds: currentSubCategories.length ? currentSubCategories as string[] : (primary ? subCategories.map((row) => row.id) : undefined),
+        },
+      });
+
+      if (document.folderPath.startsWith("CANDIDATS/A_CLASSER")) {
+        const suggestedFolder = buildCandidateFolderFromAnalysis(
+          cvAnalysis,
+          taxonomyItems,
+          candidate.createdAt.getFullYear(),
+          "CV",
+        );
+        if (!suggestedFolder.startsWith("CANDIDATS/A_CLASSER/")) {
+          await prisma.candidateDocument.update({
+            where: { id: document.id },
+            data: { folderPath: suggestedFolder, analysis: analysisRecord as Prisma.InputJsonValue, analyzedAt: document.analyzedAt || new Date() },
+          });
+        }
+      }
+    }
+
+    const skills = cvAnalysis ? cvAnalysis.skills : candidate.skills;
+    const headline = candidate.headline || cvAnalysis?.headline || null;
+    const bio = candidate.bio || cvAnalysis?.improvedSummary || cvAnalysis?.summary || null;
+    const experienceYears = candidate.experienceYears ?? cvAnalysis?.experienceYears ?? null;
+    const primaryCategoryCode = taxonomySelection.primaryCategoryCode || candidate.primaryCategory?.code;
+    const subCategoryCodes = cvAnalysis
+      ? taxonomySelection.subCategoryCodes
+      : Array.isArray(candidate.subCategoryIds) && candidate.subCategoryIds.length
+        ? candidate.subCategoryIds
+            .filter((value): value is string => typeof value === "string")
+            .map((value) => categoryCodes.get(value) || value)
+        : [];
 
     const matches = [
       ...jobs.map((job) => {
         const result = matchCandidateToJob(
           {
-            skills: candidate.skills,
-            experienceYears: candidate.experienceYears,
-            headline: candidate.headline,
-            bio: candidate.bio,
+            skills,
+            experienceYears,
+            headline,
+            bio,
             location: candidate.location,
             country: candidate.country,
-            primaryCategoryCode: candidate.primaryCategory?.code,
+            primaryCategoryCode,
             subCategoryCodes,
           },
           {
@@ -238,13 +398,13 @@ export async function GET(request: Request) {
       ...externalOffers.map((offer) => {
         const result = matchCandidateToJob(
           {
-            skills: candidate.skills,
-            experienceYears: candidate.experienceYears,
-            headline: candidate.headline,
-            bio: candidate.bio,
+            skills,
+            experienceYears,
+            headline,
+            bio,
             location: candidate.location,
             country: candidate.country,
-            primaryCategoryCode: candidate.primaryCategory?.code,
+            primaryCategoryCode,
             subCategoryCodes,
           },
           {
@@ -271,22 +431,12 @@ export async function GET(request: Request) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 20);
 
-    const document = candidate.documents[0];
-    if (!document) continue;
-
-    const existingAnalysis =
-      document.analysis && typeof document.analysis === "object" && !Array.isArray(document.analysis)
-        ? document.analysis as Record<string, unknown>
-        : {};
-
     await prisma.candidateDocument.update({
       where: { id: document.id },
       data: {
-        analysis: {
-          ...existingAnalysis,
-          suggestedMatches: matches,
-          rematchedAt: new Date().toISOString(),
-        },
+        ...(cvAnalysis ? { analysis: { ...analysisRecord, suggestedMatches: matches, rematchedAt: new Date().toISOString() } as Prisma.InputJsonValue, analyzedAt: document.analyzedAt || new Date() } : {
+          analysis: { ...existingAnalysis, suggestedMatches: matches, rematchedAt: new Date().toISOString() },
+        }),
       },
     });
 
@@ -301,10 +451,14 @@ export async function GET(request: Request) {
         actorRole: "SYSTEM",
         action: "CV_AUTOMATIC_REMATCH",
         targetType: "CV_LIBRARY",
-        details: { candidatesChecked: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched },
+        details: { candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched, foldersReclassified, cvAnalyzed, cvAnalysisFailed },
       },
     });
   }
 
-  return NextResponse.json({ ok: true, candidatesChecked: candidates.length, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched });
+  if (candidateSourceTotal > 0 && candidateBatch.length > 0) {
+    await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidateSourceTotal);
+  }
+
+  return NextResponse.json({ ok: true, candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched, foldersReclassified, cvAnalyzed, cvAnalysisFailed });
 }

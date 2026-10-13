@@ -143,6 +143,67 @@ export async function updateCompanyJob(formData: FormData) {
   revalidatePath(`/espace/entreprise/offres/${parsed.data.jobId}`);
 }
 
+export async function presentCandidateToCompany(applicationId: string) {
+  const existing = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: {
+      id: true,
+      jobId: true,
+      candidateId: true,
+      userId: true,
+      status: true,
+      job: { select: { companyId: true, title: true } },
+      candidate: { select: { userId: true } },
+    },
+  });
+  if (!existing) throw new Error("Candidature introuvable.");
+  const access = await requireCompanyAccess(existing.job.companyId);
+
+  await prisma.$transaction(async (tx) => {
+    const current = await tx.missionPresentation.findFirst({
+      where: { applicationId, companyId: access.companyId },
+      select: { id: true },
+    });
+    if (!current) {
+      await tx.missionPresentation.create({
+        data: {
+          missionId: existing.jobId,
+          applicationId: existing.id,
+          candidateId: existing.candidateId,
+          companyId: access.companyId,
+          state: "MISSION_ACTIVE",
+          anonymousMessagingEnabled: true,
+          candidateAlias: `Candidat #${existing.candidateId.slice(-6).toUpperCase()}`,
+          companyAlias: `Entreprise #${access.companyId.slice(-6).toUpperCase()}`,
+          candidateUserId: existing.candidate.userId,
+          companyUserId: access.userId,
+          financialConditionStatus: "PENDING",
+          securityDetails: { identityProtected: true, directCoordinatesBlocked: true },
+        },
+      });
+    }
+
+    if (existing.status !== "SHORTLISTED") {
+      await tx.application.update({ where: { id: existing.id }, data: { status: "SHORTLISTED" } });
+    }
+
+    await tx.recruitmentHistory.create({
+      data: {
+        applicationId: existing.id,
+        jobId: existing.jobId,
+        actorUserId: access.userId,
+        action: "CANDIDATE_PRESENTED",
+        fromStatus: existing.status,
+        toStatus: "SHORTLISTED",
+        details: { companyId: access.companyId, presentationCreated: !current },
+      },
+    });
+  });
+
+  revalidatePath("/espace/entreprise");
+  revalidatePath(`/espace/entreprise/offres/${existing.jobId}`);
+}
+
 export async function updateApplicationStatus(applicationId: string, status: string, notes?: string) {
   const existing = await prisma.application.findUnique({ where: { id: applicationId }, select: { jobId: true, status: true, job: { select: { companyId: true } } } });
   if (!existing) throw new Error("Candidature introuvable.");

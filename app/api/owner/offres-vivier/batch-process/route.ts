@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   } catch {}
 
   // Strict server-side batch limit enforced <= 20 to fit within Vercel execution timeouts
-  const limit = typeof body.limit === "number" && Number.isFinite(body.limit) ? Math.min(20, Math.max(1, body.limit)) : 20;
+  const limit = typeof body.limit === "number" && Number.isFinite(body.limit) ? Math.min(10, Math.max(1, body.limit)) : 5;
   const statusFilter = Array.isArray(body.statusFilter)
     ? body.statusFilter.filter((v): v is string => typeof v === "string")
     : ["DETECTED", "A_QUALIFIER"];

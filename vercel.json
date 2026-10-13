@@ -6,19 +6,19 @@
   "crons": [
     {
       "path": "/api/cron/global-jobs",
-      "schedule": "0 3 * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/cv-rematch",
-      "schedule": "0 4 * * *"
+      "schedule": "15 * * * *"
     },
     {
       "path": "/api/cron/enterprise-offer-sourcing",
-      "schedule": "0 5 * * *"
+      "schedule": "30 * * * *"
     },
     {
       "path": "/api/cron/global-candidates",
-      "schedule": "0 6 * * *"
+      "schedule": "45 * * * *"
     }
   ]
 }

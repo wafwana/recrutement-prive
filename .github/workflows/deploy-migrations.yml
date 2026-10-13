@@ -36,9 +36,22 @@ jobs:
           DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
         run: |
           test -n "$DATABASE_URL_PRODUCTION" || { echo "DATABASE_URL_PRODUCTION is missing"; exit 1; }
-      - name: Validate migration 0010 schema (read-only)
+      - name: Normalize production URL for Prisma CLI (direct Neon connection)
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+          DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const raw = process.env.DATABASE_URL_PRODUCTION;
+          const url = new URL(raw);
+          if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') {
+            throw new Error('DATABASE_URL_PRODUCTION must be a PostgreSQL URL');
+          }
+          url.hostname = url.hostname.replace(/-pooler(?=\.)/, '');
+          if (!url.searchParams.has('sslmode')) url.searchParams.set('sslmode', 'require');
+          fs.appendFileSync(process.env.GITHUB_ENV, 'DATABASE_URL=' + url.toString() + '\n');
+          NODE
+      - name: Validate migration 0010 schema (read-only)
         run: npx tsx scripts/check-migration-0010.ts
 
   recovery:
@@ -53,23 +66,30 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
+      - name: Normalize production URL for Prisma CLI (direct Neon connection)
+        env:
+          DATABASE_URL_PRODUCTION: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const raw = process.env.DATABASE_URL_PRODUCTION;
+          const url = new URL(raw);
+          if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') {
+            throw new Error('DATABASE_URL_PRODUCTION must be a PostgreSQL URL');
+          }
+          url.hostname = url.hostname.replace(/-pooler(?=\.)/, '');
+          if (!url.searchParams.has('sslmode')) url.searchParams.set('sslmode', 'require');
+          fs.appendFileSync(process.env.GITHUB_ENV, 'DATABASE_URL=' + url.toString() + '\n');
+          NODE
       - name: Require explicit resolve authorization
         if: ${{ github.event.inputs.resolve_0010 == 'CONFIRM_RESOLVE_0010_APPLIED' }}
         run: echo "Explicit 0010 resolve authorization accepted."
       - name: Resolve only 0010 after independent precheck (idempotent)
         if: ${{ github.event.inputs.resolve_0010 == 'CONFIRM_RESOLVE_0010_APPLIED' }}
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
         run: npx tsx scripts/recover-migration-0010.ts
       - name: Deploy remaining migrations
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
         run: npx prisma migrate deploy
       - name: Final migration status
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
         run: npx prisma migrate status
       - name: Schema validator after deploy (read-only)
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
         run: npx tsx scripts/check-migration-0010.ts

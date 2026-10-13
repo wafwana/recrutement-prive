@@ -12,13 +12,30 @@ function hasPrefix(bytes: Uint8Array, prefix: number[]) {
 }
 
 /** Validate the actual file signature instead of trusting the browser MIME type. */
-export async function validateUploadedDocument(file: File) {
+export async function validateUploadedDocument(file: File, options: { allowedTypes?: ReadonlySet<string> } = {}) {
+  const allowedTypes = options.allowedTypes ?? ALLOWED_DOCUMENT_TYPES;
   if (file.size <= 0 || file.size > MAX_FILE_SIZE) {
     return { ok: false as const, error: "Le fichier doit être compris entre 1 octet et 10 Mo." };
   }
 
-  if (!ALLOWED_DOCUMENT_TYPES.has(file.type)) {
+  if (!allowedTypes.has(file.type)) {
     return { ok: false as const, error: "Format de document non accepté." };
+  }
+
+  if (file.type === "text/plain" || file.type === "text/markdown") {
+    const expectedExtension = file.type === "text/plain" ? /\.txt$/i : /\.(md|markdown)$/i;
+    if (!expectedExtension.test(file.name)) {
+      return { ok: false as const, error: "L’extension du fichier ne correspond pas à son type texte." };
+    }
+    try {
+      const text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
+      if (!text.trim() || /\x00|[\x01-\x08\x0B\x0C\x0E-\x1F]/.test(text)) {
+        return { ok: false as const, error: "Le contenu texte est vide ou contient des octets non autorisés." };
+      }
+      return { ok: true as const };
+    } catch {
+      return { ok: false as const, error: "Le contenu texte n’est pas un UTF-8 valide." };
+    }
   }
 
   const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());

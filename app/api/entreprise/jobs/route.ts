@@ -5,6 +5,7 @@ import { requireCompanyAccess } from "@/lib/company-access";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { requireFileScanInProduction, scanBufferWithClamAV } from "@/lib/security/file-scan";
+import { matchOpenJobCandidates } from "@/lib/matching/job-candidate-pipeline";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = new Set(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
@@ -153,6 +154,13 @@ export async function POST(request: Request) {
       await tx.recruitmentHistory.create({ data: { jobId: created.id, actorUserId: access.userId, action: "JOB_CREATED", toStatus: created.status, details: attachment ? { attachmentName: attachment.name, attachmentSize: attachment.size } : undefined } });
       return created;
     });
+    if (job.status === "OPEN") {
+      try {
+        await matchOpenJobCandidates(job.id, access.userId, "COMPANY");
+      } catch (matchingError) {
+        console.error("[company-job] immediate matching failed after job creation", matchingError);
+      }
+    }
     return NextResponse.json(job, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Impossible de créer l'offre";

@@ -5,7 +5,7 @@ import LanguageSelector from "./components/LanguageSelector";
 import { useI18n } from "@/lib/i18n/context";
 
 const images = {
-  hero: "/visuals/hero-final.webp?v=hero-final-20260917",
+  hero: "/visuals/rp-global-partners.jpeg?v=rp-global-partners-20261002",
   talents: "https://images.unsplash.com/photo-1770992225308-154250075727?auto=format&fit=crop&fm=jpg&q=88&w=1400",
   enterprise: "https://images.unsplash.com/photo-1521790797524-b2497295b8a0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
   intelligence: "https://images.unsplash.com/photo-1677442135136-760c813028c0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
@@ -64,24 +64,22 @@ export default function HomePage() {
   return <main className="rp-home">
     <header className="rp-header">
       <a href="#accueil" className="rp-brand" aria-label="Recrutement Privé - accueil"><span className="rp-logo">RP</span><span className="rp-brand-copy"><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></a>
-      <nav className="rp-nav" aria-label="Navigation principale">{nav.map(([key, href], index) => <a key={key} href={href} className={index === 0 ? "active" : ""}>{t(key)}</a>)}</nav>
-      <div className="rp-header-actions"><LanguageSelector /><a className="rp-login" href="/espace"><span aria-hidden="true">●</span> {t("nav_connected_space")}</a></div>
+      <nav className="rp-nav" aria-label="Navigation principale">{nav.map(([key, href], index) => <a key={key} href={href} className={[index === 0 ? "active" : "", key === "nav_cabinet" ? "rp-nav-about" : ""].filter(Boolean).join(" ")}>{t(key)}</a>)}</nav>
+      <div className="rp-header-actions"><LanguageSelector /><a className="rp-login" href="/espace"><span aria-hidden="true">●</span> ESPACE CONNECTÉ</a></div>
     </header>
 
-    <section id="accueil" className="rp-hero">
+    <section id="accueil" className="rp-hero rp-hero-reference">
       <div className="rp-hero-copy">
-        <div className="rp-hero-kicker">{t("hero_kicker")}</div>
-        <h1>Le recrutement d'excellence,<br />guidé par l'humain et renforcé<br /><span>par l'intelligence artificielle.</span></h1>
-        <p>Nous connectons les entreprises aux meilleurs profils et accompagnons<br className="desktop-only" /> les candidats vers le succès.</p>
-        <p className="rp-hero-privacy">Recrutement Privé ne vend pas les coordonnées des candidats,<br />Recrutement Privé organise des mises en relation qualifiées, après<br />validation de l'intéret de l'entreprise et du candidat.</p>
-        <div className="rp-actions"><ArrowButton href="#candidats">▣ &nbsp; {t("hero_cv_btn")} &nbsp; →</ArrowButton><ArrowButton href="#entreprises" outline>● &nbsp; {t("hero_recruit_btn")} &nbsp; →</ArrowButton></div>
-        <div className="rp-hero-values" aria-label="Engagements clés">
-          <div><strong>☆</strong><span><b>Expertise</b><small>métiers et secteurs</small></span></div>
-          <div><strong>♧</strong><span><b>Accompagnement</b><small>sur-mesure</small></span></div>
-          <div><strong>⌁</strong><span><b>Résultats</b><small>durables</small></span></div>
+        <div className="rp-hero-kicker">CABINET DE RECRUTEMENT</div>
+        <h1>Le talent n’a pas de frontières.</h1>
+        <p className="rp-hero-statement">Nous connectons les entreprises<br className="rp-hero-desktop-break" /> aux compétences qui font avancer leurs projets<br className="rp-hero-desktop-break" /> en alliant expertise humaine<br className="rp-hero-desktop-break" /> et intelligence artificielle.</p>
+        <div className="rp-actions">
+          <ArrowButton href="#candidats">▤ &nbsp; {t("hero_cv_btn")} &nbsp; →</ArrowButton>
+          <ArrowButton href="#entreprises" outline>● &nbsp; {t("hero_recruit_btn")} &nbsp; →</ArrowButton>
         </div>
+        <p className="rp-hero-privacy">Des mises en relation qualifiées, dans le respect de la confidentialité des candidats et des entreprises.</p>
       </div>
-      <div className="rp-hero-image" role="img" aria-label={t("hero_image_alt")} style={{ backgroundImage: `url(${images.hero})` }} />
+      <div className="rp-hero-image rp-hero-reference-image" role="img" aria-label={t("hero_image_alt")} style={{ backgroundImage: `url(${images.hero})` }} />
     </section>
 
     <section id="secteurs" className="mx-auto w-[min(1180px,calc(100%-40px))] py-16 md:w-[min(1180px,calc(100%-72px))] md:py-20">

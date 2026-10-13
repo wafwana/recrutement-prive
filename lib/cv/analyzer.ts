@@ -1,4 +1,88 @@
 import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
+// pdf-parse v2 uses PDFParse with explicit in-memory data.
+// next.config.ts externalizes pdf-parse so production Node can resolve its worker dependencies.
+// Load the Node worker/canvas adapter before pdf-parse to prevent DOMMatrix crashes on Vercel.
+import { CanvasFactory } from "pdf-parse/worker";
+import { PDFParse } from "pdf-parse";
+import mammoth from "mammoth";
+
+async function parsePdfText(buffer: Buffer): Promise<string | null> {
+  let parser: PDFParse | undefined;
+  try {
+    parser = new PDFParse({ data: buffer, CanvasFactory });
+    const result = await parser.getText();
+    return result.text ? result.text.trim() : null;
+  } catch (error) {
+    // Log only the parser error class; never log the uploaded CV or extracted text.
+    console.warn(
+      "[cv pdf extraction] parser failed",
+      error instanceof Error ? error.name : "UnknownError",
+    );
+    return null;
+  } finally {
+    await parser?.destroy().catch(() => undefined);
+  }
+}
+
+async function parseDocxText(buffer: Buffer): Promise<string | null> {
+  try {
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value ? result.value.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract plain text content from buffer for supported text/plain, PDF, DOCX or markdown byte streams.
+ */
+export async function extractTextFromCvBuffer(
+  buffer: Buffer,
+  mimeType: string,
+  fileName: string
+): Promise<string | null> {
+  if (!buffer || buffer.length === 0) return null;
+
+  const lowerName = fileName.toLowerCase();
+
+  // Plain text or markdown
+  if (
+    mimeType.includes("text/plain") ||
+    mimeType.includes("text/markdown") ||
+    lowerName.endsWith(".txt") ||
+    lowerName.endsWith(".md")
+  ) {
+    const raw = buffer.toString("utf-8").trim();
+    return raw.length > 0 ? raw : null;
+  }
+
+  // PDF
+  if (mimeType.includes("pdf") || lowerName.endsWith(".pdf")) {
+    return parsePdfText(buffer);
+  }
+
+  // DOCX
+  if (
+    mimeType.includes("wordprocessingml") ||
+    mimeType.includes("msword") ||
+    lowerName.endsWith(".docx")
+  ) {
+    return parseDocxText(buffer);
+  }
+
+  // Fallback: UTF-8 plain text string extraction for text buffers
+  try {
+    const str = buffer.toString("utf-8");
+    const printableChars = str.replace(/[^\x20-\x7E\xA0-\xFF\n\r\t]/g, "");
+    if (printableChars.length >= 20 && printableChars.length / str.length > 0.6) {
+      return printableChars.trim();
+    }
+  } catch {}
+
+  return null;
+}
+
+
 
 export type CvTaxonomyItem = {
   code: string;
@@ -16,6 +100,13 @@ export type CvExperience = {
 };
 
 export type CvAnalysis = {
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  location: string | null;
+  country: string | null;
   headline: string | null;
   summary: string | null;
   improvedSummary: string | null;
@@ -40,6 +131,13 @@ const schema = {
   type: "object",
   additionalProperties: false,
   properties: {
+    firstName: { type: ["string", "null"] },
+    lastName: { type: ["string", "null"] },
+    email: { type: ["string", "null"] },
+    phone: { type: ["string", "null"] },
+    address: { type: ["string", "null"] },
+    location: { type: ["string", "null"] },
+    country: { type: ["string", "null"] },
     headline: { type: ["string", "null"] },
     summary: { type: ["string", "null"] },
     improvedSummary: { type: ["string", "null"] },
@@ -60,6 +158,13 @@ const schema = {
     confidence: { type: "number" },
   },
   required: [
+    "firstName",
+    "lastName",
+    "email",
+    "phone",
+    "address",
+    "location",
+    "country",
     "headline",
     "summary",
     "improvedSummary",
@@ -106,6 +211,84 @@ export function buildCvFileContent(input: {
   };
 }
 
+/**
+ * Deterministic local text-based CV parser that extracts structured facts without external AI network calls.
+ */
+/**
+ * Deterministic local parser. It only returns data backed by literal text in the CV;
+ * missing identity, education, certifications and experience details stay empty.
+ */
+export function parseCvTextLocally(rawText: string, taxonomy: CvTaxonomyItem[]): CvAnalysis {
+  const lines = rawText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const lower = rawText.toLocaleLowerCase();
+  const skillTerms = [
+    "JavaScript", "TypeScript", "Python", "Java", "C++", "C#", "PHP", "Ruby", "Go", "Rust",
+    "Swift", "Kotlin", "React", "Vue", "Angular", "Next.js", "Node.js", "Express", "Django",
+    "Spring", "Laravel", "SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis", "Prisma", "AWS",
+    "Azure", "GCP", "Docker", "Kubernetes", "DevOps", "CI/CD", "Git", "Agile", "Scrum",
+    "Management", "Recrutement", "Finance", "Comptabilité", "Audit", "Sourcing", "Vente", "B2B",
+    "machine learning", "pandas", "scikit-learn", "API", "CRM", "IFRS", "contrôle interne",
+    "gestion de projet", "avant-vente", "Talent Acquisition", "grands comptes"
+  ];
+  const explicitSkills = skillTerms.filter((skill) => {
+    const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp("\\b" + escaped + "\\b", "i").test(rawText);
+  });
+  const languageTerms = ["Français", "Anglais", "Espagnol", "Allemand", "Italien", "Arabe", "Néerlandais", "Chinois"];
+  const languages = languageTerms.filter((language) =>
+    new RegExp("\\b" + language + "\\b", "i").test(rawText)
+  );
+  let experienceYears: number | null = null;
+  const experienceMatch = rawText.match(/\b(\d{1,2})\s*(?:ans?|années?)\s*(?:d[’\x27]expérience|expérience)\b/i);
+  if (experienceMatch) {
+    const parsedYears = Number(experienceMatch[1]);
+    if (parsedYears >= 0 && parsedYears <= 60) experienceYears = parsedYears;
+  }
+  if (experienceYears === null) {
+    const ranges = [...rawText.matchAll(/\b(19\d{2}|20\d{2})\s*[-–—]\s*(19\d{2}|20\d{2}|présent|aujourd’hui|today)\b/gi)];
+    const durations = ranges.map((match) => {
+      const startYear = Number(match[1]);
+      const endYear = /^(présent|aujourd’hui|today)$/i.test(match[2]) ? new Date().getFullYear() : Number(match[2]);
+      return endYear >= startYear && endYear - startYear <= 60 ? endYear - startYear : null;
+    }).filter((value): value is number => value !== null);
+    if (durations.length) experienceYears = Math.max(...durations);
+  }
+  let primaryCategoryCode: string | null = null;
+  const subCategoryCodes: string[] = [];
+  for (const item of taxonomy) {
+    if (!item.code) continue;
+    const nameMatch = Boolean(item.name) && lower.includes(item.name.toLocaleLowerCase());
+    const codeMatch = new RegExp("(^|[^a-z0-9_])" + item.code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").toLocaleLowerCase() + "([^a-z0-9_]|$)", "i").test(rawText);
+    if (nameMatch || codeMatch) {
+      if (item.parentCode) {
+        if (!subCategoryCodes.includes(item.code)) subCategoryCodes.push(item.code);
+        if (!primaryCategoryCode) primaryCategoryCode = item.parentCode;
+      } else if (!primaryCategoryCode) primaryCategoryCode = item.code;
+    }
+  }
+  const headline = lines.find((line) => !/^CV\s+TEST\b/i.test(line))?.slice(0, 160) ?? null;
+  const summary = lines.length > 1 ? lines.slice(1, 4).join(" ").slice(0, 500) || null : null;
+  const hasDirectFacts = explicitSkills.length > 0 || languages.length > 0 || experienceYears !== null || primaryCategoryCode !== null;
+  return {
+    firstName: null, lastName: null, email: null, phone: null, address: null, location: null, country: null,
+    headline, summary, improvedSummary: summary,
+    skills: explicitSkills, explicitSkills, experienceYears, experiences: [], education: [], certifications: [], languages,
+    primaryCategoryCode, subCategoryCodes, alternativeCategoryCodes: [],
+    suggestedPositioning: explicitSkills.slice(0, 3), careerLevel: "NON_SPECIFIE", careerLevelEvidence: null,
+    suggestedFolder: primaryCategoryCode ? "CANDIDATS/" + primaryCategoryCode : "CANDIDATS/A_CLASSER/CV",
+    confidence: hasDirectFacts ? 0.6 : 0.1,
+  };
+}
+export async function analyzeCvDocumentLocally(input: {
+  fileName: string;
+  mimeType: string;
+  buffer: Buffer;
+  taxonomy: CvTaxonomyItem[];
+}): Promise<CvAnalysis | null> {
+  const text = await extractTextFromCvBuffer(input.buffer, input.mimeType, input.fileName);
+  return text ? parseCvTextLocally(text, input.taxonomy) : null;
+}
+
 export async function analyzeCvDocument(input: {
   fileName: string;
   mimeType: string;
@@ -113,14 +296,20 @@ export async function analyzeCvDocument(input: {
   taxonomy: CvTaxonomyItem[];
 }): Promise<CvAnalysis | null> {
   const provider = getActiveAiProvider();
-  if (!provider) return null;
+
+  // Gemini Free must never receive a real CV, its attachment, or extracted candidate PII.
+  // The rematching cron can also call the local-only entrypoint explicitly so batch
+  // analysis never sends candidate documents to an external provider.
+  if (!provider || provider === "gemini") {
+    return analyzeCvDocumentLocally(input);
+  }
 
   const taxonomyText = input.taxonomy
     .map((item) => `${item.code} — ${item.name}${item.parentCode ? ` (parent: ${item.parentCode})` : ""}`)
     .join("\n");
 
   const promptText = `Analyse ce CV pour le moteur de recrutement Recrutement Privé.
-Extrais uniquement des informations professionnelles utiles au recrutement.
+Extrais uniquement les informations professionnelles utiles au recrutement. Lorsque le document contient des coordonnées directement affichées par le candidat, extrais aussi le prénom, nom, e-mail, téléphone, adresse, ville/localisation et pays. Ces coordonnées doivent être reprises telles qu’elles apparaissent, sans les inventer ni les compléter.
 Ne déduis pas de données sensibles non nécessaires et ne crée aucune expérience ou compétence absente du document.
 Sépare les faits explicitement présents du positionnement suggéré. Détermine aussi un niveau de carrière uniquement lorsqu'il est étayé par le CV (SPECIALISTE, MANAGER, CADRE, HAUT_CADRE, DIRECTION), sinon NON_SPECIFIE, et fournis une preuve courte. Pour chaque expérience, conserve un élément de preuve textuel court. Extrait aussi formations et certifications. improvedSummary peut reformuler et mieux présenter les faits, mais ne doit ajouter aucun fait absent du CV.
 Retourne les compétences normalisées, l'expérience totale approximative en années si elle est explicitement estimable, le métier principal et les sous-domaines.
@@ -148,6 +337,13 @@ ${taxonomyText || "Aucune taxonomie fournie."}`;
 
   const parsed = response.data;
   return {
+    firstName: typeof parsed.firstName === "string" ? parsed.firstName.trim() || null : null,
+    lastName: typeof parsed.lastName === "string" ? parsed.lastName.trim() || null : null,
+    email: typeof parsed.email === "string" && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(parsed.email.trim()) ? parsed.email.trim().toLowerCase() : null,
+    phone: typeof parsed.phone === "string" ? parsed.phone.trim() || null : null,
+    address: typeof parsed.address === "string" ? parsed.address.trim() || null : null,
+    location: typeof parsed.location === "string" ? parsed.location.trim() || null : null,
+    country: typeof parsed.country === "string" ? parsed.country.trim() || null : null,
     headline: typeof parsed.headline === "string" ? parsed.headline.trim() || null : null,
     summary: typeof parsed.summary === "string" ? parsed.summary.trim() || null : null,
     improvedSummary: typeof parsed.improvedSummary === "string" ? parsed.improvedSummary.trim() || null : null,

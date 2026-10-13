@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { analyzeExternalOffer } from "@/lib/sourcing/offer-analyzer";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
+import { translateJobOfferToFrench } from "@/lib/jobs/translation";
 
 export type QualificationResult = {
   success: boolean;
@@ -202,6 +203,18 @@ export async function qualifyAndMatchExternalOffer(
   const qualifiedExperience = analysis?.experienceYears ?? offer.experienceYears ?? null;
   const qualifiedLanguage = analysis?.language || offer.language || null;
   const qualifiedDescription = analysis?.summary || offer.description || null;
+  let frenchTranslation = null;
+  try {
+    frenchTranslation = await translateJobOfferToFrench({
+      title: qualifiedTitle,
+      description: qualifiedDescription,
+      location: offer.city || offer.country,
+      skills: qualifiedSkills,
+      experienceYears: qualifiedExperience,
+    });
+  } catch (translationError) {
+    console.warn("[offer-pipeline] French translation unavailable:", translationError instanceof Error ? translationError.message : translationError);
+  }
 
   await prisma.externalJobOpportunity.update({
     where: { id: offer.id },
@@ -213,6 +226,7 @@ export async function qualifyAndMatchExternalOffer(
       experienceYears: qualifiedExperience,
       language: qualifiedLanguage,
       status: "QUALIFIED",
+      translations: frenchTranslation ? { fr: frenchTranslation } : undefined,
       rawData: {
         ...existingRawData,
         qualification: {
@@ -230,19 +244,25 @@ export async function qualifyAndMatchExternalOffer(
   });
 
   // Candidate Matching Execution
-  const candidates = await prisma.candidateProfile.findMany({
-    where: { status: "ACTIVE" },
-    include: {
-      primaryCategory: { select: { code: true } },
-    },
-    take: 1000,
-  });
+  // Evaluate both the platform CVthèque and externally sourced candidates.
+  // Sourced candidates remain internal until human validation; this step never contacts a candidate or company.
+  const [candidates, sourcedCandidates] = await Promise.all([
+    prisma.candidateProfile.findMany({
+      where: { status: "ACTIVE" },
+      include: { primaryCategory: { select: { code: true } } },
+      take: 250,
+    }),
+    prisma.sourcedCandidate.findMany({
+      where: { status: { not: "REJECTED" } },
+      take: 250,
+    }),
+  ]);
 
   const categoryRows = await prisma.jobCategory.findMany({ select: { id: true, code: true } });
   const categoryCodesMap = new Map(categoryRows.map((row) => [row.id, row.code]));
 
-  const matches = candidates
-    .map((candidate) => {
+  const matches = [
+    ...candidates.map((candidate) => {
       const candidateSubCategoryCodes = Array.isArray(candidate.subCategoryIds)
         ? candidate.subCategoryIds
             .filter((value): value is string => typeof value === "string")
@@ -273,13 +293,45 @@ export async function qualifyAndMatchExternalOffer(
 
       return {
         candidateId: candidate.id,
+        candidateType: "PLATFORM_CANDIDATE" as const,
         score: result.score,
         matchedSkills: result.matchedSkills,
         missingSkills: result.missingSkills,
         categoryMatchLevel: result.categoryMatchLevel,
         reasons: result.reasons,
       };
-    })
+    }),
+    ...sourcedCandidates.map((candidate) => {
+      const result = matchCandidateToJob(
+        {
+          skills: candidate.skills,
+          experienceYears: candidate.experienceYears,
+          headline: candidate.headline,
+          location: candidate.location,
+        },
+        {
+          requiredSkills: qualifiedSkills,
+          requiredExperienceYears: qualifiedExperience,
+          title: qualifiedTitle,
+          description: qualifiedDescription,
+          location: [offer.city, offer.country].filter(Boolean).join(", ") || null,
+          categoryCode,
+          subCategoryCode,
+        }
+      );
+
+      return {
+        candidateId: candidate.id,
+        candidateType: "SOURCED_CANDIDATE" as const,
+        source: candidate.source,
+        score: result.score,
+        matchedSkills: result.matchedSkills,
+        missingSkills: result.missingSkills,
+        categoryMatchLevel: result.categoryMatchLevel,
+        reasons: result.reasons,
+      };
+    }),
+  ]
     .filter((match) => match.score >= 25)
     .sort((a, b) => b.score - a.score)
     .slice(0, 20);
@@ -335,8 +387,8 @@ export async function processOfferBatch(options?: {
   hasMore: boolean;
   results: QualificationResult[];
 }> {
-  // Safe default batch limit of 20 to ensure sub-10 second execution on Vercel HTTP handlers
-  const limit = Math.min(20, Math.max(1, options?.limit ?? 20));
+  // Strictly bounded qualification batch to keep Vercel execution resumable.
+  const limit = Math.min(10, Math.max(1, options?.limit ?? 5));
   const statusFilter = options?.statusFilter ?? ["DETECTED", "A_QUALIFIER"];
 
   const pendingOffers = await prisma.externalJobOpportunity.findMany({

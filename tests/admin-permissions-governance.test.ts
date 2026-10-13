@@ -19,6 +19,11 @@ test("ADMIN Governance: ADMIN has zero permissions by default when non-configure
   assert.equal(isSourcing, false, "Unconfigured ADMIN must be denied SOURCING permission.");
 });
 
+test("ADMIN Governance: Issue #156 - ADMIN without explicit SOURCING permission is denied SOURCING access", async () => {
+  const isSourcingDenied = await hasPermission("admin_without_sourcing", "ADMIN", "SOURCING");
+  assert.equal(isSourcingDenied, false, "ADMIN must never access SOURCING without explicit permission granted by OWNER.");
+});
+
 test("ADMIN Governance: ADMIN granular permissions are explicit and non-expansive", async () => {
   // Simulate an ADMIN with explicitly granted CANDIDATES_VIEW
   // Granular governance is atomic: possessing CANDIDATES_VIEW never implies CANDIDATES_MANAGE or SOURCING

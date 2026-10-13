@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { CollaboratorActivityTracker } from "@/components/activity/CollaboratorActivityTracker";
+import ContextBackButton from "@/components/navigation/ContextBackButton";
 
 const navigation = [
   { href: "/espace/candidat", label: "Candidat", role: "CANDIDAT" },
@@ -37,6 +38,7 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
         </div>
       </header>
       <CollaboratorActivityTracker />
+      <ContextBackButton />
       {children}
     </main>
   );

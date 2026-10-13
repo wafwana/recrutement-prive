@@ -45,16 +45,16 @@ export default async function OwnerPage() {
           <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">Données opérationnelles consolidées depuis PostgreSQL. Cet espace est réservé au pilotage global et à la supervision de la plateforme.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Link href="/espace/owner/telephonie" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Téléphonie Standard RP</Link>
           <Link href="/espace/owner/archivage" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Archive Centralisée</Link>
           <Link href="/espace/owner/cv-matching" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">CV & Matching transversal</Link>
           <Link href="/espace/documents/cv-library" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Bibliothèque CV</Link>
           <Link href="/espace/owner/cv-intake" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Intégrer les CV réels</Link>
           <Link href="/espace/owner/metiers" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Métiers & dossiers</Link>
           <Link href="/espace/owner/sourcing" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Sourcing automatique</Link>
+          <Link href="/espace/owner/recherche-proactive" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Recherche proactive de candidats</Link>
           <Link href="/espace/owner/entreprises/nouvelle" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Rentrer une entreprise</Link>
           <Link href="/espace/owner/offres/nouvelle" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Rentrer une offre</Link>
-          <Link href="/espace/owner/partenaires" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Partenaires & Sources</Link>
+          <Link href="/espace/owner/partenaires" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Partenaires & Sources</Link>\n          <Link href="/espace/owner/contacts-securises" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Outreach & Contacts sécurisés</Link>
           <Link href="/espace/owner/offres-vivier" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Vivier des offres</Link>
           <Link href="/espace/owner/sorties-argent" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Registre — Sorties d’argent</Link>
           <Link href="/espace/owner/pre-comptabilite" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Pré-comptabilité</Link>
@@ -71,10 +71,48 @@ export default async function OwnerPage() {
       {owner && <div className="mt-6 border border-[#c7a15a]/20 bg-[#111] px-5 py-4 text-xs text-white/45">Compte Owner actif : <span className="text-white/75">{owner.name || "Owner Recrutement Privé"}</span> · {owner.email}</div>}
 
       <div className="mt-10 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
-        {[["Candidats", candidates],["CV / documents", documents],["Entreprises", companies.length],["Offres ouvertes", openJobs],["Candidatures", applications.length],["Profils sourcés", sourcedCandidates.length],["Matching ≥ 80", highMatches],["Paramètres système", settings]].map(([label, value]) => (
-          <div key={String(label)} className="bg-[#111] p-6"><span className="text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</span><p className="mt-4 font-serif text-3xl text-[#c7a15a]">{value}</p></div>
+        {[
+          ["Candidats", candidates, "/espace/documents/cv-library", "Ouvrir la bibliothèque CV"],
+          ["CV / documents", documents, "/espace/documents", "Ouvrir les documents"],
+          ["Entreprises", companies.length, "/espace/owner/entreprises", "Ouvrir les entreprises"],
+          ["Offres ouvertes", openJobs, "/espace/owner/offres", "Ouvrir les offres"],
+          ["Candidatures", applications.length, "/espace/owner/cv-matching", "Ouvrir le suivi"],
+          ["Profils sourcés", sourcedCandidates.length, "/espace/owner/sourcing", "Ouvrir le sourcing"],
+          ["Matching ≥ 80", highMatches, "/espace/owner/cv-matching", "Ouvrir le matching"],
+          ["Paramètres système", settings, "/owner/permissions", "Ouvrir les permissions"],
+        ].map(([label, value, href, action]) => (
+          <Link key={String(label)} href={String(href)} className="group block bg-[#111] p-6 transition hover:bg-[#151515] focus:outline-none focus:ring-1 focus:ring-[#c7a15a]">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</span>
+            <p className="mt-4 font-serif text-3xl text-[#c7a15a]">{value}</p>
+            <span className="mt-3 block text-[9px] uppercase tracking-[0.14em] text-white/25 transition group-hover:text-[#c7a15a]">{action} →</span>
+          </Link>
         ))}
       </div>
+
+      <section className="mt-10 border border-white/10 bg-[#0b0f14] p-7">
+        <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Lecture immédiate du moteur</p>
+        <h2 className="mt-3 font-serif text-2xl">Sources ≠ Sourcing ≠ Matching</h2>
+        <div className="mt-6 grid gap-3 md:grid-cols-5">
+          {[
+            ["SOURCES","Origine","Sources externes, partenaires, CVthèque","border-[#c7a15a]/40 text-[#c7a15a]"],
+            ["SOURCING","Collecte","Détection et import de données","border-[#F97316]/40 text-[#F97316]"],
+            ["QUALIFICATION","Analyse","Tri, traduction, classification","border-white/15 text-white/70"],
+            ["MATCHING","Rapprochement","Offre ↔ candidat + score","border-[#F97316]/50 text-[#F97316]"],
+            ["VIVIER","Sélection","Profils et offres exploitables","border-[#c7a15a]/40 text-[#c7a15a]"],
+          ].map(([title,eyebrow,desc,classes]) => (
+            <div key={title} className={`border bg-[#111] p-4 ${classes}`}>
+              <p className="text-[9px] uppercase tracking-[0.14em] opacity-60">{eyebrow}</p>
+              <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em]">{title}</p>
+              <p className="mt-2 text-xs leading-5 text-white/45">{desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link href="/espace/owner/sourcing" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Voir les sources & le sourcing →</Link>
+          <Link href="/espace/owner/cv-matching" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Voir le matching →</Link>
+          <Link href="/espace/owner/offres-vivier" className="border border-white/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-white/60">Voir le vivier →</Link>
+        </div>
+      </section>
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_.9fr]">
         <section className="border border-white/10 p-7">

@@ -6,6 +6,7 @@ import BackButton from "@/components/navigation/BackButton";
 import { useEffect, useMemo, useState } from "react";
 
 type Analysis = {
+  error?: string;
   headline?: string | null;
   summary?: string | null;
   improvedSummary?: string | null;
@@ -51,6 +52,7 @@ export default function RealCvRegistryPage() {
   const [candidateName, setCandidateName] = useState("");
   const [candidateEmail, setCandidateEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   async function load() {
@@ -87,6 +89,29 @@ export default function RealCvRegistryPage() {
       setMessage(e instanceof Error ? e.message : "Import impossible.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function retryLocalAnalysis(cv: Cv) {
+    setRetryingId(cv.id);
+    setMessage("");
+    try {
+      const res = await fetch("/api/owner/cv-intake/reprocess", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [cv.id] }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Relance impossible.");
+      const result = data.results?.[0];
+      setMessage(result?.status === "ANALYSE_OK"
+        ? "Analyse locale terminée. Le fichier original n'a pas été modifié."
+        : result?.reason || "L'extraction locale n'a pas pu analyser ce document.");
+      await load();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Relance impossible.");
+    } finally {
+      setRetryingId(null);
     }
   }
 
@@ -139,7 +164,14 @@ export default function RealCvRegistryPage() {
                 <p className="mt-2 text-xs text-white/35">Introduit par {cv.senderEmail} ({cv.senderRole}) · {new Date(cv.createdAt).toLocaleString("fr-FR")}</p>
                 <p className="mt-1 text-[10px] text-white/25">SHA-256 : {cv.originalSha256}</p>
               </div>
-              <a href={`/api/owner/cv-intake/${cv.id}/original`} target="_blank" rel="noreferrer" className="border border-white/15 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/65">Original ↗</a>
+              <div className="flex flex-wrap gap-2">
+                {(cv.status !== "ANALYSE_OK" || cv.analysis?.error) ? (
+                  <button disabled={retryingId === cv.id} onClick={() => retryLocalAnalysis(cv)} className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a] disabled:opacity-40">
+                    {retryingId === cv.id ? "Analyse locale…" : "Relancer analyse locale"}
+                  </button>
+                ) : null}
+                <a href={`/api/owner/cv-intake/${cv.id}/original`} target="_blank" rel="noreferrer" className="border border-white/15 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/65">Original ↗</a>
+              </div>
             </div>
 
             {cv.analysis ? (

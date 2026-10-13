@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { fetchGlobalJobs, fetchGlobalCandidates, configuredSources } from "@/lib/sourcing/global";
+import { fetchGlobalJobs, fetchGlobalCandidates, configuredSources, getConfiguredSourcesAsync, shouldFallbackToInternalCandidatePool } from "@/lib/sourcing/global";
 import { qualifyAndMatchExternalOffer } from "@/lib/jobs/offer-pipeline";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
+import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
+import { selectBatchWindow } from "@/lib/sourcing/batch-window";
 
 export async function markExpiredGlobalJobs() {
   const now = new Date();
@@ -19,12 +21,18 @@ export async function markExpiredGlobalJobs() {
   return updated.count;
 }
 
-export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
+export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, options?: { maxItems?: number }) {
   const items = await fetchGlobalJobs(sourceUrl);
+  const maxItems = Math.min(20, Math.max(1, options?.maxItems ?? 20));
+  const batchKey = `sourcing:global-jobs-batch:${encodeURIComponent(sourceUrl)}`;
+  const offset = await readBatchOffset(batchKey, items.length);
+  const batch = items.length > maxItems
+    ? Array.from({ length: maxItems }, (_, index) => items[(offset + index) % items.length])
+    : items;
   let created = 0, updated = 0, qualified = 0, matched = 0, expired = 0;
   const now = new Date();
 
-  for (const item of items) {
+  for (const item of batch) {
     const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
     const closingAt = item.closingAt ? new Date(item.closingAt) : null;
     const isExpired = Boolean(closingAt && closingAt < now);
@@ -107,6 +115,8 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
     }
   }
 
+  if (items.length > 0 && batch.length > 0) await writeBatchOffset(batchKey, offset + batch.length, items.length);
+
   const sweptExpired = await markExpiredGlobalJobs();
 
   await prisma.auditLog.create({
@@ -115,11 +125,293 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string) {
       actorRole: "SYSTEM",
       action: "GLOBAL_JOB_SOURCING",
       targetType: "EXTERNAL_JOB_SOURCE",
-      details: { sourceUrl, fetched: items.length, created, updated, qualified, matched, expired, sweptExpired },
+      details: { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired },
     },
   });
 
-  return { sourceUrl, fetched: items.length, created, updated, qualified, matched, expired, sweptExpired };
+  return { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired };
+}
+
+async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string) {
+  const candidate = await prisma.sourcedCandidate.findUnique({
+    where: { id: candidateId },
+    select: {
+      id: true, status: true, source: true, skills: true, experienceYears: true,
+      headline: true, location: true, matchingDetails: true,
+    },
+  });
+  if (!candidate || ["REJECTED", "ARCHIVED"].includes(candidate.status)) {
+    return { candidateId, evaluated: 0, matches: 0, bestScore: 0 };
+  }
+
+  const offers = await prisma.externalJobOpportunity.findMany({
+    where: { status: { in: ["QUALIFIED", "MATCHING"] } },
+    select: {
+      id: true, title: true, description: true, country: true, city: true,
+      skills: true, experienceYears: true, categoryCode: true, subCategoryCode: true, source: true,
+    },
+    orderBy: { sourceCollectedAt: "desc" },
+    take: 250,
+  });
+
+  const matches = offers
+    .map((offer) => {
+      const result = matchCandidateToJob(
+        {
+          skills: candidate.skills,
+          experienceYears: candidate.experienceYears,
+          headline: candidate.headline,
+          location: candidate.location,
+        },
+        {
+          requiredSkills: offer.skills,
+          requiredExperienceYears: offer.experienceYears,
+          title: offer.title,
+          description: offer.description,
+          location: [offer.city, offer.country].filter(Boolean).join(", ") || null,
+          categoryCode: offer.categoryCode,
+          subCategoryCode: offer.subCategoryCode,
+        },
+      );
+      return {
+        externalJobId: offer.id,
+        title: offer.title,
+        score: result.score,
+        matchedSkills: result.matchedSkills,
+        missingSkills: result.missingSkills,
+        categoryMatchLevel: result.categoryMatchLevel,
+        reasons: result.reasons,
+        source: offer.source,
+      };
+    })
+    .filter((match) => match.score >= 25)
+    .sort((a, b) => b.score - a.score);
+
+  const previousDetails =
+    candidate.matchingDetails && typeof candidate.matchingDetails === "object" && !Array.isArray(candidate.matchingDetails)
+      ? candidate.matchingDetails as Record<string, unknown>
+      : {};
+
+  await prisma.sourcedCandidate.update({
+    where: { id: candidate.id },
+    data: {
+      matchingScore: matches[0]?.score ?? 0,
+      matchingDetails: {
+        ...previousDetails,
+        mode: previousDetails.mode || "CANDIDATE_TO_OFFER",
+        rematchedAt: new Date().toISOString(),
+        offersEvaluated: offers.length,
+        matchedOffers: matches.slice(0, 20),
+        humanValidated: candidate.status === "VALIDATED",
+      } as unknown as Prisma.InputJsonValue,
+    },
+  });
+
+  return {
+    candidateId: candidate.id,
+    evaluated: offers.length,
+    matches: matches.length,
+    bestScore: matches[0]?.score ?? 0,
+  };
+}
+
+export async function refreshProactiveCandidatePool(actorUserId: string) {
+  const demandRows = await prisma.externalJobOpportunity.findMany({
+    where: {
+      status: { in: ["QUALIFIED", "MATCHING"] },
+    },
+    select: { skills: true, categoryCode: true, subCategoryCode: true },
+    orderBy: { sourceCollectedAt: "desc" },
+    take: 200,
+  });
+
+  const demand = new Map<string, number>();
+  for (const row of demandRows) {
+    for (const skill of Array.isArray(row.skills) ? row.skills : []) {
+      if (typeof skill !== "string" || !skill.trim()) continue;
+      const key = skill.trim().toLowerCase();
+      demand.set(key, (demand.get(key) ?? 0) + 1);
+    }
+  }
+  const topDemand = [...demand.entries()].sort((a, b) => b[1] - a[1]).slice(0, 50);
+
+  const candidateWhere = { status: "ACTIVE" as const };
+  const candidateSourceTotal = await prisma.candidateProfile.count({ where: candidateWhere });
+  const candidateBatchKey = "sourcing:proactive-pool-batch";
+  const candidateOffset = await readBatchOffset(candidateBatchKey, candidateSourceTotal);
+  const candidateBatchLimit = 10;
+  const candidateWindow = selectBatchWindow(candidateSourceTotal, candidateOffset, candidateBatchLimit);
+  const candidateBatch = candidateWindow.take > 0
+    ? await prisma.candidateProfile.findMany({
+        where: candidateWhere,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: candidateWindow.skip,
+        take: candidateWindow.take,
+        include: { user: { select: { name: true } } },
+      })
+    : [];
+
+  let created = 0;
+  let updated = 0;
+  for (const candidate of candidateBatch) {
+    const candidateSkills = Array.isArray(candidate.skills)
+      ? candidate.skills.filter((v): v is string => typeof v === "string").map((v) => v.toLowerCase())
+      : [];
+    const demandMatches = topDemand.filter(([skill]) => candidateSkills.includes(skill));
+    const demandScore = demandMatches.reduce((sum, [, weight]) => sum + weight, 0);
+    const potentialScore = Math.min(100, demandScore * 5 + Math.min(20, (candidate.experienceYears ?? 0) * 2) + (candidate.headline ? 10 : 0));
+    const matchingDetails = {
+      mode: "PROACTIVE_TALENT_POOL",
+      demandScore,
+      potentialScore,
+      matchedDemandSkills: demandMatches.slice(0, 10).map(([skill]) => skill),
+      humanValidated: false,
+    } as unknown as Prisma.InputJsonValue;
+
+    const externalId = `platform:${candidate.id}`;
+    const existing = await prisma.sourcedCandidate.findUnique({
+      where: { source_externalId: { source: "PLATFORM_CVTHEQUE", externalId } },
+      select: { id: true, status: true },
+    });
+    const finished = existing && ["VALIDATED", "REJECTED", "ARCHIVED", "CONTACTED"].includes(existing.status);
+    const data = {
+      source: "PLATFORM_CVTHEQUE",
+      sourceProfileUrl: null,
+      sourceCollectedAt: new Date(),
+      name: candidate.user.name || null,
+      headline: candidate.headline || null,
+      location: candidate.location || candidate.country || null,
+      skills: candidateSkills.length ? (candidateSkills as unknown as Prisma.InputJsonValue) : undefined,
+      experienceYears: candidate.experienceYears ?? null,
+      matchingScore: potentialScore,
+      matchingDetails,
+      notes: "Viviers proactif : candidat classé selon la demande du marché, sans contact automatique.",
+      createdByUserId: actorUserId,
+    };
+
+    if (existing) {
+      await prisma.sourcedCandidate.update({
+        where: { id: existing.id },
+        data: { ...data, status: finished ? existing.status : "DETECTED", updatedAt: new Date() },
+      });
+      if (!finished) await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
+      updated++;
+    } else {
+      const createdCandidate = await prisma.sourcedCandidate.create({ data: { ...data, externalId, status: "DETECTED" } });
+      await rematchSourcedCandidateAgainstQualifiedOffers(createdCandidate.id);
+      created++;
+    }
+  }
+
+  if (candidateSourceTotal > 0 && candidateBatch.length > 0) {
+    await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidateSourceTotal);
+  }
+
+  let internalCvIntakeSync: Awaited<ReturnType<typeof ingestAnalyzedCvIntakes>> | null = null;
+  try {
+    // Keep already-analyzed, unlinked CV imports in the sourcing pool on the scheduled path too,
+    // not only when an OWNER manually launches a proactive search.
+    internalCvIntakeSync = await ingestAnalyzedCvIntakes(actorUserId, 20);
+  } catch (error) {
+    console.warn("[proactive candidate pool CV intake sync] failed", error instanceof Error ? error.name : "UnknownError");
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      actorUserId,
+      actorRole: "SYSTEM",
+      action: "GLOBAL_CANDIDATE_SOURCING",
+      targetType: "PROACTIVE_TALENT_POOL",
+      details: {
+        mode: "PROACTIVE_TALENT_POOL",
+        demandSignals: topDemand.slice(0, 20).map(([skill, count]) => ({ skill, count })),
+        candidatesEvaluated: candidateBatch.length,
+        candidateSourceTotal,
+        batchLimit: candidateBatchLimit,
+        created,
+        updated,
+        humanValidated: false,
+        internalCvIntakes: internalCvIntakeSync ? { sourceTotal: internalCvIntakeSync.sourceTotal, batchFetched: internalCvIntakeSync.batchFetched, synced: internalCvIntakeSync.synced, skipped: internalCvIntakeSync.skipped, matched: internalCvIntakeSync.matched } : { failed: true },
+      },
+    },
+  });
+
+  return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidateBatch.length, candidateSourceTotal, batchLimit: candidateBatchLimit, created, updated, internalCvIntakes: internalCvIntakeSync ? { sourceTotal: internalCvIntakeSync.sourceTotal, batchFetched: internalCvIntakeSync.batchFetched, synced: internalCvIntakeSync.synced, skipped: internalCvIntakeSync.skipped, matched: internalCvIntakeSync.matched } : { failed: true } };
+}
+
+export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20) {
+  const take = Math.min(20, Math.max(1, Math.trunc(maxItems)));
+  const intakeWhere = { status: "ANALYSE_OK", candidateId: null };
+  const sourceTotal = await prisma.cvIntake.count({ where: intakeWhere });
+  const intakes = await prisma.cvIntake.findMany({
+    where: intakeWhere,
+    orderBy: [{ analyzedAt: "desc" }, { createdAt: "desc" }],
+    take,
+    select: { id: true, candidateName: true, analysis: true, analyzedAt: true, updatedAt: true },
+  });
+
+  const candidateIds: string[] = [];
+  const createdCandidateIds: string[] = [];
+  let skipped = 0;
+  let matched = 0;
+
+  for (const intake of intakes) {
+    const analysis = intake.analysis && typeof intake.analysis === "object" && !Array.isArray(intake.analysis)
+      ? intake.analysis as Record<string, unknown>
+      : null;
+    if (!analysis || !Array.isArray(analysis.skills) || !Array.isArray(analysis.subCategoryCodes) ||
+        !Object.prototype.hasOwnProperty.call(analysis, "primaryCategoryCode")) {
+      skipped++;
+      continue;
+    }
+
+    const externalId = `cv-intake:${intake.id}`;
+    const existing = await prisma.sourcedCandidate.findUnique({
+      where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
+      select: { id: true, status: true, matchingDetails: true },
+    });
+    const finished = Boolean(existing && ["VALIDATED", "REJECTED", "CONTACTED"].includes(existing.status));
+    const skills = analysis.skills.filter((value): value is string => typeof value === "string");
+    const locationParts = [analysis.location, analysis.country].filter((value): value is string => typeof value === "string" && Boolean(value.trim()));
+    const data = {
+      source: "PLATFORM_CV_INTAKE",
+      sourceProfileUrl: null,
+      sourceCollectedAt: intake.analyzedAt || intake.updatedAt,
+      name: intake.candidateName || null,
+      headline: typeof analysis.headline === "string" ? analysis.headline : null,
+      location: locationParts.join(", ") || null,
+      skills: skills as unknown as Prisma.InputJsonValue,
+      experienceYears: typeof analysis.experienceYears === "number" && Number.isFinite(analysis.experienceYears)
+        ? Math.max(0, Math.min(60, Math.trunc(analysis.experienceYears)))
+        : null,
+      matchingDetails: {
+        mode: "ANALYZED_CV_INTAKE",
+        cvAnalyzed: true,
+        humanValidated: false,
+        analyzedAt: intake.analyzedAt?.toISOString() || null,
+      } as unknown as Prisma.InputJsonValue,
+      notes: "CV importé en interne et analysé localement. Consentement en attente ; validation humaine obligatoire ; aucun contact automatique.",
+      createdByUserId: actorUserId,
+    };
+
+    const saved = await prisma.sourcedCandidate.upsert({
+      where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
+      create: { ...data, externalId, status: "DETECTED" },
+      update: { ...data, status: finished ? existing!.status : "DETECTED", updatedAt: new Date() },
+      select: { id: true },
+    });
+    candidateIds.push(saved.id);
+    if (!existing) createdCandidateIds.push(saved.id);
+    const previousDetails = existing?.matchingDetails && typeof existing.matchingDetails === "object" && !Array.isArray(existing.matchingDetails)
+      ? existing.matchingDetails as Record<string, unknown>
+      : {};
+    if (!Array.isArray(previousDetails.matchedOffers) || typeof previousDetails.rematchedAt !== "string") {
+      const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(saved.id);
+      matched += rematch.matches;
+    }
+  }
+
+  return { candidateIds, createdCandidateIds, sourceTotal, batchFetched: intakes.length, synced: candidateIds.length, skipped, matched };
 }
 
 export type CandidateSourcingFilter = {
@@ -129,26 +421,151 @@ export type CandidateSourcingFilter = {
   jobId?: string;
 };
 
+async function ingestPlatformCvthequeCandidates(
+  actorUserId: string,
+  options?: { maxItems?: number; filter?: CandidateSourcingFilter },
+) {
+  const maxItems = Math.min(20, Math.max(1, options?.maxItems ?? 10));
+  const filter = options?.filter;
+  const candidates = await prisma.candidateProfile.findMany({
+    where: { status: "ACTIVE" },
+    include: { user: { select: { name: true } } },
+    take: 1000,
+  });
+
+  const filteredCandidates = candidates.filter((candidate) => {
+    if (filter?.query) {
+      const q = filter.query.toLowerCase().trim();
+      const matchHeadline = (candidate.headline || "").toLowerCase().includes(q);
+      const matchSkills = (Array.isArray(candidate.skills) ? candidate.skills : [])
+        .some((skill) => typeof skill === "string" && skill.toLowerCase().includes(q));
+      if (!matchHeadline && !matchSkills) return false;
+    }
+    if (filter?.country) {
+      const target = filter.country.toLowerCase().trim();
+      const location = [candidate.country, candidate.location].filter(Boolean).join(" ").toLowerCase();
+      if (!location.includes(target)) return false;
+    }
+    if (filter?.skills?.length) {
+      const candidateSkills = (Array.isArray(candidate.skills) ? candidate.skills : [])
+        .filter((skill): skill is string => typeof skill === "string")
+        .map((skill) => skill.toLowerCase());
+      if (!filter.skills.some((skill) => candidateSkills.includes(skill.toLowerCase()))) return false;
+    }
+    return true;
+  });
+
+  const candidateBatch = filteredCandidates.slice(0, maxItems);
+  let created = 0;
+  let updated = 0;
+  let matched = 0;
+  const candidateIds: string[] = [];
+  const createdCandidateIds: string[] = [];
+
+  for (const candidate of candidateBatch) {
+    const externalId = `platform:${candidate.id}`;
+    const data = {
+      source: "PLATFORM_CVTHEQUE",
+      sourceProfileUrl: null,
+      sourceCollectedAt: new Date(),
+      name: candidate.user.name || null,
+      headline: candidate.headline || null,
+      location: candidate.location || candidate.country || null,
+      skills: candidate.skills && Array.isArray(candidate.skills)
+        ? candidate.skills as Prisma.InputJsonValue
+        : undefined,
+      experienceYears: candidate.experienceYears ?? null,
+      notes: "Projection interne de la CVthèque : utilisée pour le matching, jamais contactée automatiquement.",
+      createdByUserId: actorUserId,
+    };
+
+    const existing = await prisma.sourcedCandidate.findUnique({
+      where: { source_externalId: { source: "PLATFORM_CVTHEQUE", externalId } },
+      select: { id: true, status: true },
+    });
+
+    if (existing) {
+      const isFinished = ["VALIDATED", "REJECTED", "ARCHIVED", "CONTACTED"].includes(existing.status);
+      await prisma.sourcedCandidate.update({
+        where: { id: existing.id },
+        data: {
+          ...data,
+          status: isFinished ? existing.status : "DETECTED",
+          updatedAt: new Date(),
+        },
+      });
+      if (!isFinished) {
+        const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
+        matched += rematch.matches;
+      }
+      updated++;
+      candidateIds.push(existing.id);
+    } else {
+      const saved = await prisma.sourcedCandidate.create({
+        data: { ...data, externalId, status: "DETECTED" },
+      });
+      const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(saved.id);
+      matched += rematch.matches;
+      created++;
+      candidateIds.push(saved.id);
+      createdCandidateIds.push(saved.id);
+    }
+  }
+
+  return { fetched: candidateBatch.length, sourceTotal: candidates.length, batchLimit: maxItems, created, updated, matched, candidateIds, createdCandidateIds };
+}
+
 export async function ingestGlobalCandidates(params: {
   sourceUrl?: string;
   filter?: CandidateSourcingFilter;
   actorUserId: string;
+  maxItems?: number;
 }) {
   const { sourceUrl, filter, actorUserId } = params;
+  const maxItems = Math.min(20, Math.max(1, params.maxItems ?? 10));
   const sources = sourceUrl && /^https:\/\//i.test(sourceUrl)
     ? [sourceUrl]
-    : configuredSources("RP_GLOBAL_CANDIDATE_SOURCES");
+    : await getConfiguredSourcesAsync("RP_GLOBAL_CANDIDATE_SOURCES");
 
   if (!sources.length) {
+    const internal = await ingestPlatformCvthequeCandidates(actorUserId, { maxItems, filter });
+    await prisma.auditLog.create({
+      data: {
+        actorUserId,
+        actorRole: "SYSTEM",
+        action: "GLOBAL_CANDIDATE_SOURCING",
+        targetType: "PLATFORM_CVTHEQUE",
+        details: {
+          activeSourcesCount: 0,
+          fallbackSource: "PLATFORM_CVTHEQUE",
+          ...internal,
+          matched: internal.matched,
+        },
+      },
+    });
     return {
-      ok: false,
-      activeSourcesCount: 0,
-      message: "Aucune source candidats active. Veuillez configurer RP_GLOBAL_CANDIDATE_SOURCES avec des URLs HTTPS valides.",
-      fetched: 0,
-      created: 0,
-      updated: 0,
-      matched: 0,
-      results: [],
+      ok: true,
+      activeSourcesCount: 1,
+      fallbackSource: "PLATFORM_CVTHEQUE",
+      externalSourcesAllFailed: false,
+      message: "Aucune source externe configurée : la CVthèque interne alimente le sourcing candidat et le matching.",
+      fetched: internal.fetched,
+      sourceTotal: internal.sourceTotal,
+      batchLimit: internal.batchLimit,
+      created: internal.created,
+      updated: internal.updated,
+      matched: internal.matched,
+      candidateIds: internal.candidateIds,
+      createdCandidateIds: internal.createdCandidateIds,
+      results: [{
+        sourceUrl: "PLATFORM_CVTHEQUE",
+        fetched: internal.fetched,
+        sourceTotal: internal.sourceTotal,
+        batchLimit: internal.batchLimit,
+        created: internal.created,
+        updated: internal.updated,
+        matched: internal.matched,
+      }],
     };
   }
 
@@ -163,35 +580,49 @@ export async function ingestGlobalCandidates(params: {
   let totalCreated = 0;
   let totalUpdated = 0;
   let totalMatched = 0;
-  const results: Array<{ sourceUrl: string; fetched: number; created: number; updated: number; matched: number; error?: string }> = [];
+  const candidateIds: string[] = [];
+  const createdCandidateIds: string[] = [];
+  const results: Array<{ sourceUrl: string; fetched: number; sourceTotal: number; filteredTotal?: number; batchLimit: number; created: number; updated: number; matched: number; error?: string }> = [];
 
   const sourceCollectedAt = new Date();
 
   for (const source of sources) {
     try {
       const candidates = await fetchGlobalCandidates(source);
+      const filteredCandidates = candidates.filter((candidate) => {
+        if (filter?.query) {
+          const q = filter.query.toLowerCase().trim();
+          const matchHeadline = (candidate.headline || "").toLowerCase().includes(q);
+          const matchSkills = (candidate.skills || []).some((skill) => skill.toLowerCase().includes(q));
+          if (!matchHeadline && !matchSkills) return false;
+        }
+        if (filter?.country) {
+          const target = filter.country.toLowerCase().trim();
+          const location = [candidate.country, candidate.location].filter(Boolean).join(" ").toLowerCase();
+          if (!location.includes(target)) return false;
+        }
+        if (filter?.skills?.length) {
+          const candidateSkills = (candidate.skills || []).map((skill) => skill.toLowerCase());
+          if (!filter.skills.some((skill) => candidateSkills.includes(skill.toLowerCase()))) return false;
+        }
+        return true;
+      });
+      const filterKey = JSON.stringify({
+        query: filter?.query?.trim().toLowerCase() || "",
+        country: filter?.country?.trim().toLowerCase() || "",
+        skills: [...(filter?.skills || [])].map((skill) => skill.trim().toLowerCase()).filter(Boolean).sort(),
+        jobId: filter?.jobId || "",
+      });
+      const batchKey = `sourcing:global-candidates-batch:${encodeURIComponent(source)}:${encodeURIComponent(filterKey)}`;
+      const offset = await readBatchOffset(batchKey, filteredCandidates.length);
+      const batch = filteredCandidates.length > maxItems
+        ? Array.from({ length: maxItems }, (_, index) => filteredCandidates[(offset + index) % filteredCandidates.length])
+        : filteredCandidates;
       let created = 0;
       let updated = 0;
       let matched = 0;
 
-      for (const candidate of candidates) {
-        if (filter?.query) {
-          const q = filter.query.toLowerCase();
-          const matchTitle = (candidate.headline || "").toLowerCase().includes(q);
-          const matchSkills = (candidate.skills || []).some((s) => s.toLowerCase().includes(q));
-          if (!matchTitle && !matchSkills) continue;
-        }
-
-        if (filter?.country && candidate.country) {
-          if (candidate.country.toLowerCase() !== filter.country.toLowerCase()) continue;
-        }
-
-        if (filter?.skills && filter.skills.length > 0) {
-          const candidateSkills = (candidate.skills || []).map((s) => s.toLowerCase());
-          const hasSkill = filter.skills.some((reqSkill) => candidateSkills.includes(reqSkill.toLowerCase()));
-          if (!hasSkill) continue;
-        }
-
+      for (const candidate of batch) {
         let score: number | null = null;
         let matchDetails: Prisma.InputJsonValue | undefined = undefined;
 
@@ -255,29 +686,52 @@ export async function ingestGlobalCandidates(params: {
                 updatedAt: new Date(),
               },
             });
+            if (!isFinished) await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
             updated++;
+            candidateIds.push(existing.id);
           } else {
-            await prisma.sourcedCandidate.create({
+            const createdCandidate = await prisma.sourcedCandidate.create({
               data: { ...data, externalId: candidate.externalId },
             });
+            await rematchSourcedCandidateAgainstQualifiedOffers(createdCandidate.id);
             created++;
+            candidateIds.push(createdCandidate.id);
+            createdCandidateIds.push(createdCandidate.id);
           }
         } else {
-          await prisma.sourcedCandidate.create({ data });
+          const createdCandidate = await prisma.sourcedCandidate.create({ data });
+          await rematchSourcedCandidateAgainstQualifiedOffers(createdCandidate.id);
           created++;
+          candidateIds.push(createdCandidate.id);
+          createdCandidateIds.push(createdCandidate.id);
         }
       }
 
-      totalFetched += candidates.length;
+      if (filteredCandidates.length > 0 && batch.length > 0) {
+        await writeBatchOffset(batchKey, offset + batch.length, filteredCandidates.length);
+      }
+
+      totalFetched += batch.length;
       totalCreated += created;
       totalUpdated += updated;
       totalMatched += matched;
 
-      results.push({ sourceUrl: source, fetched: candidates.length, created, updated, matched });
+      results.push({
+        sourceUrl: source,
+        fetched: batch.length,
+        sourceTotal: candidates.length,
+        filteredTotal: filteredCandidates.length,
+        batchLimit: maxItems,
+        created,
+        updated,
+        matched,
+      });
     } catch (err) {
       results.push({
         sourceUrl: source,
         fetched: 0,
+        sourceTotal: 0,
+        batchLimit: maxItems,
         created: 0,
         updated: 0,
         matched: 0,
@@ -286,19 +740,44 @@ export async function ingestGlobalCandidates(params: {
     }
   }
 
+  // If every external source fails, keep sourcing useful by falling back to the internal CV library.
+  const externalSourcesAllFailed = shouldFallbackToInternalCandidatePool(results);
+  let fallback: Awaited<ReturnType<typeof ingestPlatformCvthequeCandidates>> | null = null;
+  if (externalSourcesAllFailed) {
+    fallback = await ingestPlatformCvthequeCandidates(actorUserId, { maxItems, filter });
+    totalFetched += fallback.fetched;
+    totalCreated += fallback.created;
+    totalUpdated += fallback.updated;
+    totalMatched += fallback.matched;
+    candidateIds.push(...fallback.candidateIds);
+    createdCandidateIds.push(...fallback.createdCandidateIds);
+    results.push({
+      sourceUrl: "PLATFORM_CVTHEQUE",
+      fetched: fallback.fetched,
+      sourceTotal: fallback.sourceTotal,
+      batchLimit: fallback.batchLimit,
+      created: fallback.created,
+      updated: fallback.updated,
+      matched: fallback.matched,
+    });
+  }
+
   await prisma.auditLog.create({
     data: {
       actorUserId,
       actorRole: "SYSTEM",
       action: "GLOBAL_CANDIDATE_SOURCING",
-      targetType: targetJob ? "JOB" : "GLOBAL_CANDIDATE_SOURCING",
+      targetType: fallback ? "PLATFORM_CVTHEQUE_FALLBACK" : targetJob ? "JOB" : "GLOBAL_CANDIDATE_SOURCING",
       targetId: targetJob?.id || null,
       details: {
         activeSourcesCount: sources.length,
         fetched: totalFetched,
+        batchLimit: maxItems,
         created: totalCreated,
         updated: totalUpdated,
         matched: totalMatched,
+        fallbackSource: fallback ? "PLATFORM_CVTHEQUE" : null,
+        externalSourcesAllFailed,
         results,
       },
     },
@@ -308,9 +787,14 @@ export async function ingestGlobalCandidates(params: {
     ok: true,
     activeSourcesCount: sources.length,
     fetched: totalFetched,
+    batchLimit: maxItems,
     created: totalCreated,
     updated: totalUpdated,
     matched: totalMatched,
+    candidateIds,
+    createdCandidateIds,
+    fallbackSource: fallback ? "PLATFORM_CVTHEQUE" : null,
+    externalSourcesAllFailed,
     results,
   };
 }

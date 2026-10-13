@@ -2,8 +2,8 @@ export const ROLES = { OWNER: "OWNER", ADMIN: "ADMIN", CONSULTANT: "CONSULTANT",
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
   OWNER: ["*"],
-  ADMIN: ["users.manage","candidates.manage","companies.manage","jobs.manage","matching.manage","sourcing.manage","automations.manage","crm.manage","reporting.view","audit.view","settings.manage"],
-  CONSULTANT: ["candidates.operate","companies.operate","jobs.operate","matching.view","matching.validate","sourcing.validate","crm.operate","reporting.view"],
+  ADMIN: [],
+  CONSULTANT: [],
   COMPANY: ["company.profile.manage","jobs.manage.own","applications.view.own"],
   CANDIDATE: ["candidate.profile.manage","candidate.cv.manage","applications.view.own"]
 };

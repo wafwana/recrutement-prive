@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ingestGlobalCandidates } from "@/lib/sourcing/ingest";
+import { ingestGlobalCandidates, refreshProactiveCandidatePool } from "@/lib/sourcing/ingest";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -20,6 +20,7 @@ export async function GET(request: Request) {
   const result = await ingestGlobalCandidates({
     actorUserId: owner.id,
   });
+  const proactive = await refreshProactiveCandidatePool(owner.id);
 
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, proactive });
 }

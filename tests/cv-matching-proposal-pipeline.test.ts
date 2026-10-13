@@ -22,6 +22,10 @@ test("CV & AI Pipeline: getActiveAiProvider resolves provider or returns null wh
 
     delete process.env.GEMINI_API_KEY;
     process.env.OPENAI_API_KEY = "test_openai_key";
+    // OPENAI_API_KEY alone does not enable OpenAI; AI_PROVIDER=openai is required.
+    assert.equal(getActiveAiProvider(), null);
+
+    process.env.AI_PROVIDER = "openai";
     assert.equal(getActiveAiProvider(), "openai");
 
     process.env.GEMINI_API_KEY = "test_gemini_key";

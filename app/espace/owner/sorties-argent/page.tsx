@@ -15,6 +15,7 @@ type OutflowItem = {
   category?: string | null;
   originModule: string;
   amountHt: number;
+  amountTvaRate: number;
   amountTva: number;
   amountTtc: number;
   currency: string;
@@ -23,6 +24,8 @@ type OutflowItem = {
   referenceNumber?: string | null;
   documentUrl?: string | null;
   documentId?: string | null;
+  documentName?: string | null;
+  documentMimeType?: string | null;
   status: string;
   reconciliationStatus: string;
   isPrivateOwnerExpense: boolean;
@@ -67,8 +70,9 @@ export default function RegistreSortiesPage() {
     category: "",
     originModule: "PAIE",
     amountHt: "",
+    amountTvaRate: "20",
     amountTva: "0",
-    amountTtc: "",
+    amountTtc: "0",
     paymentMethod: "VIREMENT",
     paymentSource: "COMPTE_PRINCIPAL",
     referenceNumber: "",
@@ -80,6 +84,7 @@ export default function RegistreSortiesPage() {
   const [selectedOutflow, setSelectedOutflow] = useState<OutflowItem | null>(null);
   const [editCategory, setEditCategory] = useState("");
   const [editDocUrl, setEditDocUrl] = useState("");
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [editStatus, setEditStatus] = useState("");
   const [editNotes, setEditNotes] = useState("");
 
@@ -130,18 +135,25 @@ export default function RegistreSortiesPage() {
     setActionMessage(null);
     try {
       const ht = parseFloat(formData.amountHt) || 0;
-      const tva = parseFloat(formData.amountTva) || 0;
-      const ttc = parseFloat(formData.amountTtc) || ht + tva;
+      const rate = parseFloat(formData.amountTvaRate) || 0;
+      const tva = Math.round((ht * rate / 100) * 100) / 100;
+      const ttc = Math.round((ht + tva) * 100) / 100;
+
+      const payload = new FormData();
+      Object.entries({
+        ...formData,
+        amountHt: String(ht),
+        amountTvaRate: String(rate),
+        amountTva: String(tva),
+        amountTtc: String(ttc),
+      }).forEach(([key, value]) => {
+        if (key !== "documentUrl") payload.append(key, value);
+      });
+      if (documentFile) payload.append("document", documentFile);
 
       const res = await fetch("/api/owner/outflows", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          amountHt: ht,
-          amountTva: tva,
-          amountTtc: ttc,
-        }),
+        body: payload,
       });
 
       let data: { error?: string; message?: string } | null = null;
@@ -160,6 +172,7 @@ export default function RegistreSortiesPage() {
       } else {
         setActionMessage("Sortie d'argent ajoutée au registre comptable !");
         setShowCreateModal(false);
+        setDocumentFile(null);
         setFormData({
           beneficiaryName: "",
           beneficiaryEmail: "",
@@ -168,8 +181,9 @@ export default function RegistreSortiesPage() {
           category: "",
           originModule: "PAIE",
           amountHt: "",
+          amountTvaRate: "20",
           amountTva: "0",
-          amountTtc: "",
+          amountTtc: "0",
           paymentMethod: "VIREMENT",
           paymentSource: "COMPTE_PRINCIPAL",
           referenceNumber: "",
@@ -456,7 +470,16 @@ export default function RegistreSortiesPage() {
                   </td>
 
                   <td className="p-3 text-center">
-                    {item.documentUrl ? (
+                    {item.documentId?.startsWith("OUTFLOW-FILE-") ? (
+                      <a
+                        href={`/api/owner/outflows/${item.id}/document`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-emerald-400 underline hover:text-emerald-300 text-[10px]"
+                      >
+                        {item.documentName || "Voir pièce"}
+                      </a>
+                    ) : item.documentUrl ? (
                       <a
                         href={item.documentUrl}
                         target="_blank"
@@ -575,25 +598,36 @@ export default function RegistreSortiesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-white/60 mb-1">TVA (€)</label>
+                  <label className="block text-white/60 mb-1">Taux TVA (%) *</label>
                   <input
                     type="number"
+                    min="0"
+                    max="100"
                     step="0.01"
-                    value={formData.amountTva}
-                    onChange={(e) => setFormData({ ...formData, amountTva: e.target.value })}
+                    required
+                    value={formData.amountTvaRate}
+                    onChange={(e) => setFormData({ ...formData, amountTvaRate: e.target.value })}
                     className="w-full border border-white/15 bg-black px-3 py-2 text-white outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-white/60 mb-1">Montant TTC (€) *</label>
+                  <label className="block text-white/60 mb-1">TVA calculée (€)</label>
                   <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={formData.amountTtc}
-                    onChange={(e) => setFormData({ ...formData, amountTtc: e.target.value })}
-                    className="w-full border border-white/15 bg-black px-3 py-2 text-white outline-none"
+                    type="text"
+                    readOnly
+                    value={((parseFloat(formData.amountHt) || 0) * (parseFloat(formData.amountTvaRate) || 0) / 100).toFixed(2)}
+                    className="w-full border border-white/15 bg-black/70 px-3 py-2 text-white/70 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-white/60 mb-1">Montant TTC calculé (€)</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={((parseFloat(formData.amountHt) || 0) * (1 + (parseFloat(formData.amountTvaRate) || 0) / 100)).toFixed(2)}
+                    className="w-full border border-white/15 bg-black/70 px-3 py-2 text-[#c7a15a] outline-none font-semibold"
                   />
                 </div>
               </div>
@@ -622,14 +656,15 @@ export default function RegistreSortiesPage() {
               </div>
 
               <div>
-                <label className="block text-white/60 mb-1">Lien vers la pièce justificative (URL)</label>
+                <label className="block text-white/60 mb-1">Ajouter un fichier</label>
                 <input
-                  type="url"
-                  value={formData.documentUrl}
-                  onChange={(e) => setFormData({ ...formData, documentUrl: e.target.value })}
-                  className="w-full border border-white/15 bg-black px-3 py-2 text-white outline-none"
-                  placeholder="https://…"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                  onChange={(e) => setDocumentFile(e.target.files?.[0] || null)}
+                  className="w-full border border-white/15 bg-black px-3 py-2 text-white outline-none file:mr-3 file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-xs file:text-white"
                 />
+                <p className="mt-1 text-[10px] text-white/35">PDF, JPG, JPEG, PNG ou WEBP — 10 Mo maximum. Les fichiers Word ne sont pas acceptés.</p>
+                {documentFile ? <p className="mt-1 text-[10px] text-emerald-300">Fichier sélectionné : {documentFile.name}</p> : null}
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-white/10">

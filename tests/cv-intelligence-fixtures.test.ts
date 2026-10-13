@@ -2,7 +2,67 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import path from "node:path";
-import { analyzeCvDocument, buildCvFileContent, type CvTaxonomyItem } from "../lib/cv/analyzer";
+import { analyzeCvDocument, analyzeCvDocumentLocally, buildCvFileContent, extractTextFromCvBuffer, parseCvTextLocally, type CvTaxonomyItem } from "../lib/cv/analyzer";
+import { validateUploadedDocument } from "../lib/security/file-validation";
+
+function buildSyntheticPdf(text: string): Buffer {
+  const stream = `BT /F1 12 Tf 72 720 Td (${text}) Tj ET`;
+  const objects = [
+    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+    "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n",
+    "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+    `5 0 obj\n<< /Length ${Buffer.byteLength(stream, "ascii")} >>\nstream\n${stream}\nendstream\nendobj\n`,
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(pdf, "ascii"));
+    pdf += object;
+  }
+  const xrefOffset = Buffer.byteLength(pdf, "ascii");
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets.slice(1)) {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(pdf, "ascii");
+}
+
+test("PDF extraction reads text from a valid synthetic PDF in the Node runtime", async () => {
+  const text = await extractTextFromCvBuffer(
+    buildSyntheticPdf("CV TEST Python SQL"),
+    "application/pdf",
+    "synthetic-cv.pdf",
+  );
+  assert.ok(text, "Valid PDF text should be extracted instead of failing on DOMMatrix");
+  assert.match(text, /Python/);
+  assert.match(text, /SQL/);
+});
+
+test("CV intake upload accepts synthetic TXT/MD only for the CV-specific allowlist and rejects malformed text", async () => {
+  const cvAllowed = new Set([
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "image/jpeg",
+    "text/plain",
+    "text/markdown",
+  ]);
+  const txt = new File(["CV TEST\nCompétences: Python, SQL"], "synthetic-cv.txt", { type: "text/plain" });
+  const md = new File(["# CV TEST\nSkills: Python, SQL"], "synthetic-cv.md", { type: "text/markdown" });
+  const binaryText = new File([new Uint8Array([0xff, 0xfe, 0x00, 0x00])], "synthetic-cv.txt", { type: "text/plain" });
+  const mismatchedName = new File(["CV TEST"], "synthetic-cv.bin", { type: "text/plain" });
+  const empty = new File(["   \n"], "synthetic-cv.txt", { type: "text/plain" });
+
+  assert.equal((await validateUploadedDocument(txt, { allowedTypes: cvAllowed })).ok, true);
+  assert.equal((await validateUploadedDocument(md, { allowedTypes: cvAllowed })).ok, true);
+  assert.equal((await validateUploadedDocument(binaryText, { allowedTypes: cvAllowed })).ok, false);
+  assert.equal((await validateUploadedDocument(mismatchedName, { allowedTypes: cvAllowed })).ok, false);
+  assert.equal((await validateUploadedDocument(empty, { allowedTypes: cvAllowed })).ok, false);
+  assert.equal((await validateUploadedDocument(txt)).ok, false, "The generic document deposit must not expand supported types");
+});
+
 
 // Fixtures synthétiques : aucune donnée personnelle réelle.
 const FIXTURES = [
@@ -55,6 +115,170 @@ test("CV fixtures: contenu professionnel et secteurs attendus", async () => {
   }
 });
 
+test("Local CV parser extracts facts deterministically when AI provider is absent", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+
+  try {
+    delete process.env.AI_PROVIDER;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+
+    for (const fixture of FIXTURES) {
+      const buffer = await readFile(path.join(process.cwd(), "tests/fixtures/cv", fixture.file));
+      const analysis = await analyzeCvDocument({
+        fileName: fixture.file,
+        mimeType: "text/plain",
+        buffer,
+        taxonomy: TAXONOMY,
+      });
+
+      assert.ok(analysis, `Local analysis failed for ${fixture.file}`);
+      assert.ok(analysis.skills.length > 0, `Skills should be extracted for ${fixture.file}`);
+      assert.ok(analysis.confidence > 0, `Confidence should be positive for ${fixture.file}`);
+    }
+  } finally {
+    if (originalProvider) process.env.AI_PROVIDER = originalProvider; else delete process.env.AI_PROVIDER;
+    if (originalOpenAiKey) process.env.OPENAI_API_KEY = originalOpenAiKey; else delete process.env.OPENAI_API_KEY;
+    if (originalGeminiKey) process.env.GEMINI_API_KEY = originalGeminiKey; else delete process.env.GEMINI_API_KEY;
+  }
+});
+
+test("Gemini-configured CV analysis stays local and never uploads a real CV", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+
+  try {
+    process.env.AI_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+    delete process.env.OPENAI_API_KEY;
+
+    const analysis = await analyzeCvDocument({
+      fileName: "synthetic-cv.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("CV TEST\nCompétences: Python, SQL, gestion de projet"),
+      taxonomy: TAXONOMY,
+    });
+
+    assert.ok(analysis, "Gemini-configured CV intake should fall back to local analysis");
+    assert.ok(analysis.skills.some((skill) => skill.toLowerCase() === "python"));
+    assert.ok(analysis.confidence > 0);
+  } finally {
+    if (originalProvider === undefined) delete process.env.AI_PROVIDER; else process.env.AI_PROVIDER = originalProvider;
+    if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = originalOpenAiKey;
+    if (originalGeminiKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalGeminiKey;
+  }
+});
+
+test("Local CV parser handles empty, corrupt, or unsupported binary buffers gracefully without throwing", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+
+  try {
+    delete process.env.AI_PROVIDER;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+
+    // Empty buffer
+    const emptyRes = await analyzeCvDocument({
+      fileName: "empty.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.alloc(0),
+      taxonomy: TAXONOMY,
+    });
+    assert.equal(emptyRes, null, "Empty buffer should return null without throwing");
+
+    // Corrupted pseudo-binary
+    const corruptRes = await analyzeCvDocument({
+      fileName: "corrupt.docx",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: Buffer.from("INVALID_BINARY_STREAM_CONTENT_NON_ZIP"),
+      taxonomy: TAXONOMY,
+    });
+    assert.equal(corruptRes, null, "Corrupt binary stream should return null without throwing");
+  } finally {
+    if (originalProvider) process.env.AI_PROVIDER = originalProvider; else delete process.env.AI_PROVIDER;
+    if (originalOpenAiKey) process.env.OPENAI_API_KEY = originalOpenAiKey; else delete process.env.OPENAI_API_KEY;
+    if (originalGeminiKey) process.env.GEMINI_API_KEY = originalGeminiKey; else delete process.env.GEMINI_API_KEY;
+  }
+});
+
+test("Zero AI network calls during local CV parsing when AI provider is unconfigured", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+
+  let fetchCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCount++;
+    throw new Error("NETWORK_CALL_UNEXPECTED: Local CV analysis must never make network calls!");
+  }) as typeof globalThis.fetch;
+
+  try {
+    delete process.env.AI_PROVIDER;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+
+    const buffer = await readFile(path.join(process.cwd(), "tests/fixtures/cv/CV-01-ingenieur-data-ia.txt"));
+    const analysis = await analyzeCvDocument({
+      fileName: "CV-01-ingenieur-data-ia.txt",
+      mimeType: "text/plain",
+      buffer,
+      taxonomy: TAXONOMY,
+    });
+
+    assert.ok(analysis);
+    assert.equal(fetchCount, 0, "Network fetch count must remain 0 during local CV parsing!");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalProvider) process.env.AI_PROVIDER = originalProvider; else delete process.env.AI_PROVIDER;
+    if (originalOpenAiKey) process.env.OPENAI_API_KEY = originalOpenAiKey; else delete process.env.OPENAI_API_KEY;
+    if (originalGeminiKey) process.env.GEMINI_API_KEY = originalGeminiKey; else delete process.env.GEMINI_API_KEY;
+  }
+});
+
+test("Local deterministic parser returns no invented identity or experience facts", () => {
+  const parsed = parseCvTextLocally("CV TEST\nCompétences: Python, SQL\nLangues: français, anglais", TAXONOMY);
+  assert.equal(parsed.firstName, null);
+  assert.equal(parsed.experienceYears, null);
+  assert.deepEqual(parsed.skills, ["Python", "SQL"]);
+  assert.deepEqual(parsed.languages, ["Français", "Anglais"]);
+  assert.deepEqual(parsed, parseCvTextLocally("CV TEST\nCompétences: Python, SQL\nLangues: français, anglais", TAXONOMY));
+});
+
+test("Local text extraction handles empty and unsupported inputs safely", async () => {
+  assert.equal(await extractTextFromCvBuffer(Buffer.alloc(0), "application/pdf", "empty.pdf"), null);
+  assert.equal(await extractTextFromCvBuffer(Buffer.from([0, 1, 2, 3]), "application/octet-stream", "binary.bin"), null);
+  assert.equal(await extractTextFromCvBuffer(Buffer.from("# Skills\nPython"), "text/markdown", "skills.md"), "# Skills\nPython");
+});
+
+test("Actual synthetic PDF and DOCX extractors work without an AI provider", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  try {
+    delete process.env.AI_PROVIDER;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    const pdf = await readFile(path.join(process.cwd(), "tests/fixtures/cv/synthetic-cv.pdf"));
+    const pdfText = await extractTextFromCvBuffer(pdf, "application/pdf", "synthetic-cv.pdf");
+    assert.ok(pdfText?.includes("SYNTHETIC CV TEST"));
+    assert.ok(pdfText?.includes("Python, SQL"));
+    const docx = await readFile(path.join(process.cwd(), "tests/fixtures/cv/synthetic-cv.docx"));
+    const docxText = await extractTextFromCvBuffer(docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "synthetic-cv.docx");
+    assert.ok(docxText?.includes("SYNTHETIC CV DOCX"));
+    assert.ok(docxText?.includes("TypeScript and Python"));
+  } finally {
+    if (originalProvider) process.env.AI_PROVIDER = originalProvider; else delete process.env.AI_PROVIDER;
+    if (originalOpenAiKey) process.env.OPENAI_API_KEY = originalOpenAiKey; else delete process.env.OPENAI_API_KEY;
+    if (originalGeminiKey) process.env.GEMINI_API_KEY = originalGeminiKey; else delete process.env.GEMINI_API_KEY;
+  }
+});
+
 test(
   "CV fixtures: analyse IA optionnelle et secteurs alternatifs",
   { skip: process.env.RUN_LIVE_CV_ANALYSIS !== "1" },
@@ -75,3 +299,30 @@ test(
     }
   },
 );
+
+test("Local-only CV analysis never routes a real CV to an explicitly configured external provider", async () => {
+  const originalProvider = process.env.AI_PROVIDER;
+  const originalOpenAiKey = process.env.OPENAI_API_KEY;
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+
+  try {
+    process.env.AI_PROVIDER = "openai";
+    process.env.OPENAI_API_KEY = "synthetic-test-key";
+    delete process.env.GEMINI_API_KEY;
+
+    const analysis = await analyzeCvDocumentLocally({
+      fileName: "synthetic-cv.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("CV TEST\\nIngénieur data\\nCompétences: Python, SQL, machine learning"),
+      taxonomy: TAXONOMY,
+    });
+
+    assert.ok(analysis, "Local-only CV analysis should produce a deterministic result");
+    assert.ok(analysis.skills.some((skill) => skill.toLowerCase() === "python"));
+    assert.ok(analysis.skills.some((skill) => skill.toLowerCase() === "sql"));
+  } finally {
+    if (originalProvider === undefined) delete process.env.AI_PROVIDER; else process.env.AI_PROVIDER = originalProvider;
+    if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = originalOpenAiKey;
+    if (originalGeminiKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = originalGeminiKey;
+  }
+});

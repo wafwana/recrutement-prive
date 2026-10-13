@@ -50,6 +50,8 @@ jobs:
       - run: npm ci
       - name: OWNER compatibility gate — FIRST verification
         run: npm run test:owner-compatibility
+      - name: Verify Gemini structured-output schema contract
+        run: npm run test:gemini-schema-normalization
       - run: npx prisma generate
       - run: npx prisma migrate deploy
       - name: Validate migration history 0011-0014 after local deploy
@@ -57,15 +59,30 @@ jobs:
       - name: Validate migration 0010 schema after local deploy
         run: npx tsx scripts/check-migration-0010.ts
       - run: npm run test:migration-check
+      - run: npm run test:trusted-video
       - run: npm run test:mission-lock
       - run: npm run test:candidate-auth
       - run: npm run test:candidate-flow
       - run: npm run test:company-flow
       - run: npm run test:taxonomy-cv-protection
       - run: npm run test:cv-intelligence
+      - run: npm run test:cv-folder-classification
+      - run: npm run test:cv-rematch-batch-window
+      - run: npm run test:cron-schedule
       - run: npm run test:global-sourcing
+      - run: npm run test:proactive-search
+      - run: npm run test:enterprise-sourcing-batch
+      - run: npm run test:enterprise-candidate-matches
+      - run: npm run test:ai-provider
+      - run: npm run test:internal-messaging
+      - run: npm run test:secure-contact
+      - run: npm run test:secure-contact-authorization
+      - run: npm run test:secure-contact-payments
+      - run: npm run test:executive-search
       - run: npx tsx tests/candidate-integration.ts
       - run: npx tsx tests/final-validation.ts
       - run: npx tsx tests/offer-attachment-validation.ts
       - run: npm run typecheck
       - run: npm run build
+      - name: End-to-end Auth.js login, CV intake and OWNER outflows over HTTP
+        run: npm run test:owner-cv-intake

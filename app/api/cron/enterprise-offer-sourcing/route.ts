@@ -4,6 +4,15 @@ import { configuredSources, fetchGlobalJobs } from "@/lib/sourcing/global";
 import { analyzeExternalOffer } from "@/lib/sourcing/offer-analyzer";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { extractOfferContactEmail, generateExternalOfferOutreach, sendExternalOfferOutreach } from "@/lib/sourcing/outreach";
+import { translateJobOfferToFrench } from "@/lib/jobs/translation";
+import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
+import { selectEnterpriseOfferBatch } from "@/lib/sourcing/enterprise-batch";
+import { selectBatchWindow } from "@/lib/sourcing/batch-window";
+import { mergeEnterpriseCandidateMatches } from "@/lib/sourcing/enterprise-candidate-matches";
+
+const MAX_OFFERS_PER_SOURCE_RUN = 10;
+const MAX_SOURCE_PAIRS_PER_RUN = 2;
+const MAX_TOTAL_OFFERS_PER_RUN = 3;
 
 const normalize = (value: string) =>
   value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -48,13 +57,10 @@ export async function GET(request: Request) {
   }));
   const validCodes = new Set(taxonomy.map((row) => row.code));
 
-  const candidates = await prisma.candidateProfile.findMany({
-    where: { status: "ACTIVE" },
-    include: {
-      primaryCategory: { select: { code: true } },
-    },
-    take: 1000,
-  });
+  const candidateWhere = { status: "ACTIVE" as const };
+  const candidateSourceTotal = await prisma.candidateProfile.count({ where: candidateWhere });
+  const candidateBatchLimit = 1000;
+  let candidateProfilesEvaluated = 0;
   const categoryRows = await prisma.jobCategory.findMany({ select: { id: true, code: true } });
   const categoryCodes = new Map(categoryRows.map((row) => [row.id, row.code]));
 
@@ -63,14 +69,27 @@ export async function GET(request: Request) {
   let matches = 0;
   const errors: { companyId: string; sourceUrl: string; error: string }[] = [];
 
-  for (const company of companies) {
+  const pairs = companies.flatMap((company) => sources.map((sourceUrl) => ({ company, sourceUrl })));
+  const pairCursorKey = "sourcing:enterprise-pair-cursor";
+  const pairOffset = await readBatchOffset(pairCursorKey, pairs.length);
+  const pairWindow = selectEnterpriseOfferBatch(pairs, pairOffset, MAX_SOURCE_PAIRS_PER_RUN);
+  let pairsVisited = 0;
+
+  for (const pair of pairWindow.batch) {
+    const { company, sourceUrl } = pair;
     const selectedCountries = new Set(company.countries.map(normalize));
-    for (const sourceUrl of sources) {
-      try {
-        const items = await fetchGlobalJobs(sourceUrl);
-        for (const item of items) {
-          if (!item.country || !selectedCountries.has(normalize(item.country))) continue;
-          offers++;
+    if (offers >= MAX_TOTAL_OFFERS_PER_RUN) break;
+    try {
+      const items = await fetchGlobalJobs(sourceUrl);
+      const batchKey = `sourcing:enterprise-batch:${company.companyId}:${encodeURIComponent(sourceUrl)}`;
+      const offset = await readBatchOffset(batchKey, items.length);
+      const { batch } = selectEnterpriseOfferBatch(items, offset, MAX_OFFERS_PER_SOURCE_RUN);
+      let scannedInBatch = 0;
+      for (const item of batch) {
+        if (offers >= MAX_TOTAL_OFFERS_PER_RUN) break;
+        scannedInBatch++;
+        if (!item.country || !selectedCountries.has(normalize(item.country))) continue;
+        offers++;
 
           const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
           const sourceCollectedAt = new Date();
@@ -153,6 +172,26 @@ export async function GET(request: Request) {
                 confidence: categoryCode ? 0.5 : 0,
               };
 
+          let frenchTranslation = null;
+          if (inScope) {
+            try {
+              frenchTranslation = await translateJobOfferToFrench({
+                title: safeAnalysis.title,
+                description: safeAnalysis.summary,
+                location: item.city || item.country,
+                skills: safeAnalysis.skills,
+                experienceYears: safeAnalysis.experienceYears,
+              });
+            } catch (translationError) {
+              console.warn("[enterprise-offer-sourcing] French translation unavailable:", translationError instanceof Error ? translationError.message : translationError);
+            }
+          }
+
+
+          if (frenchTranslation) {
+            await prisma.externalJobOpportunity.update({ where: { id: externalJob.id }, data: { translations: { fr: frenchTranslation } } });
+          }
+
           const outreach = inScope
             ? await generateExternalOfferOutreach({
                 companyName: item.companyName,
@@ -168,8 +207,25 @@ export async function GET(request: Request) {
               })
             : null;
 
-          const activeCandidates = candidates;
-          const candidateMatches = inScope
+          const candidateBatchKey = `sourcing:enterprise-candidate-batch:${company.companyId}:${externalJob.id}`;
+          const candidateOffset = inScope
+            ? await readBatchOffset(candidateBatchKey, candidateSourceTotal)
+            : 0;
+          const candidateWindow = inScope
+            ? selectBatchWindow(candidateSourceTotal, candidateOffset, candidateBatchLimit)
+            : { skip: 0, take: 0, nextOffset: 0 };
+          const activeCandidates = candidateWindow.take > 0
+            ? await prisma.candidateProfile.findMany({
+                where: candidateWhere,
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                skip: candidateWindow.skip,
+                take: candidateWindow.take,
+                include: { primaryCategory: { select: { code: true } } },
+              })
+            : [];
+          candidateProfilesEvaluated += activeCandidates.length;
+
+          const batchCandidateMatches = inScope
             ? activeCandidates
                 .map((candidate) => {
                   const subCategoryCodes = Array.isArray(candidate.subCategoryIds)
@@ -207,8 +263,18 @@ export async function GET(request: Request) {
                     reasons: result.reasons,
                   };
                 })
-                .sort((a, b) => b.score - a.score)
+                .sort((a, b) => b.score - a.score || a.candidateId.localeCompare(b.candidateId))
                 .slice(0, 20)
+            : [];
+
+          const existingEnterpriseOffer = inScope && candidateSourceTotal > 0
+            ? await prisma.enterpriseSourcedOffer.findUnique({
+                where: { companyId_externalJobId: { companyId: company.companyId, externalJobId: externalJob.id } },
+                select: { matching: true },
+              })
+            : null;
+          const candidateMatches = inScope && candidateSourceTotal > 0
+            ? mergeEnterpriseCandidateMatches(existingEnterpriseOffer?.matching, batchCandidateMatches, 20, activeCandidates.map((candidate) => candidate.id))
             : [];
 
           if (inScope) {
@@ -244,6 +310,10 @@ export async function GET(request: Request) {
             },
           });
 
+          if (inScope && candidateSourceTotal > 0 && activeCandidates.length > 0) {
+            await writeBatchOffset(candidateBatchKey, candidateOffset + activeCandidates.length, candidateSourceTotal);
+          }
+
           if (
             outreach?.recipientEmail &&
             process.env.RP_AUTO_OUTREACH_ENABLED === "true"
@@ -265,14 +335,24 @@ export async function GET(request: Request) {
             }
           }
         }
-      } catch (error) {
-        errors.push({
-          companyId: company.companyId,
-          sourceUrl,
-          error: error instanceof Error ? error.message : "Erreur inconnue",
-        });
+      // Advance only through items actually scanned. If the global cap is reached
+      // mid-batch, the remaining items stay queued for a later invocation.
+      if (items.length > 0 && scannedInBatch > 0) {
+        await writeBatchOffset(batchKey, offset + scannedInBatch, items.length);
       }
+    } catch (error) {
+      errors.push({
+        companyId: company.companyId,
+        sourceUrl,
+        error: error instanceof Error ? error.message : "Erreur inconnue",
+      });
     }
+    pairsVisited++;
+    if (offers >= MAX_TOTAL_OFFERS_PER_RUN) break;
+  }
+
+  if (pairs.length > 0 && pairsVisited > 0) {
+    await writeBatchOffset(pairCursorKey, pairOffset + pairsVisited, pairs.length);
   }
 
   const owner = await prisma.user.findFirst({ where: { role: "OWNER", status: "ACTIVE" }, select: { id: true } });
@@ -283,10 +363,10 @@ export async function GET(request: Request) {
         actorRole: "SYSTEM",
         action: "ENTERPRISE_AUTOMATED_OFFER_SOURCING",
         targetType: "ENTERPRISE_SOURCING",
-        details: { companies: companies.length, sources: sources.length, offers, qualified, matches, errors },
+        details: { companies: companies.length, sources: sources.length, offers, qualified, matches, errors, candidateSourceTotal, candidateProfilesEvaluated, candidateBatchLimit },
       },
     });
   }
 
-  return NextResponse.json({ ok: true, companies: companies.length, sources: sources.length, offers, qualified, matches, errors });
+  return NextResponse.json({ ok: true, companies: companies.length, sources: sources.length, offers, qualified, matches, errors, candidateSourceTotal, candidateProfilesEvaluated, candidateBatchLimit });
 }

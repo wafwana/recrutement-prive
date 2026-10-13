@@ -2,6 +2,10 @@
 
 Application SaaS de recrutement haut de gamme développée avec **Next.js 15**, **TypeScript**, **Tailwind CSS**, **Prisma**, **PostgreSQL** et **Auth.js**.
 
+## Règle de travail obligatoire
+
+Toute évolution suit le processus **A → Z** décrit dans le [cahier des charges maître](docs/CAHIER_DES_CHARGES.md) : référence GitHub/commit unique, contrôles CI et sécurité, non-régression, fusion, déploiement Vercel du SHA attendu et tests fonctionnels en production. **Un déploiement READY ne suffit pas à prouver qu'une fonctionnalité est opérationnelle.** Les états et preuves doivent être alignés avant toute annonce de clôture.
+
 ## Architecture par lots
 
 - Lot 1 — fondations et page d’accueil premium

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
-import { configuredSources } from "@/lib/sourcing/global";
+import { configuredSources, getConfiguredSourcesAsync } from "@/lib/sourcing/global";
 import BackButton from "@/components/navigation/BackButton";
 import SourcingRunButton from "@/components/owner/SourcingRunButton";
 import CandidateSourcingClient from "@/components/owner/CandidateSourcingClient";
@@ -13,8 +13,8 @@ export default async function OwnerSourcingPage() {
   const fallbackRedirect = session.user.role === "ADMIN" ? "/espace/admin" : session.user.role === "CONSULTANT" ? "/espace/consultant" : "/espace";
   if (!(await hasPermission(session.user.id, session.user.role, "SOURCING"))) redirect(fallbackRedirect);
 
-  const jobSources = configuredSources("RP_GLOBAL_JOB_SOURCES");
-  const candidateSources = configuredSources("RP_GLOBAL_CANDIDATE_SOURCES");
+  const jobSources = await getConfiguredSourcesAsync("RP_GLOBAL_JOB_SOURCES");
+  const candidateSources = await getConfiguredSourcesAsync("RP_GLOBAL_CANDIDATE_SOURCES");
 
   const [offers, candidatesRaw, jobs] = await Promise.all([
     prisma.externalJobOpportunity.findMany({
@@ -32,6 +32,7 @@ export default async function OwnerSourcingPage() {
         categoryCode: true,
         subCategoryCode: true,
         status: true,
+        translations: true,
         createdAt: true,
       },
     }),
@@ -109,6 +110,9 @@ export default async function OwnerSourcingPage() {
         </div>
         <div className="flex flex-col items-end gap-3">
           <div className="flex flex-wrap justify-end gap-2">
+            <a href="/espace/owner/sourcing/pays" className="border border-[#F97316] px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316] hover:bg-[#F97316]/10">
+              Pays par entreprise
+            </a>
             <a href="/espace/owner/offres-vivier" className="border border-[#c7a15a] px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a] hover:bg-[#c7a15a]/10">
               Vivier des offres
             </a>
@@ -125,6 +129,38 @@ export default async function OwnerSourcingPage() {
           </div>
         </div>
       </div>
+
+      <section className="mt-10 border border-white/10 bg-[#0b0f14] p-6">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.28em] text-[#c7a15a]">Chaîne opérationnelle</p>
+            <h2 className="mt-2 font-serif text-2xl text-white">Chaque étape a maintenant son rôle.</h2>
+            <p className="mt-2 max-w-3xl text-xs leading-6 text-white/45">La provenance est visible au niveau de la source. Le matching est une étape distincte : il rapproche une offre et des profils et affiche un score, sans confondre collecte et sélection.</p>
+          </div>
+        </div>
+        <nav aria-label="Navigation du pipeline de sourcing" className="mt-6 grid gap-3 md:grid-cols-5">
+          {[
+            ["01","SOURCES","Origine des données","/espace/owner/sourcing/sources","text-[#c7a15a]"],
+            ["02","SOURCING","Collecte / détection","/espace/owner/sourcing/sourcing","text-[#F97316]"],
+            ["03","QUALIFICATION","Analyse / classement","/espace/owner/sourcing/qualification","text-white"],
+            ["04","MATCHING","Offre ↔ candidat","/espace/owner/sourcing/matching","text-[#F97316]"],
+            ["05","VIVIER","Profils retenus","/espace/owner/offres-vivier","text-[#c7a15a]"],
+          ].map(([step,title,desc,href,color]) => (
+            <a
+              key={step}
+              href={href}
+              className="group scroll-mt-28 border border-white/10 bg-[#111] p-4 transition hover:-translate-y-0.5 hover:border-[#c7a15a]/60 hover:bg-[#151515] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7a15a]"
+            >
+              <p className="text-[10px] tracking-[0.18em] text-white/25">{step}</p>
+              <p className={`mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] ${color}`}>{title}</p>
+              <p className="mt-2 text-xs leading-5 text-white/45">{desc}</p>
+              <p className="mt-3 text-[9px] uppercase tracking-[0.16em] text-white/25 transition group-hover:text-white/60">
+                "Ouvrir la vue →"
+              </p>
+            </a>
+          ))}
+        </nav>
+      </section>
 
       {/* Main Content Sections */}
       <div className="mt-12 space-y-16">
@@ -182,16 +218,19 @@ export default async function OwnerSourcingPage() {
               <span>Offre</span>
               <span>Entreprise</span>
               <span>Localisation</span>
-              <span>Catégorie</span>
-              <span>Source & Statut</span>
+              <span>Qualification</span>
+              <span>Source / provenance</span>
             </div>
 
             <div className="divide-y divide-white/10">
               {offers.map((offer) => (
                 <article key={offer.id} className="grid grid-cols-1 gap-3 px-5 py-5 md:grid-cols-[2fr_1.1fr_1fr_1fr_1fr] md:items-center">
                   <div>
-                    <p className="text-sm font-medium text-white/85">{offer.title}</p>
-                    <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/40">{offer.status}</p>
+                    <p className="text-sm font-medium text-white/85">{typeof offer.translations === "object" && offer.translations !== null && "fr" in offer.translations && typeof (offer.translations as Record<string, unknown>).fr === "object" && (offer.translations as Record<string, unknown>).fr !== null && "titleFr" in ((offer.translations as Record<string, unknown>).fr as Record<string, unknown>) ? String(((offer.translations as Record<string, unknown>).fr as Record<string, unknown>).titleFr || offer.title) : offer.title}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="border border-white/10 bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-white/45">SOURCING · {offer.status}</span>
+                      {offer.source && <span className="border border-[#c7a15a]/30 bg-[#c7a15a]/5 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-[#c7a15a]">SOURCE · {offer.source}</span>}
+                    </div>
                   </div>
                   <p className="text-xs text-white/55">{offer.companyName || "Entreprise non renseignée"}</p>
                   <p className="text-xs text-white/55">{[offer.city, offer.country].filter(Boolean).join(", ") || "—"}</p>
@@ -200,13 +239,15 @@ export default async function OwnerSourcingPage() {
                     {offer.subCategoryCode ? ` · ${offer.subCategoryCode}` : ""}
                   </p>
                   <div className="text-xs">
+                    <p className="mb-2 text-[9px] uppercase tracking-[0.14em] text-white/30">Provenance directe</p>
                     {offer.sourceUrl ? (
                       <a href={offer.sourceUrl} target="_blank" rel="noreferrer" className="text-[#F97316] hover:underline">
-                        Voir la source
+                        Voir la source ↗
                       </a>
                     ) : (
                       <span className="text-white/30">{offer.source}</span>
                     )}
+                    {offer.source && <p className="mt-1 text-[10px] text-white/45">Source : {offer.source}</p>}
                     {offer.publishedAt && (
                       <p className="mt-1 text-[10px] text-white/25">{new Date(offer.publishedAt).toLocaleDateString("fr-FR")}</p>
                     )}
