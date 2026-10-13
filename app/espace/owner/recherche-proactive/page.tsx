@@ -51,11 +51,13 @@ export default async function ProactiveSearchHistoryPage({ searchParams }: { sea
           },
         })
       : Promise.resolve(null),
-    prisma.ownerNotification.findMany({
-      where: { senderName: "Sourcing proactif" },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    }),
+    session.user.role === "OWNER"
+      ? prisma.ownerNotification.findMany({
+          where: { senderName: "Sourcing proactif" },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        })
+      : Promise.resolve([]),
   ]);
 
   const summary = asRecord(selected?.sourceSummary);
