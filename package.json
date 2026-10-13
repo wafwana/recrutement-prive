@@ -21,6 +21,7 @@
     "test:global-sourcing": "node --import tsx --test tests/global-sourcing.test.ts",
     "test:proactive-search": "node --import tsx --test tests/proactive-search-taxonomy.test.ts",
     "test:enterprise-sourcing-batch": "node --import tsx --test tests/enterprise-sourcing-batch.test.ts",
+    "test:enterprise-candidate-matches": "node --import tsx --test tests/enterprise-candidate-matches.test.ts",
     "test:cv-intelligence": "node --import tsx --test tests/cv-intelligence-fixtures.test.ts",
     "test:cv-rematch-batch-window": "node --import tsx --test tests/cv-rematch-batch-window.test.ts",
     "test:cron-schedule": "node --import tsx --test tests/cron-schedule.test.ts",
