@@ -8,6 +8,7 @@ import { buildProfessionRoot } from "@/lib/cv/folders";
 import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
 import { getStrongProfilesForProfession } from "@/lib/taxonomy/strong-profiles";
 import BackButton from "@/components/navigation/BackButton";
+import ProactiveSearchButton from "@/components/owner/ProactiveSearchButton";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -32,6 +33,7 @@ export default async function OwnerMetiersPage({ searchParams }: { searchParams:
     const fallbackRedirect = session.user.role === "ADMIN" ? "/espace/admin" : session.user.role === "CONSULTANT" ? "/espace/consultant" : "/espace";
     redirect(fallbackRedirect);
   }
+  const canRunSourcing = await hasPermission(session.user.id, session.user.role, "SOURCING");
 
   const params = await searchParams;
   await ensureTaxonomySynced();
@@ -266,12 +268,22 @@ export default async function OwnerMetiersPage({ searchParams }: { searchParams:
                 </div>
               </div>
             </div>
-            <Link
-              href={keepQuery("", "", query, dossierFilter)}
-              className="border border-white/15 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/60"
-            >
-              Fermer le dossier
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              {canRunSourcing && (
+                <ProactiveSearchButton
+                  sectorCode={selected.sectorCode}
+                  sectorName={selected.sectorName}
+                  professionCode={selected.professionCode}
+                  professionName={selected.professionName}
+                />
+              )}
+              <Link
+                href={keepQuery("", "", query, dossierFilter)}
+                className="border border-white/15 px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/60"
+              >
+                Fermer le dossier
+              </Link>
+            </div>
           </div>
 
           <div className="mt-7 space-y-3">
@@ -343,6 +355,15 @@ export default async function OwnerMetiersPage({ searchParams }: { searchParams:
                   <p className="mt-1 text-[10px] text-[#F97316]">
                     {sectorCvCount} CV dans les dossiers visibles
                   </p>
+                  {canRunSourcing && (
+                    <div className="mt-3">
+                      <ProactiveSearchButton
+                        sectorCode={sector.code}
+                        sectorName={sector.name.fr}
+                        suggestedSkills={sector.subcategories.map((item) => item.name.fr)}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -354,14 +375,8 @@ export default async function OwnerMetiersPage({ searchParams }: { searchParams:
                   const profiles = getStrongProfilesForProfession(sector.code, profession.code);
 
                   return (
-                    <Link
+                    <article
                       key={profession.code}
-                      href={keepQuery(
-                        sector.code,
-                        profession.code,
-                        query,
-                        dossierFilter,
-                      )}
                       className={
                         "group border p-5 transition " +
                         (isSelected
@@ -407,20 +422,29 @@ export default async function OwnerMetiersPage({ searchParams }: { searchParams:
                         </div>
                       </div>
 
-                      <div className="mt-5 flex items-center justify-between gap-3">
-                        <span
+                      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                        <Link
+                          href={keepQuery(sector.code, profession.code, query, dossierFilter)}
                           className={
                             "text-[10px] uppercase tracking-[0.14em] " +
                             (count ? "text-[#c7a15a]" : "text-white/35")
                           }
                         >
                           {count ? "Ouvrir le dossier →" : "Dossier disponible →"}
-                        </span>
+                        </Link>
+                        {canRunSourcing && (
+                          <ProactiveSearchButton
+                            sectorCode={sector.code}
+                            sectorName={sector.name.fr}
+                            professionCode={profession.code}
+                            professionName={profession.name.fr}
+                          />
+                        )}
                         <span className="text-[9px] uppercase tracking-[0.12em] text-white/20">
                           {count ? "alimenté" : "vide"}
                         </span>
                       </div>
-                    </Link>
+                    </article>
                   );
                 })}
               </div>
