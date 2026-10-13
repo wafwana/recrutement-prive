@@ -4,7 +4,7 @@ import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { analyzeCvDocument } from "@/lib/cv/analyzer";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
-import { buildCandidateFolder } from "@/lib/cv/folders";
+import { buildCandidateFolder, buildCandidateFolderFromAnalysis, resolveCvTaxonomySelection } from "@/lib/cv/folders";
 import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
 import { hasPermission } from "@/lib/auth/permissions";
 import { hashToken } from "@/lib/password-crypto";
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     });
     const taxonomyItems = taxonomy.map((item) => ({
       code: item.code,
-      name: typeof item.name === "object" && item.name !== null && "fr" in item.name ? String((item.name as Record<string, unknown>).fr || item.code) : item.code,
+      name: typeof item.name === "object" && item.name !== null && "fr" in item.name ? String((item.name as Record<string, unknown>).fr || item.code) : typeof item.name === "string" ? item.name : item.code,
       parentCode: taxonomy.find((parent) => parent.id === item.parentId)?.code || null,
     }));
 
@@ -124,6 +124,8 @@ export async function POST(request: Request) {
       .filter((item) => item.score >= 25)
       .sort((a, b) => b.score - a.score)
       .slice(0, 20);
+
+    const taxonomySelection = resolveCvTaxonomySelection(analysis, taxonomyItems);
 
     const extractedEmail = analysis?.email || null;
     const candidateEmail = (typeof formData.get("candidateEmail") === "string"
@@ -167,12 +169,10 @@ export async function POST(request: Request) {
       } else if (user.candidat) {
         candidate = user.candidat;
       } else {
-        const primaryCategory = analysis?.primaryCategoryCode
-          ? await prisma.jobCategory.findUnique({ where: { code: analysis.primaryCategoryCode }, select: { id: true } })
+        const primaryCategory = taxonomySelection.primaryCategoryCode
+          ? taxonomy.find((item) => item.code === taxonomySelection.primaryCategoryCode && item.parentId === null)
           : null;
-        const subCategories = analysis?.subCategoryCodes?.length
-          ? await prisma.jobCategory.findMany({ where: { code: { in: analysis.subCategoryCodes } }, select: { id: true } })
-          : [];
+        const subCategories = taxonomy.filter((item) => taxonomySelection.subCategoryCodes.includes(item.code));
         candidate = await prisma.candidateProfile.create({
           data: {
             userId: user.id,
@@ -237,12 +237,7 @@ export async function POST(request: Request) {
 
     const year = new Date().getFullYear();
     const suggestedFolder = analysis
-      ? buildCandidateFolder({
-          sectorCode: analysis.primaryCategoryCode,
-          professionCode: analysis.subCategoryCodes[0] || "A_VERIFIER",
-          year,
-          documentKind: "CV",
-        })
+      ? buildCandidateFolderFromAnalysis(analysis, taxonomyItems, year, "CV")
       : buildCandidateFolder({ year, documentKind: "CV" });
 
     const record = await prisma.cvIntake.create({

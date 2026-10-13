@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { analyzeCvDocument } from "@/lib/cv/analyzer";
-import { buildCandidateFolder } from "@/lib/cv/folders";
+import { buildCandidateFolderFromAnalysis, resolveCvTaxonomySelection } from "@/lib/cv/folders";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 import { selectBatchWindow } from "@/lib/sourcing/batch-window";
 
@@ -59,22 +59,19 @@ export async function GET(request: Request) {
   let intakeAnalyzed = 0;
   let intakeMatched = 0;
 
-  const categoryRows = await prisma.jobCategory.findMany({ select: { id: true, code: true } });
+  const categoryRows = await prisma.jobCategory.findMany({ select: { id: true, code: true, name: true, parentId: true, isActive: true } });
   const categoryCodes = new Map(categoryRows.map((row) => [row.id, row.code]));
+  const taxonomyItems = categoryRows.filter((row) => row.isActive).map((row) => ({
+    code: row.code,
+    name: typeof row.name === "object" && row.name !== null && "fr" in row.name
+      ? String((row.name as Record<string, unknown>).fr || row.code)
+      : typeof row.name === "string" ? row.name : row.code,
+    parentCode: row.parentId ? categoryCodes.get(row.parentId) || null : null,
+  }));
 
   let updated = 0;
   for (const intake of intakeQueue) {
-    const taxonomy = await prisma.jobCategory.findMany({
-      where: { isActive: true },
-      select: { id: true, code: true, name: true, parentId: true },
-    });
-    const taxonomyItems = taxonomy.map((row) => ({
-      code: row.code,
-      name: typeof row.name === "object" && row.name !== null && "fr" in row.name
-        ? String((row.name as Record<string, unknown>).fr || row.code)
-        : row.code,
-      parentCode: taxonomy.find((parent) => parent.id === row.parentId)?.code || null,
-    }));
+
 
     try {
       const analysis = await analyzeCvDocument({
@@ -94,8 +91,11 @@ export async function GET(request: Request) {
         continue;
       }
 
-      const primary = taxonomy.find((row) => row.code === analysis.primaryCategoryCode && row.parentId === null);
-      const subCategories = taxonomy.filter((row) => analysis.subCategoryCodes.includes(row.code) && row.parentId);
+      const taxonomySelection = resolveCvTaxonomySelection(analysis, taxonomyItems);
+      const primary = taxonomySelection.primaryCategoryCode
+        ? categoryRows.find((row) => row.code === taxonomySelection.primaryCategoryCode && row.parentId === null)
+        : null;
+      const subCategories = categoryRows.filter((row) => taxonomySelection.subCategoryCodes.includes(row.code));
       const candidateMatches = [
         ...jobs.map((job) => {
           const result = matchCandidateToJob(
@@ -143,12 +143,12 @@ export async function GET(request: Request) {
         }),
       ].filter((item) => item.score >= 25).sort((a, b) => b.score - a.score).slice(0, 20);
 
-      const suggestedFolder = buildCandidateFolder({
-        sectorCode: analysis.primaryCategoryCode,
-        professionCode: analysis.subCategoryCodes[0] || "A_VERIFIER",
-        year: intake.createdAt.getFullYear(),
-        documentKind: "CV",
-      });
+      const suggestedFolder = buildCandidateFolderFromAnalysis(
+        analysis,
+        taxonomyItems,
+        intake.createdAt.getFullYear(),
+        "CV",
+      );
 
       await prisma.cvIntake.update({
         where: { id: intake.id },
@@ -205,6 +205,62 @@ export async function GET(request: Request) {
       console.error("[cv-rematch intake]", intake.id, error);
     }
   }
+
+
+  // Reclassify previously analyzed intake records that still use the generic
+  // folder. Cursor over the stable ANALYSE_OK set so unresolved records cannot
+  // starve later records; only generic folders are changed, preserving manual
+  // folder assignments and the original file bytes.
+  const reclassificationWhere = { status: "ANALYSE_OK" };
+  const reclassificationTotal = await prisma.cvIntake.count({ where: reclassificationWhere });
+  const reclassificationKey = "cv-intake:folder-reclassification";
+  const reclassificationOffset = await readBatchOffset(reclassificationKey, reclassificationTotal);
+  const reclassificationQueue = reclassificationTotal > 0
+    ? await prisma.cvIntake.findMany({
+        where: reclassificationWhere,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: reclassificationOffset,
+        take: 10,
+        select: { id: true, analysis: true, createdAt: true, candidateId: true, originalName: true, folderPath: true },
+      })
+    : [];
+  let foldersReclassified = 0;
+
+  for (const intake of reclassificationQueue) {
+    if (!intake.folderPath.startsWith("CANDIDATS/A_CLASSER")) continue;
+    const suggestedFolder = buildCandidateFolderFromAnalysis(
+      intake.analysis,
+      taxonomyItems,
+      intake.createdAt.getFullYear(),
+      "CV",
+    );
+    if (suggestedFolder === intake.folderPath || suggestedFolder.startsWith("CANDIDATS/A_CLASSER/")) continue;
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.cvIntake.update({
+          where: { id: intake.id },
+          data: { folderPath: suggestedFolder },
+        });
+        if (intake.candidateId) {
+          await tx.candidateDocument.updateMany({
+            where: { candidateId: intake.candidateId, name: intake.originalName, docType: "CV" },
+            data: { folderPath: suggestedFolder },
+          });
+        }
+      });
+      foldersReclassified++;
+    } catch (error) {
+      // Keep the batch moving; the persisted cursor will revisit this row on
+      // the next cycle. Never log CV contents or candidate contact details.
+      console.warn("[cv folder reclassification] update failed", error instanceof Error ? error.name : "UnknownError");
+    }
+  }
+
+  if (reclassificationTotal > 0 && reclassificationQueue.length > 0) {
+    await writeBatchOffset(reclassificationKey, reclassificationOffset + reclassificationQueue.length, reclassificationTotal);
+  }
+
 
 
 
@@ -314,7 +370,7 @@ export async function GET(request: Request) {
         actorRole: "SYSTEM",
         action: "CV_AUTOMATIC_REMATCH",
         targetType: "CV_LIBRARY",
-        details: { candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched },
+        details: { candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched, foldersReclassified },
       },
     });
   }
@@ -323,5 +379,5 @@ export async function GET(request: Request) {
     await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidateSourceTotal);
   }
 
-  return NextResponse.json({ ok: true, candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched });
+  return NextResponse.json({ ok: true, candidatesChecked: candidateBatch.length, candidateSourceTotal, openJobs: jobs.length, externalOffers: externalOffers.length, documentsUpdated: updated, intakeAnalyzed, intakeMatched, foldersReclassified });
 }
