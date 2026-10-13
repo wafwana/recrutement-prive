@@ -10,15 +10,15 @@
     },
     {
       "path": "/api/cron/cv-rematch",
-      "schedule": "0 * * * *"
+      "schedule": "15 * * * *"
     },
     {
       "path": "/api/cron/enterprise-offer-sourcing",
-      "schedule": "0 * * * *"
+      "schedule": "30 * * * *"
     },
     {
       "path": "/api/cron/global-candidates",
-      "schedule": "0 * * * *"
+      "schedule": "45 * * * *"
     }
   ]
 }
