@@ -5,6 +5,7 @@ import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
+import { getStrongProfilesForProfession } from "@/lib/taxonomy/strong-profiles";
 import { ingestGlobalCandidates } from "@/lib/sourcing/ingest";
 
 const searchSchema = z.object({
@@ -112,17 +113,16 @@ export async function POST(request: Request) {
       const professionCandidates = profession ? [profession] : sector.subcategories;
       const matchedProfession = professionCandidates
         .map((item) => {
-          const name = normalize(item.name.fr);
-          const titleMatch = Boolean(name && headline.includes(name));
-          const skillMatch = candidateSkills.some((skill) => skill === name || skill.includes(name));
+          const aliases = [item.name.fr, ...getStrongProfilesForProfession(sector.code, item.code).map((profile) => profile.title)]
+            .map(normalize)
+            .filter(Boolean);
+          const titleMatch = aliases.some((alias) => headline.includes(alias));
+          const skillMatch = candidateSkills.some((skill) => aliases.some((alias) => skill === alias || skill.includes(alias)));
           return { item, titleMatch, skillMatch };
         })
         .find((match) => match.titleMatch || match.skillMatch);
-      const queryNorm = normalize(query);
-      const queryTitleMatch = Boolean(queryNorm && headline.includes(queryNorm));
-      const querySkillMatch = Boolean(queryNorm && candidateSkills.some((skill) => skill === queryNorm || skill.includes(queryNorm)));
-      const titleMatch = matchedProfession?.titleMatch || queryTitleMatch;
-      const skillMatch = matchedProfession?.skillMatch || querySkillMatch;
+      const titleMatch = Boolean(matchedProfession?.titleMatch);
+      const skillMatch = Boolean(matchedProfession?.skillMatch);
       const confidence = titleMatch ? "HIGH" : skillMatch ? "MEDIUM" : "LOW";
       const targetProfession = matchedProfession?.item || profession;
       const isClassified = confidence !== "LOW" && Boolean(targetProfession);
