@@ -44,7 +44,7 @@ async function callOpenAiStructured<T>(request: AiStructuredRequest<T>): Promise
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
 
-  const client = new OpenAI({ apiKey });
+  const client = new OpenAI({ apiKey, timeout: 15_000, maxRetries: 0 });
   const model = request.modelOverride || process.env.OPENAI_CV_MODEL || "gpt-4.1-mini";
 
   const contentParts: Array<Record<string, unknown>> = [];

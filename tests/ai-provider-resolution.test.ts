@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getActiveAiProvider } from "@/lib/ai/client";
-import { buildGeminiGenerationConfig, getGeminiModel } from "@/lib/ai/gemini";
+import { buildGeminiGenerationConfig, getGeminiModel, callGeminiStructured, GEMINI_REQUEST_TIMEOUT_MS } from "@/lib/ai/gemini";
 
 const original = {
   provider: process.env.AI_PROVIDER,
@@ -67,4 +67,33 @@ test("Gemini structured output uses the documented GenerateContent REST envelope
     responseMimeType: "application/json",
     responseJsonSchema: schema,
   });
+});
+
+
+test("Gemini structured calls use a bounded request timeout with synthetic data", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.GEMINI_API_KEY;
+  let signalProvided = false;
+  process.env.GEMINI_API_KEY = "synthetic-test-key";
+  globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+    signalProvided = init?.signal instanceof AbortSignal;
+    return new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: JSON.stringify({ ok: true }) }] } }],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  try {
+    const result = await callGeminiStructured<{ ok: boolean }>({
+      userPrompt: "Synthetic test only.",
+      jsonSchemaName: "synthetic_timeout_test",
+      jsonSchema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] },
+      context: { classification: "MOCK_DATA", isMockData: true },
+    });
+    assert.deepEqual(result, { ok: true });
+    assert.equal(GEMINI_REQUEST_TIMEOUT_MS, 15_000);
+    assert.equal(signalProvided, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalKey;
+  }
 });
