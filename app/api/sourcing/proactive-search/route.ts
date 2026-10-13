@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   }
 
   const query = parsed.data.query || profession?.name.fr || "";
-  const skills = parsed.data.skills?.length
+  const skills = parsed.data.skills !== undefined
     ? [...new Set(parsed.data.skills)]
     : !profession
       ? sector.subcategories.map((item) => item.name.fr)
