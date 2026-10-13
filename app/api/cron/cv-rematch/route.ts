@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { analyzeCvDocument, analyzeCvDocumentLocally, type CvAnalysis } from "@/lib/cv/analyzer";
@@ -342,7 +343,7 @@ export async function GET(request: Request) {
         if (!suggestedFolder.startsWith("CANDIDATS/A_CLASSER/")) {
           await prisma.candidateDocument.update({
             where: { id: document.id },
-            data: { folderPath: suggestedFolder, analysis: analysisRecord, analyzedAt: document.analyzedAt || new Date() },
+            data: { folderPath: suggestedFolder, analysis: analysisRecord as Prisma.InputJsonValue, analyzedAt: document.analyzedAt || new Date() },
           });
         }
       }
@@ -433,7 +434,7 @@ export async function GET(request: Request) {
     await prisma.candidateDocument.update({
       where: { id: document.id },
       data: {
-        ...(cvAnalysis ? { analysis: { ...analysisRecord, suggestedMatches: matches, rematchedAt: new Date().toISOString() }, analyzedAt: document.analyzedAt || new Date() } : {
+        ...(cvAnalysis ? { analysis: { ...analysisRecord, suggestedMatches: matches, rematchedAt: new Date().toISOString() } as Prisma.InputJsonValue, analyzedAt: document.analyzedAt || new Date() } : {
           analysis: { ...existingAnalysis, suggestedMatches: matches, rematchedAt: new Date().toISOString() },
         }),
       },
