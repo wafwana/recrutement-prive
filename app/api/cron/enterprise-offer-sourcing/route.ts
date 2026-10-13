@@ -9,6 +9,8 @@ import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 import { selectEnterpriseOfferBatch } from "@/lib/sourcing/enterprise-batch";
 
 const MAX_OFFERS_PER_SOURCE_RUN = 10;
+const MAX_SOURCE_PAIRS_PER_RUN = 2;
+const MAX_TOTAL_OFFERS_PER_RUN = 3;
 
 const normalize = (value: string) =>
   value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -68,17 +70,27 @@ export async function GET(request: Request) {
   let matches = 0;
   const errors: { companyId: string; sourceUrl: string; error: string }[] = [];
 
-  for (const company of companies) {
+  const pairs = companies.flatMap((company) => sources.map((sourceUrl) => ({ company, sourceUrl })));
+  const pairCursorKey = "sourcing:enterprise-pair-cursor";
+  const pairOffset = await readBatchOffset(pairCursorKey, pairs.length);
+  const pairWindow = selectEnterpriseOfferBatch(pairs, pairOffset, MAX_SOURCE_PAIRS_PER_RUN);
+  let pairsVisited = 0;
+
+  for (const pair of pairWindow.batch) {
+    const { company, sourceUrl } = pair;
     const selectedCountries = new Set(company.countries.map(normalize));
-    for (const sourceUrl of sources) {
-      try {
-        const items = await fetchGlobalJobs(sourceUrl);
-        const batchKey = `sourcing:enterprise-batch:${company.companyId}:${encodeURIComponent(sourceUrl)}`;
-        const offset = await readBatchOffset(batchKey, items.length);
-        const { batch, nextOffset } = selectEnterpriseOfferBatch(items, offset, MAX_OFFERS_PER_SOURCE_RUN);
-        for (const item of batch) {
-          if (!item.country || !selectedCountries.has(normalize(item.country))) continue;
-          offers++;
+    if (offers >= MAX_TOTAL_OFFERS_PER_RUN) break;
+    try {
+      const items = await fetchGlobalJobs(sourceUrl);
+      const batchKey = `sourcing:enterprise-batch:${company.companyId}:${encodeURIComponent(sourceUrl)}`;
+      const offset = await readBatchOffset(batchKey, items.length);
+      const { batch } = selectEnterpriseOfferBatch(items, offset, MAX_OFFERS_PER_SOURCE_RUN);
+      let scannedInBatch = 0;
+      for (const item of batch) {
+        if (offers >= MAX_TOTAL_OFFERS_PER_RUN) break;
+        scannedInBatch++;
+        if (!item.country || !selectedCountries.has(normalize(item.country))) continue;
+        offers++;
 
           const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
           const sourceCollectedAt = new Date();
@@ -293,19 +305,24 @@ export async function GET(request: Request) {
             }
           }
         }
-        // Advance over every scanned item, including offers filtered out by country.
-        // Upserts are idempotent, so a failed batch safely retries from its prior offset.
-        if (items.length > 0 && batch.length > 0) {
-          await writeBatchOffset(batchKey, nextOffset, items.length);
-        }
-      } catch (error) {
-        errors.push({
-          companyId: company.companyId,
-          sourceUrl,
-          error: error instanceof Error ? error.message : "Erreur inconnue",
-        });
+      // Advance only through items actually scanned. If the global cap is reached
+      // mid-batch, the remaining items stay queued for a later invocation.
+      if (items.length > 0 && scannedInBatch > 0) {
+        await writeBatchOffset(batchKey, offset + scannedInBatch, items.length);
       }
+    } catch (error) {
+      errors.push({
+        companyId: company.companyId,
+        sourceUrl,
+        error: error instanceof Error ? error.message : "Erreur inconnue",
+      });
     }
+    pairsVisited++;
+    if (offers >= MAX_TOTAL_OFFERS_PER_RUN) break;
+  }
+
+  if (pairs.length > 0 && pairsVisited > 0) {
+    await writeBatchOffset(pairCursorKey, pairOffset + pairsVisited, pairs.length);
   }
 
   const owner = await prisma.user.findFirst({ where: { role: "OWNER", status: "ACTIVE" }, select: { id: true } });
