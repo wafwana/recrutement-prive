@@ -20,16 +20,21 @@ export function mergeEnterpriseCandidateMatches(
   existing: unknown,
   incoming: EnterpriseCandidateMatch[],
   limit = 20,
+  evaluatedCandidateIds: readonly string[] = [],
 ): EnterpriseCandidateMatch[] {
   const safeLimit = Number.isFinite(limit) ? Math.max(0, Math.trunc(limit)) : 20;
   if (safeLimit === 0) return [];
 
+  const evaluated = new Set(evaluatedCandidateIds);
   const byCandidate = new Map<string, EnterpriseCandidateMatch>();
   if (Array.isArray(existing)) {
     for (const item of existing) {
       if (!item || typeof item !== "object" || Array.isArray(item)) continue;
       const record = item as Record<string, unknown>;
       if (typeof record.candidateId !== "string" || !record.candidateId.trim()) continue;
+      // If this candidate was just reevaluated but did not make the batch's
+      // top 20, remove the old score instead of preserving a stale match.
+      if (evaluated.has(record.candidateId)) continue;
       if (typeof record.score !== "number" || !Number.isFinite(record.score)) continue;
       byCandidate.set(record.candidateId, {
         candidateId: record.candidateId,
