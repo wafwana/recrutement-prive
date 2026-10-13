@@ -307,6 +307,15 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
     await writeBatchOffset(candidateBatchKey, candidateOffset + candidateBatch.length, candidateSourceTotal);
   }
 
+  let internalCvIntakeSync: Awaited<ReturnType<typeof ingestAnalyzedCvIntakes>> | null = null;
+  try {
+    // Keep already-analyzed, unlinked CV imports in the sourcing pool on the scheduled path too,
+    // not only when an OWNER manually launches a proactive search.
+    internalCvIntakeSync = await ingestAnalyzedCvIntakes(actorUserId, 20);
+  } catch (error) {
+    console.warn("[proactive candidate pool CV intake sync] failed", error instanceof Error ? error.name : "UnknownError");
+  }
+
   await prisma.auditLog.create({
     data: {
       actorUserId,
@@ -322,11 +331,12 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
         created,
         updated,
         humanValidated: false,
+        internalCvIntakes: internalCvIntakeSync ? { sourceTotal: internalCvIntakeSync.sourceTotal, batchFetched: internalCvIntakeSync.batchFetched, synced: internalCvIntakeSync.synced, skipped: internalCvIntakeSync.skipped, matched: internalCvIntakeSync.matched } : { failed: true },
       },
     },
   });
 
-  return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidateBatch.length, candidateSourceTotal, batchLimit: candidateBatchLimit, created, updated };
+  return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidateBatch.length, candidateSourceTotal, batchLimit: candidateBatchLimit, created, updated, internalCvIntakes: internalCvIntakeSync ? { sourceTotal: internalCvIntakeSync.sourceTotal, batchFetched: internalCvIntakeSync.batchFetched, synced: internalCvIntakeSync.synced, skipped: internalCvIntakeSync.skipped, matched: internalCvIntakeSync.matched } : { failed: true } };
 }
 
 export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20) {
