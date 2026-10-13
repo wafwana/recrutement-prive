@@ -190,8 +190,8 @@ export async function POST(request: Request) {
       if (!createdCandidateIds.has(item.candidate.id)) continue;
       await prisma.ownerNotification.create({
         data: {
-          title: `Nouveau profil sourcé — ${item.targetProfession?.name.fr || sector.name.fr}`,
-          message: `Un nouveau profil a été découvert via « ${title} ». Classement proposé : ${item.isClassified ? item.targetProfession?.name.fr : "À qualifier"}. ${item.rationale} ${item.candidate.source === "PLATFORM_CVTHEQUE" ? (item.cvAnalyzed ? "CV analysé localement." : "CV non analysé.") : "CV non fourni par la source."} Aucune prise de contact n’a été effectuée.`,
+          title: item.candidate.source === "PLATFORM_CV_INTAKE" ? `CV interne à examiner — ${item.targetProfession?.name.fr || sector.name.fr}` : `Nouveau profil sourcé — ${item.targetProfession?.name.fr || sector.name.fr}`,
+          message: item.candidate.source === "PLATFORM_CV_INTAKE" ? `Un CV importé en interne a été analysé localement. Classement proposé : ${item.isClassified ? item.targetProfession?.name.fr : "À qualifier"}. ${item.rationale} Consentement en attente ; validation humaine obligatoire ; aucun contact automatique.` : `Un nouveau profil a été découvert via « ${title} ». Classement proposé : ${item.isClassified ? item.targetProfession?.name.fr : "À qualifier"}. ${item.rationale} ${item.candidate.source === "PLATFORM_CVTHEQUE" ? (item.cvAnalyzed ? "CV analysé localement." : "CV non analysé.") : "CV non fourni par la source."} Aucune prise de contact n’a été effectuée.`,
           senderName: "Sourcing proactif",
           senderRole: "SYSTEM",
           status: "UNREAD",
@@ -214,7 +214,7 @@ export async function POST(request: Request) {
           score: item.score,
           confidence: item.confidence,
           rationale: item.rationale,
-          cvStatus: item.candidate.source === "PLATFORM_CVTHEQUE" ? (item.cvAnalyzed ? "ANALYZED" : "NOT_ANALYZED") : "NOT_PROVIDED",
+          cvStatus: ["PLATFORM_CVTHEQUE", "PLATFORM_CV_INTAKE"].includes(item.candidate.source) ? (item.cvAnalyzed ? "ANALYZED" : "NOT_ANALYZED") : "NOT_PROVIDED",
           status: item.isClassified ? "CLASSIFIED_AFTER_NOTIFICATION" : "TO_QUALIFY",
         },
         update: {
@@ -224,7 +224,7 @@ export async function POST(request: Request) {
           score: item.score,
           confidence: item.confidence,
           rationale: item.rationale,
-          cvStatus: item.candidate.source === "PLATFORM_CVTHEQUE" ? (item.cvAnalyzed ? "ANALYZED" : "NOT_ANALYZED") : "NOT_PROVIDED",
+          cvStatus: ["PLATFORM_CVTHEQUE", "PLATFORM_CV_INTAKE"].includes(item.candidate.source) ? (item.cvAnalyzed ? "ANALYZED" : "NOT_ANALYZED") : "NOT_PROVIDED",
           status: item.isClassified ? "CLASSIFIED_AFTER_NOTIFICATION" : "TO_QUALIFY",
         },
       });
@@ -246,6 +246,7 @@ export async function POST(request: Request) {
           matched: ingestion.matched,
           fallbackSource: ingestion.fallbackSource || null,
           externalSourcesAllFailed: ingestion.externalSourcesAllFailed || false,
+          internalCvIntakes: { sourceTotal: cvIntakeSync.sourceTotal, synced: cvIntakeSync.synced, skipped: cvIntakeSync.skipped, resultsIncluded: classified.filter((item) => item.candidate.source === "PLATFORM_CV_INTAKE").length },
           sources: ingestion.results || [],
           resultCount: classified.length,
           classifiedCount: classified.filter((item) => item.isClassified).length,
