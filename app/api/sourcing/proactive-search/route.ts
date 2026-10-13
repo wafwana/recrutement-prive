@@ -175,6 +175,30 @@ export async function POST(request: Request) {
         (storedAnalysis?.primaryCategoryCode === sector.code ||
           analyzedSubcategories.some((code) => sector.subcategories.some((item) => item.code === code))),
       );
+      const cvSkills = Array.isArray(storedAnalysis?.skills)
+        ? storedAnalysis.skills.filter((value): value is string => typeof value === "string")
+        : [];
+      const cvText = [
+        storedAnalysis?.headline,
+        storedAnalysis?.summary,
+        storedAnalysis?.improvedSummary,
+        ...cvSkills,
+        ...(Array.isArray(storedAnalysis?.explicitSkills) ? storedAnalysis.explicitSkills : []),
+        ...(Array.isArray(storedAnalysis?.suggestedPositioning) ? storedAnalysis.suggestedPositioning : []),
+      ].filter((value): value is string => typeof value === "string").join(" ").toLocaleLowerCase();
+      const explicitQuery = parsed.data.query?.trim().toLocaleLowerCase() || "";
+      const queryMatches = !explicitQuery || cvText.includes(explicitQuery);
+      const countryTarget = parsed.data.country?.trim().toLocaleLowerCase() || "";
+      const cvLocation = [storedAnalysis?.location, storedAnalysis?.country]
+        .filter((value): value is string => typeof value === "string")
+        .join(" ").toLocaleLowerCase();
+      const countryMatches = !countryTarget || cvLocation.includes(countryTarget);
+      const requestedSkills = parsed.data.skills || [];
+      const skillsMatch = !requestedSkills.length || requestedSkills.some((requestedSkill) => {
+        const normalized = requestedSkill.toLocaleLowerCase();
+        return cvText.includes(normalized) || cvSkills.some((skill) => skill.toLocaleLowerCase().includes(normalized) || normalized.includes(skill.toLocaleLowerCase()));
+      });
+      const cvSearchCriteriaMatches = queryMatches && countryMatches && skillsMatch;
       const classification = classifyProactiveCandidate({
         sector,
         profession,
@@ -182,8 +206,8 @@ export async function POST(request: Request) {
         skills: cvAnalyzed ? storedAnalysis?.skills : candidate.skills,
         cvAnalyzed,
       });
-      return { candidate, cvAnalyzed, cvTaxonomyMatches, ...classification };
-    }).filter((item) => item.candidate.source !== "PLATFORM_CV_INTAKE" || item.isClassified || item.cvTaxonomyMatches);
+      return { candidate, cvAnalyzed, cvTaxonomyMatches, cvSearchCriteriaMatches, ...classification };
+    }).filter((item) => item.candidate.source !== "PLATFORM_CV_INTAKE" || (item.cvSearchCriteriaMatches && (item.isClassified || item.cvTaxonomyMatches)));
 
     // Notify the internal team about newly discovered profiles before creating their classification records.
     for (const item of classified) {
