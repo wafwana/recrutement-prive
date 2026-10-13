@@ -329,10 +329,12 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
   return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidateBatch.length, candidateSourceTotal, batchLimit: candidateBatchLimit, created, updated };
 }
 
-export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 100) {
-  const take = Math.min(100, Math.max(1, Math.trunc(maxItems)));
+export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20) {
+  const take = Math.min(20, Math.max(1, Math.trunc(maxItems)));
+  const intakeWhere = { status: "ANALYSE_OK", candidateId: null };
+  const sourceTotal = await prisma.cvIntake.count({ where: intakeWhere });
   const intakes = await prisma.cvIntake.findMany({
-    where: { status: "ANALYSE_OK", candidateId: null },
+    where: intakeWhere,
     orderBy: [{ analyzedAt: "desc" }, { createdAt: "desc" }],
     take,
     select: { id: true, candidateName: true, analysis: true, analyzedAt: true, updatedAt: true },
@@ -399,7 +401,7 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 10
     }
   }
 
-  return { candidateIds, createdCandidateIds, sourceTotal: intakes.length, synced: candidateIds.length, skipped, matched };
+  return { candidateIds, createdCandidateIds, sourceTotal, batchFetched: intakes.length, synced: candidateIds.length, skipped, matched };
 }
 
 export type CandidateSourcingFilter = {
