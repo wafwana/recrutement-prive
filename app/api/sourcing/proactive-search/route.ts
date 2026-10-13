@@ -144,7 +144,7 @@ export async function POST(request: Request) {
         ...classifyProactiveCandidate({
           sector,
           profession,
-          headline: cvAnalyzed && typeof storedAnalysis?.headline === "string" ? storedAnalysis.headline : candidate.headline,
+          headline: cvAnalyzed ? (typeof storedAnalysis?.headline === "string" ? storedAnalysis.headline : null) : candidate.headline,
           skills: cvAnalyzed ? storedAnalysis?.skills : candidate.skills,
           cvAnalyzed,
         }),
