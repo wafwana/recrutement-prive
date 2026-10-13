@@ -1,9 +1,9 @@
 import { getStrongProfilesForProfession } from "@/lib/taxonomy/strong-profiles";
 
-type TaxonomyProfession = { code: string; name: { fr: string } };
+type TaxonomyProfession = { code: string; name: Record<string, string> };
 type TaxonomySector = {
   code: string;
-  name: { fr: string };
+  name: Record<string, string>;
   subcategories: TaxonomyProfession[];
 };
 
