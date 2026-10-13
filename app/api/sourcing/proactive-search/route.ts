@@ -242,7 +242,7 @@ export async function POST(request: Request) {
           searchId: search.id,
           sourcedCandidateId: item.candidate.id,
           source: item.candidate.source,
-          primarySectorCode: item.isClassified ? sector.code : null,
+          primarySectorCode: item.isClassified || item.cvTaxonomyMatches ? sector.code : null,
           primaryProfessionCode: item.isClassified ? item.targetProfession?.code || null : null,
           secondaryMatches: item.targetProfession && profession && item.targetProfession.code !== profession.code
             ? [item.targetProfession.code] as unknown as Prisma.InputJsonValue
