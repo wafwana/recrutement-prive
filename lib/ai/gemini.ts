@@ -40,6 +40,8 @@ export function buildGeminiGenerationConfig(schema: Record<string, unknown>) {
 }
 
 export const GEMINI_REQUEST_TIMEOUT_MS = 15_000;
+const GEMINI_UNAVAILABLE_COOLDOWN_MS = 60_000;
+let geminiUnavailableUntil = 0;
 
 export function getGeminiModel(): string {
   return process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
@@ -51,6 +53,11 @@ export async function callGeminiStructured<T>(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     safeLogError("GEMINI", "GEMINI_API_KEY non configurée dans l'environnement.");
+    return null;
+  }
+
+  if (Date.now() < geminiUnavailableUntil) {
+    safeLogInfo("GEMINI", "Fournisseur temporairement indisponible; utilisation du fallback métier.");
     return null;
   }
 
@@ -88,7 +95,8 @@ export async function callGeminiStructured<T>(
       // Network failures/timeouts are not retried here: a second 15s wait per
       // offer can exhaust the Vercel cron budget. The caller uses deterministic
       // qualification when AI is unavailable.
-      safeLogError("GEMINI", "Échec de communication avec l'API Gemini.");
+      geminiUnavailableUntil = Date.now() + GEMINI_UNAVAILABLE_COOLDOWN_MS;
+      safeLogError("GEMINI", "Échec de communication avec l'API Gemini; fallback métier activé temporairement.");
       return null;
     }
 
@@ -113,7 +121,10 @@ export async function callGeminiStructured<T>(
     }
 
     if (retryDelayMs === null) {
-      safeLogError("GEMINI", `Erreur de communication API (HTTP ${response.status}).`);
+      if ([429, 500, 502, 503, 504].includes(response.status)) {
+        geminiUnavailableUntil = Date.now() + GEMINI_UNAVAILABLE_COOLDOWN_MS;
+      }
+      safeLogError("GEMINI", `Erreur de communication API (HTTP ${response.status}); fallback métier activé si nécessaire.`);
       return null;
     }
 
