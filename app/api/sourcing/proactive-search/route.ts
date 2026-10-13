@@ -157,7 +157,7 @@ export async function POST(request: Request) {
       await prisma.ownerNotification.create({
         data: {
           title: `Nouveau profil sourcé — ${item.targetProfession?.name.fr || sector.name.fr}`,
-          message: `Un nouveau profil public a été découvert via « ${title} ». Classement proposé : ${item.isClassified ? item.targetProfession?.name.fr : "À qualifier"}. ${item.rationale} CV : non analysé ; aucune prise de contact n'a été effectuée.`,
+          message: `Un nouveau profil a été découvert via « ${title} ». Classement proposé : ${item.isClassified ? item.targetProfession?.name.fr : "À qualifier"}. ${item.rationale} ${item.candidate.source === "PLATFORM_CVTHEQUE" ? (item.cvAnalyzed ? "CV analysé localement." : "CV non analysé.") : "CV non fourni par la source."} Aucune prise de contact n’a été effectuée.`,
           senderName: "Sourcing proactif",
           senderRole: "SYSTEM",
           status: "UNREAD",
@@ -180,7 +180,7 @@ export async function POST(request: Request) {
           score: item.score,
           confidence: item.confidence,
           rationale: item.rationale,
-          cvStatus: item.candidate.source === "PLATFORM_CVTHEQUE" ? "NOT_ANALYZED" : "NOT_PROVIDED",
+          cvStatus: item.candidate.source === "PLATFORM_CVTHEQUE" ? (item.cvAnalyzed ? "ANALYZED" : "NOT_ANALYZED") : "NOT_PROVIDED",
           status: item.isClassified ? "CLASSIFIED_AFTER_NOTIFICATION" : "TO_QUALIFY",
         },
         update: {
@@ -190,7 +190,7 @@ export async function POST(request: Request) {
           score: item.score,
           confidence: item.confidence,
           rationale: item.rationale,
-          cvStatus: item.candidate.source === "PLATFORM_CVTHEQUE" ? "NOT_ANALYZED" : "NOT_PROVIDED",
+          cvStatus: item.candidate.source === "PLATFORM_CVTHEQUE" ? (item.cvAnalyzed ? "ANALYZED" : "NOT_ANALYZED") : "NOT_PROVIDED",
           status: item.isClassified ? "CLASSIFIED_AFTER_NOTIFICATION" : "TO_QUALIFY",
         },
       });
