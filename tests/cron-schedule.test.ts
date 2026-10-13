@@ -10,5 +10,5 @@ test("bounded sourcing cron jobs run hourly so persistent batches can make progr
   assert.equal(schedules.get("/api/cron/global-jobs"), "0 * * * *");
   assert.equal(schedules.get("/api/cron/cv-rematch"), "0 * * * *");
   assert.equal(schedules.get("/api/cron/global-candidates"), "0 * * * *");
-  assert.equal(schedules.get("/api/cron/enterprise-offer-sourcing"), "0 5 * * *");
+  assert.equal(schedules.get("/api/cron/enterprise-offer-sourcing"), "0 * * * *");
 });
