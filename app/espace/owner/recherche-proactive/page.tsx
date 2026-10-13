@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
 import BackButton from "@/components/navigation/BackButton";
+import ArchiveProactiveSearchButton from "@/components/owner/ArchiveProactiveSearchButton";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -99,6 +100,10 @@ export default async function ProactiveSearchHistoryPage({ searchParams }: { sea
                 <p className="mt-2 text-xs text-white/45">Statut : {selected.status} · lancée le {new Date(selected.createdAt).toLocaleString("fr-FR")}</p>
                 {selected.completedAt && <p className="mt-1 text-xs text-white/35">Terminée le {new Date(selected.completedAt).toLocaleString("fr-FR")}</p>}
                 {selected.lastError && <p className="mt-3 border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-200">{selected.lastError}</p>}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link href={`/espace/owner/metiers?sector=${encodeURIComponent(selected.sectorCode)}${selected.professionCode ? `&profession=${encodeURIComponent(selected.professionCode)}` : ""}`} className="border border-[#F97316]/50 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[#F97316]">Relancer depuis la taxonomie</Link>
+                  {selected.status !== "ARCHIVED" && selected.status !== "RUNNING" && <ArchiveProactiveSearchButton searchId={selected.id} />}
+                </div>
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -139,7 +144,7 @@ export default async function ProactiveSearchHistoryPage({ searchParams }: { sea
                     <p className="mt-3 text-xs leading-5 text-white/55">{result.rationale}</p>
                     {result.primaryProfessionCode && <p className="mt-2 text-[10px] text-emerald-300">Dossier métier : {result.primarySectorCode} / {result.primaryProfessionCode}</p>}
                     {result.status === "TO_QUALIFY" && <p className="mt-2 text-[10px] uppercase tracking-[0.12em] text-[#F97316]">À qualifier — aucun classement forcé</p>}
-                    {result.sourcedCandidate.sourceProfileUrl && <a href={result.sourcedCandidate.sourceProfileUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block border border-white/15 px-3 py-2 text-[10px] text-white/60">Ouvrir la source publique ↗</a>}
+                    {result.sourcedCandidate.sourceProfileUrl?.startsWith("https://") && <a href={result.sourcedCandidate.sourceProfileUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block border border-white/15 px-3 py-2 text-[10px] text-white/60">Ouvrir la source publique ↗</a>}
                   </article>
                 ))}
                 {selected.results.length === 0 && <p className="border border-dashed border-white/15 p-6 text-sm text-white/40">Aucun profil correspondant dans cette exécution.</p>}
