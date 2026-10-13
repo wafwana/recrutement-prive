@@ -160,7 +160,7 @@ export default async function ProactiveSearchHistoryPage({ searchParams }: { sea
                       <div className="min-w-0">
                         <p className="text-sm text-white/85">{result.sourcedCandidate.headline || result.sourcedCandidate.name || "Profil public sans intitulé"}</p>
                         <p className="mt-1 text-xs text-white/40">{result.sourcedCandidate.location || "Localisation non renseignée"} · {result.source}</p>
-                        <p className="mt-2 text-[10px] text-white/35">CV : {result.cvStatus === "NOT_PROVIDED" ? "non fourni par la source" : "non analysé — vérification nécessaire"}</p>
+                        <p className="mt-2 text-[10px] text-white/35">CV : {result.cvStatus === "ANALYZED" ? "analysé localement" : result.cvStatus === "NOT_PROVIDED" ? "non fourni par la source" : "non analysé — vérification nécessaire"}</p>
                       </div>
                       <div className="shrink-0 text-right">
                         <p className="text-sm text-[#F97316]">{result.score ?? "—"}/100</p>
