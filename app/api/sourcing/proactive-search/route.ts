@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     const createdCandidateIds = new Set([...(ingestion.createdCandidateIds || []), ...cvIntakeSync.createdCandidateIds]);
     const candidates = candidateIds.length
       ? await prisma.sourcedCandidate.findMany({
-          where: { id: { in: candidateIds }, status: { not: "REJECTED" } },
+          where: { id: { in: candidateIds }, status: { notIn: ["REJECTED", "CONTACTED"] } },
           select: { id: true, externalId: true, source: true, headline: true, location: true, skills: true, status: true, sourceProfileUrl: true },
         })
       : [];
@@ -255,7 +255,7 @@ export async function POST(request: Request) {
         },
         update: {
           source: item.candidate.source,
-          primarySectorCode: item.isClassified ? sector.code : null,
+          primarySectorCode: item.isClassified || item.cvTaxonomyMatches ? sector.code : null,
           primaryProfessionCode: item.isClassified ? item.targetProfession?.code || null : null,
           score: item.score,
           confidence: item.confidence,
