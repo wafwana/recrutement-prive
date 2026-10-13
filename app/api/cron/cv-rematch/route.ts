@@ -59,9 +59,9 @@ export async function GET(request: Request) {
   let intakeAnalyzed = 0;
   let intakeMatched = 0;
 
-  const categoryRows = await prisma.jobCategory.findMany({ select: { id: true, code: true, name: true, parentId: true } });
+  const categoryRows = await prisma.jobCategory.findMany({ select: { id: true, code: true, name: true, parentId: true, isActive: true } });
   const categoryCodes = new Map(categoryRows.map((row) => [row.id, row.code]));
-  const taxonomyItems = categoryRows.map((row) => ({
+  const taxonomyItems = categoryRows.filter((row) => row.isActive).map((row) => ({
     code: row.code,
     name: typeof row.name === "object" && row.name !== null && "fr" in row.name
       ? String((row.name as Record<string, unknown>).fr || row.code)
