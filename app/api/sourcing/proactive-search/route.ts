@@ -282,7 +282,7 @@ export async function POST(request: Request) {
           matched: ingestion.matched,
           fallbackSource: ingestion.fallbackSource || null,
           externalSourcesAllFailed: ingestion.externalSourcesAllFailed || false,
-          internalCvIntakes: { sourceTotal: cvIntakeSync.sourceTotal, synced: cvIntakeSync.synced, skipped: cvIntakeSync.skipped, resultsIncluded: classified.filter((item) => item.candidate.source === "PLATFORM_CV_INTAKE").length },
+          internalCvIntakes: { sourceTotal: cvIntakeSync.sourceTotal, synced: cvIntakeSync.synced, skipped: cvIntakeSync.skipped, matched: cvIntakeSync.matched, resultsIncluded: classified.filter((item) => item.candidate.source === "PLATFORM_CV_INTAKE").length },
           sources: ingestion.results || [],
           resultCount: classified.length,
           classifiedCount: classified.filter((item) => item.isClassified).length,
