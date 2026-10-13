@@ -73,19 +73,62 @@ export async function callGeminiStructured<T>(
     generationConfig: buildGeminiGenerationConfig(request.jsonSchema as Record<string, unknown>),
   };
 
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      safeLogError("GEMINI", `Erreur de communication API (HTTP ${res.status}).`);
+  const maxRetries = 1;
+  let response: Response | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS),
+      });
+    } catch {
+      // Network failures/timeouts are not retried here: a second 15s wait per
+      // offer can exhaust the Vercel cron budget. The caller uses deterministic
+      // qualification when AI is unavailable.
+      safeLogError("GEMINI", "Échec de communication avec l'API Gemini.");
       return null;
     }
 
-    const resData = (await res.json()) as {
+    if (response.ok) break;
+
+    const retryAfterHeader = response.headers.get("retry-after");
+    let retryDelayMs: number | null = null;
+    const retryableStatus = [500, 502, 503, 504].includes(response.status);
+    if (attempt < maxRetries && (retryableStatus || response.status === 429)) {
+      if (retryAfterHeader !== null) {
+        const seconds = Number(retryAfterHeader);
+        const parsedDate = Date.parse(retryAfterHeader);
+        const requestedDelay = Number.isFinite(seconds) && retryAfterHeader.trim() !== ""
+          ? seconds * 1000
+          : Number.isFinite(parsedDate) ? parsedDate - Date.now() : Number.POSITIVE_INFINITY;
+        // Never sleep longer than the bounded cron retry budget. If Google
+        // requests a longer wait, defer to the next scheduled invocation.
+        if (requestedDelay >= 0 && requestedDelay <= 750) retryDelayMs = requestedDelay;
+      } else if (retryableStatus) {
+        retryDelayMs = 350;
+      }
+    }
+
+    if (retryDelayMs === null) {
+      safeLogError("GEMINI", `Erreur de communication API (HTTP ${response.status}).`);
+      return null;
+    }
+
+    safeLogInfo("GEMINI", `API temporairement indisponible (HTTP ${response.status}); une reprise bornée est tentée.`);
+    try { await response.body?.cancel(); } catch { /* Ignore body cleanup errors. */ }
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+  }
+
+  if (!response?.ok) {
+    safeLogError("GEMINI", `Erreur de communication API (HTTP ${response?.status ?? "inconnu"}).`);
+    return null;
+  }
+
+  try {
+    const resData = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     };
     const rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -97,7 +140,7 @@ export async function callGeminiStructured<T>(
     safeLogInfo("GEMINI", `Traitement IA terminé avec succès (modèle: ${model}).`);
     return parsed;
   } catch {
-    safeLogError("GEMINI", "Échec du traitement de la requête IA.");
+    safeLogError("GEMINI", "Échec du traitement de la réponse structurée Gemini.");
     return null;
   }
 }
