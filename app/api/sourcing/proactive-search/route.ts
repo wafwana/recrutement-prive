@@ -99,19 +99,57 @@ export async function POST(request: Request) {
     const candidates = candidateIds.length
       ? await prisma.sourcedCandidate.findMany({
           where: { id: { in: candidateIds } },
-          select: { id: true, source: true, headline: true, skills: true, status: true, sourceProfileUrl: true },
+          select: { id: true, externalId: true, source: true, headline: true, skills: true, status: true, sourceProfileUrl: true },
         })
       : [];
 
-    const classified = candidates.map((candidate) => ({
-      candidate,
-      ...classifyProactiveCandidate({
-        sector,
-        profession,
-        headline: candidate.headline,
-        skills: candidate.skills,
-      }),
-    }));
+    const internalProfileIds = [...new Set(candidates
+      .filter((candidate) => candidate.source === "PLATFORM_CVTHEQUE" && candidate.externalId?.startsWith("platform:"))
+      .map((candidate) => candidate.externalId!.slice("platform:".length))
+      .filter(Boolean))];
+    const internalProfiles = internalProfileIds.length
+      ? await prisma.candidateProfile.findMany({
+          where: { id: { in: internalProfileIds } },
+          select: {
+            id: true,
+            documents: {
+              where: { docType: "CV" },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { analysis: true, analyzedAt: true },
+            },
+          },
+        })
+      : [];
+    const internalCvByProfileId = new Map(internalProfiles.map((profile) => [profile.id, profile.documents[0] || null]));
+
+    const classified = candidates.map((candidate) => {
+      const profileId = candidate.source === "PLATFORM_CVTHEQUE" && candidate.externalId?.startsWith("platform:")
+        ? candidate.externalId.slice("platform:".length)
+        : null;
+      const document = profileId ? internalCvByProfileId.get(profileId) : null;
+      const storedAnalysis = document?.analysis && typeof document.analysis === "object" && !Array.isArray(document.analysis)
+        ? document.analysis as Record<string, unknown>
+        : null;
+      const cvAnalyzed = Boolean(
+        document?.analyzedAt &&
+        storedAnalysis &&
+        Array.isArray(storedAnalysis.skills) &&
+        Array.isArray(storedAnalysis.subCategoryCodes) &&
+        Object.prototype.hasOwnProperty.call(storedAnalysis, "primaryCategoryCode"),
+      );
+      return {
+        candidate,
+        cvAnalyzed,
+        ...classifyProactiveCandidate({
+          sector,
+          profession,
+          headline: cvAnalyzed && typeof storedAnalysis?.headline === "string" ? storedAnalysis.headline : candidate.headline,
+          skills: cvAnalyzed ? storedAnalysis?.skills : candidate.skills,
+          cvAnalyzed,
+        }),
+      };
+    });
 
     // Notify the internal team about newly discovered profiles before creating their classification records.
     for (const item of classified) {
