@@ -274,7 +274,7 @@ export async function GET(request: Request) {
               })
             : null;
           const candidateMatches = inScope && candidateSourceTotal > 0
-            ? mergeEnterpriseCandidateMatches(existingEnterpriseOffer?.matching, batchCandidateMatches)
+            ? mergeEnterpriseCandidateMatches(existingEnterpriseOffer?.matching, batchCandidateMatches, 20, activeCandidates.map((candidate) => candidate.id))
             : [];
 
           if (inScope) {
