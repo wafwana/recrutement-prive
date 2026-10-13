@@ -186,9 +186,8 @@ export async function POST(request: Request) {
       });
     }
 
-    const failedSources = Array.isArray(ingestion.results)
-      ? ingestion.results.filter((result) => Boolean(result.error))
-      : [];
+    const sourceResults = (ingestion.results || []) as Array<{ sourceUrl: string; fetched: number; sourceTotal: number; created: number; updated: number; matched: number; error?: string }>;
+    const failedSources = sourceResults.filter((result) => Boolean(result.error));
     const finalStatus = failedSources.length ? (candidates.length ? "PARTIAL" : "FAILED") : "COMPLETED";
     const updated = await prisma.proactiveSearch.update({
       where: { id: search.id },
