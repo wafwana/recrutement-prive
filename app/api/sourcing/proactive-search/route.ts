@@ -5,7 +5,7 @@ import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
-import { getStrongProfilesForProfession } from "@/lib/taxonomy/strong-profiles";
+import { classifyProactiveCandidate } from "@/lib/sourcing/proactive-classification";
 import { ingestGlobalCandidates } from "@/lib/sourcing/ingest";
 
 const searchSchema = z.object({
@@ -27,10 +27,6 @@ async function requireSourcingActor() {
   if (!(await hasPermission(userId, role || undefined, "SOURCING"))) return null;
   if (!(await hasPermission(userId, role || undefined, "METIERS_DOSSIERS"))) return null;
   return { userId, role };
-}
-
-function normalize(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
 export async function POST(request: Request) {
@@ -107,41 +103,15 @@ export async function POST(request: Request) {
         })
       : [];
 
-    const classified = candidates.map((candidate) => {
-      const headline = normalize(candidate.headline || "");
-      const candidateSkills = Array.isArray(candidate.skills)
-        ? candidate.skills.filter((item): item is string => typeof item === "string").map(normalize)
-        : [];
-      const professionCandidates = profession ? [profession] : sector.subcategories;
-      const matchedProfession = professionCandidates
-        .map((item) => {
-          const aliases = [item.name.fr, ...getStrongProfilesForProfession(sector.code, item.code).map((profile) => profile.title)]
-            .map(normalize)
-            .filter(Boolean);
-          const titleMatch = aliases.some((alias) => headline.includes(alias));
-          const skillMatch = candidateSkills.some((skill) => aliases.some((alias) => skill === alias || skill.includes(alias)));
-          return { item, titleMatch, skillMatch };
-        })
-        .find((match) => match.titleMatch || match.skillMatch);
-      const titleMatch = Boolean(matchedProfession?.titleMatch);
-      const skillMatch = Boolean(matchedProfession?.skillMatch);
-      const confidence = titleMatch ? "HIGH" : skillMatch ? "MEDIUM" : "LOW";
-      const targetProfession = matchedProfession?.item || profession;
-      const isClassified = confidence !== "LOW" && Boolean(targetProfession);
-      const rationale = titleMatch
-        ? "Le titre public du profil correspond au métier recherché."
-        : skillMatch
-          ? "Une compétence déclarée correspond au métier recherché ; CV non vérifié."
-          : "Correspondance insuffisante sur les champs publics disponibles : à qualifier.";
-      return {
-        candidate,
-        confidence,
-        targetProfession,
-        isClassified,
-        score: titleMatch ? 90 : skillMatch ? 65 : 25,
-        rationale,
-      };
-    });
+    const classified = candidates.map((candidate) => ({
+      candidate,
+      ...classifyProactiveCandidate({
+        sector,
+        profession,
+        headline: candidate.headline,
+        skills: candidate.skills,
+      }),
+    }));
 
     // Notify the internal team about newly discovered profiles before creating their classification records.
     for (const item of classified) {
