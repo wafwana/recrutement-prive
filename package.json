@@ -34,6 +34,7 @@
     "test:trusted-video": "node --import tsx --test tests/trusted-video-security.test.ts",
     "test:ai-provider": "node --import tsx --test tests/ai-provider-resolution.test.ts",
     "test:gemini-schema-normalization": "node --import tsx --test tests/gemini-schema-normalization.test.ts",
+    "test:gemini-retry": "node --import tsx --test tests/gemini-retry.test.ts",
     "test:secure-contact": "node --import tsx --test tests/secure-contact-contracts.test.ts",
     "test:executive-search": "node --import tsx --test tests/executive-search-presentation.test.ts",
     "test:secure-contact-authorization": "node --import tsx --test tests/secure-contact-authorization.test.ts",
