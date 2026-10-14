@@ -92,11 +92,15 @@ export async function callGeminiStructured<T>(
         signal: AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS),
       });
     } catch {
-      // Network failures/timeouts are not retried here: a second 15s wait per
-      // offer can exhaust the Vercel cron budget. The caller uses deterministic
-      // qualification when AI is unavailable.
+      // Retry one transient network/timeout failure with a short bounded delay.
+      // The shared retry budget remains one extra request per call.
+      if (attempt < maxRetries) {
+        safeLogInfo("GEMINI", "Échec réseau temporaire; nouvelle tentative bornée.");
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        continue;
+      }
       geminiUnavailableUntil = Date.now() + GEMINI_UNAVAILABLE_COOLDOWN_MS;
-      safeLogError("GEMINI", "Échec de communication avec l'API Gemini; fallback métier activé temporairement.");
+      safeLogError("GEMINI", "Échec de communication avec l'API Gemini après une tentative bornée; fallback métier activé temporairement.");
       return null;
     }
 
