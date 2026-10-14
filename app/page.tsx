@@ -69,7 +69,7 @@ export default function HomePage() {
     </header>
 
     <section id="accueil" className="rp-hero rp-hero-reference">
-      <div className="rp-hero-seal" aria-hidden="true"><img src="/visuals/rp-global-partners.jpeg?v=rp-seal-20261014" alt="" /></div>
+      <div className="rp-hero-seal" aria-hidden="true"><img src="/visuals/rp-global-partners-seal.webp?v=rp-seal-20261014" alt="" /></div>
       <div className="rp-hero-copy">
         <div className="rp-hero-kicker">CABINET DE RECRUTEMENT</div>
         <h1>Le talent n’a pas de frontières.</h1>
