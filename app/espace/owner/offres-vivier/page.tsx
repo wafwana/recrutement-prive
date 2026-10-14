@@ -92,6 +92,9 @@ export default async function OfferPoolPage({
           <Link href="/espace/owner/sourcing" className="border border-[#F97316] px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">
             Lancer / voir le sourcing
           </Link>
+          <Link href="/espace/owner/matching" className="border border-white/20 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/80">
+            Voir les candidats matchés
+          </Link>
         </div>
       </div>
 
