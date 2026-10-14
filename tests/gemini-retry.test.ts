@@ -20,7 +20,7 @@ test("Gemini retries one HTTP 429 without Retry-After and returns the successful
     calls += 1;
     if (calls === 1) return new Response("rate limited", { status: 429 });
     return new Response(JSON.stringify({
-      candidates: [{ content: { parts: [{ text: JSON.stringify({ title: "OK" })] } }],
+      candidates: [{ content: { parts: [{ text: JSON.stringify({ title: "OK" }) }] } }],
     }), { status: 200, headers: { "Content-Type": "application/json" } });
   }) as typeof fetch;
 
@@ -44,7 +44,7 @@ test("Gemini retries one transient network failure and then succeeds", async () 
     calls += 1;
     if (calls === 1) throw new TypeError("network unavailable");
     return new Response(JSON.stringify({
-      candidates: [{ content: { parts: [{ text: JSON.stringify({ title: "Recovered" })] } }],
+      candidates: [{ content: { parts: [{ text: JSON.stringify({ title: "Recovered" }) }] } }],
     }), { status: 200, headers: { "Content-Type": "application/json" } });
   }) as typeof fetch;
 
