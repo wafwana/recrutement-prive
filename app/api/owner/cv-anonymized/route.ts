@@ -72,7 +72,7 @@ export async function GET() {
   await prisma.auditLog.create({
     data: {
       actorUserId: userId,
-      actorRole: role,
+      actorRole: role as "OWNER" | "ADMIN" | "CONSULTANT",
       action: "ANONYMIZED_CV_WORKSPACE_VIEW",
       targetType: "CV_LIBRARY",
       details: { profilesReturned: items.length, identityFieldsExcluded: true, originalFilesExcluded: true },
