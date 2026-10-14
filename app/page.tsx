@@ -5,7 +5,7 @@ import LanguageSelector from "./components/LanguageSelector";
 import { useI18n } from "@/lib/i18n/context";
 
 const images = {
-  hero: "/visuals/hero-final.webp?v=rp-hero-final-20261014",
+  hero: "/visuals/rp-global-skyline.webp?v=rp-global-skyline-20261014",
   talents: "https://images.unsplash.com/photo-1770992225308-154250075727?auto=format&fit=crop&fm=jpg&q=88&w=1400",
   enterprise: "https://images.unsplash.com/photo-1521790797524-b2497295b8a0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
   intelligence: "https://images.unsplash.com/photo-1677442135136-760c813028c0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
@@ -69,6 +69,7 @@ export default function HomePage() {
     </header>
 
     <section id="accueil" className="rp-hero rp-hero-reference">
+      <div className="rp-hero-seal" aria-hidden="true"><img src="/visuals/rp-global-partners.jpeg?v=rp-seal-20261014" alt="" /></div>
       <div className="rp-hero-copy">
         <div className="rp-hero-kicker">CABINET DE RECRUTEMENT</div>
         <h1>Le talent n’a pas de frontières.</h1>
