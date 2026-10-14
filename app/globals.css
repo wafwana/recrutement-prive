@@ -199,8 +199,8 @@
   .rp-hero-seal {
     position: absolute;
     z-index: 5;
-    top: -88px;
-    left: clamp(42px, 10.1vw, 168px);
+    top: 12px;
+    right: clamp(28px, 7vw, 112px);
     width: clamp(190px, 16.2vw, 270px);
     aspect-ratio: 1;
     pointer-events: none;
@@ -262,7 +262,11 @@
     gap: 8px;
   }
   .rp-hero-seal {
-    display: none;
+    display: block;
+    top: 12px;
+    right: clamp(16px, 3vw, 40px);
+    left: auto;
+    width: clamp(190px, 16.2vw, 230px);
   }
   .rp-hero-reference {
     display: grid;
