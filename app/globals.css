@@ -262,7 +262,11 @@
     gap: 8px;
   }
   .rp-hero-seal {
-    display: none;
+    display: block;
+    top: 12px;
+    right: clamp(16px, 3vw, 40px);
+    left: auto;
+    width: clamp(190px, 16.2vw, 230px);
   }
   .rp-hero-reference {
     display: grid;
