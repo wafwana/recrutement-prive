@@ -199,9 +199,9 @@
   .rp-hero-seal {
     position: absolute;
     z-index: 5;
-    top: -88px;
+    top: 12px;
     left: clamp(42px, 10.1vw, 168px);
-    width: clamp(190px, 16.2vw, 270px);
+    width: clamp(170px, 13.5vw, 190px);
     aspect-ratio: 1;
     pointer-events: none;
     filter: drop-shadow(0 8px 15px rgba(0, 0, 0, .42));
