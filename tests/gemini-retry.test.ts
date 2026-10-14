@@ -5,7 +5,7 @@ import { callGeminiStructured } from "../lib/ai/gemini";
 const request = {
   userPrompt: "Return a simple title",
   jsonSchemaName: "simple_title",
-  context: { classification: "MOCK_DATA", isMockData: true },
+  context: { classification: "MOCK_DATA" as const, isMockData: true },
   jsonSchema: {
     type: "object",
     properties: { title: { type: "string" } },
