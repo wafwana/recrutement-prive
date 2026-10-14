@@ -80,6 +80,9 @@ export async function callGeminiStructured<T>(
     generationConfig: buildGeminiGenerationConfig(request.jsonSchema as Record<string, unknown>),
   };
 
+  // Keep retries tightly bounded for Vercel cron runs. Never retry permanent
+  // client/configuration failures (400/401/403/404); only transient transport
+  // failures and provider overload/rate limiting are eligible.
   const maxRetries = 1;
   let response: Response | null = null;
 
@@ -92,9 +95,11 @@ export async function callGeminiStructured<T>(
         signal: AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS),
       });
     } catch {
-      // Network failures/timeouts are not retried here: a second 15s wait per
-      // offer can exhaust the Vercel cron budget. The caller uses deterministic
-      // qualification when AI is unavailable.
+      if (attempt < maxRetries) {
+        safeLogInfo("GEMINI", "Échec réseau temporaire; une reprise bornée est tentée.");
+        await new Promise((resolve) => setTimeout(resolve, 300 + Math.floor(Math.random() * 201)));
+        continue;
+      }
       geminiUnavailableUntil = Date.now() + GEMINI_UNAVAILABLE_COOLDOWN_MS;
       safeLogError("GEMINI", "Échec de communication avec l'API Gemini; fallback métier activé temporairement.");
       return null;
@@ -112,11 +117,13 @@ export async function callGeminiStructured<T>(
         const requestedDelay = Number.isFinite(seconds) && retryAfterHeader.trim() !== ""
           ? seconds * 1000
           : Number.isFinite(parsedDate) ? parsedDate - Date.now() : Number.POSITIVE_INFINITY;
-        // Never sleep longer than the bounded cron retry budget. If Google
-        // requests a longer wait, defer to the next scheduled invocation.
+        // Honour short Retry-After values. Longer provider requests are deferred
+        // to the next scheduled invocation instead of extending the cron run.
         if (requestedDelay >= 0 && requestedDelay <= 750) retryDelayMs = requestedDelay;
-      } else if (retryableStatus) {
-        retryDelayMs = 350;
+      } else {
+        // Retry 429 once as well as transient 5xx. A longer quota reset must be
+        // handled by the provider cooldown and deterministic fallback.
+        retryDelayMs = response.status === 429 ? 500 : 350;
       }
     }
 
