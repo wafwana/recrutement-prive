@@ -44,7 +44,7 @@ export default async function OwnerMatchingPage() {
     const raw = asObject(offer.rawData);
     const matching = asObject(raw?.matching);
     const matches = Array.isArray(matching?.topMatches) ? matching.topMatches as StoredMatch[] : [];
-    return { offer, matching, matches };
+    return { offer, matches };
   });
   const platformIds = [...new Set(parsed.flatMap(({ matches }) => matches.filter((m) => m.candidateType === "PLATFORM_CANDIDATE" && m.candidateId).map((m) => m.candidateId as string)))];
   const sourcedIds = [...new Set(parsed.flatMap(({ matches }) => matches.filter((m) => m.candidateType === "SOURCED_CANDIDATE" && m.candidateId).map((m) => m.candidateId as string)))];
@@ -81,7 +81,7 @@ export default async function OwnerMatchingPage() {
       </div>
 
       <div className="mt-8 space-y-6">
-        {parsed.map(({offer, matching, matches}) => (
+        {parsed.map(({offer, matches}) => (
           <article key={offer.id} className="overflow-hidden border border-white/10">
             <div className="border-b border-white/10 bg-[#111] p-5 md:p-6">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
