@@ -56,3 +56,294 @@
 .rp-global-seal:hover,.rp-global-seal:focus-visible{opacity:1;transform:scale(1.035);outline:2px solid rgba(255,106,0,.78);outline-offset:3px}
 @media(max-width:640px){.rp-global-seal{width:44px;height:44px;right:10px;bottom:10px;opacity:.72}}
 @media(prefers-reduced-motion:reduce){.rp-global-seal{transition:none}}
+
+
+/* Exact supplied RP Global Partners homepage reference */
+@media (min-width:1181px) {
+  .rp-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    height: 150px;
+    min-height: 150px;
+    padding: 0 28px;
+    gap: 0;
+    overflow: visible;
+    align-items: flex-start;
+  }
+  .rp-header > .rp-brand {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .rp-header > .rp-brand:focus-visible {
+    position: fixed;
+    left: 16px;
+    top: 16px;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 10px 14px;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    background: #061725;
+    outline: 2px solid #ff6a00;
+    z-index: 100;
+  }
+  .rp-header .rp-nav {
+    position: absolute;
+    left: clamp(385px, 38.8vw, 640px);
+    right: clamp(350px, 23.4vw, 385px);
+    top: 72px;
+    height: 80px;
+    gap: clamp(9px, 1.45vw, 24px);
+    justify-content: space-between;
+    align-items: stretch;
+    flex: initial;
+    white-space: nowrap;
+    border-bottom: 2px solid #ff6a00;
+    font-size: clamp(10px, .88vw, 14px);
+  }
+  .rp-header .rp-nav a {
+    padding-top: 2px;
+    border-bottom-width: 3px;
+  }
+  .rp-header-actions {
+    position: absolute;
+    top: 72px;
+    right: 28px;
+    gap: 14px;
+    z-index: 34;
+  }
+  .rp-hero-reference {
+    position: relative;
+    isolation: isolate;
+    display: block;
+    min-height: clamp(780px, calc(100svh - 150px), 850px);
+    height: auto;
+    overflow: hidden;
+    background: #062b52;
+  }
+  .rp-hero-reference::before {
+    z-index: -1;
+    background: linear-gradient(90deg, #062b52 0%, #062b52 34%, rgba(6, 43, 82, .96) 43%, rgba(6, 43, 82, .60) 59%, rgba(6, 43, 82, .12) 100%);
+  }
+  .rp-hero-reference .rp-hero-copy {
+    position: relative;
+    z-index: 2;
+    width: 65%;
+    max-width: 1040px;
+    padding: 210px 0 42px clamp(24px, 5.1vw, 84px);
+    align-self: auto;
+  }
+  .rp-hero-reference .rp-hero-kicker {
+    font-size: clamp(15px, 1.65vw, 24px);
+    gap: 16px;
+    margin-bottom: 20px;
+    letter-spacing: 0;
+  }
+  .rp-hero-reference .rp-hero-kicker::before {
+    width: 42px;
+    height: 12px;
+    flex: 0 0 42px;
+  }
+  .rp-hero-reference h1 {
+    max-width: 900px;
+    font-size: clamp(42px, 4.15vw, 68px);
+    line-height: 1.03;
+    margin: 0 0 12px;
+    letter-spacing: -.035em;
+  }
+  .rp-hero-reference .rp-hero-statement {
+    max-width: 980px;
+    font-size: clamp(24px, 2.78vw, 44px);
+    line-height: 1.08;
+    letter-spacing: -.025em;
+  }
+  .rp-hero-reference .rp-actions {
+    margin-top: 34px;
+    gap: 18px;
+  }
+  .rp-hero-reference .rp-btn {
+    min-height: 69px;
+    padding: 0 clamp(16px, 2vw, 29px);
+    font-size: clamp(12px, .98vw, 15px);
+    font-weight: 500;
+    border-radius: 6px;
+    border: 1.5px solid #f3f6fa;
+    white-space: nowrap;
+  }
+  .rp-hero-reference .rp-hero-privacy {
+    display: none !important;
+  }
+  .rp-hero-reference-image {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    background-size: auto 100%;
+    background-position: right bottom;
+    background-repeat: no-repeat;
+    background-color: transparent;
+    pointer-events: none;
+  }
+  .rp-hero-seal {
+    position: absolute;
+    z-index: 5;
+    top: -88px;
+    left: clamp(42px, 10.1vw, 168px);
+    width: clamp(190px, 16.2vw, 270px);
+    aspect-ratio: 1;
+    pointer-events: none;
+    filter: drop-shadow(0 8px 15px rgba(0, 0, 0, .42));
+  }
+  .rp-hero-seal img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}
+
+@media (max-width:1180px) {
+  .rp-header {
+    position: sticky;
+    top: 0;
+    height: auto;
+    min-height: 88px;
+    padding: 12px 20px;
+    gap: 14px;
+    overflow: visible;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .rp-header > .rp-brand {
+    position: relative;
+    left: auto;
+    top: auto;
+    width: auto;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: nowrap;
+    border: 0;
+    flex: 0 0 auto;
+  }
+  .rp-header .rp-nav {
+    position: relative;
+    order: 3;
+    left: auto;
+    right: auto;
+    top: auto;
+    height: 38px;
+    width: 100%;
+    flex: 1 0 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+    gap: 22px;
+    border-bottom: 0;
+  }
+  .rp-header-actions {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin-left: auto;
+    gap: 8px;
+  }
+  .rp-hero-seal {
+    display: none;
+  }
+  .rp-hero-reference {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, .72fr);
+    min-height: 560px;
+    height: auto;
+  }
+  .rp-hero-reference .rp-hero-copy {
+    width: auto;
+    max-width: 100%;
+    align-self: center;
+    padding: 38px 0 38px 24px;
+  }
+  .rp-hero-reference-image {
+    position: relative;
+    inset: auto;
+    z-index: 0;
+    width: auto;
+    height: auto;
+    min-height: 560px;
+    background-size: contain;
+    background-position: center right;
+  }
+  .rp-hero-reference .rp-hero-privacy {
+    display: none !important;
+  }
+}
+
+@media (max-width:640px) {
+  .rp-header {
+    min-height: 0;
+    padding: 10px 16px;
+  }
+  .rp-hero-reference {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: linear-gradient(180deg, #062b52 0%, #062b52 54%, #041f3d 100%);
+  }
+  .rp-hero-reference .rp-hero-copy {
+    order: 1;
+    width: 100%;
+    padding: 30px 20px 32px;
+  }
+  .rp-hero-reference-image {
+    order: 0;
+    position: relative;
+    inset: auto;
+    z-index: 0;
+    min-height: 250px;
+    height: 250px;
+    width: 100%;
+    background-size: contain;
+    background-position: center center;
+  }
+  .rp-hero-reference .rp-hero-kicker {
+    font-size: 13px;
+    margin-bottom: 15px;
+  }
+  .rp-hero-reference .rp-hero-kicker::before {
+    width: 28px;
+    height: 8px;
+    flex-basis: 28px;
+  }
+  .rp-hero-reference h1 {
+    font-size: clamp(35px, 9vw, 48px);
+    line-height: 1.02;
+  }
+  .rp-hero-reference .rp-hero-statement {
+    font-size: clamp(23px, 6.1vw, 30px);
+    line-height: 1.08;
+  }
+  .rp-hero-desktop-break {
+    display: none;
+  }
+  .rp-hero-reference .rp-actions {
+    flex-direction: column;
+    margin-top: 24px;
+  }
+  .rp-hero-reference .rp-btn {
+    width: 100%;
+    min-height: 52px;
+  }
+}
