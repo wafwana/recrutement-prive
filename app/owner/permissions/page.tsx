@@ -9,28 +9,30 @@ type Staff = {
 };
 
 const labels: Record<string, string> = {
-  CANDIDATES_VIEW: "CANDIDATES_VIEW — Voir les candidats / le vivier",
-  CANDIDATES_MANAGE: "CANDIDATES_MANAGE — Gérer les candidats",
-  CV_INTAKE: "CV_INTAKE — Intégrer les CV",
-  CV_LIBRARY: "CV_LIBRARY — Bibliothèque CV",
-  CV_MATCHING: "CV_MATCHING — CV & Matching",
-  METIERS_DOSSIERS: "METIERS_DOSSIERS — Métiers & dossiers",
-  SOURCING: "SOURCING — Sourcing automatique",
-  OFFRES_VIVIER: "OFFRES_VIVIER — Vivier des offres",
-  ARCHIVAGE: "ARCHIVAGE — Archivage",
-  PRE_COMPTABILITE: "PRE_COMPTABILITE — Pré-comptabilité",
-  PRESTATIONS_TARIFS: "PRESTATIONS_TARIFS — Prestations & tarifs",
-  FACTURATION: "FACTURATION — Honoraires & facturation",
-  JOBS_MANAGE: "JOBS_MANAGE — Offres / missions",
-  PRESENTATIONS_MANAGE: "PRESENTATIONS_MANAGE — Présentations candidats",
-  COMPANIES_MANAGE: "COMPANIES_MANAGE — Entreprises",
-  CRM: "CRM — CRM",
-  REPORTING: "REPORTING — Reporting",
-  DOCUMENTS_DEPOSIT: "DOCUMENTS_DEPOSIT — Dépôt de documents",
-  DOCUMENTS_VIEW: "DOCUMENTS_VIEW — Consultation des documents",
-  MESSAGING_CLIENTS_ENTERPRISE: "MESSAGING_CLIENTS_ENTERPRISE — Messagerie clients / entreprises",
-  PLATFORM_SETTINGS: "PLATFORM_SETTINGS — Configuration plateforme",
-  ENTERPRISE_OFFER_SOURCING: "ENTERPRISE_OFFER_SOURCING — Sourcing automatisé des offres entreprise",
+  CANDIDATES_VIEW: "Voir les candidats / le vivier",
+  CANDIDATES_MANAGE: "Gérer les candidats",
+  CV_INTAKE: "Intégrer les CV réels",
+  CV_LIBRARY: "Bibliothèque CV",
+  CV_MATCHING: "CV & Matching transversal",
+  METIERS_DOSSIERS: "Métiers & dossiers",
+  SOURCING: "Sourcing automatique",
+  OFFRES_VIVIER: "Vivier des offres",
+  ARCHIVAGE: "Archive Centralisée",
+  PRE_COMPTABILITE: "Pré-comptabilité",
+  PRESTATIONS_TARIFS: "Prestations & tarifs",
+  FACTURATION: "Honoraires & facturation",
+  JOBS_MANAGE: "Offres / missions",
+  PRESENTATIONS_MANAGE: "Présentations candidats",
+  COMPANIES_MANAGE: "Gestion des entreprises",
+  CRM: "Suivi des entreprises et contacts (CRM)",
+  REPORTING: "Reporting / tableaux de suivi",
+  DOCUMENTS_DEPOSIT: "Dépôt de documents",
+  DOCUMENTS_VIEW: "Consultation des documents",
+  MESSAGING_CLIENTS_ENTERPRISE: "Messagerie clients / entreprises",
+  PLATFORM_SETTINGS: "Configuration de la plateforme",
+  ENTERPRISE_OFFER_SOURCING: "Sourcing automatisé des offres entreprise",
+  PARTNERS_MANAGE: "Partenaires & Sources",
+  SECURE_CONTACTS_AUTHORIZE: "Outreach & Contacts sécurisés",
 };
 
 export default function OwnerPermissionsPage() {
@@ -83,7 +85,7 @@ export default function OwnerPermissionsPage() {
         <div className="mt-4"><a href="/owner/supervision" className="inline-flex rounded border border-[#F97316] px-4 py-2 text-xs uppercase tracking-wider text-[#F97316]">Supervision des collaborateurs</a></div>
         <p className="mt-3 max-w-3xl text-sm text-white/70">
           L’OWNER décide individuellement de ce que chaque collaborateur peut utiliser.
-          Les collaborateurs ne voient jamais cette matrice.
+          Les collaborateurs ne voient jamais cette matrice. Les intitulés ci-dessous reprennent les noms des rubriques de la vue complète lorsque cela correspond à un onglet. Les autorisations complémentaires sont nommées selon leur action réelle. Cocher une autorisation donne accès au périmètre correspondant ; les codes techniques restent internes.
         </p>
         {error && <p className="mt-5 rounded border border-red-400/40 bg-red-400/10 p-3 text-sm">{error}</p>}
         {success && <p aria-live="polite" className="mt-5 rounded border border-emerald-400/40 bg-emerald-400/10 p-3 text-sm text-emerald-300">{success}</p>}
