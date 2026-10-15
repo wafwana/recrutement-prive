@@ -44,6 +44,10 @@ test("matching does not send outreach or open a meeting automatically", () => {
 test("automatic proposals are bounded and show if a pair has already been presented", () => {
   assert.match(route, /take: 150/);
   assert.match(route, /ranked\.slice\(0, 100\)/);
+  assert.match(route, /candidateSuggestions/);
+  assert.match(route, /offerSuggestions/);
+  assert.match(route, /candidateCount < 3/);
+  assert.match(route, /offerCount < 3/);
   assert.match(route, /presentationExists/);
   assert.match(page, /match\.presentationExists/);
 });
