@@ -183,15 +183,20 @@
   .rp-hero-reference .rp-hero-privacy {
     display: none !important;
   }
+  /* Preserve the approved artwork: crop its full-resolution skyline area on desktop and keep the seal as a separate transparent asset. */
   .rp-hero-reference-image {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
     z-index: -2;
-    width: 100%;
+    width: min(51vw, 830px);
     height: 100%;
     min-height: 100%;
+    background-image: url("/visuals/rp-global-partners.jpeg?v=rp-hires-skyline-20261016") !important;
     background-size: auto 100%;
-    background-position: right bottom;
+    background-position: right center;
     background-repeat: no-repeat;
     background-color: transparent;
     pointer-events: none;
