@@ -8,10 +8,10 @@
 
 - Dépôt : [wafwana/recrutement-prive](https://github.com/wafwana/recrutement-prive)
 - Branche de référence : `main`
-- SHA de `main` relevé lors de la vérification : `bd46adf3388aa6a6abb3165d42fb4dbc2fdca545`
-- Déploiement Vercel associé : `dpl_8uekL7tWxL42To6zVVX56ostvpS2`
+- SHA de `main` relevé lors de la vérification : `850014fc0730a03a2b0cc5739ae628ada5dfa7f2`
+- Déploiement Vercel associé : `dpl_3QSVkjJdkMA6CWN6jS3gH9x4ZJfL`
 - État relevé : `READY`
-- SHA déployé relevé : `bd46adf3388aa6a6abb3165d42fb4dbc2fdca545`
+- SHA déployé relevé : `850014fc0730a03a2b0cc5739ae628ada5dfa7f2`
 - Domaine : [www.recrutement-prive.com](https://www.recrutement-prive.com/)
 
 **Précaution :** le SHA et le statut de déploiement ci-dessus sont ceux constatés à la date de vérification. Au prochain travail, relever à nouveau la tête de `main`, le déploiement de production et leurs SHA avant d'utiliser ces valeurs comme état courant.
@@ -29,7 +29,7 @@
 | Sujet | État au 15 octobre 2026 | Prochaine action correcte |
 |---|---|---|
 | Skyline haute résolution | **Non livrée en production** selon les éléments vérifiés : la ressource déployée était rapportée à 680 × 462 px et manquait de netteté lorsqu'elle était agrandie. | Rechercher les branches et PR déjà existantes, retrouver la meilleure ressource source, puis intégrer uniquement l'amélioration manquante via une PR dédiée. Ne pas remplacer le visuel de référence par une image générique, ne pas repartir du hero entier. |
-| Executive Search & Secure Interview Center | **Partiellement opérationnel dans la référence initiale** : l’écran Owner affichait des compteurs, du contenu descriptif et une file d’autorisation, mais pas de vues dédiées aux présentations, aux entretiens, aux décisions et à la prospection. La correction d’interface est en cours dans la [PR #270](https://github.com/wafwana/recrutement-prive/pull/270) ; CI, porte OWNER, fusion, déploiement et parcours réel restent à confirmer. | [PR #189 fusionnée — livraison du socle](https://github.com/wafwana/recrutement-prive/pull/189) ; `app/espace/owner/contacts-securises/page.tsx`, `AuthorizationQueue.tsx`, modèle `MissionPresentation` et endpoint `/api/contacts/secure`. | Réutiliser les données et actions existantes ; préserver les alias et le contrôle OWNER ; ne pas simuler un paiement ou une décision de l’entreprise. Ne considérer la lacune d’interface comme résolue qu’après CI/OWNER gates, déploiement du SHA attendu et vérification des onglets sur le domaine de production. |
+| Executive Search & Secure Interview Center | **Corrigé dans le code, fusionné et déployé en production**. Les six onglets et leurs données sont présents dans le SHA `850014fc0730a03a2b0cc5739ae628ada5dfa7f2`. Les contrôles CI et OWNER ont réussi sur le SHA de la PR ; Vercel indique `READY` sur le commit de fusion et l’alias `www.recrutement-prive.com` pointe vers ce déploiement. **Le test manuel avec une session OWNER authentifiée reste non vérifié** dans cette intervention. | [PR #270 fusionnée](https://github.com/wafwana/recrutement-prive/pull/270), commit `850014fc0730a03a2b0cc5739ae628ada5dfa7f2`, déploiement `dpl_3QSVkjJdkMA6CWN6jS3gH9x4ZJfL`; `app/espace/owner/contacts-securises/page.tsx`, `ExecutiveSearchTabs.tsx`, `AuthorizationQueue.tsx`. | Ne plus traiter « aucun onglet exploitable » comme un blocage actif : la fonctionnalité a été livrée. Ne la rouvrir qu’en présence d’un échec reproduit sur le SHA déployé. Pour clore également la vérification fonctionnelle, ouvrir la page en session OWNER et contrôler les onglets, filtres et autorisation/refus ; ne pas confondre cela avec les tests CI ou le statut READY. |
 | Smoke tests candidat et entreprise de bout en bout | **Non vérifiés dans cette référence.** Les tests automatisés verts ne prouvent pas à eux seuls tous les parcours en conditions réelles. | Exécuter un scénario candidat authentifié (dépôt/analyse CV) et un scénario entreprise authentifié, avec les autorisations appropriées ; consigner le résultat réel et le SHA testé. Ne pas inventer de résultat si les identités ou accès ne sont pas disponibles. |
 
 ## Protocole obligatoire avant toute intervention
