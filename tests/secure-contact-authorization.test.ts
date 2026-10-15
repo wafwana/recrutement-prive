@@ -20,8 +20,15 @@ test("authorization is OWNER-first with delegated admin capability", () => {
   assert.match(route, /delegatedAdmin: session\.user\.role === "ADMIN"/);
 });
 
-test("owner cockpit exposes an authorization queue", () => {
+test("owner cockpit exposes operational Executive Search tabs and the authorization queue", () => {
   const page = fs.readFileSync(path.join(root, "app/espace/owner/contacts-securises/page.tsx"), "utf8");
-  assert.match(page, /AuthorizationQueue/);
+  const tabs = fs.readFileSync(path.join(root, "app/espace/owner/contacts-securises/ExecutiveSearchTabs.tsx"), "utf8");
+  assert.match(page, /ExecutiveSearchTabs/);
   assert.match(page, /status: "REQUESTED"/);
+  assert.match(tabs, /id: "presentations"/);
+  assert.match(tabs, /id: "meetings"/);
+  assert.match(tabs, /id: "authorizations"/);
+  assert.match(tabs, /id: "decisions"/);
+  assert.match(tabs, /id: "outreach"/);
+  assert.match(tabs, /AuthorizationQueue/);
 });
