@@ -24,6 +24,15 @@ Ces règles s'appliquent à tout agent, contributeur ou automatisation qui inter
 
 - Prioriser la résolution des travaux déjà engagés, des blocages de production et des régressions avant d'ajouter des évolutions secondaires.
 - Avant de commencer, vérifier les issues, pull requests, branches et changements en cours liés au besoin ; identifier les travaux déjà réalisés, en cours, bloqués, obsolètes ou redondants.
+
+### 3.1 Source de vérité obligatoire — correctifs déjà résolus
+
+- Avant tout diagnostic ou codage, lire [le registre des correctifs validés](docs/operations/REGISTRE-CORRECTIFS-VALIDES.md). Ce registre est le checkpoint partagé entre agents et conversations pour éviter qu'un ancien problème soit traité comme encore bloqué.
+- Un état de PR (**ouverte**, **fermée** ou **fusionnée**) ne suffit jamais à conclure qu'un défaut existe ou est résolu. Rechercher les PR de remplacement, commits de fusion, ancestry/diff avec `main`, code et tests actuels, puis SHA du déploiement de production.
+- Lorsqu'un correctif est déjà intégré, testé et déployé, ne pas le réimplémenter, le cherry-pick à nouveau, ni créer une correction parallèle sans nouvelle preuve reproductible d'un défaut sur le SHA actuellement déployé.
+- Si une PR ancienne est remplacée par une PR déjà fusionnée, la marquer explicitement comme **supersédée**, commenter le lien vers le correctif livré et la fermer quand cela est approprié. Ne pas la présenter comme un blocage actif.
+- Mettre à jour le registre dans la même PR qui change l'état d'un sujet : statut, PR/commit, fichiers et tests de preuve, SHA de production et éventuels contrôles encore manquants. Séparer explicitement **code livré** et **fonctionnement réel en production vérifié**.
+- Si une preuve manque, inscrire **non vérifié** et préciser l'action de vérification ; ne pas refaire le correctif par défaut. Avant chaque fusion, recontrôler que le `main` n'a pas avancé et que le diff de la PR ne réintroduit pas un correctif déjà livré.
 - Respecter le cahier des charges et les décisions précédentes. Ne pas relancer un chantier à zéro ni abandonner silencieusement un travail en cours.
 - Réaliser la demande de bout en bout dans le périmètre convenu : implémentation, tests, contrôles de sécurité, vérification de déploiement et validation fonctionnelle lorsque l'environnement le permet. Ne pas s'arrêter à un simple rapport ou à une moitié de solution.
 
