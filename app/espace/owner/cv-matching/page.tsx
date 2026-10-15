@@ -14,7 +14,7 @@ type Suggestion = {
   reasons: string[]; categoryMatchLevel: string; applicationStatus: string | null;
   presentationExists: boolean; presentationState: string | null;
 };
-type Overview = { canPresent: boolean; candidateCount: number; jobCount: number; totalMatches: number; truncated: boolean; suggestions: Suggestion[] };
+type Overview = { canPresent: boolean; candidateCount: number; jobCount: number; totalMatches: number; truncated: boolean; suggestions: Suggestion[]; candidateSuggestions: Suggestion[]; offerSuggestions: Suggestion[] };
 
 function candidateAlias(id: string) { return "Profil #" + id.slice(-6).toUpperCase(); }
 function scoreLabel(score: number) {
@@ -129,14 +129,14 @@ export default function CvMatchingPage() {
   const suggestions = overview?.suggestions || [];
   const byCandidate = useMemo(() => {
     const groups = new Map<string, Suggestion[]>();
-    for (const item of suggestions) groups.set(item.candidateId, [...(groups.get(item.candidateId) || []), item]);
+    for (const item of (overview?.candidateSuggestions || suggestions)) groups.set(item.candidateId, [...(groups.get(item.candidateId) || []), item]);
     return [...groups.entries()].map(([id, matches]) => ({ id, matches })).slice(0, 12);
-  }, [suggestions]);
+  }, [suggestions, overview?.candidateSuggestions]);
   const byOffer = useMemo(() => {
     const groups = new Map<string, Suggestion[]>();
-    for (const item of suggestions) groups.set(item.jobId, [...(groups.get(item.jobId) || []), item]);
+    for (const item of (overview?.offerSuggestions || suggestions)) groups.set(item.jobId, [...(groups.get(item.jobId) || []), item]);
     return [...groups.entries()].map(([id, matches]) => ({ id, matches })).slice(0, 12);
-  }, [suggestions]);
+  }, [suggestions, overview?.offerSuggestions]);
 
   async function runCandidateMatching(targetId = candidateId) {
     if (!targetId) return;
@@ -187,7 +187,8 @@ export default function CvMatchingPage() {
   }
 
   function findPair(candidate: string, job: string) {
-    return suggestions.find((item) => item.candidateId === candidate && item.jobId === job);
+    const all = [...(overview?.candidateSuggestions || []), ...(overview?.offerSuggestions || []), ...suggestions];
+    return all.find((item) => item.candidateId === candidate && item.jobId === job);
   }
 
   return (
