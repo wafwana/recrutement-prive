@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import AuthorizationQueue from "./AuthorizationQueue";
 
 type TabId = "overview" | "presentations" | "meetings" | "authorizations" | "decisions" | "outreach";
@@ -29,6 +29,7 @@ type MeetingRow = {
   scheduledAt: string | null;
   startedAt: string | null;
   endedAt: string | null;
+  updatedAt: string;
   durationMinutes: number;
   priceTtc: number;
   paymentStatus: string;
@@ -119,7 +120,7 @@ function StatusPill({ value }: { value: string }) {
   return <span className="inline-flex border border-white/15 bg-white/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-[0.1em] text-slate-300">{readableStatus(value)}</span>;
 }
 
-function EmptyState({ children }: { children: React.ReactNode }) {
+function EmptyState({ children }: { children: ReactNode }) {
   return <p className="border border-white/10 bg-black/10 p-5 text-sm leading-6 text-slate-400">{children}</p>;
 }
 
