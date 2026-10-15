@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AuthorizationQueue({ meetings }: { meetings: { id: string; alias: string | null; channel: string; createdAt: string }[] }) {
+  const router = useRouter();
   const [items, setItems] = useState(meetings);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -19,6 +21,7 @@ export default function AuthorizationQueue({ meetings }: { meetings: { id: strin
         throw new Error(data.error || "Action impossible.");
       }
       setItems(current => current.filter(item => item.id !== meetingId));
+      router.refresh();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Action impossible.");
     } finally {
