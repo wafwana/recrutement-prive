@@ -105,6 +105,8 @@ export async function GET(request: Request) {
         totalMatches: 0,
         truncated: false,
         suggestions: [],
+        candidateSuggestions: [],
+        offerSuggestions: [],
       });
     }
 
@@ -208,6 +210,22 @@ export async function GET(request: Request) {
     }
 
     ranked.sort((a, b) => b.score - a.score);
+    const candidateSuggestionCounts = new Map<string, number>();
+    const offerSuggestionCounts = new Map<string, number>();
+    const candidateSuggestions: typeof ranked = [];
+    const offerSuggestions: typeof ranked = [];
+    for (const item of ranked) {
+      const candidateCount = candidateSuggestionCounts.get(item.candidateId) || 0;
+      if (candidateCount < 3) {
+        candidateSuggestions.push(item);
+        candidateSuggestionCounts.set(item.candidateId, candidateCount + 1);
+      }
+      const offerCount = offerSuggestionCounts.get(item.jobId) || 0;
+      if (offerCount < 3) {
+        offerSuggestions.push(item);
+        offerSuggestionCounts.set(item.jobId, offerCount + 1);
+      }
+    }
     return NextResponse.json({
       canPresent,
       candidateCount: candidates.length,
@@ -215,6 +233,8 @@ export async function GET(request: Request) {
       totalMatches: ranked.length,
       truncated: ranked.length > 100,
       suggestions: ranked.slice(0, 100),
+      candidateSuggestions,
+      offerSuggestions,
     });
   }
 
