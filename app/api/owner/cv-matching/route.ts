@@ -329,7 +329,7 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({
-      job: { id: job.id, title: job.title, location: job.location, companyName: job.company.name },
+      job: { id: job.id, title: job.title, location: job.location },
       matches,
     });
   }
