@@ -78,6 +78,7 @@ jobs:
       - run: npm run test:internal-messaging
       - run: npm run test:secure-contact
       - run: npm run test:secure-contact-authorization
+      - run: npm run test:cv-matching-dashboard
       - run: npm run test:secure-contact-payments
       - run: npm run test:executive-search
       - run: npx tsx tests/candidate-integration.ts
