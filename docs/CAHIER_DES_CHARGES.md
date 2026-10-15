@@ -73,6 +73,7 @@ Maintenir une seule synthèse opérationnelle de référence pour une tâche. É
 - les éventuels blocages qui nécessitent réellement son intervention.
 
 GitHub/CI, Vercel et les tests de production sont des sources complémentaires, pas des avis concurrents : comparer leurs résultats pour le même SHA et expliquer tout écart avant de conclure.
+Le registre partagé [des correctifs validés et travaux restants](operations/REGISTRE-CORRECTIFS-VALIDES.md) doit être consulté au début de chaque intervention et mis à jour avec les preuves de toute nouvelle résolution. Une ancienne PR ouverte n'est pas, à elle seule, la preuve d'un blocage.
 
 ## 2. Socle existant et règle de non-régression
 
