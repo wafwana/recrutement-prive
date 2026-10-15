@@ -70,12 +70,58 @@ export default async function OwnerPage() {
 
       {owner && <div className="mt-6 border border-[#c7a15a]/20 bg-[#111] px-5 py-4 text-xs text-white/45">Compte Owner actif : <span className="text-white/75">{owner.name || "Owner Recrutement Privé"}</span> · {owner.email}</div>}
 
+
+      <section aria-labelledby="owner-workflow-guide" className="mt-6 border border-[#F97316]/30 bg-[#0b0f14] p-6 md:p-7">
+        <p className="text-[10px] uppercase tracking-[0.22em] text-[#F97316]">Guide de travail · mode d’emploi</p>
+        <h2 id="owner-workflow-guide" className="mt-2 font-serif text-2xl">Par où commencer ?</h2>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">Suivez ce parcours pour retrouver facilement votre travail et éviter les doublons. Chaque rubrique a un rôle différent ; les scores aident à trier les profils, mais la décision finale reste humaine.</p>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Link href="/espace/owner/cv-intake" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 1 · Ajouter</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">Intégrer les CV réels</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Importer les CV reçus, puis contrôler l’extraction du texte et des informations utiles.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Ouvrir l’intégration des CV →</span>
+          </Link>
+          <Link href="/espace/documents/cv-library" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 2 · Retrouver</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">Bibliothèque CV</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Consulter les profils déjà intégrés et leur classement. Les coordonnées restent protégées.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Ouvrir la bibliothèque →</span>
+          </Link>
+          <Link href="/espace/owner/metiers" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 3 · Organiser</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">Métiers & dossiers</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Classer les profils par secteur et métier ou lancer une recherche ciblée, même sans offre.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Ouvrir les métiers →</span>
+          </Link>
+          <Link href="/espace/owner/sourcing" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 4 · Rechercher</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">Sourcing automatique</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Suivre la collecte, la provenance et la qualification. Une détection n’est pas une validation.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Ouvrir le sourcing →</span>
+          </Link>
+          <Link href="/espace/owner/cv-matching" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 5 · Comparer</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">CV & matching transversal</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Comparer compétences et besoins, examiner les scores puis décider explicitement d’une présentation confidentielle.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Ouvrir le matching →</span>
+          </Link>
+          <Link href="#entreprises" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 6 · Piloter</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">Entreprises & offres</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Consulter les entreprises connues, voir leurs offres et ouvrir les formulaires de création.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Voir les listes opérationnelles →</span>
+          </Link>
+        </div>
+        <p className="mt-4 border-t border-white/10 pt-4 text-xs leading-5 text-white/45">Repère : <span className="text-white/70">Sources</span> = origine de l’information · <span className="text-white/70">Sourcing</span> = recherche et collecte · <span className="text-white/70">Matching</span> = comparaison profil/besoin · <span className="text-white/70">Vivier</span> = offres externes collectées et qualifiées.</p>
+      </section>
+
       <div className="mt-10 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
         {[
           ["Candidats", candidates, "/espace/documents/cv-library", "Ouvrir la bibliothèque CV"],
           ["CV / documents", documents, "/espace/documents", "Ouvrir les documents"],
-          ["Entreprises", companies.length, "/espace/owner/entreprises", "Ouvrir les entreprises"],
-          ["Offres ouvertes", openJobs, "/espace/owner/offres", "Ouvrir les offres"],
+          ["Entreprises", companies.length, "#entreprises", "Voir les entreprises"],
+          ["Offres ouvertes", openJobs, "#offres", "Voir les offres"],
           ["Candidatures", applications.length, "/espace/owner/cv-matching", "Ouvrir le suivi"],
           ["Profils sourcés", sourcedCandidates.length, "/espace/owner/sourcing", "Ouvrir le sourcing"],
           ["Matching ≥ 80", highMatches, "/espace/owner/cv-matching", "Ouvrir le matching"],
@@ -111,6 +157,55 @@ export default async function OwnerPage() {
           <Link href="/espace/owner/sourcing" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Voir les sources & le sourcing →</Link>
           <Link href="/espace/owner/cv-matching" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Voir le matching →</Link>
           <Link href="/espace/owner/offres-vivier" className="border border-white/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-white/60">Voir le vivier →</Link>
+        </div>
+      </section>
+
+
+      <section id="entreprises" aria-labelledby="owner-companies-heading" className="mt-10 scroll-mt-24 border border-white/10 bg-[#0b0f14] p-6 md:p-7">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Répertoire opérationnel</p>
+            <h2 id="owner-companies-heading" className="mt-2 font-serif text-2xl">Entreprises enregistrées</h2>
+            <p className="mt-2 text-xs leading-5 text-white/45">Vue d’ensemble issue des données existantes, sans modifier ni réattribuer de dossier.</p>
+          </div>
+          <Link href="/espace/owner/entreprises/nouvelle" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a]">Ajouter une entreprise →</Link>
+        </div>
+        <div className="mt-5 space-y-2">
+          {companies.slice(0, 12).map((company) => (
+            <div key={company.id} className="flex flex-col gap-2 border border-white/10 bg-[#111] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-white/80">{company.name}</p>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/35">{company._count.members} membre(s) · {company._count.jobs} offre(s)</p>
+              </div>
+              <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">{company._count.jobs > 0 ? "Avec offre(s)" : "Sans offre publiée"}</span>
+            </div>
+          ))}
+          {companies.length === 0 && <p className="border border-white/10 p-4 text-sm text-white/45">Aucune entreprise enregistrée pour le moment.</p>}
+          {companies.length > 12 && <p className="text-[10px] text-white/35">Affichage des 12 entreprises les plus récentes sur {companies.length}.</p>}
+        </div>
+      </section>
+
+      <section id="offres" aria-labelledby="owner-jobs-heading" className="mt-6 scroll-mt-24 border border-white/10 bg-[#0b0f14] p-6 md:p-7">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.25em] text-[#F97316]">Suivi des missions</p>
+            <h2 id="owner-jobs-heading" className="mt-2 font-serif text-2xl">Offres internes récentes</h2>
+            <p className="mt-2 text-xs leading-5 text-white/45">Vérifier le statut et l’entreprise rattachée avant de lancer ou préparer un matching.</p>
+          </div>
+          <Link href="/espace/owner/offres/nouvelle" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Ajouter une offre →</Link>
+        </div>
+        <div className="mt-5 space-y-2">
+          {jobs.slice(0, 12).map((job) => (
+            <div key={job.id} className="flex flex-col gap-2 border border-white/10 bg-[#111] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-white/80">{job.title}</p>
+                <p className="mt-1 text-xs text-white/40">{job.company.name}</p>
+              </div>
+              <span className={"self-start border px-2.5 py-1 text-[9px] uppercase tracking-[0.12em] " + (job.status === "OPEN" ? "border-emerald-400/30 text-emerald-300" : "border-white/10 text-white/45")}>{job.status === "OPEN" ? "Ouverte" : job.status}</span>
+            </div>
+          ))}
+          {jobs.length === 0 && <p className="border border-white/10 p-4 text-sm text-white/45">Aucune offre enregistrée pour le moment.</p>}
+          {jobs.length > 12 && <p className="text-[10px] text-white/35">Affichage des 12 offres les plus récemment modifiées sur les 100 chargées.</p>}
         </div>
       </section>
 
