@@ -70,6 +70,51 @@ export default async function OwnerPage() {
 
       {owner && <div className="mt-6 border border-[#c7a15a]/20 bg-[#111] px-5 py-4 text-xs text-white/45">Compte Owner actif : <span className="text-white/75">{owner.name || "Owner Recrutement Privé"}</span> · {owner.email}</div>}
 
+      <section aria-labelledby="owner-workflow-guide" className="mt-6 border border-[#F97316]/30 bg-[#0b0f14] p-6 md:p-7">
+        <p className="text-[10px] uppercase tracking-[0.22em] text-[#F97316]">Guide de travail · mode d’emploi</p>
+        <h2 id="owner-workflow-guide" className="mt-2 font-serif text-2xl">Par où commencer ?</h2>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">Chaque rubrique a un rôle différent. Suivez ces étapes dans l’ordre pour éviter les doublons et retrouver facilement votre travail. Ouvrez une rubrique pour accéder à ses outils.</p>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Link href="/espace/owner/cv-intake" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 1 · Ajouter</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">Intégrer les CV réels</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Importer les CV reçus, puis vérifier que le texte et les informations utiles ont été extraits.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Ouvrir l’intégration des CV →</span>
+          </Link>
+          <Link href="/espace/documents/cv-library" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 2 · Retrouver</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">Bibliothèque CV</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Consulter les dossiers de candidats et retrouver les profils déjà intégrés. Les coordonnées restent protégées.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Ouvrir la bibliothèque →</span>
+          </Link>
+          <Link href="/espace/owner/metiers" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 3 · Organiser</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">Métiers & dossiers</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Classer les profils par secteur et métier, ou lancer une recherche ciblée sans dépendre d’une offre.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Ouvrir les métiers →</span>
+          </Link>
+          <Link href="/espace/owner/sourcing" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 4 · Rechercher</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">Sourcing automatique</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Suivre la collecte et la qualification des profils détectés. Une détection ne signifie pas qu’un candidat est validé.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Ouvrir le sourcing →</span>
+          </Link>
+          <Link href="/espace/owner/cv-matching" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 5 · Comparer</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">CV & Matching transversal</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Comparer les critères d’une mission aux compétences des profils. Le score aide à trier, mais ne remplace pas la vérification humaine.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Ouvrir le matching →</span>
+          </Link>
+          <Link href="/espace/owner/entreprises" className="group border border-white/10 bg-[#111] p-4 transition hover:border-[#F97316]/60 focus:outline-none focus:ring-2 focus:ring-[#F97316]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#F97316]">Étape 6 · Gérer</p>
+            <h3 className="mt-2 text-sm font-semibold text-white">Entreprises & offres</h3>
+            <p className="mt-2 text-xs leading-5 text-white/55">Créer ou retrouver une entreprise, puis gérer ses offres et candidatures depuis les rubriques dédiées.</p>
+            <span className="mt-3 block text-xs text-[#F97316]">Ouvrir les entreprises →</span>
+          </Link>
+        </div>
+        <p className="mt-4 border-t border-white/10 pt-4 text-xs leading-5 text-white/45">Repère simple : <span className="text-white/70">Sources</span> = d’où vient l’information · <span className="text-white/70">Sourcing</span> = rechercher et collecter · <span className="text-white/70">Matching</span> = comparer profil et besoin · <span className="text-white/70">Vivier</span> = retrouver les offres ou profils disponibles.</p>
+      </section>
+
       <div className="mt-10 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
         {[
           ["Candidats", candidates, "/espace/documents/cv-library", "Ouvrir la bibliothèque CV"],
