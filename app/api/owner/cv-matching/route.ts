@@ -254,7 +254,6 @@ export async function GET(request: Request) {
     const candidates = await prisma.candidateProfile.findMany({
       where: { status: "ACTIVE" },
       include: {
-        user: { select: { name: true, email: true } },
         primaryCategory: { select: { code: true } },
       },
       orderBy: { updatedAt: "desc" },
@@ -337,7 +336,7 @@ export async function GET(request: Request) {
 
   const candidate = await prisma.candidateProfile.findUnique({
     where: { id: candidateId },
-    include: { user: { select: { name: true, email: true } }, primaryCategory: { select: { code: true } } },
+    include: { primaryCategory: { select: { code: true } } },
   });
   if (!candidate) return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
 
@@ -351,7 +350,6 @@ export async function GET(request: Request) {
   const jobs = await prisma.job.findMany({
     where: { status: "OPEN" },
     include: {
-      company: { select: { name: true } },
       jobCategory: { select: { code: true } },
       subCategory: { select: { code: true } },
     },
