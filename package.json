@@ -39,6 +39,7 @@
     "test:executive-search": "node --import tsx --test tests/executive-search-presentation.test.ts",
     "test:secure-contact-authorization": "node --import tsx --test tests/secure-contact-authorization.test.ts",
     "test:admin-partners-security": "node --import tsx --test tests/admin-partners-api-security.test.ts",
+    "test:security": "tsx tests/security-validation.ts",
     "test:global-back-navigation": "node --import tsx --test tests/global-back-navigation.test.ts",
     "test:sector-visuals": "node --import tsx --test tests/sector-visuals.test.ts",
     "test:owner-permissions-governance": "node --import tsx --test tests/owner-permissions-governance.test.ts",
