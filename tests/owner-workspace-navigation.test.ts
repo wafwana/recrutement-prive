@@ -33,7 +33,8 @@ test("every hard-coded OWNER navigation destination resolves to an existing App 
   const hrefs = [...nav.matchAll(/href: "([^"]+)"/g)].map((match) => match[1]);
   assert.ok(hrefs.length >= 25, `expected complete navigation list; got ${hrefs.length} links`);
   for (const href of hrefs) {
-    const routeFile = path.join(root, "app", href.replace(/^\/+/, ""), "page.tsx");
+    const routePath = href.split("#")[0].replace(/^\\/+/, "");
+    const routeFile = path.join(root, "app", routePath, "page.tsx");
     assert.ok(fs.existsSync(routeFile), `navigation target has no page: ${href} -> ${routeFile}`);
   }
 });
