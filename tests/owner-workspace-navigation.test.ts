@@ -12,6 +12,8 @@ test("persistent OWNER navigation is visible only to OWNER and keeps role author
   assert.match(layout, /role === "OWNER" \? <OwnerWorkspaceNavigation \/> : null/);
   assert.match(layout, /const visibleNavigation = navigation\.filter/);
   assert.match(layout, /<ContextBackButton \/>/);
+  const legacyLayout = read("app/owner/layout.tsx");
+  assert.match(legacyLayout, /session\?\.user\?\.role === "OWNER" \? <OwnerWorkspaceNavigation \/> : null/);
 });
 
 test("OWNER navigation offers core work areas, grouped routes and keyboard/screen-reader states", () => {
