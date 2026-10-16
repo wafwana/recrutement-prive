@@ -21,7 +21,7 @@ test("all workspace navigation keys have non-empty translations in all seven sup
   for (const locale of SUPPORTED_LOCALES) {
     for (const key of usedKeys) {
       const value = WORKSPACE_NAV_TRANSLATIONS[locale]?.[key];
-      assert.equal(typeof value, "string", `${locale} has no string for ${key}`);
+      assert.ok(typeof value === "string", `${locale} has no string for ${key}`);
       assert.ok(value.trim().length > 0, `${locale} has an empty translation for ${key}`);
       assert.notEqual(value, key, `${locale} falls back to the raw key for ${key}`);
       assert.equal(getTranslation(locale, key), value, `${locale} does not resolve ${key} through getTranslation`);
