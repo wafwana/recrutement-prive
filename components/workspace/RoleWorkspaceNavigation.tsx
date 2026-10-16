@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 type WorkspaceRole = "CANDIDAT" | "ENTREPRISE" | "CONSULTANT" | "ADMIN";
-type AdminPermission = "PLATFORM_SETTINGS" | "PARTNERS_MANAGE";
-type NavItem = { href: string; label: string; permission?: AdminPermission };
+export type WorkspaceNavigationPermission = "PLATFORM_SETTINGS" | "PARTNERS_MANAGE";
+type NavItem = { href: string; label: string; permission?: WorkspaceNavigationPermission };
 type WorkspaceDefinition = { title: string; description: string; links: NavItem[] };
 
 const workspaces: Record<WorkspaceRole, WorkspaceDefinition> = {
@@ -63,15 +63,15 @@ function isActive(pathname: string, href: string): boolean {
 
 export default function RoleWorkspaceNavigation({
   role,
-  allowedAdminPermissions = [],
+  allowedWorkspaceNavigationPermissions = [],
 }: {
   role: WorkspaceRole;
-  allowedAdminPermissions?: AdminPermission[];
+  allowedWorkspaceNavigationPermissions?: WorkspaceNavigationPermission[];
 }) {
   const pathname = usePathname() || "/";
   const workspace = workspaces[role];
   const links = workspace.links.filter(
-    (item) => !item.permission || allowedAdminPermissions.includes(item.permission),
+    (item) => !item.permission || allowedWorkspaceNavigationPermissions.includes(item.permission),
   );
 
   return (
