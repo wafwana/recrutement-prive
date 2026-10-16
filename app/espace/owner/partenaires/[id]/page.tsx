@@ -10,13 +10,12 @@ export default async function PartnerDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const session = await auth();
-  if (!session?.user?.id || !["OWNER", "ADMIN", "CONSULTANT"].includes(session.user.role || "")) {
+  if (!session?.user?.id || session.user.role !== "OWNER") {
     redirect("/connexion");
   }
 
   if (!(await hasPermission(session.user.id, session.user.role, "PARTNERS_MANAGE"))) {
-    const fallbackRedirect = session.user.role === "ADMIN" ? "/espace/admin" : session.user.role === "CONSULTANT" ? "/espace/consultant" : "/espace";
-    redirect(fallbackRedirect);
+    redirect("/espace");
   }
 
   const { id } = await params;
@@ -54,7 +53,7 @@ export default async function PartnerDetailPage({
   return (
     <PartnerDetailClient
       partner={serializedPartner}
-      currentUserRole={session.user.role || "CONSULTANT"}
+      currentUserRole="OWNER"
     />
   );
 }
