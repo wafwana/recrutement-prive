@@ -32,13 +32,18 @@ export interface SourcingClientProps {
   }>;
 }
 
+function partnerKey(item: SourcingClientProps["initialItems"][number]): string {
+  return `${item.source}:${item.officialName.trim().toLocaleLowerCase("fr-FR")}`;
+}
+
 export default function SourcingClient({ initialItems }: SourcingClientProps) {
   const [items, setItems] = useState(initialItems);
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [country, setCountry] = useState("");
   const [loading, setLoading] = useState(false);
-  const [importingIndex, setImportingIndex] = useState<number | null>(null);
+  const [importingKey, setImportingKey] = useState<string | null>(null);
+  const [importedKeys, setImportedKeys] = useState<Set<string>>(() => new Set());
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   async function handleSearch(e: React.FormEvent) {
@@ -64,8 +69,18 @@ export default function SourcingClient({ initialItems }: SourcingClientProps) {
     }
   }
 
-  async function handleImport(partnerItem: (typeof initialItems)[0], index: number) {
-    setImportingIndex(index);
+  function clearFilters() {
+    setQ("");
+    setCategory("");
+    setCountry("");
+    setItems(initialItems);
+    setMessage(null);
+  }
+
+  async function handleImport(partnerItem: (typeof initialItems)[0]) {
+    const key = partnerKey(partnerItem);
+    if (importedKeys.has(key)) return;
+    setImportingKey(key);
     setMessage(null);
 
     try {
@@ -83,6 +98,7 @@ export default function SourcingClient({ initialItems }: SourcingClientProps) {
         throw new Error(data.error || "Erreur lors de l'importation.");
       }
 
+      setImportedKeys((previous) => new Set(previous).add(key));
       setMessage({
         type: "success",
         text: `Organisme "${partnerItem.officialName}" importé avec succès sous le statut "À qualifier".`,
@@ -90,7 +106,7 @@ export default function SourcingClient({ initialItems }: SourcingClientProps) {
     } catch (err: unknown) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Erreur" });
     } finally {
-      setImportingIndex(null);
+      setImportingKey(null);
     }
   }
 
@@ -103,7 +119,7 @@ export default function SourcingClient({ initialItems }: SourcingClientProps) {
           <p className="text-[10px] uppercase tracking-[0.35em] text-[#F97316]">Owner · Découverte & Sourcing</p>
           <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Organismes & Réseaux Découverts</h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">
-            Sourcing et identification des réseaux d&apos;expatriés, universités, écoles, chambres de commerce et associations à l&apos;international.
+            Répertoire institutionnel préqualifié pour identifier les réseaux d&apos;expatriés, universités, écoles, chambres de commerce et associations utiles au recrutement international.
           </p>
         </div>
         <Link
@@ -126,54 +142,84 @@ export default function SourcingClient({ initialItems }: SourcingClientProps) {
         </div>
       )}
 
-      <form onSubmit={handleSearch} className="mt-8 border border-white/10 bg-[#111] p-6 space-y-4">
-        <p className="text-[10px] uppercase tracking-[0.2em] text-[#F97316]">Recherche d&apos;organismes institutionnels</p>
+      <div className="mt-8 border border-white/10 bg-[#111] p-4 text-xs leading-6 text-white/55">
+        <p><strong className="text-white">Mode de recherche :</strong> répertoire intégré filtré localement via l&apos;API RP. Ce bouton ne lance pas de collecte Web en direct ; les fiches doivent être vérifiées sur leur site officiel avant toute prise de contact.</p>
+        <p className="mt-2 text-white/40">Référentiel affiché : {items.length} organisme(s). Les sources et contacts sont des indications de découverte, pas une validation de partenariat.</p>
+      </div>
+
+      <form onSubmit={handleSearch} className="mt-4 border border-white/10 bg-[#111] p-6 space-y-4">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-[#F97316]">Filtrer le répertoire institutionnel</p>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <input
-            type="text"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Mots-clés (nom, sigle, réseau...)"
-            className="border border-white/15 bg-black/60 px-3 py-2 text-xs text-white"
-          />
+          <div>
+            <label htmlFor="partner-directory-query" className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-white/45">Mots-clés</label>
+            <input
+              id="partner-directory-query"
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Nom, sigle, réseau, ville..."
+              className="w-full border border-white/15 bg-black/60 px-3 py-2 text-xs text-white outline-none focus:border-[#F97316]"
+            />
+          </div>
 
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="border border-white/15 bg-black/60 px-3 py-2 text-xs text-white"
-          >
-            <option value="">Toutes les catégories</option>
-            {PARTNER_CATEGORIES.map((cat) => (
-              <option key={cat.code} value={cat.code}>
-                {cat.label}
-              </option>
-            ))}
-          </select>
+          <div>
+            <label htmlFor="partner-directory-category" className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-white/45">Catégorie</label>
+            <select
+              id="partner-directory-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full border border-white/15 bg-black/60 px-3 py-2 text-xs text-white outline-none focus:border-[#F97316]"
+            >
+              <option value="">Toutes les catégories</option>
+              {PARTNER_CATEGORIES.map((cat) => (
+                <option key={cat.code} value={cat.code}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <input
-            type="text"
-            value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            placeholder="Pays / Région..."
-            className="border border-white/15 bg-black/60 px-3 py-2 text-xs text-white"
-          />
+          <div>
+            <label htmlFor="partner-directory-country" className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-white/45">Pays</label>
+            <input
+              id="partner-directory-country"
+              type="search"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="France, Inde, Émirats..."
+              className="w-full border border-white/15 bg-black/60 px-3 py-2 text-xs text-white outline-none focus:border-[#F97316]"
+            />
+          </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={loading || (!q && !category && !country)}
+            className="border border-white/15 px-5 py-2.5 text-xs uppercase tracking-wider text-white/70 hover:border-white/35 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Effacer les filtres
+          </button>
           <button
             type="submit"
             disabled={loading}
-            className="border border-[#F97316] bg-[#F97316] px-6 py-2.5 text-xs font-semibold text-black uppercase tracking-wider"
+            className="border border-[#F97316] bg-[#F97316] px-6 py-2.5 text-xs font-semibold text-black uppercase tracking-wider disabled:cursor-wait disabled:opacity-60"
           >
-            {loading ? "Recherche..." : "Lancer le Sourcing"}
+            {loading ? "Recherche..." : "Filtrer le répertoire"}
           </button>
         </div>
       </form>
 
-      <div className="mt-8 space-y-4">
-        {items.map((item, index) => (
-          <article key={index} className="border border-white/10 bg-[#111] p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-xs text-white/50">
+        <p role="status" aria-live="polite">{items.length} résultat(s) affiché(s).</p>
+        <p className="text-white/35">{initialItems.length} fiche(s) dans le répertoire initial</p>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        {items.map((item) => (
+          <article key={partnerKey(item)} className="border border-white/10 bg-[#111] p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-2 max-w-3xl">
               <div className="flex items-center gap-3">
                 <span className="border border-[#F97316]/40 bg-[#F97316]/10 px-2.5 py-0.5 text-[9px] uppercase tracking-wider text-[#F97316]">
@@ -201,11 +247,16 @@ export default function SourcingClient({ initialItems }: SourcingClientProps) {
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => handleImport(item, index)}
-                disabled={importingIndex === index}
-                className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-[#c7a15a] hover:bg-[#c7a15a]/20 disabled:opacity-50"
+                type="button"
+                onClick={() => void handleImport(item)}
+                disabled={importingKey === partnerKey(item) || importedKeys.has(partnerKey(item))}
+                className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-[#c7a15a] hover:bg-[#c7a15a]/20 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {importingIndex === index ? "Importation..." : "+ Importer comme Partenaire"}
+                {importingKey === partnerKey(item)
+                  ? "Importation..."
+                  : importedKeys.has(partnerKey(item))
+                    ? "Importé pendant cette session"
+                    : "+ Importer comme partenaire"}
               </button>
             </div>
           </article>
