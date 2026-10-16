@@ -93,7 +93,16 @@ export async function POST(request: Request) {
       parsed = jobSchema.safeParse(body);
     }
     if (!parsed.success) return NextResponse.json({ error: "Données d'offre invalides" }, { status: 400 });
-    const access = await requireCompanyAccess(parsed.data.companyId);
+    let access;
+    try {
+      access = await requireCompanyAccess(parsed.data.companyId);
+    } catch (error) {
+      // Keep authorization failures distinct from invalid job payloads.
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Accès refusé" },
+        { status: 403 },
+      );
+    }
     const requestLimit = rateLimit(`company-job:create:${access.userId}`, 20, 60 * 60_000);
     if (!requestLimit.allowed) return NextResponse.json({ error: "Trop de créations d'offres. Merci de réessayer plus tard." }, { status: 429 });
 
