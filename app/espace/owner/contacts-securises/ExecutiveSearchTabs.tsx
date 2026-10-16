@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import AuthorizationQueue from "./AuthorizationQueue";
 
-type TabId = "overview" | "presentations" | "meetings" | "authorizations" | "decisions" | "outreach";
+type TabId = "overview" | "matching" | "presentations" | "meetings" | "authorizations" | "decisions" | "outreach";
 
 type PresentationRow = {
   id: string;
@@ -48,6 +48,36 @@ type OutreachRow = {
   repliedAt: string | null;
 };
 
+type MatchingSuggestion = {
+  candidateId: string;
+  candidateAlias: string;
+  candidateHeadline: string | null;
+  candidateLocation: string | null;
+  candidateCountry: string | null;
+  experienceYears: number | null;
+  jobId: string;
+  jobTitle: string;
+  companyAlias: string;
+  jobLocation: string | null;
+  score: number;
+  matchedSkills: string[];
+  missingSkills: string[];
+  reasons: string[];
+  categoryMatchLevel: string;
+  applicationStatus: string | null;
+  presentationExists: boolean;
+  presentationState: string | null;
+};
+
+type MatchingOverview = {
+  canPresent: boolean;
+  candidateCount: number;
+  jobCount: number;
+  totalMatches: number;
+  truncated: boolean;
+  suggestions: MatchingSuggestion[];
+};
+
 type Props = {
   counts: {
     pendingOutreach: number;
@@ -64,6 +94,7 @@ type Props = {
 
 const tabs: { id: TabId; label: string; count?: (props: Props) => number }[] = [
   { id: "overview", label: "Vue d’ensemble" },
+  { id: "matching", label: "Matching candidats ↔ offres" },
   { id: "presentations", label: "Présentations", count: (props) => props.presentations.length },
   { id: "meetings", label: "Entretiens sécurisés", count: (props) => props.meetings.length },
   { id: "authorizations", label: "Autorisations", count: (props) => props.authorizations.length },
@@ -131,6 +162,12 @@ export default function ExecutiveSearchTabs(props: Props) {
   const [meetingSearch, setMeetingSearch] = useState("");
   const [meetingStatus, setMeetingStatus] = useState("ALL");
   const [outreachStatus, setOutreachStatus] = useState("ALL");
+  const [matchingOverview, setMatchingOverview] = useState<MatchingOverview | null>(null);
+  const [matchingLoading, setMatchingLoading] = useState(false);
+  const [matchingLoaded, setMatchingLoaded] = useState(false);
+  const [matchingError, setMatchingError] = useState("");
+  const [matchingMessage, setMatchingMessage] = useState("");
+  const [presentingMatchKey, setPresentingMatchKey] = useState<string | null>(null);
 
   const filteredPresentations = props.presentations.filter((item) => {
     const query = presentationSearch.trim().toLocaleLowerCase("fr-FR");
@@ -146,6 +183,57 @@ export default function ExecutiveSearchTabs(props: Props) {
 
   const filteredOutreach = props.outreach.filter((item) => outreachStatus === "ALL" || item.status === outreachStatus);
   const decisionItems = props.meetings.filter((item) => item.decisionRequired || (item.status === "COMPLETED" && item.decisionStatus === "PENDING"));
+
+  async function loadMatchingOverview() {
+    setMatchingLoading(true);
+    setMatchingError("");
+    try {
+      const response = await fetch("/api/owner/cv-matching?mode=overview", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Impossible de charger les propositions de matching.");
+      setMatchingOverview(data as MatchingOverview);
+      setMatchingLoaded(true);
+    } catch (error) {
+      setMatchingError(error instanceof Error ? error.message : "Erreur de chargement du matching.");
+      setMatchingLoaded(true);
+    } finally {
+      setMatchingLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "matching" && !matchingLoaded && !matchingLoading) {
+      void loadMatchingOverview();
+    }
+  }, [activeTab, matchingLoaded, matchingLoading]);
+
+  async function prepareMatchingPresentation(match: MatchingSuggestion) {
+    if (!matchingOverview?.canPresent || match.presentationExists) return;
+    const confirmed = window.confirm(
+      `Préparer une présentation confidentielle pour ${match.candidateAlias} et ${match.jobTitle} ? L’identité restera protégée ; aucun email ni contact externe ne sera envoyé automatiquement.`,
+    );
+    if (!confirmed) return;
+
+    const key = match.candidateId + "::" + match.jobId;
+    setPresentingMatchKey(key);
+    setMatchingMessage("");
+    setMatchingError("");
+    try {
+      const response = await fetch("/api/owner/cv-matching", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "present", candidateId: match.candidateId, jobId: match.jobId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "La présentation n’a pas pu être préparée.");
+      setMatchingMessage(data.message || "Présentation confidentielle préparée.");
+      await loadMatchingOverview();
+    } catch (error) {
+      setMatchingError(error instanceof Error ? error.message : "Erreur pendant la préparation de la présentation.");
+    } finally {
+      setPresentingMatchKey(null);
+    }
+  }
 
   return (
     <div className="mt-8">
@@ -171,6 +259,109 @@ export default function ExecutiveSearchTabs(props: Props) {
       </div>
 
       <section id="executive-search-tab-panel" role="tabpanel" aria-labelledby={`executive-search-tab-${activeTab}`} tabIndex={0} className="mt-4 min-w-0 outline-none">
+        {activeTab === "matching" && (
+          <section className="space-y-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-400">Matching candidats ↔ offres</p>
+                <h2 className="mt-2 text-2xl font-semibold">Propositions directement dans le cockpit</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+                  Les meilleures paires sont calculées par le moteur existant et affichées sous forme anonymisée. Examinez les points communs, les éléments à vérifier et décidez explicitement de préparer ou non une présentation confidentielle.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => void loadMatchingOverview()} disabled={matchingLoading} className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.14em] text-slate-300 hover:border-orange-400 disabled:opacity-40">
+                  {matchingLoading ? "Actualisation…" : "Actualiser"}
+                </button>
+                <Link href="/espace/owner/cv-matching" className="border border-orange-400/50 px-4 py-3 text-[10px] uppercase tracking-[0.14em] text-orange-300 hover:bg-orange-400/10">
+                  Matching complet →
+                </Link>
+              </div>
+            </div>
+
+            {matchingOverview ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  ["Profils actifs", matchingOverview.candidateCount],
+                  ["Offres ouvertes", matchingOverview.jobCount],
+                  ["Paires au-dessus du seuil", matchingOverview.totalMatches],
+                  ["Propositions chargées", matchingOverview.suggestions.length],
+                ].map(([label, value]) => (
+                  <article key={String(label)} className="border border-white/10 bg-white/[0.04] p-4">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">{label}</p>
+                    <p className="mt-2 text-2xl font-semibold text-orange-300">{value}</p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+
+            {matchingMessage ? <p aria-live="polite" className="border border-emerald-400/30 bg-emerald-400/[0.04] p-4 text-sm text-emerald-200">{matchingMessage}</p> : null}
+            {matchingError ? <p aria-live="polite" className="border border-red-400/30 bg-red-400/[0.04] p-4 text-sm text-red-200">{matchingError}</p> : null}
+
+            {matchingLoading && !matchingOverview ? <EmptyState>Chargement des meilleures correspondances…</EmptyState> : null}
+            {!matchingLoading && matchingLoaded && !matchingError && (matchingOverview?.suggestions.length ?? 0) === 0 ? (
+              <EmptyState>
+                Aucune paire ne dépasse actuellement le seuil du moteur. Vérifiez que les CV ont été intégrés et que des offres sont ouvertes.
+              </EmptyState>
+            ) : null}
+
+            {matchingOverview?.suggestions.length ? (
+              <div className="space-y-3">
+                {matchingOverview.suggestions.slice(0, 15).map((match) => {
+                  const key = match.candidateId + "::" + match.jobId;
+                  const busy = presentingMatchKey === key;
+                  return (
+                    <article key={key} className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange-300">
+                            {match.candidateAlias} ↔ {match.companyAlias}
+                          </p>
+                          <h3 className="mt-2 text-lg font-semibold text-white">{match.jobTitle}</h3>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {[match.candidateHeadline, match.candidateLocation, match.candidateCountry, match.experienceYears !== null ? match.experienceYears + " an(s) d’expérience" : null].filter(Boolean).join(" · ") || "Informations de profil limitées"}
+                          </p>
+                          <p className="mt-3 text-sm leading-6 text-slate-300">{match.reasons.join(" ") || "Score calculé à partir des informations disponibles."}</p>
+                        </div>
+                        <div className="flex shrink-0 flex-row items-center gap-3 lg:flex-col lg:items-end">
+                          <span className="border border-orange-400/40 bg-orange-400/[0.06] px-3 py-2 text-center">
+                            <strong className="block text-2xl text-orange-300">{match.score}%</strong>
+                            <span className="block text-[9px] uppercase tracking-[0.12em] text-slate-400">Compatibilité indicative</span>
+                          </span>
+                          {match.presentationExists ? <StatusPill value="PRESENTED" /> : null}
+                        </div>
+                      </div>
+
+                      {match.matchedSkills.length ? (
+                        <div className="mt-4">
+                          <p className="text-[9px] uppercase tracking-[0.14em] text-slate-400">Compétences communes</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {match.matchedSkills.slice(0, 8).map((skill) => <span key={skill} className="border border-emerald-400/25 px-2 py-1 text-[10px] text-emerald-200">{skill}</span>)}
+                          </div>
+                        </div>
+                      ) : null}
+                      {match.missingSkills.length ? <p className="mt-3 text-xs leading-5 text-amber-200/80">À vérifier : {match.missingSkills.slice(0, 6).join(", ")}</p> : null}
+                      <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-[9px] uppercase tracking-[0.12em] text-slate-500">
+                          {match.presentationExists ? "Présentation déjà enregistrée" : "Proposition indicative · décision humaine requise"}
+                        </p>
+                        {match.presentationExists ? (
+                          <span className="border border-emerald-400/25 px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-emerald-200">Déjà présenté</span>
+                        ) : (
+                          <button type="button" disabled={!matchingOverview.canPresent || busy} onClick={() => void prepareMatchingPresentation(match)} title={!matchingOverview.canPresent ? "La permission de présenter un candidat n'est pas accordée." : undefined} className="border border-orange-400 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-orange-300 hover:bg-orange-400/10 disabled:cursor-not-allowed disabled:opacity-35">
+                            {busy ? "Préparation…" : "Préparer la mise en relation"}
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : null}
+            {matchingOverview?.truncated ? <p className="text-xs leading-5 text-amber-100/70">La liste est limitée aux 15 meilleures paires dans ce cockpit. Utilisez « Matching complet » pour explorer l’ensemble des propositions.</p> : null}
+          </section>
+        )}
+
         {activeTab === "overview" && (
           <div className="space-y-8">
             <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
