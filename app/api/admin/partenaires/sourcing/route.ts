@@ -39,6 +39,10 @@ export async function POST(request: Request) {
 
   try {
     const body: { partner: DiscoveredPartner; initialStatus?: string } = await request.json();
+    if (body.initialStatus === "VALIDATED_PARTNER") {
+      return NextResponse.json({ error: "Seul l'OWNER peut valider officiellement un partenariat." }, { status: 403 });
+    }
+
     if (!body.partner || !body.partner.officialName || !body.partner.category) {
       return NextResponse.json({ error: "Données de l'organisme découvertes incomplètes." }, { status: 400 });
     }
