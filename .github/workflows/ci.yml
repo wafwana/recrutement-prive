@@ -88,6 +88,7 @@ jobs:
       - run: npm run test:global-back-navigation
       - run: npm run test:sector-visuals
       - run: npm run test:owner-permissions-governance
+      - run: npm run test:api-authorization-matrix
       - run: npm run typecheck
       - run: npm run build
       - name: End-to-end Auth.js login, CV intake and OWNER outflows over HTTP
