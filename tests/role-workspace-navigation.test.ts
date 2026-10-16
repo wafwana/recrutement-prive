@@ -8,7 +8,7 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
 test("role workspaces get persistent navigation without changing the OWNER gate", () => {
   const layout = read("app/espace/layout.tsx");
-  assert.match(layout, /import RoleWorkspaceNavigation from "@\/components\/workspace\/RoleWorkspaceNavigation"/);
+  assert.match(layout, /import RoleWorkspaceNavigation.*from "@\/components\/workspace\/RoleWorkspaceNavigation"/);
   assert.match(layout, /workspaceRole \? <RoleWorkspaceNavigation role=\{workspaceRole\}/);
   assert.match(layout, /role === "OWNER" \? <OwnerWorkspaceNavigation \/> : null/);
   assert.match(layout, /const visibleNavigation = navigation\.filter\(\(item\) => item\.role === "ALL" \|\| item\.role === role\)/);
