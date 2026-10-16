@@ -10,7 +10,9 @@ test("persistent OWNER navigation is visible only to OWNER and keeps role author
   const layout = read("app/espace/layout.tsx");
   assert.match(layout, /import OwnerWorkspaceNavigation from "@\/components\/owner\/OwnerWorkspaceNavigation"/);
   assert.match(layout, /role === "OWNER" \? <OwnerWorkspaceNavigation \/> : null/);
-  assert.match(layout, /const visibleNavigation = navigation\.filter/);
+  assert.doesNotMatch(layout, /const navigation = \[/);
+  assert.doesNotMatch(layout, /visibleNavigation/);
+  assert.match(layout, /workspaceRole \? <RoleWorkspaceNavigation role=\{workspaceRole\}/);
   assert.match(layout, /<ContextBackButton \/>/);
   const legacyLayout = read("app/owner/layout.tsx");
   assert.match(legacyLayout, /session\?\.user\?\.role === "OWNER" \? <OwnerWorkspaceNavigation \/> : null/);

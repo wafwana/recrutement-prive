@@ -7,17 +7,9 @@ import OwnerWorkspaceNavigation from "@/components/owner/OwnerWorkspaceNavigatio
 import RoleWorkspaceNavigation, { type WorkspaceNavigationPermission } from "@/components/workspace/RoleWorkspaceNavigation";
 import { hasPermission } from "@/lib/auth/permissions";
 
-const navigation = [
-  { href: "/espace/candidat", label: "Candidat", role: "CANDIDAT" },
-  { href: "/espace/entreprise", label: "Entreprise", role: "ENTREPRISE" },
-  { href: "/espace/consultant", label: "Consultant", role: "CONSULTANT" },
-  { href: "/espace/messages", label: "Messagerie", role: "ALL" },
-];
-
 export default async function EspaceLayout({ children }: { children: ReactNode }) {
   const session = await auth();
   const role = session?.user?.role;
-  const visibleNavigation = navigation.filter((item) => item.role === "ALL" || item.role === role);
   const canManagePlatformSettings = role === "ADMIN" && session?.user?.id
     ? await hasPermission(session.user.id, role, "PLATFORM_SETTINGS").catch(() => false)
     : false;
@@ -38,14 +30,8 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
       <header className="border-b border-white/10">
         <div className="mx-auto flex min-h-20 w-[min(1180px,calc(100%-40px))] items-center justify-between gap-8 md:w-[min(1180px,calc(100%-72px))]">
           <Link href="/" className="font-serif text-xl tracking-[0.22em]">RP</Link>
-          <nav className="flex flex-wrap items-center justify-end gap-5 text-[10px] uppercase tracking-[0.2em] text-white/60">
-            {visibleNavigation.map((item) => (
-              <Link key={item.href} href={item.href} className="transition hover:text-white">
-                {item.label}
-              </Link>
-            ))}
-            {role === "ADMIN" && <Link href="/espace/admin" className="text-[#c7a15a] transition hover:text-white">Admin</Link>}{role === "ADMIN" && canManagePlatformSettings && <Link href="/espace/admin/configuration" className="text-white/50 transition hover:text-white">Configuration</Link>}
-            <Link href="/" className="text-[#c7a15a]">Retour au site</Link>
+          <nav aria-label="Navigation générale" className="flex items-center justify-end text-[10px] uppercase tracking-[0.2em] text-white/60">
+            <Link href="/" className="min-h-11 inline-flex items-center px-2 text-[#c7a15a] transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f1ce8b]">Retour au site</Link>
           </nav>
         </div>
       </header>
