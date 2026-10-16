@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
-import { configuredSources, getConfiguredSourcesAsync } from "@/lib/sourcing/global";
+import { getConfiguredSourcesAsync, hasExplicitConfiguredSources } from "@/lib/sourcing/global";
 import BackButton from "@/components/navigation/BackButton";
 import SourcingRunButton from "@/components/owner/SourcingRunButton";
 import CandidateSourcingClient from "@/components/owner/CandidateSourcingClient";
@@ -15,6 +15,7 @@ export default async function OwnerSourcingPage() {
 
   const jobSources = await getConfiguredSourcesAsync("RP_GLOBAL_JOB_SOURCES");
   const candidateSources = await getConfiguredSourcesAsync("RP_GLOBAL_CANDIDATE_SOURCES");
+  const candidateSourcesEditable = !hasExplicitConfiguredSources("RP_GLOBAL_CANDIDATE_SOURCES");
 
   const [offers, candidatesRaw, jobs] = await Promise.all([
     prisma.externalJobOpportunity.findMany({
@@ -177,6 +178,7 @@ export default async function OwnerSourcingPage() {
             initialCandidates={formattedCandidates}
             activeSourcesCount={candidateSources.length}
             candidateSources={candidateSources}
+            sourcesEditable={candidateSourcesEditable}
             jobs={jobs}
             lastAudit={candidateAuditSummary}
           />
