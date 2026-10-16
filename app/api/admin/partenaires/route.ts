@@ -56,6 +56,10 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
+    if (body.status === "VALIDATED_PARTNER") {
+      return NextResponse.json({ error: "Seul l'OWNER peut valider officiellement un partenariat." }, { status: 403 });
+    }
+
     if (!body.officialName || !body.category) {
       return NextResponse.json({ error: "Champs obligatoires manquants : officialName, category." }, { status: 400 });
     }
