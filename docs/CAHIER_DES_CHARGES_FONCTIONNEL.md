@@ -2,7 +2,7 @@
 
 **Version :** 1.0  
 **Date de consolidation :** 16 octobre 2026  
-**Référence du code :** branche main, commit 8d65b516ded5afb088ad4a066231ac3090251b43  
+**SHA applicatif fonctionnel de référence :** 8d65b516ded5afb088ad4a066231ac3090251b43 (les commits documentaires ultérieurs peuvent avancer la tête de main sans changer ce code)  
 **Déploiement de référence :** Vercel production dpl_7mewP3owDHeuCjSHMNV9cQxhBUGU, état READY, commit 8d65b516ded5afb088ad4a066231ac3090251b43  
 **Document complémentaire :** ce document détaille le périmètre produit. Les règles de gouvernance et la procédure obligatoire A à Z restent définies dans CAHIER_DES_CHARGES.md.
 
@@ -223,7 +223,7 @@ Une livraison est acceptée uniquement si les points applicables ci-dessous sont
 ## 8. État connu au 16 octobre 2026
 
 ### Confirmé par les outils au moment de la consolidation
-- Dépôt : wafwana/recrutement-prive ; branche principale main au moment de la consolidation fonctionnelle : SHA 8d65b516ded5afb088ad4a066231ac3090251b43.
+- Dernier SHA applicatif fonctionnel validé lors de la consolidation : `8d65b516ded5afb088ad4a066231ac3090251b43`. Les PR #288, #290 et #291 constituent les changements fonctionnels tracés ; le cahier et le registre ont été fusionnés ensuite séparément, sans changement des fonctions métier.
 - PR #288 fusionnée ; correction du traitement global des offres borné et rotatif.
 - CI PR #288 : barrière OWNER, migrations de test, tests sourcing/matching/sécurité, typecheck et build réussis avant fusion.
 - PR #290 fusionnée : panneau « Actions prioritaires » dans le cockpit Executive Search, préchargement du matching sur la vue d'ensemble et raccourcis vers les sections déjà existantes ; aucun contact externe ni décision automatique.
