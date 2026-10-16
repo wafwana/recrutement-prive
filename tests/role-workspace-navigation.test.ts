@@ -14,7 +14,7 @@ test("role workspaces get persistent navigation without changing the OWNER gate"
   assert.doesNotMatch(layout, /const navigation = \[/);
   assert.doesNotMatch(layout, /visibleNavigation/);
   assert.match(layout, /aria-label="Navigation générale"/);
-  assert.match(layout, /import ReturnToSiteLink.*from "@\\/components\\/navigation\\/ReturnToSiteLink"/);
+  assert.ok(layout.includes('import ReturnToSiteLink from "@/components/navigation/ReturnToSiteLink"'));
   assert.match(layout, /<ReturnToSiteLink \/>/);
   assert.doesNotMatch(layout, /href="\/espace\/admin\/configuration"/);
   assert.match(layout, /allowedAdminPermissions/);
