@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth, getActiveSessionContext, type AuthSession } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { PERMISSIONS, type Permission, getUserPermissions } from "@/lib/auth/permissions";
+import { PERMISSIONS, getUserPermissions } from "@/lib/auth/permissions";
 import { z } from "zod";
 
 const schema = z.object({
   userId: z.string().min(1),
-  permissions: z.array(z.string()).default([]),
+  permissions: z.array(z.enum(PERMISSIONS)).max(PERMISSIONS.length).default([]),
+  reason: z.string().trim().min(5, "Le motif de modification des permissions est obligatoire (5 caractères minimum)."),
 });
 
 function isOwner(session: AuthSession | null) {
@@ -43,9 +44,7 @@ export async function PUT(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Données invalides." }, { status: 400 });
 
-  const permissions = parsed.data.permissions.filter((p): p is Permission =>
-    (PERMISSIONS as readonly string[]).includes(p),
-  );
+  const permissions = [...new Set(parsed.data.permissions)];
 
   const target = await prisma.user.findUnique({
     where: { id: parsed.data.userId },
@@ -55,22 +54,47 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "ADMIN/CONSULTANT introuvable." }, { status: 404 });
   }
 
-  const record = await prisma.systemSetting.upsert({
-    where: { key: `permissions:${target.id}` },
-    update: { value: permissions },
-    create: { key: `permissions:${target.id}`, value: permissions },
+  const key = `permissions:${target.id}`;
+  const saved = await prisma.$transaction(async (tx) => {
+    const previousRecord = await tx.systemSetting.findUnique({
+      where: { key },
+      select: { value: true },
+    });
+    const previousPermissions = Array.isArray(previousRecord?.value)
+      ? previousRecord.value.filter((item): item is string => typeof item === "string")
+      : [];
+
+    const record = await tx.systemSetting.upsert({
+      where: { key },
+      update: { value: permissions },
+      create: { key, value: permissions },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorUserId: ownerId,
+        actorRole: "OWNER",
+        action: "UPDATE_STAFF_PERMISSIONS",
+        targetType: "USER",
+        targetId: target.id,
+        details: {
+          targetRole: target.role,
+          targetEmail: target.email,
+          permissionsBeforeConfigured: previousRecord !== null,
+          previousPermissions,
+          permissions,
+          reason: parsed.data.reason,
+        },
+      },
+    });
+
+    return { record, previousPermissions };
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorUserId: ownerId,
-      actorRole: "OWNER",
-      action: "UPDATE_STAFF_PERMISSIONS",
-      targetType: "USER",
-      targetId: target.id,
-      details: { permissions },
-    },
+  return NextResponse.json({
+    userId: target.id,
+    permissions: saved.record.value,
+    previousPermissions: saved.previousPermissions,
+    audited: true,
   });
-
-  return NextResponse.json({ userId: target.id, permissions: record.value });
 }
