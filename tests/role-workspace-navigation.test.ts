@@ -55,3 +55,11 @@ test("ADMIN-only tools are permission-gated and do not expose OWNER navigation",
   assert.match(nav, /permission: "PARTNERS_MANAGE"/);
   assert.match(nav, /!item\.permission \|\| allowedAdminPermissions\.includes\(item\.permission\)/);
 });
+
+test("enterprise navigation preserves the selected company when jumping between dashboard sections", () => {
+  const nav = read("components/workspace/RoleWorkspaceNavigation.tsx");
+  assert.match(nav, /useSearchParams/);
+  assert.match(nav, /searchParams\.get\("companyId"\)/);
+  assert.match(nav, /encodeURIComponent\(activeCompanyId\)/);
+  assert.match(nav, /href=\{getHref\(item\.href\)\}/);
+});
