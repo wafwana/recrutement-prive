@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { RP_TAXONOMY } from "@/lib/taxonomy/rp-taxonomy";
+import { getSectorVisual } from "@/lib/taxonomy/sector-visuals";
 import { buildProfessionRoot } from "@/lib/cv/folders";
 import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
 import { getStrongProfilesForProfession } from "@/lib/taxonomy/strong-profiles";
@@ -337,8 +338,24 @@ export default async function OwnerMetiersPage({ searchParams }: { searchParams:
               sum + (counts.get(buildProfessionRoot(sector.code, profession.code)) || 0),
             0,
           );
+          const visual = getSectorVisual(sector.code, sector.name.fr);
           return (
-            <section key={sector.code} className="border border-white/10 bg-[#111] p-5 md:p-6">
+            <section key={sector.code} className="overflow-hidden border border-white/10 bg-[#111] p-5 md:p-6">
+              <div className="-mx-5 -mt-5 mb-5 h-32 overflow-hidden bg-[#081625] md:-mx-6 md:-mt-6">
+                <div className="relative h-full w-full">
+                  <img
+                    src={visual.src}
+                    alt={visual.alt}
+                    width={960}
+                    height={480}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover opacity-85"
+                  />
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#111] via-[#081625]/10 to-transparent" />
+                  <p className="absolute bottom-3 left-4 text-[9px] uppercase tracking-[0.22em] text-white/75">Univers métier · {sector.code.replaceAll("_", " ")}</p>
+                </div>
+              </div>
               <div className="flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="text-[10px] uppercase tracking-[0.22em] text-[#c7a15a]">
