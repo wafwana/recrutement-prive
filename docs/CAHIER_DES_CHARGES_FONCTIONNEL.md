@@ -3,7 +3,7 @@
 **Version :** 1.0  
 **Date de consolidation :** 16 octobre 2026  
 **SHA applicatif fonctionnel de référence :** bcc26485a4f248503bf0f06335aca55ae28a2f32 (sourcing sûr, navigation OWNER persistante et répertoire partenaires amélioré)  
-**Déploiement de référence :** Vercel production dpl_FUUYbynnkvaNsBCt49vK1ygj2crE, état READY, commit bcc26485a4f248503bf0f06335aca55ae28a2f32 ; second projet recrutement-prive-4swf en contrôle final au moment de la consolidation  
+**Déploiement de référence :** Vercel production dpl_FUUYbynnkvaNsBCt49vK1ygj2crE et recrutement-prive-4swf dpl_694AvcpmKVLocPtEWU2j3ksTYQVF, les deux en état READY sur le commit bcc26485a4f248503bf0f06335aca55ae28a2f32  
 **Document complémentaire :** ce document détaille le périmètre produit. Les règles de gouvernance et la procédure obligatoire A à Z restent définies dans CAHIER_DES_CHARGES.md.
 
 > Statut à lire correctement : READY indique que le déploiement technique est prêt. Cela ne remplace pas les tests fonctionnels en production sous des sessions OWNER, CANDIDAT et ENTREPRISE.
@@ -247,7 +247,7 @@ Une livraison est acceptée uniquement si les points applicables ci-dessous sont
 
 ### Déploiement vérifié
 
-Le projet Vercel principal `recrutement-prive` a le SHA `bcc26485a4f248503bf0f06335aca55ae28a2f32` en état `READY` dans `dpl_FUUYbynnkvaNsBCt49vK1ygj2crE`, avec le domaine public rattaché. Le projet `recrutement-prive-4swf` doit également afficher `READY` pour le même SHA avant de clore la vérification de déploiement.
+Le projet Vercel principal `recrutement-prive` a le SHA `bcc26485a4f248503bf0f06335aca55ae28a2f32` en état `READY` dans `dpl_FUUYbynnkvaNsBCt49vK1ygj2crE`, avec le domaine public rattaché. Le projet `recrutement-prive-4swf` affiche lui aussi `READY` pour le même SHA, vérifié dans le déploiement `dpl_694AvcpmKVLocPtEWU2j3ksTYQVF`. Les deux statuts Vercel sont réussis.
 
 ### Restant à vérifier manuellement en production
 
