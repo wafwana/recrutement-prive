@@ -202,7 +202,7 @@ export default function ExecutiveSearchTabs(props: Props) {
   }
 
   useEffect(() => {
-    if (activeTab === "matching" && !matchingLoaded && !matchingLoading) {
+    if ((activeTab === "matching" || activeTab === "overview") && !matchingLoaded && !matchingLoading) {
       void loadMatchingOverview();
     }
   }, [activeTab, matchingLoaded, matchingLoading]);
@@ -379,6 +379,60 @@ export default function ExecutiveSearchTabs(props: Props) {
               ))}
             </section>
 
+            <section aria-label="Actions prioritaires" className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-400">Actions prioritaires</p>
+                <h2 className="mt-2 text-2xl font-semibold">Les prochaines étapes du cabinet</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">Les compteurs proviennent des données chargées et du moteur de matching existant. Chaque carte ouvre la section appropriée ; aucune action de recrutement n'est exécutée automatiquement.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {[
+                  {
+                    id: "matching" as const,
+                    title: "Matching candidats ↔ offres",
+                    value: matchingOverview ? `${matchingOverview.totalMatches} paire(s) au-dessus du seuil` : matchingLoading ? "Calcul des propositions…" : "Consulter les propositions",
+                    detail: "Examiner les compétences communes et décider d'une présentation confidentielle.",
+                  },
+                  {
+                    id: "authorizations" as const,
+                    title: "Autorisations à traiter",
+                    value: `${props.authorizations.length} demande(s) en attente`,
+                    detail: "Autoriser ou refuser chaque demande via le contrôle audité existant.",
+                  },
+                  {
+                    id: "meetings" as const,
+                    title: "Entretiens et contacts",
+                    value: `${props.counts.openMeetings} contact(s) ouvert(s)`,
+                    detail: "Vérifier les créneaux, les canaux et l'état des contacts sécurisés.",
+                  },
+                  {
+                    id: "decisions" as const,
+                    title: "Décisions entreprise",
+                    value: `${decisionItems.length} décision(s) à suivre`,
+                    detail: "Repérer les décisions attendues sans décider à la place de l'entreprise.",
+                  },
+                  {
+                    id: "outreach" as const,
+                    title: "Prospection à suivre",
+                    value: `${props.counts.pendingOutreach} événement(s) en attente`,
+                    detail: "Contrôler la provenance et l'état des événements de prospection.",
+                  },
+                ].map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => setActiveTab(action.id)}
+                    className="group flex h-full flex-col items-start rounded-xl border border-white/10 bg-white/[0.03] p-5 text-left transition hover:border-orange-400/50 hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  >
+                    <span className="text-sm font-semibold text-white">{action.title}</span>
+                    <span className="mt-3 text-lg font-semibold text-orange-300">{action.value}</span>
+                    <span className="mt-2 text-sm leading-6 text-slate-400">{action.detail}</span>
+                    <span className="mt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-orange-300">Ouvrir la section →</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
             <section>
               <div className="mb-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-400">Méthode propriétaire</p>
@@ -437,6 +491,9 @@ export default function ExecutiveSearchTabs(props: Props) {
                   {Array.from(new Set(props.presentations.map((item) => item.state))).map((state) => <option value={state} key={state}>{readableStatus(state)}</option>)}
                 </select>
               </div>
+              <button type="button" onClick={() => setActiveTab("matching")} className="border border-orange-400/50 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-orange-300 hover:bg-orange-400/10">
+                Trouver de nouvelles mises en relation
+              </button>
             </div>
             {filteredPresentations.length === 0 ? <EmptyState>Aucune présentation ne correspond aux filtres. Une présentation apparaît ici lorsqu’elle existe déjà dans le processus de mise en relation.</EmptyState> : (
               <div className="space-y-3">
@@ -475,6 +532,14 @@ export default function ExecutiveSearchTabs(props: Props) {
                   <option value="ALL">Tous les statuts</option>
                   {Array.from(new Set(props.meetings.map((item) => item.status))).map((status) => <option value={status} key={status}>{readableStatus(status)}</option>)}
                 </select>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setActiveTab("authorizations")} disabled={props.authorizations.length === 0} className="border border-white/15 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300 hover:border-orange-400 disabled:cursor-not-allowed disabled:opacity-40">
+                  Autorisations ({props.authorizations.length})
+                </button>
+                <button type="button" onClick={() => setActiveTab("decisions")} disabled={decisionItems.length === 0} className="border border-orange-400/50 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-orange-300 hover:bg-orange-400/10 disabled:cursor-not-allowed disabled:opacity-40">
+                  Décisions ({decisionItems.length})
+                </button>
               </div>
             </div>
             {filteredMeetings.length === 0 ? <EmptyState>Aucun contact sécurisé ne correspond aux filtres.</EmptyState> : (
@@ -520,6 +585,14 @@ export default function ExecutiveSearchTabs(props: Props) {
               <h2 className="mt-2 text-2xl font-semibold">Décisions attendues de l’entreprise</h2>
               <p className="mt-2 text-sm leading-6 text-slate-400">La décision appartient à l’entreprise. Cette vue permet au cabinet de repérer les dossiers à relancer sans décider à sa place.</p>
             </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setActiveTab("meetings")} className="border border-white/15 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300 hover:border-orange-400">
+                Revenir aux entretiens sécurisés
+              </button>
+              <button type="button" onClick={() => setActiveTab("matching")} className="border border-orange-400/50 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-orange-300 hover:bg-orange-400/10">
+                Examiner de nouveaux matchings
+              </button>
+            </div>
             {decisionItems.length === 0 ? <EmptyState>Aucune décision n’est actuellement en attente.</EmptyState> : (
               <div className="space-y-3">
                 {decisionItems.map((item) => (
@@ -554,6 +627,14 @@ export default function ExecutiveSearchTabs(props: Props) {
                 <option value="ALL">Tous les statuts</option>
                 {Array.from(new Set(props.outreach.map((item) => item.status))).map((status) => <option value={status} key={status}>{readableStatus(status)}</option>)}
               </select>
+              <div className="flex flex-wrap gap-2">
+                <Link href="/espace/owner/sourcing" className="border border-orange-400/50 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-orange-300 hover:bg-orange-400/10">
+                  Ouvrir le sourcing
+                </Link>
+                <Link href="/espace/owner/metiers" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.14em] text-slate-300 hover:border-orange-400">
+                  Lancer une recherche métier
+                </Link>
+              </div>
             </div>
             {filteredOutreach.length === 0 ? <EmptyState>Aucun événement de prospection ne correspond aux filtres.</EmptyState> : (
               <div className="space-y-3">
