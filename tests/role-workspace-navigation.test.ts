@@ -41,7 +41,9 @@ test("every hard-coded workspace destination resolves to a page and every in-pag
     const routePath = path.join(root, "app", route.slice(1), "page.tsx");
     assert.ok(fs.existsSync(routePath), `navigation destination has no page: ${href}`);
     if (anchor) {
-      const page = route === "/espace/entreprise"\n        ? read("app/espace/entreprise/CompanyDashboard.tsx")\n        : read(path.relative(root, routePath));
+      const page = route === "/espace/entreprise"
+        ? read("app/espace/entreprise/CompanyDashboard.tsx")
+        : read(path.relative(root, routePath));
       assert.match(page, new RegExp(`id=["']${anchor}["']`), `shortcut target does not exist: ${href}`);
     }
   }
