@@ -51,7 +51,8 @@
     "test:candidate-sourcing-config": "node --import tsx --test tests/candidate-sourcing-config.test.ts",
     "test:owner-workspace-navigation": "node --import tsx --test tests/owner-workspace-navigation.test.ts",
     "test:partner-sourcing-usability": "node --import tsx --test tests/partner-sourcing-usability.test.ts",
-    "test:role-workspace-navigation": "node --import tsx --test tests/role-workspace-navigation.test.ts"
+    "test:role-workspace-navigation": "node --import tsx --test tests/role-workspace-navigation.test.ts",
+    "test:workspace-navigation-locales": "node --import tsx --test tests/workspace-navigation-locales.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

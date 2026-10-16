@@ -2,52 +2,53 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useI18n } from "@/lib/i18n/context";
 
 type WorkspaceRole = "CANDIDAT" | "ENTREPRISE" | "CONSULTANT" | "ADMIN";
 export type WorkspaceNavigationPermission = "PLATFORM_SETTINGS" | "PARTNERS_MANAGE";
-type NavItem = { href: string; label: string; permission?: WorkspaceNavigationPermission };
-type WorkspaceDefinition = { title: string; description: string; links: NavItem[] };
+type NavItem = { href: string; labelKey: string; permission?: WorkspaceNavigationPermission };
+type WorkspaceDefinition = { titleKey: string; descriptionKey: string; links: NavItem[] };
 
 const workspaces: Record<WorkspaceRole, WorkspaceDefinition> = {
   CANDIDAT: {
-    title: "Espace candidat",
-    description: "Retrouvez votre profil, vos documents et le suivi de vos démarches.",
+    titleKey: "ws_candidate_title",
+    descriptionKey: "ws_candidate_description",
     links: [
-      { href: "/espace/candidat", label: "Mon profil & mes documents" },
-      { href: "/espace/candidat/candidatures", label: "Mes candidatures" },
-      { href: "/espace/messages", label: "Messagerie" },
+      { href: "/espace/candidat", labelKey: "ws_candidate_profile_documents" },
+      { href: "/espace/candidat/candidatures", labelKey: "ws_candidate_applications" },
+      { href: "/espace/messages", labelKey: "ws_messages" },
     ],
   },
   ENTREPRISE: {
-    title: "Espace entreprise",
-    description: "Accédez directement aux offres, aux candidatures et aux présentations sécurisées.",
+    titleKey: "ws_enterprise_title",
+    descriptionKey: "ws_enterprise_description",
     links: [
-      { href: "/espace/entreprise#entreprise-kpis", label: "Vue d’ensemble" },
-      { href: "/espace/entreprise#offres", label: "Mes offres" },
-      { href: "/espace/entreprise#candidatures", label: "Candidatures reçues" },
-      { href: "/espace/entreprise#presentations-confidentielles", label: "Présentations confidentielles" },
-      { href: "/espace/messages", label: "Messagerie" },
+      { href: "/espace/entreprise#entreprise-kpis", labelKey: "ws_overview" },
+      { href: "/espace/entreprise#offres", labelKey: "ws_enterprise_offers" },
+      { href: "/espace/entreprise#candidatures", labelKey: "ws_enterprise_applications" },
+      { href: "/espace/entreprise#presentations-confidentielles", labelKey: "ws_enterprise_presentations" },
+      { href: "/espace/messages", labelKey: "ws_messages" },
     ],
   },
   CONSULTANT: {
-    title: "Espace consultant",
-    description: "Passez du pipeline candidats à la file de sourcing sans perdre le fil.",
+    titleKey: "ws_consultant_title",
+    descriptionKey: "ws_consultant_description",
     links: [
-      { href: "/espace/consultant", label: "Vue d’ensemble" },
-      { href: "/espace/consultant/candidatures", label: "Pipeline candidats" },
-      { href: "/espace/consultant/sourcing", label: "File de sourcing" },
-      { href: "/espace/messages", label: "Messagerie" },
+      { href: "/espace/consultant", labelKey: "ws_overview" },
+      { href: "/espace/consultant/candidatures", labelKey: "ws_consultant_pipeline" },
+      { href: "/espace/consultant/sourcing", labelKey: "ws_consultant_sourcing" },
+      { href: "/espace/messages", labelKey: "ws_messages" },
     ],
   },
   ADMIN: {
-    title: "Espace ADMIN",
-    description: "Accédez aux outils d’administration accordés par les permissions actives.",
+    titleKey: "ws_admin_title",
+    descriptionKey: "ws_admin_description",
     links: [
-      { href: "/espace/admin", label: "Tableau de bord" },
-      { href: "/espace/admin/autorisations", label: "Mes autorisations" },
-      { href: "/espace/admin/configuration", label: "Configuration", permission: "PLATFORM_SETTINGS" },
-      { href: "/espace/admin/partenaires", label: "Partenaires & sources", permission: "PARTNERS_MANAGE" },
-      { href: "/espace/messages", label: "Messagerie" },
+      { href: "/espace/admin", labelKey: "ws_admin_dashboard" },
+      { href: "/espace/admin/autorisations", labelKey: "ws_admin_permissions" },
+      { href: "/espace/admin/configuration", labelKey: "ws_admin_configuration", permission: "PLATFORM_SETTINGS" },
+      { href: "/espace/admin/partenaires", labelKey: "ws_admin_partners_sources", permission: "PARTNERS_MANAGE" },
+      { href: "/espace/messages", labelKey: "ws_messages" },
     ],
   },
 };
@@ -68,6 +69,7 @@ export default function RoleWorkspaceNavigation({
   role: WorkspaceRole;
   allowedAdminPermissions?: WorkspaceNavigationPermission[];
 }) {
+  const { t } = useI18n();
   const pathname = usePathname() || "/";
   const searchParams = useSearchParams();
   const activeCompanyId = role === "ENTREPRISE" ? searchParams.get("companyId") : null;
@@ -83,15 +85,15 @@ export default function RoleWorkspaceNavigation({
 
   return (
     <section
-      aria-label={`Navigation de l’espace ${workspace.title.replace("Espace ", "")}`}
+      aria-label={t("ws_role_navigation_aria")}
       className="border-b border-white/10 bg-[#0e1115]"
     >
       <div className="mx-auto w-[min(1180px,calc(100%-40px))] py-3 md:w-[min(1180px,calc(100%-72px))]">
         <div className="mb-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f1ce8b]">{workspace.title}</p>
-          <p className="mt-1 text-sm text-white/55">{workspace.description}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f1ce8b]">{t(workspace.titleKey)}</p>
+          <p className="mt-1 text-sm text-white/55">{t(workspace.descriptionKey)}</p>
         </div>
-        <nav aria-label={`Accès rapides — ${workspace.title}`} className="flex flex-wrap gap-2">
+        <nav aria-label={t("ws_role_quick_navigation_aria")} className="flex flex-wrap gap-2">
           {links.map((item) => {
             const active = isActive(pathname, item.href);
             return (
@@ -105,7 +107,7 @@ export default function RoleWorkspaceNavigation({
                     : "inline-flex min-h-11 items-center rounded-md border border-white/10 px-3 py-2 text-sm text-white/75 transition hover:border-[#c7a15a]/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f1ce8b]"
                 }
               >
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             );
           })}

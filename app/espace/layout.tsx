@@ -6,6 +6,7 @@ import ContextBackButton from "@/components/navigation/ContextBackButton";
 import OwnerWorkspaceNavigation from "@/components/owner/OwnerWorkspaceNavigation";
 import RoleWorkspaceNavigation, { type WorkspaceNavigationPermission } from "@/components/workspace/RoleWorkspaceNavigation";
 import { hasPermission } from "@/lib/auth/permissions";
+import ReturnToSiteLink from "@/components/navigation/ReturnToSiteLink";
 
 export default async function EspaceLayout({ children }: { children: ReactNode }) {
   const session = await auth();
@@ -31,7 +32,7 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
         <div className="mx-auto flex min-h-20 w-[min(1180px,calc(100%-40px))] items-center justify-between gap-8 md:w-[min(1180px,calc(100%-72px))]">
           <Link href="/" className="font-serif text-xl tracking-[0.22em]">RP</Link>
           <nav aria-label="Navigation générale" className="flex items-center justify-end text-[10px] uppercase tracking-[0.2em] text-white/60">
-            <Link href="/" className="min-h-11 inline-flex items-center px-2 text-[#c7a15a] transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f1ce8b]">Retour au site</Link>
+            <ReturnToSiteLink />
           </nav>
         </div>
       </header>
