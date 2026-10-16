@@ -31,8 +31,8 @@ async function restoreCandidateSourcesSetting(original: { value: unknown } | nul
 test("database candidate sources override default fallbacks, explicit environment sources override the database, and an empty saved list is respected", { skip: !process.env.DATABASE_URL }, async () => {
   const originalEnv = process.env[ENV_KEY];
   const originalSetting = await prisma.systemSetting.findUnique({ where: { key: SETTING_KEY }, select: { value: true } });
-  const databaseSources = ["https://candidates-db.example.test/feed.json"];
-  const environmentSources = ["https://candidates-env.example.test/api/candidates"];
+  const databaseSources = ["https://candidates-db.example.com/feed.json"];
+  const environmentSources = ["https://candidates-env.example.com/api/candidates"];
 
   try {
     delete process.env[ENV_KEY];
@@ -65,12 +65,12 @@ test("database candidate sources override default fallbacks, explicit environmen
 
 test("OWNER cannot save database sources while explicit environment sources control the effective list", async () => {
   const originalEnv = process.env[ENV_KEY];
-  process.env[ENV_KEY] = JSON.stringify(["https://candidates-env.example.test/api/candidates"]);
+  process.env[ENV_KEY] = JSON.stringify(["https://candidates-env.example.com/api/candidates"]);
 
   try {
     const response = await runWithTestSession(
       { user: { id: "candidate-source-env-lock-owner", role: "OWNER" } },
-      () => saveCandidateSourceConfig(sourceConfigRequest(["https://ignored-db.example.test/feed.json"])),
+      () => saveCandidateSourceConfig(sourceConfigRequest(["https://ignored-db.example.com/feed.json"])),
     );
     assert.equal(response.status, 409);
     const payload = await response.json();
@@ -85,7 +85,7 @@ test("source configuration audit records hostnames without storing source paths 
   const originalEnv = process.env[ENV_KEY];
   const originalSetting = await prisma.systemSetting.findUnique({ where: { key: SETTING_KEY }, select: { value: true } });
   const actorUserId = "candidate-source-config-audit-test-owner";
-  const tokenizedUrl = "https://example.test/private-candidate-feed?access_token=source-config-test-secret";
+  const tokenizedUrl = "https://example.com/private-candidate-feed?access_token=source-config-test-secret";
 
   try {
     delete process.env[ENV_KEY];
@@ -106,7 +106,7 @@ test("source configuration audit records hostnames without storing source paths 
     assert.ok(audit, "Source configuration changes must be audited");
     const details = audit.details as Record<string, unknown>;
     assert.equal(details.sourcesCount, 1);
-    assert.deepEqual(details.sourceHosts, ["example.test"]);
+    assert.deepEqual(details.sourceHosts, ["example.com"]);
     assert.doesNotMatch(JSON.stringify(details), /source-config-test-secret|access_token|private-candidate-feed/);
   } finally {
     await prisma.auditLog.deleteMany({ where: { actorUserId, action: "UPDATE_CANDIDATE_SOURCING_CONFIG" } });
