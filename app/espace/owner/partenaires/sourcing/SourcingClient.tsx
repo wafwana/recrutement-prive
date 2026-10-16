@@ -143,7 +143,7 @@ export default function SourcingClient({ initialItems }: SourcingClientProps) {
       )}
 
       <div className="mt-8 border border-white/10 bg-[#111] p-4 text-xs leading-6 text-white/55">
-        <p><strong className="text-white">Mode de recherche :</strong> répertoire intégré filtré localement via l&apos;API RP. Ce bouton ne lance pas de collecte Web en direct ; les fiches doivent être vérifiées sur leur site officiel avant toute prise de contact.</p>
+        <p><strong className="text-white">Mode de recherche :</strong> référentiel déjà intégré à RP, interrogé via l&apos;API. Ce bouton ne lance pas de collecte Web en direct ; les fiches doivent être vérifiées sur leur site officiel avant toute prise de contact.</p>
         <p className="mt-2 text-white/40">Référentiel affiché : {items.length} organisme(s). Les sources et contacts sont des indications de découverte, pas une validation de partenariat.</p>
       </div>
 
