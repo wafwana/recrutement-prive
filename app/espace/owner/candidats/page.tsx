@@ -68,7 +68,7 @@ export default async function OwnerCandidatesPage() {
                 <div><p className="text-[10px] uppercase tracking-[0.14em] text-white/35">Fonction</p><p className="mt-2 text-sm text-white/70">{profile?.headline || "—"}</p></div>
                 <div><p className="text-[10px] uppercase tracking-[0.14em] text-white/35">Localisation</p><p className="mt-2 text-sm text-white/70">{[profile?.location, profile?.country].filter(Boolean).join(", ") || "—"}</p></div>
                 <div><p className="text-[10px] uppercase tracking-[0.14em] text-white/35">Expérience</p><p className="mt-2 text-sm text-white/70">{profile?.experienceYears != null ? `${profile.experienceYears} an(s)` : "—"}</p></div>
-                <div><p className="text-[10px] uppercase tracking-[0.14em] text-white/35">Catégorie</p><p className="mt-2 text-sm text-white/70">{profile?.primaryCategory?.name && typeof profile.primaryCategory.name === "object" && "fr" in profile.primaryCategory.name ? String((profile.primaryCategory.name as Record<string, unknown>).fr ?? "—") : typeof profile?.primaryCategory?.name === "string" ? profile.primaryCategory.name : "—"}</p></div>
+                <div><p className="text-[10px] uppercase tracking-[0.14em] text-white/35">Catégorie</p><p className="mt-2 text-sm text-white/70">{profile?.primaryCategory?.name && typeof profile.primaryCategory.name === "object" && !Array.isArray(profile.primaryCategory.name) && "fr" in profile.primaryCategory.name ? String((profile.primaryCategory.name as Record<string, unknown>).fr ?? "—") : typeof profile?.primaryCategory?.name === "string" ? profile.primaryCategory.name : "—"}</p></div>
               </div>
 
               <div className="mt-6 border-t border-white/10 pt-5">
