@@ -11,8 +11,11 @@ test("role workspaces get persistent navigation without changing the OWNER gate"
   assert.match(layout, /import RoleWorkspaceNavigation.*from "@\/components\/workspace\/RoleWorkspaceNavigation"/);
   assert.match(layout, /workspaceRole \? <RoleWorkspaceNavigation role=\{workspaceRole\}/);
   assert.match(layout, /role === "OWNER" \? <OwnerWorkspaceNavigation \/> : null/);
-  assert.match(layout, /const visibleNavigation = navigation\.filter\(\(item\) => item\.role === "ALL" \|\| item\.role === role\)/);
-  assert.doesNotMatch(layout, /item\.role === role \|\| role === "ADMIN"/);
+  assert.doesNotMatch(layout, /const navigation = \[/);
+  assert.doesNotMatch(layout, /visibleNavigation/);
+  assert.match(layout, /aria-label="Navigation générale"/);
+  assert.match(layout, />Retour au site<\/Link>/);
+  assert.doesNotMatch(layout, /href="\/espace\/admin\/configuration"/);
   assert.match(layout, /allowedAdminPermissions/);
 });
 
