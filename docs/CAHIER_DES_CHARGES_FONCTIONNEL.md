@@ -2,8 +2,8 @@
 
 **Version :** 1.0  
 **Date de consolidation :** 16 octobre 2026  
-**SHA applicatif fonctionnel de référence :** 8d65b516ded5afb088ad4a066231ac3090251b43 (les commits documentaires ultérieurs peuvent avancer la tête de main sans changer ce code)  
-**Déploiement de référence :** Vercel production dpl_7mewP3owDHeuCjSHMNV9cQxhBUGU, état READY, commit 8d65b516ded5afb088ad4a066231ac3090251b43  
+**SHA applicatif fonctionnel de référence :** bcc26485a4f248503bf0f06335aca55ae28a2f32 (sourcing sûr, navigation OWNER persistante et répertoire partenaires amélioré)  
+**Déploiement de référence :** Vercel production dpl_FUUYbynnkvaNsBCt49vK1ygj2crE et recrutement-prive-4swf dpl_694AvcpmKVLocPtEWU2j3ksTYQVF, les deux en état READY sur le commit bcc26485a4f248503bf0f06335aca55ae28a2f32  
 **Document complémentaire :** ce document détaille le périmètre produit. Les règles de gouvernance et la procédure obligatoire A à Z restent définies dans CAHIER_DES_CHARGES.md.
 
 > Statut à lire correctement : READY indique que le déploiement technique est prêt. Cela ne remplace pas les tests fonctionnels en production sous des sessions OWNER, CANDIDAT et ENTREPRISE.
@@ -115,6 +115,18 @@ L'identité entreprise et les éléments SIREN/SIRET soutiennent la préqualific
 
 La base du projet prévoit le français par défaut et une interface multilingue. Les langues activées doivent être contrôlées dans les dictionnaires et les tests du dépôt avant de déclarer une couverture complète. Les contenus IA doivent respecter les schémas attendus, les délais et reprises bornés, les règles de confidentialité et le fournisseur de secours. Les clés API restent exclusivement dans les paramètres d'environnement sécurisés et ne sont jamais ajoutées à la documentation, au code client ou aux journaux.
 
+### 3.10 Navigation opérationnelle et accessibilité des onglets
+
+La navigation OWNER doit rester disponible sur les pages de l'espace connecté, y compris la bibliothèque documentaire et l'écran historique de permissions `/owner/permissions`. Les outils les plus fréquents apparaissent en accès direct : Vue d'ensemble, Candidats, CVthèque, Métiers & dossiers, Sourcing, Matching et Executive Search. Les autres fonctions sont regroupées par domaine pour éviter une liste unique trop longue : recherche/sourcing, entreprises/offres, CV/documents, partenaires/finances et équipe/gouvernance.
+
+Critères d'acceptation :
+- barre visible uniquement pour une session dont le rôle réel est `OWNER`, sans modifier les permissions côté serveur ;
+- indication explicite de la page active et liens clavier avec focus visible ;
+- menu détaillé ouvrable/réductible, avec ouverture automatique sur une sous-page de la section correspondante ;
+- chaque destination pointe vers une page existante ou vers une ancre de section existante du cockpit ;
+- contrat automatisé qui vérifie les 33 destinations, la condition OWNER et les états d'accessibilité ; test exécuté par la CI générale et la porte OWNER ;
+- les pages et API conservent leurs contrôles d'accès habituels. Afficher un lien ne confère aucun droit.
+
 ## 4. Architecture et services
 
 | Élément | Rôle attendu | Contrôle de gouvernance |
@@ -222,28 +234,32 @@ Une livraison est acceptée uniquement si les points applicables ci-dessous sont
 
 ## 8. État connu au 16 octobre 2026
 
-### Confirmé par les outils au moment de la consolidation
-- Dernier SHA applicatif fonctionnel validé lors de la consolidation : `8d65b516ded5afb088ad4a066231ac3090251b43`. Les PR #288, #290 et #291 constituent les changements fonctionnels tracés ; le cahier et le registre ont été fusionnés ensuite séparément, sans changement des fonctions métier.
-- PR #288 fusionnée ; correction du traitement global des offres borné et rotatif.
-- CI PR #288 : barrière OWNER, migrations de test, tests sourcing/matching/sécurité, typecheck et build réussis avant fusion.
-- PR #290 fusionnée : panneau « Actions prioritaires » dans le cockpit Executive Search, préchargement du matching sur la vue d'ensemble et raccourcis vers les sections déjà existantes ; aucun contact externe ni décision automatique.
-- CI PR #290 : OWNER Compatibility Gate, suite verify, typecheck, build et les deux contrôles Vercel réussis avant fusion.
-- PR #291 fusionnée : le compteur OWNER compte les comptes actifs `CANDIDAT` et le KPI ouvre une page dédiée ; celle-ci vérifie OWNER côté serveur et utilise l’API de documents protégée existante.
-- CI PR #291 : OWNER Compatibility Gate, tests de sécurité/API, test de la nouvelle page, typecheck et build réussis avant fusion ; les deux contrôles Vercel ont réussi.
-- Vercel production : dpl_7mewP3owDHeuCjSHMNV9cQxhBUGU, SHA 8d65b516ded5afb088ad4a066231ac3090251b43, état READY, alias publics présents et aliasError nul.
-- Des points de restauration avant/après fusion ont été créés pour les correctifs sourcing et base candidats OWNER.
-- Un point de restauration Git avant fusion et un point de restauration après fusion ont été créés pour le correctif sourcing.
+### Changements fonctionnels fusionnés et preuves automatiques
 
-### Restant à valider
-1. Exécuter les parcours de production avec une vraie session OWNER et des identités distinctes CANDIDAT et ENTREPRISE.
-2. Importer/analyser un CV représentatif en production, puis vérifier son classement, son matching et l'absence d'exposition non autorisée.
-3. Observer les journaux des prochains cycles de sourcing après le déploiement, y compris la rotation entre sources et le statut du checkpoint.
-4. Reconfirmer le comportement des fournisseurs IA et des sources externes après les erreurs historiques signalées ; ne pas déclencher un cron de production manuellement avec le secret de production.
-5. Contrôler visuellement le Hero et les visuels sectoriels sur ordinateur, tablette et mobile.
-6. Comparer chaque ancienne PR ouverte à main avant de la réouvrir ou la fusionner ; une PR ancienne non fusionnable n'est pas forcément un défaut actif.
-7. Tester la nouvelle page candidats avec une session OWNER réelle, en confirmant que le compte OWNER et les autres rôles ne sont pas répertoriés et que l’accès aux documents suit toujours l’API protégée existante.
+- Code applicatif de référence : `bcc26485a4f248503bf0f06335aca55ae28a2f32`. Les commits de documentation ultérieurs peuvent faire avancer `main` sans modifier le code métier.
+- Sourcing global d'offres — PR #288 : chaque invocation traite une source configurée et deux offres au maximum ; la rotation est persistante et les erreurs d'une source ne doivent pas affamer les suivantes.
+- Résolution sûre de configuration des sources candidats — commit `0a4553b90e69fe411b8de9e92996a1156a363cb2` : le moteur utilise les sources configurées effectives, refuse l'édition en base quand la configuration est pilotée par l'environnement et n'écrit pas les chemins/paramètres sensibles des URL dans les journaux. Test dédié `test:candidate-sourcing-config`.
+- Executive Search — PR #290 : vue d'ensemble avec actions prioritaires basées sur les données existantes, matching préchargé et raccourcis entre Présentations, Entretiens, Autorisations, Décisions et Prospection ; aucune mise en relation/contact/décision de recrutement n'est déclenché automatiquement.
+- Base candidats OWNER — PR #291 : le compteur porte sur les comptes actifs `CANDIDAT` ; le lien ouvre une page dédiée réservée à OWNER qui utilise l'API de documents protégée existante.
+- Navigation de travail OWNER — PR #295 : accès persistant sur les écrans connectés, sept raccourcis prioritaires, cinq groupes de fonctions, état actif et focus clavier ; elle est également disponible sur l'écran historique `/owner/permissions`. Le test `test:owner-workspace-navigation` vérifie les 33 destinations réelles et s'exécute dans la CI générale et la porte OWNER.
+- Partenaires & Sources — PR #296 : le répertoire de découverte précise qu'il s'agit d'un catalogue institutionnel intégré et filtré, non d'une collecte Web en direct ; il montre le nombre de résultats et le total initial, propose une remise à zéro et des états accessibles, et marque un organisme déjà importé pendant la session.
+- Les PR #295 et #296 ont passé OWNER Compatibility Gate, `verify`, typecheck/build et les deux previews Vercel avant fusion. Des points de restauration avant/après fusion sont présents pour ces livraisons.
 
-Les livraisons techniques des PR #288 (sourcing borné), #290 (actions du cockpit Executive Search) et #291 (base candidats OWNER) sont fusionnées et incluses dans le déploiement READY référencé ci-dessus. La validation métier complète en production reste ouverte tant que les sessions authentifiées et les parcours réels CV/sourcing n'ont pas été observés.
+### Déploiement vérifié
+
+Le projet Vercel principal `recrutement-prive` a le SHA `bcc26485a4f248503bf0f06335aca55ae28a2f32` en état `READY` dans `dpl_FUUYbynnkvaNsBCt49vK1ygj2crE`, avec le domaine public rattaché. Le projet `recrutement-prive-4swf` affiche lui aussi `READY` pour le même SHA, vérifié dans le déploiement `dpl_694AvcpmKVLocPtEWU2j3ksTYQVF`. Les deux statuts Vercel sont réussis.
+
+### Restant à vérifier manuellement en production
+
+1. Avec une vraie session OWNER, ouvrir la navigation persistante, les 7 accès rapides et le menu « Toutes les fonctions », y compris la page `/owner/permissions`.
+2. Vérifier les comptes candidats réels, leurs métadonnées et l'ouverture des documents via l'API protégée ; confirmer que le compte OWNER et les autres rôles ne sont pas répertoriés comme candidats.
+3. Importer/analyser un CV représentatif sous une session autorisée, vérifier classement/matching et l'absence d'exposition non autorisée.
+4. Observer les prochains cycles programmés du sourcing, la rotation persistante, les checkpoints et les erreurs de sources ; ne pas déclencher de cron de production manuellement avec le secret réel.
+5. Reconfirmer les parcours IA et les sources externes touchés par les anciennes erreurs HTTP signalées avec les journaux récents, sans révéler de secret.
+6. Contrôler visuellement le Hero et les visuels sectoriels sur ordinateur, tablette et mobile.
+7. Exécuter un scénario de bout en bout avec des identités distinctes CANDIDAT et ENTREPRISE.
+
+Les tests automatisés verts et un déploiement `READY` ne valent pas preuve d'une session réelle authentifiée. Tant que les scénarios ci-dessus ne sont pas observés, la validation métier complète reste ouverte.
 
 ## 9. Gouvernance des évolutions et définition de terminé
 
