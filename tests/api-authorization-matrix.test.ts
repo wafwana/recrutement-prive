@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../lib/prisma";
-import { runWithTestSession } from "../auth";
+import { runWithTestSession, type AuthSession } from "../auth";
 import { GET as getEnterpriseJobs, POST as createEnterpriseJob } from "../app/api/entreprise/jobs/route";
 import { GET as getEnterpriseApplications } from "../app/api/entreprise/applications/route";
 import { GET as getCandidateProfile, PUT as updateCandidateProfile } from "../app/api/candidat/profil/route";
@@ -79,12 +79,13 @@ test("current route handlers enforce candidate and enterprise authorization boun
     });
 
     // Candidate profile APIs reject missing sessions and all non-CANDIDAT roles.
-    for (const session of [
+    const deniedCandidateSessions: AuthSession[] = [
       {},
       sessionFor(admin.id, "ADMIN"),
       sessionFor(consultant.id, "CONSULTANT"),
       sessionFor(enterpriseA.id, "ENTREPRISE"),
-    ]) {
+    ];
+    for (const session of deniedCandidateSessions) {
       const response = await runWithTestSession(session, () => getCandidateProfile());
       assert.equal(response.status, 403, `candidate profile must reject role ${session.user?.role ?? "ANONYMOUS"}`);
     }
