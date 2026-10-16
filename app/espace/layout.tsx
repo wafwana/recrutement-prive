@@ -44,18 +44,14 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
                 {item.label}
               </Link>
             ))}
-            {role === "ADMIN" && (
-              <>
-                <Link href="/espace/admin" className="text-[#c7a15a] transition hover:text-white">Admin</Link>
-                <Link href="/espace/admin/configuration" className="text-white/50 transition hover:text-white">Configuration</Link>
-              </>
-            )}
+            {role === "ADMIN" && <Link href="/espace/admin" className="text-[#c7a15a] transition hover:text-white">Admin</Link>}{role === "ADMIN" && canManagePlatformSettings && <Link href="/espace/admin/configuration" className="text-white/50 transition hover:text-white">Configuration</Link>}
             <Link href="/" className="text-[#c7a15a]">Retour au site</Link>
           </nav>
         </div>
       </header>
       <CollaboratorActivityTracker />
-      {role === "OWNER" ? <OwnerWorkspaceNavigation /> : null}\n      {workspaceRole ? <RoleWorkspaceNavigation role={workspaceRole} allowedAdminPermissions={allowedAdminPermissions} /> : null}
+      {role === "OWNER" ? <OwnerWorkspaceNavigation /> : null}
+      {workspaceRole ? <RoleWorkspaceNavigation role={workspaceRole} allowedAdminPermissions={allowedAdminPermissions} /> : null}
       <ContextBackButton />
       {children}
     </main>
