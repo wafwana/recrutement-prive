@@ -27,3 +27,25 @@ test("recording only starts with two-party consent", () => {
   assert.match(service, /candidateConsentAt === null \|\| meeting\.companyConsentAt === null/);
   assert.match(service, /recordingStartedAt: new Date\(\)/);
 });
+
+
+test("Executive Search embeds live anonymous candidate-offer proposals and reuses the audited presentation flow", () => {
+  const cockpit = fs.readFileSync(path.join(root, "app/espace/owner/contacts-securises/ExecutiveSearchTabs.tsx"), "utf8");
+  const matchingRoute = fs.readFileSync(path.join(root, "app/api/owner/cv-matching/route.ts"), "utf8");
+
+  assert.match(cockpit, /id: "matching", label: "Matching candidats ↔ offres"/);
+  assert.match(cockpit, /\/api\/owner\/cv-matching\?mode=overview/);
+  assert.match(cockpit, /Préparer la mise en relation/);
+  assert.match(cockpit, /match\.candidateAlias/);
+  assert.match(cockpit, /match\.companyAlias/);
+  assert.match(cockpit, /presentationExists/);
+  assert.match(cockpit, /action: "present", candidateId: match\.candidateId, jobId: match\.jobId/);
+  assert.match(cockpit, /aucun email ni contact externe ne sera envoyé automatiquement/i);
+  assert.doesNotMatch(cockpit, /candidate\.email|candidate\.phone|match\.email/);
+
+  assert.match(matchingRoute, /requireMatchingAccess/);
+  assert.match(matchingRoute, /"PRESENTATIONS_MANAGE"/);
+  assert.match(matchingRoute, /"CANDIDATE_MATCH_PRESENTED"/);
+  assert.match(matchingRoute, /anonymousMessagingEnabled: true/);
+  assert.match(matchingRoute, /identityProtected: true/);
+});
