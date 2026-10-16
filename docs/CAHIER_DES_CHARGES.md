@@ -1,5 +1,7 @@
 # Cahier des charges maître — Recrutement Privé
 
+> **Complément fonctionnel et technique (16 octobre 2026) :** le périmètre produit, les rôles, les intégrations, les scripts et les critères d’acceptation sont détaillés dans le [cahier des charges fonctionnel](CAHIER_DES_CHARGES_FONCTIONNEL.md). Le présent document reste la référence pour la gouvernance et le processus A → Z.
+
 > **Règle d'ouverture obligatoire : exécution de bout en bout, preuves alignées et source de vérité unique.**  
 > Toute tâche, correction, option ou mise en production commence par ce processus et ne peut être déclarée terminée sur la seule base d'un rapport, d'une compilation ou d'un déploiement réussi.
 
