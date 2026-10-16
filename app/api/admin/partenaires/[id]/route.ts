@@ -51,6 +51,10 @@ export async function PATCH(
   try {
     const body = await request.json();
 
+    if (Object.prototype.hasOwnProperty.call(body, "status")) {
+      return NextResponse.json({ error: "Utilisez le changement de statut audité ; le champ status direct est interdit." }, { status: 400 });
+    }
+
     if (body.newStatus) {
       const updated = await updatePartnerStatus(
         id,
