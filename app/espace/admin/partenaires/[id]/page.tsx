@@ -53,7 +53,7 @@ export default async function PartnerDetailPage({
   return (
     <PartnerDetailClient
       partner={serializedPartner}
-      currentUserRole={session.user.role || "CONSULTANT"}
+      currentUserRole="ADMIN"
     />
   );
 }
