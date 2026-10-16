@@ -46,7 +46,8 @@
     "test:owner-permissions-governance": "node --import tsx --test tests/owner-permissions-governance.test.ts",
     "test:api-authorization-matrix": "node --import tsx --test tests/api-authorization-matrix.test.ts",
     "test:cv-matching-dashboard": "node --import tsx --test tests/cv-matching-dashboard.test.ts",
-    "test:secure-contact-payments": "node --import tsx --test tests/secure-contact-payments.test.ts"
+    "test:secure-contact-payments": "node --import tsx --test tests/secure-contact-payments.test.ts",
+    "test:owner-candidates-directory": "node --import tsx --test tests/owner-candidates-directory.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -20,7 +20,7 @@ export default async function OwnerPage() {
 
   const [users, candidates, documents, companies, jobs, applications, sourcedCandidates, settings, owner] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, email: true, role: true, createdAt: true } }),
-    prisma.candidateProfile.count(),
+    prisma.user.count({ where: { role: "CANDIDAT", status: "ACTIVE" } }),
     prisma.candidateDocument.count(),
     prisma.company.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { _count: { select: { members: true, jobs: true } } } }),
     prisma.job.findMany({ orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, title: true, status: true, company: { select: { name: true } }, updatedAt: true } }),
@@ -118,7 +118,7 @@ export default async function OwnerPage() {
 
       <div className="mt-10 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          ["Candidats", candidates, "/espace/documents/cv-library", "Ouvrir la bibliothèque CV"],
+          ["Candidats", candidates, "/espace/owner/candidats", "Voir les candidats"],
           ["CV / documents", documents, "/espace/documents", "Ouvrir les documents"],
           ["Entreprises", companies.length, "#entreprises", "Voir les entreprises"],
           ["Offres ouvertes", openJobs, "#offres", "Voir les offres"],
