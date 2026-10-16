@@ -63,15 +63,15 @@ function isActive(pathname: string, href: string): boolean {
 
 export default function RoleWorkspaceNavigation({
   role,
-  allowedWorkspaceNavigationPermissions = [],
+  allowedAdminPermissions = [],
 }: {
   role: WorkspaceRole;
-  allowedWorkspaceNavigationPermissions?: WorkspaceNavigationPermission[];
+  allowedAdminPermissions?: WorkspaceNavigationPermission[];
 }) {
   const pathname = usePathname() || "/";
   const workspace = workspaces[role];
   const links = workspace.links.filter(
-    (item) => !item.permission || allowedWorkspaceNavigationPermissions.includes(item.permission),
+    (item) => !item.permission || allowedAdminPermissions.includes(item.permission),
   );
 
   return (
