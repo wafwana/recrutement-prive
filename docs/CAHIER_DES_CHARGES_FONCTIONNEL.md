@@ -2,8 +2,8 @@
 
 **Version :** 1.0  
 **Date de consolidation :** 16 octobre 2026  
-**Référence du code :** branche main, commit b865ebfbdf4f7c27742bd5db110721295dcb0696  
-**Déploiement de référence :** Vercel production dpl_AHndDBNv186cCE1UL7wFjcD2MtYJ, état READY, commit b865ebfbdf4f7c27742bd5db110721295dcb0696  
+**Référence du code :** branche main, commit 8d65b516ded5afb088ad4a066231ac3090251b43  
+**Déploiement de référence :** Vercel production dpl_7mewP3owDHeuCjSHMNV9cQxhBUGU, état READY, commit 8d65b516ded5afb088ad4a066231ac3090251b43  
 **Document complémentaire :** ce document détaille le périmètre produit. Les règles de gouvernance et la procédure obligatoire A à Z restent définies dans CAHIER_DES_CHARGES.md.
 
 > Statut à lire correctement : READY indique que le déploiement technique est prêt. Cela ne remplace pas les tests fonctionnels en production sous des sessions OWNER, CANDIDAT et ENTREPRISE.
@@ -223,12 +223,15 @@ Une livraison est acceptée uniquement si les points applicables ci-dessous sont
 ## 8. État connu au 16 octobre 2026
 
 ### Confirmé par les outils au moment de la consolidation
-- Dépôt : wafwana/recrutement-prive ; branche principale main au moment de la consolidation fonctionnelle : SHA b865ebfbdf4f7c27742bd5db110721295dcb0696.
+- Dépôt : wafwana/recrutement-prive ; branche principale main au moment de la consolidation fonctionnelle : SHA 8d65b516ded5afb088ad4a066231ac3090251b43.
 - PR #288 fusionnée ; correction du traitement global des offres borné et rotatif.
 - CI PR #288 : barrière OWNER, migrations de test, tests sourcing/matching/sécurité, typecheck et build réussis avant fusion.
 - PR #290 fusionnée : panneau « Actions prioritaires » dans le cockpit Executive Search, préchargement du matching sur la vue d'ensemble et raccourcis vers les sections déjà existantes ; aucun contact externe ni décision automatique.
 - CI PR #290 : OWNER Compatibility Gate, suite verify, typecheck, build et les deux contrôles Vercel réussis avant fusion.
-- Vercel production : dpl_AHndDBNv186cCE1UL7wFjcD2MtYJ, SHA b865ebfbdf4f7c27742bd5db110721295dcb0696, état READY, alias publics présents et aliasError nul.
+- PR #291 fusionnée : le compteur OWNER compte les comptes actifs `CANDIDAT` et le KPI ouvre une page dédiée ; celle-ci vérifie OWNER côté serveur et utilise l’API de documents protégée existante.
+- CI PR #291 : OWNER Compatibility Gate, tests de sécurité/API, test de la nouvelle page, typecheck et build réussis avant fusion ; les deux contrôles Vercel ont réussi.
+- Vercel production : dpl_7mewP3owDHeuCjSHMNV9cQxhBUGU, SHA 8d65b516ded5afb088ad4a066231ac3090251b43, état READY, alias publics présents et aliasError nul.
+- Des points de restauration avant/après fusion ont été créés pour les correctifs sourcing et base candidats OWNER.
 - Un point de restauration Git avant fusion et un point de restauration après fusion ont été créés pour le correctif sourcing.
 
 ### Restant à valider
@@ -238,9 +241,9 @@ Une livraison est acceptée uniquement si les points applicables ci-dessous sont
 4. Reconfirmer le comportement des fournisseurs IA et des sources externes après les erreurs historiques signalées ; ne pas déclencher un cron de production manuellement avec le secret de production.
 5. Contrôler visuellement le Hero et les visuels sectoriels sur ordinateur, tablette et mobile.
 6. Comparer chaque ancienne PR ouverte à main avant de la réouvrir ou la fusionner ; une PR ancienne non fusionnable n'est pas forcément un défaut actif.
-7. Finaliser la PR #291 sur la base candidats OWNER uniquement après réussite de la CI, de la porte OWNER, du typecheck/build et des deux contrôles Vercel.
+7. Tester la nouvelle page candidats avec une session OWNER réelle, en confirmant que le compte OWNER et les autres rôles ne sont pas répertoriés et que l’accès aux documents suit toujours l’API protégée existante.
 
-Les livraisons techniques de la PR #288 (sourcing borné) et de la PR #290 (actions du cockpit Executive Search) sont fusionnées et incluses dans le déploiement READY référencé ci-dessus. La validation métier complète en production reste ouverte tant que les sessions authentifiées et les parcours réels CV/sourcing n'ont pas été observés. La PR #291 rétablit séparément l'accès direct OWNER à la base des comptes candidats actifs ; elle est en validation et n'est pas encore fusionnée.
+Les livraisons techniques des PR #288 (sourcing borné), #290 (actions du cockpit Executive Search) et #291 (base candidats OWNER) sont fusionnées et incluses dans le déploiement READY référencé ci-dessus. La validation métier complète en production reste ouverte tant que les sessions authentifiées et les parcours réels CV/sourcing n'ont pas été observés.
 
 ## 9. Gouvernance des évolutions et définition de terminé
 
