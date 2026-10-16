@@ -173,32 +173,48 @@ async function fetchSafeSource(input: string, init: RequestInit, requester: Pinn
 }
 
 
-export function configuredSources(envName: string): string[] {
+function parseEnvironmentSources(envName: string): string[] | null {
   const raw = process.env[envName];
-  if (!raw) {
-    if (envName === "RP_GLOBAL_JOB_SOURCES") return [...DEFAULT_FREE_JOB_SOURCES];
-    if (envName === "RP_GLOBAL_CANDIDATE_SOURCES") return [...DEFAULT_FREE_CANDIDATE_SOURCES];
-    return [];
-  }
+  if (!raw?.trim()) return null;
   try {
-    const parsed = typeof raw === "string" && raw.trim().startsWith("[") ? JSON.parse(raw) as unknown : raw.split(/[,;\n]/);
+    const parsed = raw.trim().startsWith("[")
+      ? JSON.parse(raw) as unknown
+      : raw.split(/[,;\n]/);
     const configured = Array.isArray(parsed)
-      ? parsed.map((v) => (typeof v === "string" ? v.trim() : "")).filter((v): v is string => Boolean(v) && /^https:\/\//i.test(v))
+      ? parsed
+          .map((value) => (typeof value === "string" ? value.trim() : ""))
+          .filter((value): value is string => Boolean(value) && value.toLowerCase().startsWith("https://"))
       : [];
-    if (configured.length > 0) return configured;
-    if (envName === "RP_GLOBAL_JOB_SOURCES") return [...DEFAULT_FREE_JOB_SOURCES];
-    if (envName === "RP_GLOBAL_CANDIDATE_SOURCES") return [...DEFAULT_FREE_CANDIDATE_SOURCES];
-    return [];
+    return configured.length > 0 ? configured : null;
   } catch {
-    if (envName === "RP_GLOBAL_JOB_SOURCES") return [...DEFAULT_FREE_JOB_SOURCES];
-    if (envName === "RP_GLOBAL_CANDIDATE_SOURCES") return [...DEFAULT_FREE_CANDIDATE_SOURCES];
-    return [];
+    return null;
   }
 }
 
+function defaultSources(envName: string): string[] {
+  if (envName === "RP_GLOBAL_JOB_SOURCES") return [...DEFAULT_FREE_JOB_SOURCES];
+  if (envName === "RP_GLOBAL_CANDIDATE_SOURCES") return [...DEFAULT_FREE_CANDIDATE_SOURCES];
+  return [];
+}
+
+/** True only when valid sources are explicitly pinned in the server environment. */
+export function hasExplicitConfiguredSources(envName: string): boolean {
+  return parseEnvironmentSources(envName) !== null;
+}
+
+/** Return environment sources or the existing free-source fallback. */
+export function configuredSources(envName: string): string[] {
+  return parseEnvironmentSources(envName) ?? defaultSources(envName);
+}
+
+/**
+ * Resolve effective sources in this order:
+ * explicit server environment > persisted candidate configuration > free-source defaults.
+ * An existing empty database list is intentional and disables external candidate sources.
+ */
 export async function getConfiguredSourcesAsync(envName: string): Promise<string[]> {
-  const envSources = configuredSources(envName);
-  if (envSources.length > 0) return envSources;
+  const envSources = parseEnvironmentSources(envName);
+  if (envSources) return envSources;
 
   if (envName === "RP_GLOBAL_CANDIDATE_SOURCES" && process.env.DATABASE_URL) {
     try {
@@ -206,16 +222,16 @@ export async function getConfiguredSourcesAsync(envName: string): Promise<string
         where: { key: "sourcing:candidate_sources" },
         select: { value: true },
       });
-      if (record && Array.isArray(record.value)) {
-        const dbSources = record.value
-          .filter((v): v is string => typeof v === "string" && isSafeHttpsUrl(v).safe)
-          .map((v) => isSafeHttpsUrl(v).url || v.trim());
-        if (dbSources.length > 0) return dbSources;
+      if (record) {
+        if (!Array.isArray(record.value)) return [];
+        return record.value
+          .filter((value): value is string => typeof value === "string" && isSafeHttpsUrl(value).safe)
+          .map((value) => isSafeHttpsUrl(value).url || value.trim());
       }
     } catch (err) {
       console.warn("[getConfiguredSourcesAsync] Failed to fetch DB candidate sources:", err);
     }
   }
 
-  return envName === "RP_GLOBAL_JOB_SOURCES" ? [...DEFAULT_FREE_JOB_SOURCES] : [];
+  return defaultSources(envName);
 }

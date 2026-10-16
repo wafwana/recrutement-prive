@@ -29,18 +29,34 @@ type AuditSummary = {
   details: unknown;
 } | null;
 
+function displaySourceUrl(raw: string): string {
+  try {
+    const url = new URL(raw);
+    for (const key of Array.from(url.searchParams.keys())) {
+      if (/(token|key|secret|auth|signature|password|credential|api[_-]?key)/i.test(key)) {
+        url.searchParams.set(key, "[masqué]");
+      }
+    }
+    return url.toString();
+  } catch {
+    return "URL de source à vérifier";
+  }
+}
+
 export default function CandidateSourcingClient({
   initialCandidates,
   activeSourcesCount,
   candidateSources,
   jobs,
   lastAudit,
+  sourcesEditable,
 }: {
   initialCandidates: SourcedCandidateItem[];
   activeSourcesCount: number;
   candidateSources: string[];
   jobs: JobOption[];
   lastAudit: AuditSummary;
+  sourcesEditable: boolean;
 }) {
   const [candidates, setCandidates] = useState<SourcedCandidateItem[]>(initialCandidates);
   const [query, setQuery] = useState("");
@@ -182,47 +198,64 @@ export default function CandidateSourcingClient({
           <div>
             <h3 className="text-sm font-medium text-white">Gestion des sources candidats HTTPS</h3>
             <p className="text-xs text-white/50">
-              Configurez et enregistrez les URLs d&apos;API de sources candidats autorisées.
+              {sourcesEditable
+                ? "Configurez les URLs HTTPS de sources candidats autorisées. Une configuration enregistrée est utilisée par le moteur de sourcing."
+                : "Les sources effectives sont définies par l’environnement serveur. Leur édition est désactivée ici pour éviter un enregistrement sans effet."}
             </p>
           </div>
           <span className="text-[10px] uppercase tracking-[0.16em] text-[#c7a15a]">
-            {sourcesList.length} source(s) configurée(s)
+            {sourcesEditable ? `${sourcesList.length} source(s) configurée(s)` : "Configuration serveur"}
           </span>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            type="url"
-            value={newSourceInput}
-            onChange={(e) => setNewSourceInput(e.target.value)}
-            placeholder="https://votre-source-candidats.com/api/candidates"
-            className="flex-1 border border-white/15 bg-transparent px-3 py-2 text-xs text-white outline-none focus:border-[#c7a15a]"
-          />
-          <button
-            type="button"
-            onClick={handleAddSource}
-            disabled={savingConfig}
-            className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-2 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a] hover:bg-[#c7a15a]/20 disabled:opacity-50"
-          >
-            {savingConfig ? "Enregistrement..." : "Ajouter la Source"}
-          </button>
-        </div>
+        {sourcesEditable ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <label htmlFor="candidate-source-url" className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-white/45">Nouvelle URL de source candidats (HTTPS)</label>
+              <input
+                id="candidate-source-url"
+                type="url"
+                value={newSourceInput}
+                onChange={(e) => setNewSourceInput(e.target.value)}
+                placeholder="https://votre-source-candidats.com/api/candidates"
+                aria-describedby="candidate-source-help"
+                className="w-full border border-white/15 bg-transparent px-3 py-2 text-xs text-white outline-none focus:border-[#c7a15a]"
+              />
+              <p id="candidate-source-help" className="mt-1 text-[10px] text-white/35">Les hôtes privés et les URL non HTTPS seront refusés.</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleAddSource}
+              disabled={savingConfig}
+              className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-2 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a] hover:bg-[#c7a15a]/20 disabled:opacity-50"
+            >
+              {savingConfig ? "Enregistrement..." : "Ajouter la source"}
+            </button>
+          </div>
+        ) : (
+          <p role="note" className="border border-white/10 bg-black/20 p-3 text-xs leading-5 text-white/55">
+            Pour modifier les sources actives, mettez à jour <code className="text-[#c7a15a]">RP_GLOBAL_CANDIDATE_SOURCES</code> dans la configuration Vercel du projet. Les changements ne sont pas enregistrés en base tant que l’environnement pilote la liste.
+          </p>
+        )}
 
-        {configMessage && <p className="text-xs text-[#c7a15a]">{configMessage}</p>}
+        {configMessage && <p role="status" aria-live="polite" className="text-xs text-[#c7a15a]">{configMessage}</p>}
 
         {sourcesList.length > 0 && (
           <div className="space-y-2 pt-2 border-t border-white/10">
             {sourcesList.map((src, idx) => (
-              <div key={idx} className="flex items-center justify-between border border-white/5 bg-black/30 px-3 py-2 text-xs text-white/80">
-                <span className="truncate pr-4 font-mono text-[11px]">{src}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveSource(idx)}
-                  disabled={savingConfig}
-                  className="text-[10px] text-red-400 hover:underline uppercase tracking-wider"
-                >
-                  Supprimer
-                </button>
+              <div key={idx} className="flex items-center justify-between gap-3 border border-white/5 bg-black/30 px-3 py-2 text-xs text-white/80">
+                <span className="min-w-0 truncate pr-2 font-mono text-[11px]" title={displaySourceUrl(src)}>{displaySourceUrl(src)}</span>
+                {sourcesEditable && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSource(idx)}
+                    disabled={savingConfig}
+                    aria-label={`Supprimer la source ${displaySourceUrl(src)}`}
+                    className="shrink-0 text-[10px] text-red-400 hover:underline uppercase tracking-wider disabled:opacity-50"
+                  >
+                    Supprimer
+                  </button>
+                )}
               </div>
             ))}
           </div>
