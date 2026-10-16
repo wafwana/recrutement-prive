@@ -27,6 +27,7 @@
     "test:cv-folder-classification": "node --import tsx --test tests/cv-folder-classification.test.ts",
     "test:cv-rematch-batch-window": "node --import tsx --test tests/cv-rematch-batch-window.test.ts",
     "test:cron-schedule": "node --import tsx --test tests/cron-schedule.test.ts",
+    "test:global-jobs-cron-batch": "node --import tsx --test tests/global-jobs-cron-batch.test.ts",
     "test:owner-cv-intake": "tsx tests/owner-cv-intake-integration.ts",
     "test:owner-compatibility": "node --import tsx --test tests/owner-compatibility.test.ts",
     "test:migration-check": "node --import tsx --test tests/migration-check.test.ts",
