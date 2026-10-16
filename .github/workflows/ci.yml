@@ -85,6 +85,7 @@ jobs:
       - run: npx tsx tests/final-validation.ts
       - run: npx tsx tests/offer-attachment-validation.ts
       - run: npm run test:admin-partners-security
+      - run: npm run test:security
       - run: npm run test:global-back-navigation
       - run: npm run test:sector-visuals
       - run: npm run test:owner-permissions-governance
