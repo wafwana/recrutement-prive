@@ -61,6 +61,7 @@ jobs:
           npm run test:cv-matching-dashboard
           npm run test:owner-candidates-directory
           npm run test:owner-workspace-navigation
+          npm run test:partner-sourcing-usability
           npm run test:candidate-sourcing-config
           npm run typecheck
       - name: Build after OWNER gate
