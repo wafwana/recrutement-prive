@@ -197,7 +197,7 @@ export default function NewPartnerPage() {
                 onChange={(e) => setStatus(e.target.value)}
                 className="mt-1.5 w-full border border-white/15 bg-black/60 px-3 py-2.5 text-xs text-white focus:border-[#c7a15a] focus:outline-none"
               >
-                {PARTNER_STATUSES.map((st) => (
+                {PARTNER_STATUSES.filter((st) => st.code !== "VALIDATED_PARTNER").map((st) => (
                   <option key={st.code} value={st.code}>
                     {st.label}
                   </option>
