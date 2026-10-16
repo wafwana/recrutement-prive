@@ -32,9 +32,9 @@ const navGroups: NavGroup[] = [
   {
     title: "Entreprises & offres",
     links: [
-      { href: "/espace/owner/entreprises", label: "Entreprises" },
+      { href: "/espace/owner#entreprises", label: "Entreprises" },
       { href: "/espace/owner/entreprises/nouvelle", label: "Ajouter une entreprise" },
-      { href: "/espace/owner/offres", label: "Offres" },
+      { href: "/espace/owner#offres", label: "Offres" },
       { href: "/espace/owner/offres/nouvelle", label: "Ajouter une offre" },
       { href: "/espace/owner/offres-vivier", label: "Vivier des offres" },
     ],
@@ -71,6 +71,7 @@ const navGroups: NavGroup[] = [
 ];
 
 function isActive(pathname: string, href: string): boolean {
+  if (href.includes("#")) return false;
   if (href === "/espace/owner") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
