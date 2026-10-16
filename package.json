@@ -38,6 +38,7 @@
     "test:secure-contact": "node --import tsx --test tests/secure-contact-contracts.test.ts",
     "test:executive-search": "node --import tsx --test tests/executive-search-presentation.test.ts",
     "test:secure-contact-authorization": "node --import tsx --test tests/secure-contact-authorization.test.ts",
+    "test:admin-partners-security": "node --import tsx --test tests/admin-partners-api-security.test.ts",
     "test:cv-matching-dashboard": "node --import tsx --test tests/cv-matching-dashboard.test.ts",
     "test:secure-contact-payments": "node --import tsx --test tests/secure-contact-payments.test.ts"
   },
