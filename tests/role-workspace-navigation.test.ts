@@ -58,8 +58,8 @@ test("ADMIN-only tools are permission-gated and do not expose OWNER navigation",
 
 test("enterprise navigation preserves the selected company when jumping between dashboard sections", () => {
   const nav = read("components/workspace/RoleWorkspaceNavigation.tsx");
-  assert.match(nav, /useSearchParams/);
-  assert.match(nav, /searchParams\.get\("companyId"\)/);
-  assert.match(nav, /encodeURIComponent\(activeCompanyId\)/);
-  assert.match(nav, /href=\{getHref\(item\.href\)\}/);
+  assert.ok(nav.includes("useSearchParams"));
+  assert.ok(nav.includes('searchParams.get("companyId")'));
+  assert.ok(nav.includes("encodeURIComponent(activeCompanyId)"));
+  assert.ok(nav.includes("href={getHref(item.href)}"));
 });
