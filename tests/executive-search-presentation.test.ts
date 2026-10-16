@@ -47,7 +47,7 @@ test("Executive Search embeds live anonymous candidate-offer proposals and reuse
   assert.match(cockpit, /Les prochaines étapes du cabinet/);
   assert.match(cockpit, /Trouver de nouvelles mises en relation/);
   assert.match(cockpit, /Examiner de nouveaux matchings/);
-  assert.match(cockpit, /activeTab === "matching" || activeTab === "overview"/);
+  assert.ok(cockpit.includes('if ((activeTab === "matching" || activeTab === "overview") && !matchingLoaded && !matchingLoading)'));
 
   assert.match(matchingRoute, /requireMatchingAccess/);
   assert.match(matchingRoute, /"PRESENTATIONS_MANAGE"/);
