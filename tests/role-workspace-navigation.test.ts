@@ -14,7 +14,8 @@ test("role workspaces get persistent navigation without changing the OWNER gate"
   assert.doesNotMatch(layout, /const navigation = \[/);
   assert.doesNotMatch(layout, /visibleNavigation/);
   assert.match(layout, /aria-label="Navigation générale"/);
-  assert.match(layout, />Retour au site<\/Link>/);
+  assert.match(layout, /import ReturnToSiteLink.*from "@\\/components\\/navigation\\/ReturnToSiteLink"/);
+  assert.match(layout, /<ReturnToSiteLink \/>/);
   assert.doesNotMatch(layout, /href="\/espace\/admin\/configuration"/);
   assert.match(layout, /allowedAdminPermissions/);
 });
@@ -24,12 +25,11 @@ test("navigation separates candidate, enterprise, consultant and ADMIN destinati
   for (const role of ["CANDIDAT", "ENTREPRISE", "CONSULTANT", "ADMIN"]) {
     assert.match(nav, new RegExp(`^  ${role}: \\{`, "m"), `missing role navigation: ${role}`);
   }
-  for (const label of [
-    "Mon profil & mes documents", "Mes candidatures", "Vue d’ensemble", "Mes offres",
-    "Candidatures reçues", "Présentations confidentielles", "Pipeline candidats",
-    "File de sourcing", "Mes autorisations", "Configuration", "Partenaires & sources",
-    "Messagerie",
-  ]) assert.ok(nav.includes(label), `missing navigation item: ${label}`);
+  for (const labelKey of ["ws_candidate_title","ws_candidate_description","ws_candidate_profile_documents","ws_candidate_applications","ws_enterprise_title","ws_enterprise_description","ws_enterprise_offers","ws_enterprise_applications","ws_enterprise_presentations","ws_consultant_title","ws_consultant_description","ws_consultant_pipeline","ws_consultant_sourcing","ws_admin_title","ws_admin_description","ws_admin_dashboard","ws_admin_permissions","ws_admin_configuration","ws_admin_partners_sources","ws_messages","ws_overview"]) {
+    assert.ok(nav.includes(labelKey), `missing navigation translation key: ${labelKey}`);
+  }
+  assert.match(nav, /useI18n/);
+  assert.match(nav, /t\(item\.labelKey\)/);
   assert.match(nav, /aria-current=\{active \? "page" : undefined\}/);
   assert.match(nav, /focus-visible:ring-2/);
   assert.doesNotMatch(nav, /href: "\/espace\/owner/);
