@@ -179,11 +179,11 @@ function parseEnvironmentSources(envName: string): string[] | null {
   try {
     const parsed = raw.trim().startsWith("[")
       ? JSON.parse(raw) as unknown
-      : raw.split(/[,;\\n]/);
+      : raw.split(/[,;\n]/);
     const configured = Array.isArray(parsed)
       ? parsed
           .map((value) => (typeof value === "string" ? value.trim() : ""))
-          .filter((value): value is string => Boolean(value) && /^https:\\/\\//i.test(value))
+          .filter((value): value is string => Boolean(value) && /^https:\/\/\//i.test(value))
       : [];
     return configured.length > 0 ? configured : null;
   } catch {
