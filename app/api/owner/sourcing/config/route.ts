@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import { z } from "zod";
 import { isSafeHttpsUrl } from "@/lib/security/ssrf";
+import { hasExplicitConfiguredSources } from "@/lib/sourcing/global";
 
 const configSchema = z.object({
   sources: z.array(z.string().trim().url("Chaque source doit être une URL valide (https://)")).default([]),
@@ -38,6 +39,12 @@ export async function GET() {
 export async function POST(request: Request) {
   const actor = await requireOwnerOrSourcingAccess();
   if (!actor) return NextResponse.json({ error: "Non autorisé." }, { status: 403 });
+  if (hasExplicitConfiguredSources("RP_GLOBAL_CANDIDATE_SOURCES")) {
+    return NextResponse.json(
+      { error: "Les sources sont pilotées par RP_GLOBAL_CANDIDATE_SOURCES dans l’environnement serveur. Aucune modification en base n’a été enregistrée." },
+      { status: 409 },
+    );
+  }
 
   let body: unknown;
   try {
@@ -78,7 +85,10 @@ export async function POST(request: Request) {
       actorRole: actor.role || "STAFF",
       action: "UPDATE_CANDIDATE_SOURCING_CONFIG",
       targetType: "SYSTEM_SETTING",
-      details: { sourcesCount: validSources.length, sources: validSources },
+      details: {
+        sourcesCount: validSources.length,
+        sourceHosts: validSources.map((source) => new URL(source).hostname.toLowerCase()),
+      },
     },
   });
 
