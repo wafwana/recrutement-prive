@@ -64,7 +64,11 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json(profile);
+  const safeProfile = profile
+    ? Object.fromEntries(Object.entries(profile).filter(([key]) => key !== "cvUrl"))
+    : null;
+
+  return NextResponse.json(safeProfile);
 }
 
 export async function PUT(request: Request) {
@@ -192,5 +196,6 @@ export async function PUT(request: Request) {
     },
   });
 
-  return NextResponse.json(profile);
+  const safeProfile = Object.fromEntries(Object.entries(profile).filter(([key]) => key !== "cvUrl"));
+  return NextResponse.json(safeProfile);
 }
