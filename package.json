@@ -41,6 +41,7 @@
     "test:admin-partners-security": "node --import tsx --test tests/admin-partners-api-security.test.ts",
     "test:global-back-navigation": "node --import tsx --test tests/global-back-navigation.test.ts",
     "test:sector-visuals": "node --import tsx --test tests/sector-visuals.test.ts",
+    "test:owner-permissions-governance": "node --import tsx --test tests/owner-permissions-governance.test.ts",
     "test:cv-matching-dashboard": "node --import tsx --test tests/cv-matching-dashboard.test.ts",
     "test:secure-contact-payments": "node --import tsx --test tests/secure-contact-payments.test.ts"
   },
