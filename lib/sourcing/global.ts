@@ -183,7 +183,7 @@ function parseEnvironmentSources(envName: string): string[] | null {
     const configured = Array.isArray(parsed)
       ? parsed
           .map((value) => (typeof value === "string" ? value.trim() : ""))
-          .filter((value): value is string => Boolean(value) && /^https:\/\/\//i.test(value))
+          .filter((value): value is string => Boolean(value) && value.toLowerCase().startsWith("https://"))
       : [];
     return configured.length > 0 ? configured : null;
   } catch {
