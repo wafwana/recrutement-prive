@@ -3,6 +3,7 @@
 import React from "react";
 import LanguageSelector from "./components/LanguageSelector";
 import { useI18n } from "@/lib/i18n/context";
+import { getSectorVisual } from "@/lib/taxonomy/sector-visuals";
 
 const images = {
   hero: "/visuals/rp-global-skyline.webp?v=rp-global-skyline-20261014",
@@ -87,19 +88,36 @@ export default function HomePage() {
       <SectionHeading><h2>Secteurs d’activité <span>&amp; métiers</span></h2></SectionHeading>
       <p className="mx-auto mt-4 max-w-3xl text-center text-sm leading-7 text-white/50">Aperçu public des principaux secteurs. L’accès aux métiers, sous-métiers et fonctionnalités complètes est réservé aux utilisateurs inscrits.</p>
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {publicSectorCards.map((sector) => (
-          <article key={sector.code} className="border border-white/10 bg-[#111] p-6 transition hover:border-[#F97316]/50">
-            <h3 className="font-serif text-xl text-white">{sector.name}</h3>
-            <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-[#F97316]/80">Recherche de cadres supérieurs &amp; profils rares</div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {sector.jobs.map((job) => (
-                <span key={job} className="border border-white/10 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.08em] text-white/50">
-                  {job}
-                </span>
-              ))}
-            </div>
-          </article>
-        ))}
+        {publicSectorCards.map((sector) => {
+          const visual = getSectorVisual(sector.code, sector.name);
+          return (
+            <article key={sector.code} className="overflow-hidden border border-white/10 bg-[#111] transition hover:border-[#F97316]/50">
+              <div className="relative h-40 overflow-hidden bg-[#081625]">
+                <img
+                  src={visual.src}
+                  alt={visual.alt}
+                  width={960}
+                  height={480}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover opacity-85 transition duration-500 group-hover:scale-[1.02]"
+                />
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#111] via-[#081625]/10 to-transparent" />
+              </div>
+              <div className="p-6">
+                <h3 className="font-serif text-xl text-white">{sector.name}</h3>
+                <div className="mt-2 text-[9px] uppercase tracking-[0.18em] text-[#F97316]/80">Recherche de cadres supérieurs &amp; profils rares</div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {sector.jobs.map((job) => (
+                    <span key={job} className="border border-white/10 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.08em] text-white/50">
+                      {job}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </article>
+          );
+        })}
       </div>
       <div className="mt-8 text-center">
         <a href="/inscription" className="inline-flex border border-[#F97316] px-6 py-3 text-[10px] uppercase tracking-[0.2em] text-[#F97316]">S’inscrire pour accéder à tous les secteurs &amp; métiers →</a>
