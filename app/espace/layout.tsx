@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { CollaboratorActivityTracker } from "@/components/activity/CollaboratorActivityTracker";
 import ContextBackButton from "@/components/navigation/ContextBackButton";
+import OwnerWorkspaceNavigation from "@/components/owner/OwnerWorkspaceNavigation";
 
 const navigation = [
   { href: "/espace/candidat", label: "Candidat", role: "CANDIDAT" },
@@ -38,6 +39,7 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
         </div>
       </header>
       <CollaboratorActivityTracker />
+      {role === "OWNER" ? <OwnerWorkspaceNavigation /> : null}
       <ContextBackButton />
       {children}
     </main>
