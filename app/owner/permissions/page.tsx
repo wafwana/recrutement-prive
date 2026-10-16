@@ -64,16 +64,28 @@ export default function OwnerPermissionsPage() {
   }
 
   async function save(user: Staff) {
-    setSaving(user.id); setError(null); setSuccess(null);
-    const res = await fetch("/api/owner/permissions", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, permissions: user.permissions || [] }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setSaving(null);
-    if (!res.ok) { setError(data.error || "Enregistrement impossible."); return; }
-    await load();
-    setSuccess(`Permissions de ${user.name || user.email} enregistrées et vérifiées. La modification est journalisée.`);
+    setError(null); setSuccess(null);
+    const reason = window.prompt(`Motif obligatoire de modification des permissions pour ${user.name || user.email} :`);
+    if (!reason || reason.trim().length < 5) {
+      setError("Modification annulée : un motif d'au moins 5 caractères est obligatoire.");
+      return;
+    }
+
+    setSaving(user.id);
+    try {
+      const res = await fetch("/api/owner/permissions", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, permissions: user.permissions || [], reason: reason.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error || "Enregistrement impossible."); return; }
+      await load();
+      setSuccess(`Permissions de ${user.name || user.email} enregistrées et auditées.`);
+    } catch {
+      setError("Erreur réseau pendant l'enregistrement des permissions.");
+    } finally {
+      setSaving(null);
+    }
   }
 
   return (
