@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 type WorkspaceRole = "CANDIDAT" | "ENTREPRISE" | "CONSULTANT" | "ADMIN";
 export type WorkspaceNavigationPermission = "PLATFORM_SETTINGS" | "PARTNERS_MANAGE";
@@ -69,7 +69,14 @@ export default function RoleWorkspaceNavigation({
   allowedAdminPermissions?: WorkspaceNavigationPermission[];
 }) {
   const pathname = usePathname() || "/";
+  const searchParams = useSearchParams();
+  const activeCompanyId = role === "ENTREPRISE" ? searchParams.get("companyId") : null;
   const workspace = workspaces[role];
+  const getHref = (href: string) => {
+    if (!activeCompanyId || role !== "ENTREPRISE" || !href.startsWith("/espace/entreprise#")) return href;
+    const anchor = href.slice(href.indexOf("#"));
+    return `/espace/entreprise?companyId=${encodeURIComponent(activeCompanyId)}${anchor}`;
+  };
   const links = workspace.links.filter(
     (item) => !item.permission || allowedAdminPermissions.includes(item.permission),
   );
@@ -90,7 +97,7 @@ export default function RoleWorkspaceNavigation({
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={getHref(item.href)}
                 aria-current={active ? "page" : undefined}
                 className={
                   active
