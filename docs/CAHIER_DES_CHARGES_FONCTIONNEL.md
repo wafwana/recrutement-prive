@@ -2,8 +2,8 @@
 
 **Version :** 1.0  
 **Date de consolidation :** 16 octobre 2026  
-**Référence du code :** branche main, commit 34882bef037f99f6b52b071ed03739044b7dd4b6  
-**Déploiement de référence :** Vercel production dpl_8MyKJV232GaZV4mKQ2VRsMzd15pz, état READY, commit identique  
+**Référence du code :** branche main, commit b865ebfbdf4f7c27742bd5db110721295dcb0696  
+**Déploiement de référence :** Vercel production dpl_AHndDBNv186cCE1UL7wFjcD2MtYJ, état READY, commit b865ebfbdf4f7c27742bd5db110721295dcb0696  
 **Document complémentaire :** ce document détaille le périmètre produit. Les règles de gouvernance et la procédure obligatoire A à Z restent définies dans CAHIER_DES_CHARGES.md.
 
 > Statut à lire correctement : READY indique que le déploiement technique est prêt. Cela ne remplace pas les tests fonctionnels en production sous des sessions OWNER, CANDIDAT et ENTREPRISE.
@@ -223,10 +223,12 @@ Une livraison est acceptée uniquement si les points applicables ci-dessous sont
 ## 8. État connu au 16 octobre 2026
 
 ### Confirmé par les outils au moment de la consolidation
-- Dépôt : wafwana/recrutement-prive ; branche principale main ; SHA 34882bef037f99f6b52b071ed03739044b7dd4b6.
+- Dépôt : wafwana/recrutement-prive ; branche principale main au moment de la consolidation fonctionnelle : SHA b865ebfbdf4f7c27742bd5db110721295dcb0696.
 - PR #288 fusionnée ; correction du traitement global des offres borné et rotatif.
 - CI PR #288 : barrière OWNER, migrations de test, tests sourcing/matching/sécurité, typecheck et build réussis avant fusion.
-- Vercel production : dpl_8MyKJV232GaZV4mKQ2VRsMzd15pz, SHA 34882bef037f99f6b52b071ed03739044b7dd4b6, état READY, alias public présents et aliasError nul.
+- PR #290 fusionnée : panneau « Actions prioritaires » dans le cockpit Executive Search, préchargement du matching sur la vue d'ensemble et raccourcis vers les sections déjà existantes ; aucun contact externe ni décision automatique.
+- CI PR #290 : OWNER Compatibility Gate, suite verify, typecheck, build et les deux contrôles Vercel réussis avant fusion.
+- Vercel production : dpl_AHndDBNv186cCE1UL7wFjcD2MtYJ, SHA b865ebfbdf4f7c27742bd5db110721295dcb0696, état READY, alias publics présents et aliasError nul.
 - Un point de restauration Git avant fusion et un point de restauration après fusion ont été créés pour le correctif sourcing.
 
 ### Restant à valider
@@ -236,8 +238,9 @@ Une livraison est acceptée uniquement si les points applicables ci-dessous sont
 4. Reconfirmer le comportement des fournisseurs IA et des sources externes après les erreurs historiques signalées ; ne pas déclencher un cron de production manuellement avec le secret de production.
 5. Contrôler visuellement le Hero et les visuels sectoriels sur ordinateur, tablette et mobile.
 6. Comparer chaque ancienne PR ouverte à main avant de la réouvrir ou la fusionner ; une PR ancienne non fusionnable n'est pas forcément un défaut actif.
+7. Finaliser la PR #291 sur la base candidats OWNER uniquement après réussite de la CI, de la porte OWNER, du typecheck/build et des deux contrôles Vercel.
 
-À ce stade, la livraison technique de la PR #288 est déployée et READY ; la validation complète métier de la plateforme en production n'est pas déclarée terminée tant que les tests authentifiés ci-dessus n'ont pas été observés.
+Les livraisons techniques de la PR #288 (sourcing borné) et de la PR #290 (actions du cockpit Executive Search) sont fusionnées et incluses dans le déploiement READY référencé ci-dessus. La validation métier complète en production reste ouverte tant que les sessions authentifiées et les parcours réels CV/sourcing n'ont pas été observés. La PR #291 rétablit séparément l'accès direct OWNER à la base des comptes candidats actifs ; elle est en validation et n'est pas encore fusionnée.
 
 ## 9. Gouvernance des évolutions et définition de terminé
 
