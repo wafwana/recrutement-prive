@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { CollaboratorActivityTracker } from "@/components/activity/CollaboratorActivityTracker";
 import ContextBackButton from "@/components/navigation/ContextBackButton";
 import OwnerWorkspaceNavigation from "@/components/owner/OwnerWorkspaceNavigation";
+import RoleWorkspaceNavigation, { type WorkspaceNavigationPermission } from "@/components/workspace/RoleWorkspaceNavigation";
+import { hasPermission } from "@/lib/auth/permissions";
 
 const navigation = [
   { href: "/espace/candidat", label: "Candidat", role: "CANDIDAT" },
@@ -15,7 +17,21 @@ const navigation = [
 export default async function EspaceLayout({ children }: { children: ReactNode }) {
   const session = await auth();
   const role = session?.user?.role;
-  const visibleNavigation = navigation.filter((item) => item.role === "ALL" || item.role === role || role === "ADMIN");
+  const visibleNavigation = navigation.filter((item) => item.role === "ALL" || item.role === role);
+  const canManagePlatformSettings = role === "ADMIN" && session?.user?.id
+    ? await hasPermission(session.user.id, role, "PLATFORM_SETTINGS").catch(() => false)
+    : false;
+  const canManagePartners = role === "ADMIN" && session?.user?.id
+    ? await hasPermission(session.user.id, role, "PARTNERS_MANAGE").catch(() => false)
+    : false;
+  const allowedAdminPermissions: WorkspaceNavigationPermission[] = [
+    ...(canManagePlatformSettings ? ["PLATFORM_SETTINGS" as const] : []),
+    ...(canManagePartners ? ["PARTNERS_MANAGE" as const] : []),
+  ];
+  const workspaceRole =
+    role === "CANDIDAT" || role === "ENTREPRISE" || role === "CONSULTANT" || role === "ADMIN"
+      ? role
+      : null;
 
   return (
     <main className="min-h-screen bg-[#0b0b0b] text-white">
@@ -39,7 +55,7 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
         </div>
       </header>
       <CollaboratorActivityTracker />
-      {role === "OWNER" ? <OwnerWorkspaceNavigation /> : null}
+      {role === "OWNER" ? <OwnerWorkspaceNavigation /> : null}\n      {workspaceRole ? <RoleWorkspaceNavigation role={workspaceRole} allowedAdminPermissions={allowedAdminPermissions} /> : null}
       <ContextBackButton />
       {children}
     </main>
