@@ -71,6 +71,7 @@ jobs:
       - run: npm run test:cron-schedule
       - run: npm run test:global-jobs-cron-batch
       - run: npm run test:global-sourcing
+      - run: npm run test:candidate-sourcing-config
       - run: npm run test:sourcing-candidate-status
       - run: npm run test:proactive-search
       - run: npm run test:enterprise-sourcing-batch
