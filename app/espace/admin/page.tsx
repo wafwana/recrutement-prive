@@ -33,6 +33,7 @@ export default async function AdminPage() {
     canSourcing,
     canCvIntake,
     canManagePartners,
+    canManageMetiers,
   ] = await Promise.all([
     hasPermission(userId, role, "CANDIDATES_VIEW"),
     hasPermission(userId, role, "JOBS_MANAGE"),
@@ -42,6 +43,7 @@ export default async function AdminPage() {
     hasPermission(userId, role, "SOURCING"),
     hasPermission(userId, role, "CV_INTAKE"),
     hasPermission(userId, role, "PARTNERS_MANAGE"),
+    hasPermission(userId, role, "METIERS_DOSSIERS"),
   ]);
 
   // Fetch only data authorized by active permissions
@@ -106,6 +108,14 @@ export default async function AdminPage() {
               className="border border-white/20 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/80 hover:border-white/40"
             >
               Import CV
+            </Link>
+          )}
+          {canManageMetiers && (
+            <Link
+              href="/espace/owner/metiers"
+              className="border border-white/20 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/80 hover:border-white/40"
+            >
+              Métiers &amp; dossiers
             </Link>
           )}
           {canManagePartners && (
