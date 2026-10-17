@@ -13,3 +13,15 @@ test("allows automatic refresh only for non-reviewed states", () => {
     assert.equal(shouldPreserveSourcedCandidateStatus(status), false, status);
   }
 });
+
+test("rematches technical scores for reviewed candidates but excludes rejected or archived profiles", () => {
+  const { shouldRematchSourcedCandidate } = require("../lib/sourcing/candidate-status") as typeof import("../lib/sourcing/candidate-status");
+
+  for (const status of ["DETECTED", "MATCHED", "REVIEWING", "VALIDATED", "CONTACTED", "A_QUALIFIER", "UNKNOWN"]) {
+    assert.equal(shouldRematchSourcedCandidate(status), true, status);
+  }
+
+  for (const status of ["REJECTED", "ARCHIVED"]) {
+    assert.equal(shouldRematchSourcedCandidate(status), false, status);
+  }
+});
