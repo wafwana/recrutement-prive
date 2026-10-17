@@ -5,7 +5,7 @@ import { qualifyAndMatchExternalOffer } from "@/lib/jobs/offer-pipeline";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 import { selectBatchWindow } from "@/lib/sourcing/batch-window";
-import { shouldPreserveSourcedCandidateStatus } from "@/lib/sourcing/candidate-status";
+import { shouldPreserveSourcedCandidateStatus, shouldRematchSourcedCandidate } from "@/lib/sourcing/candidate-status";
 
 export async function markExpiredGlobalJobs() {
   const now = new Date();
@@ -141,7 +141,7 @@ async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string
       headline: true, location: true, matchingDetails: true,
     },
   });
-  if (!candidate || ["REJECTED", "ARCHIVED"].includes(candidate.status)) {
+  if (!candidate || !shouldRematchSourcedCandidate(candidate.status)) {
     return { candidateId, evaluated: 0, matches: 0, bestScore: 0 };
   }
 
@@ -296,7 +296,7 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
         data: { ...data, status: finished ? existing.status : "DETECTED", updatedAt: new Date() },
       });
       // A human-reviewed status must not suppress technical rematching.
-      if (!['REJECTED', 'ARCHIVED'].includes(existing.status)) {
+      if (shouldRematchSourcedCandidate(existing.status)) {
         await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
       }
       updated++;
@@ -499,7 +499,7 @@ async function ingestPlatformCvthequeCandidates(
         },
       });
       // Keep the workflow status intact while refreshing technical match results.
-      if (!['REJECTED', 'ARCHIVED'].includes(existing.status)) {
+      if (shouldRematchSourcedCandidate(existing.status)) {
         const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
         matched += rematch.matches;
       }
