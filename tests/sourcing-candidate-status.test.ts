@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { shouldPreserveSourcedCandidateStatus } from "../lib/sourcing/candidate-status";
+import { shouldPreserveSourcedCandidateStatus, shouldRematchSourcedCandidate } from "../lib/sourcing/candidate-status";
 
 test("preserves human-reviewed and terminal sourcing states", () => {
   for (const status of ["REVIEWING", "VALIDATED", "CONTACTED", "REJECTED", "ARCHIVED"]) {
@@ -15,8 +15,6 @@ test("allows automatic refresh only for non-reviewed states", () => {
 });
 
 test("rematches technical scores for reviewed candidates but excludes rejected or archived profiles", () => {
-  const { shouldRematchSourcedCandidate } = require("../lib/sourcing/candidate-status") as typeof import("../lib/sourcing/candidate-status");
-
   for (const status of ["DETECTED", "MATCHED", "REVIEWING", "VALIDATED", "CONTACTED", "A_QUALIFIER", "UNKNOWN"]) {
     assert.equal(shouldRematchSourcedCandidate(status), true, status);
   }
