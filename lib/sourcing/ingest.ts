@@ -295,7 +295,10 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
         where: { id: existing.id },
         data: { ...data, status: finished ? existing.status : "DETECTED", updatedAt: new Date() },
       });
-      if (!finished) await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
+      // A human-reviewed status must not suppress technical rematching.
+      if (!['REJECTED', 'ARCHIVED'].includes(existing.status)) {
+        await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
+      }
       updated++;
     } else {
       const createdCandidate = await prisma.sourcedCandidate.create({ data: { ...data, externalId, status: "DETECTED" } });
@@ -495,7 +498,8 @@ async function ingestPlatformCvthequeCandidates(
           updatedAt: new Date(),
         },
       });
-      if (!isFinished) {
+      // Keep the workflow status intact while refreshing technical match results.
+      if (!['REJECTED', 'ARCHIVED'].includes(existing.status)) {
         const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
         matched += rematch.matches;
       }
