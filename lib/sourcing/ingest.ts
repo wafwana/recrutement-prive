@@ -687,7 +687,10 @@ export async function ingestGlobalCandidates(params: {
                 updatedAt: new Date(),
               },
             });
-            if (!isFinished) await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
+            // Recompute technical matching even for human-reviewed candidates; preserve their workflow status separately.
+            if (!['REJECTED', 'ARCHIVED'].includes(existing.status)) {
+              await rematchSourcedCandidateAgainstQualifiedOffers(existing.id);
+            }
             updated++;
             candidateIds.push(existing.id);
           } else {
