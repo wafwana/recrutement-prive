@@ -27,9 +27,9 @@ export default async function NewOwnerJobPage({searchParams}:{searchParams:Promi
    <label className="text-xs text-white/50">Ou collez l'offre complète
     <textarea name="rawText" rows={14} maxLength={30000} placeholder="Collez ici le texte de l'offre. L'IA se charge du reste." className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"/>
    </label>
-   <label className="text-xs text-white/50">Ou fournissez un fichier texte
-    <input name="offerFile" type="file" accept=".txt,.html,.htm,.json,text/plain,text/html,application/json" className="mt-2 block w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white/60"/>
-    <span className="mt-2 block text-[10px] text-white/30">TXT, HTML ou JSON pour cette première version. L'original reste traité comme source et l'opération est journalisée.</span>
+   <label className="text-xs text-white/50">Importer une offre depuis un fichier
+    <input name="offerFile" type="file" accept=".pdf,.docx,.txt,.md,.html,.htm,.json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/html,application/json" className="mt-2 block w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white/60"/>
+    <span className="mt-2 block text-[10px] text-white/30">PDF, Word (.docx), TXT, Markdown, HTML ou JSON · 10 Mo maximum. Le texte est extrait pour analyser l'offre ; le fichier original n'est pas conservé par cette action.</span>
    </label>
    <div className="flex items-center justify-between gap-4">
     <p className="text-[10px] uppercase tracking-[0.14em] text-white/30">OWNER · isolation · audit · vivier CV protégé</p>
