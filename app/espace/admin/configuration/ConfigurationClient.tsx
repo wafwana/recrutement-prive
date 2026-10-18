@@ -29,14 +29,20 @@ const toggles: { key: BooleanSetting; title: string; description: string }[] = [
 export default function AdminConfigurationClient() {
   const [settings, setSettings] = useState<Settings>(defaults);
   const [status, setStatus] = useState("Chargement…");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
     fetch("/api/admin/settings", { cache: "no-store" }).then(async (response) => {
       const data = await response.json();
       if (!active) return;
-      if (response.ok) setSettings(data.settings);
-      setStatus(response.ok ? "Configuration chargée" : data.error || "Accès refusé");
+      if (response.ok && data.settings && typeof data.settings === "object") {
+        setSettings({ ...defaults, ...data.settings });
+        setLoaded(true);
+        setStatus("Configuration chargée");
+      } else {
+        setStatus(data.error || "Impossible de charger la configuration. Aucun changement ne peut être enregistré.");
+      }
     }).catch(() => {
       if (active) setStatus("Impossible de charger la configuration. Réessayez.");
     });
@@ -44,6 +50,7 @@ export default function AdminConfigurationClient() {
   }, []);
 
   const save = async () => {
+    if (!loaded) return;
     setStatus("Enregistrement…");
     try {
       const response = await fetch("/api/admin/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
@@ -63,14 +70,14 @@ export default function AdminConfigurationClient() {
       <p className="mt-4 max-w-2xl text-sm leading-7 text-white/50">Les paramètres sont persistés en base et protégés par une permission dédiée.</p>
       <div className="mt-10 space-y-3">
         {toggles.map(({ key, title, description }) => (
-          <button key={key} type="button" onClick={() => toggle(key)} className="flex w-full items-center justify-between gap-6 border border-white/10 bg-[#111] p-6 text-left transition hover:border-white/20">
+          <button key={key} type="button" onClick={() => toggle(key)} disabled={!loaded || status === "Enregistrement…"} className="flex w-full items-center justify-between gap-6 border border-white/10 bg-[#111] p-6 text-left transition hover:border-white/20">
             <span><strong className="block font-serif text-xl font-normal">{title}</strong><span className="mt-2 block text-xs leading-5 text-white/40">{description}</span></span>
             <span className={`h-6 w-11 rounded-full border p-1 ${settings[key] ? "border-[#c7a15a]" : "border-white/20"}`}><span className={`block h-4 w-4 rounded-full transition ${settings[key] ? "translate-x-5 bg-[#c7a15a]" : "bg-white/30"}`} /></span>
           </button>
         ))}
       </div>
-      <label className="mt-6 block border border-white/10 bg-[#111] p-6"><span className="text-[10px] uppercase tracking-[0.2em] text-white/35">Statut initial d'une candidature</span><select value={settings.defaultApplicationStatus} onChange={(event) => setSettings({ ...settings, defaultApplicationStatus: event.target.value as Settings["defaultApplicationStatus"] })} className="mt-3 w-full border border-white/10 bg-[#0b0b0b] px-4 py-3 text-sm text-white"><option value="SUBMITTED">Soumise</option><option value="REVIEWING">En étude</option><option value="INTERVIEW">Entretien</option><option value="SHORTLISTED">Présélection</option><option value="REJECTED">Refusée</option><option value="HIRED">Recrutée</option></select></label>
-      <div className="mt-8 flex items-center justify-between gap-4"><span role="status" aria-live="polite" className="text-xs text-white/35">{status}</span><button type="button" onClick={() => void save()} disabled={status === "Enregistrement…"} className="border border-[#c7a15a]/60 px-6 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a] hover:bg-[#c7a15a] hover:text-black disabled:opacity-50">Enregistrer</button></div>
+      <label className="mt-6 block border border-white/10 bg-[#111] p-6"><span className="text-[10px] uppercase tracking-[0.2em] text-white/35">Statut initial d'une candidature</span><select value={settings.defaultApplicationStatus} onChange={(event) => setSettings({ ...settings, defaultApplicationStatus: event.target.value as Settings["defaultApplicationStatus"] })} disabled={!loaded || status === "Enregistrement…"} className="mt-3 w-full border border-white/10 bg-[#0b0b0b] px-4 py-3 text-sm text-white"><option value="SUBMITTED">Soumise</option><option value="REVIEWING">En étude</option><option value="INTERVIEW">Entretien</option><option value="SHORTLISTED">Présélection</option><option value="REJECTED">Refusée</option><option value="HIRED">Recrutée</option></select></label>
+      <div className="mt-8 flex items-center justify-between gap-4"><span role="status" aria-live="polite" className="text-xs text-white/35">{status}</span><button type="button" onClick={() => void save()} disabled={!loaded || status === "Enregistrement…"} className="border border-[#c7a15a]/60 px-6 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a] hover:bg-[#c7a15a] hover:text-black disabled:opacity-50">Enregistrer</button></div>
     </section>
   );
 }
