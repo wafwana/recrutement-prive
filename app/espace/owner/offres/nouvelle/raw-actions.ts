@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { analyzeAndMatchJob } from "@/lib/jobs/automation";
+import { extractTextFromCvBuffer } from "@/lib/cv/analyzer";
 import { analyzeRawOffer, enrichCompanyFromAnalysis, extractEmailFromText, fetchPublicOfferUrl, sendRawOfferOutreach, sourceFingerprint } from "@/lib/sourcing/raw-offer";
 
 async function ownerId(){const s=await auth();if(!s?.user?.id||s.user.role!=="OWNER")throw new Error("Accès réservé à l'OWNER.");return s.user.id;}
@@ -24,7 +25,7 @@ export async function processOwnerRawOffer(formData:FormData){
  let rawText=String(formData.get("rawText")||"").trim();let source:{title?:string|null;companyName?:string|null;country?:string|null;city?:string|null;rawData?:unknown}={};
  if(externalJobId){const e=await prisma.externalJobOpportunity.findUnique({where:{id:externalJobId}});if(!e)throw new Error("Offre source introuvable.");source={title:e.title,companyName:e.companyName,country:e.country,city:e.city,rawData:e.rawData};sourceUrl=e.sourceUrl||sourceUrl;rawText=e.description||"";if(!rawText&&e.rawData)rawText=JSON.stringify(e.rawData);}
  else if(sourceUrl){const f=await fetchPublicOfferUrl(sourceUrl);sourceUrl=f.url;rawText=f.text;}
- else {const file=formData.get("offerFile");if(file instanceof File&&file.size){if(!/^(text\/(plain|html)|application\/(json|xhtml\+xml))$/i.test(file.type||""))throw new Error("Fichier accepté actuellement : TXT, HTML ou JSON.");rawText=(await file.text()).slice(0,30000);}}
+ else {const file=formData.get("offerFile");if(file instanceof File&&file.size){if(file.size>10*1024*1024)throw new Error("Le fichier dépasse la limite de 10 Mo.");const name=file.name.toLowerCase();if(!/\.(pdf|docx|txt|md|html?|json)$/i.test(name))throw new Error("Format non pris en charge. Importez un PDF, Word (.docx), TXT, Markdown, HTML ou JSON.");const mime=file.type||"application/octet-stream";const buffer=Buffer.from(await file.arrayBuffer());if(/\.(html?|json)$/i.test(name)){rawText=buffer.toString("utf8").slice(0,30000);}else{const extracted=await extractTextFromCvBuffer(buffer,mime,file.name);if(!extracted)throw new Error("Aucun texte exploitable n’a pu être extrait. Pour un PDF scanné ou une image, utilisez un PDF avec texte sélectionnable ou collez le texte de l’offre.");rawText=extracted.slice(0,30000);}}}
  const parsed=z.string().trim().min(80,"L'offre brute est trop courte.").max(30000).safeParse(rawText);if(!parsed.success)throw new Error(parsed.error.issues[0]?.message||"Offre invalide.");
  const rows=await taxonomy();const a=await analyzeRawOffer({rawText:parsed.data,source:{...source,sourceUrl},taxonomy:rows.map(r=>({code:r.code,name:typeof r.name==="object"&&r.name!==null?String((r.name as Record<string,unknown>).fr??r.code):r.code,parentCode:rows.find(p=>p.id===r.parentId)?.code??null}))});if(!a)throw new Error("Le moteur IA n'est pas disponible : aucun fournisseur IA n'est configuré ou opérationnel.");
  if(!a.contactEmail){const e=extractEmailFromText(parsed.data);if(e)a.contactEmail=e;}
