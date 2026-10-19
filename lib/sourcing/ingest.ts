@@ -162,7 +162,7 @@ async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string
           skills: candidate.skills,
           experienceYears: candidate.experienceYears,
           headline: candidate.headline,
-          location: candidate.location,
+          location: [candidate.location, (candidate.matchingDetails as Record<string, unknown> | null)?.country].filter((v): v is string => typeof v === "string" && Boolean(v.trim())).join(", ") || null,
         },
         {
           requiredSkills: offer.skills,
@@ -170,6 +170,7 @@ async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string
           title: offer.title,
           description: offer.description,
           location: [offer.city, offer.country].filter(Boolean).join(", ") || null,
+          country: offer.country,
           categoryCode: offer.categoryCode,
           subCategoryCode: offer.subCategoryCode,
         },
@@ -474,7 +475,7 @@ async function ingestPlatformCvthequeCandidates(
       sourceCollectedAt: new Date(),
       name: candidate.user.name || null,
       headline: candidate.headline || null,
-      location: candidate.location || candidate.country || null,
+      location: [candidate.location, candidate.country].filter((value): value is string => typeof value === "string" && Boolean(value.trim())).join(", ") || null,
       skills: candidate.skills && Array.isArray(candidate.skills)
         ? candidate.skills as Prisma.InputJsonValue
         : undefined,
