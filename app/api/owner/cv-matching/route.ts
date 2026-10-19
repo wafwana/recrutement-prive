@@ -379,6 +379,7 @@ export async function GET(request: Request) {
     include: {
       jobCategory: { select: { code: true } },
       subCategory: { select: { code: true } },
+      company: { select: { country: true } },
     },
     orderBy: { updatedAt: "desc" },
   });
