@@ -88,6 +88,7 @@ export async function GET(request: Request) {
           title: true,
           location: true,
           companyId: true,
+          company: { select: { country: true } },
           description: true,
           requiredSkills: true,
           requiredExperienceYears: true,
@@ -152,6 +153,7 @@ export async function GET(request: Request) {
       missingSkills: string[];
       reasons: string[];
       categoryMatchLevel: string;
+      countryFit: string;
       applicationStatus: string | null;
       presentationExists: boolean;
       presentationState: string | null;
@@ -179,6 +181,7 @@ export async function GET(request: Request) {
             title: job.title,
             description: job.description,
             location: job.location,
+            country: job.company?.country,
             categoryCode: job.jobCategory?.code,
             subCategoryCode: job.subCategory?.code,
           }
@@ -202,6 +205,7 @@ export async function GET(request: Request) {
           missingSkills: result.missingSkills,
           reasons: result.reasons,
           categoryMatchLevel: result.categoryMatchLevel,
+          countryFit: result.countryFit,
           applicationStatus: application?.status ?? null,
           presentationExists: Boolean(presentation),
           presentationState: presentation?.state ?? null,
@@ -262,6 +266,7 @@ export async function GET(request: Request) {
         id: true,
         title: true,
         location: true,
+        company: { select: { country: true } },
         description: true,
         requiredSkills: true,
         requiredExperienceYears: true,
@@ -315,6 +320,7 @@ export async function GET(request: Request) {
             title: job.title,
             description: job.description,
             location: job.location,
+            country: job.company?.country,
             categoryCode: job.jobCategory?.code,
             subCategoryCode: job.subCategory?.code,
           }
@@ -331,6 +337,7 @@ export async function GET(request: Request) {
           missingSkills: result.missingSkills,
           reasons: result.reasons,
           categoryMatchLevel: result.categoryMatchLevel,
+          countryFit: result.countryFit,
         };
       })
       .sort((a, b) => b.score - a.score)
@@ -395,6 +402,7 @@ export async function GET(request: Request) {
           title: job.title,
           description: job.description,
           location: job.location,
+          country: job.company?.country,
           categoryCode: job.jobCategory?.code,
           subCategoryCode: job.subCategory?.code,
         }
@@ -409,6 +417,7 @@ export async function GET(request: Request) {
         missingSkills: result.missingSkills,
         reasons: result.reasons,
         categoryMatchLevel: result.categoryMatchLevel,
+        countryFit: result.countryFit,
       };
     })
     .sort((a, b) => b.score - a.score);
@@ -486,6 +495,7 @@ export async function POST(request: Request) {
         title: true,
         companyId: true,
         location: true,
+        company: { select: { country: true } },
         description: true,
         requiredSkills: true,
         requiredExperienceYears: true,
@@ -532,6 +542,7 @@ export async function POST(request: Request) {
       title: job.title,
       description: job.description,
       location: job.location,
+      country: job.company?.country,
       categoryCode: job.jobCategory?.code,
       subCategoryCode: job.subCategory?.code,
     }
