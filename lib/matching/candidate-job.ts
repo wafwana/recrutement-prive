@@ -51,6 +51,16 @@ function keywordContext(job: MatchingJob): string[] {
   return [job.title, job.description, job.location].filter((v): v is string => Boolean(v)).flatMap((v) => normalize(v).split(/[^a-z0-9+#.-]+/).filter((x) => x.length >= 4));
 }
 
+function countryFromLocation(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const parts = value.split(/[,|]/).map((part) => part.trim()).filter(Boolean);
+  for (const part of parts.reverse()) {
+    const normalized = normalizeCountry(part);
+    if (normalized === "FR" || normalized === "CH") return normalized;
+  }
+  return null;
+}
+
 function normalizeCountry(value: string | null | undefined): string | null {
   if (!value) return null;
   const country = normalize(value).replace(/[^a-z]/g, "");
@@ -107,7 +117,7 @@ export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJ
 
   // Cross-border fit is a verification signal, not an eligibility decision.
   // Never infer work authorization, commute, language or permit eligibility.
-  const candidateCountry = normalizeCountry(candidate.country);
+  const candidateCountry = normalizeCountry(candidate.country) ?? countryFromLocation(candidate.location);
   const jobCountry = normalizeCountry(job.country);
   const countryFit: MatchingResult["countryFit"] = !candidateCountry || !jobCountry
     ? "UNKNOWN"
