@@ -578,7 +578,7 @@ export async function ingestGlobalCandidates(params: {
   const targetJob = filter?.jobId
     ? await prisma.job.findUnique({
         where: { id: filter.jobId },
-        include: { jobCategory: { select: { code: true } }, subCategory: { select: { code: true } } },
+        include: { jobCategory: { select: { code: true } }, subCategory: { select: { code: true } }, company: { select: { country: true } } },
       })
     : null;
 
@@ -647,12 +647,13 @@ export async function ingestGlobalCandidates(params: {
               title: targetJob.title,
               description: targetJob.description,
               location: targetJob.location,
+              country: targetJob.company?.country,
               categoryCode: targetJob.jobCategory?.code,
               subCategoryCode: targetJob.subCategory?.code,
             }
           );
           score = result.score;
-          matchDetails = { jobId: targetJob.id, externalId: candidate.externalId, match: result } as unknown as Prisma.InputJsonValue;
+          matchDetails = { jobId: targetJob.id, externalId: candidate.externalId, country: candidate.country ?? null, match: result } as unknown as Prisma.InputJsonValue;
           if (score > 0) matched++;
         }
 
@@ -664,7 +665,8 @@ export async function ingestGlobalCandidates(params: {
           sourceCollectedAt,
           name: candidate.name || null,
           headline: candidate.headline || null,
-          location: candidate.location || candidate.country || null,
+          location: [candidate.location, candidate.country].filter((value): value is string => typeof value === "string" && Boolean(value.trim())).join(", ") || null,
+          matchingDetails: matchDetails ?? ({ country: candidate.country ?? null } as unknown as Prisma.InputJsonValue),
           skills: candidate.skills && candidate.skills.length ? (candidate.skills as unknown as Prisma.InputJsonValue) : undefined,
           experienceYears: candidate.experienceYears ?? null,
           status: initialStatus,
