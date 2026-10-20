@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import { matchCandidateToJob } from "../lib/matching/candidate-job";
 
 const candidate = {
@@ -25,9 +26,9 @@ const swissJob = {
 describe("France–Switzerland cross-border matching", () => {
   it("flags France candidate / Swiss company without changing the skill score or assuming eligibility", () => {
     const result = matchCandidateToJob(candidate, swissJob);
-    expect(result.countryFit).toBe("FRANCE_SWITZERLAND_CROSS_BORDER");
-    expect(result.reasons.join(" ")).toContain("permis/autorisation de travail");
-    expect(result.score).toBeGreaterThan(0);
+    assert.equal(result.countryFit, "FRANCE_SWITZERLAND_CROSS_BORDER");
+    assert.ok(result.reasons.join(" ").includes("permis/autorisation de travail"));
+    assert.ok(result.score > 0);
   });
 
   it("detects country when a sourced profile only has a combined location field", () => {
@@ -36,16 +37,14 @@ describe("France–Switzerland cross-border matching", () => {
   });
 
   it("normalizes country aliases", () => {
-    expect(matchCandidateToJob({ ...candidate, country: "FR" }, { ...swissJob, country: "CH" }).countryFit)
-      .toBe("FRANCE_SWITZERLAND_CROSS_BORDER");
+    assert.equal(matchCandidateToJob({ ...candidate, country: "FR" }, { ...swissJob, country: "CH" }).countryFit, "FRANCE_SWITZERLAND_CROSS_BORDER");
   });
 
   it("flags missing country data for manual verification", () => {
-    expect(matchCandidateToJob({ ...candidate, country: null }, { ...swissJob, country: null }).countryFit)
-      .toBe("UNKNOWN");
+    assert.equal(matchCandidateToJob({ ...candidate, country: null }, { ...swissJob, country: null }).countryFit, "UNKNOWN");
   });
 
   it("does not flag a same-country match as cross-border", () => {
-    expect(matchCandidateToJob(candidate, { ...swissJob, country: "France" }).countryFit).toBe("SAME_COUNTRY");
+    assert.equal(matchCandidateToJob(candidate, { ...swissJob, country: "France" }).countryFit, "SAME_COUNTRY");
   });
 });
