@@ -666,7 +666,6 @@ export async function ingestGlobalCandidates(params: {
           name: candidate.name || null,
           headline: candidate.headline || null,
           location: [candidate.location, candidate.country].filter((value): value is string => typeof value === "string" && Boolean(value.trim())).join(", ") || null,
-          matchingDetails: matchDetails ?? ({ country: candidate.country ?? null } as unknown as Prisma.InputJsonValue),
           skills: candidate.skills && candidate.skills.length ? (candidate.skills as unknown as Prisma.InputJsonValue) : undefined,
           experienceYears: candidate.experienceYears ?? null,
           status: initialStatus,
