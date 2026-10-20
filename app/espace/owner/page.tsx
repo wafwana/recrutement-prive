@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import OwnerLogoutButton from "./OwnerLogoutButton";
+import ContextualHelpButton from "@/components/help/ContextualHelpButton";
 
 const applicationLabels: Record<string, string> = {
   SUBMITTED: "Soumises",
@@ -45,6 +46,9 @@ export default async function OwnerPage() {
           <p className="mt-4 max-w-3xl text-sm leading-7 text-white/50">Données opérationnelles consolidées depuis PostgreSQL. Cet espace est réservé au pilotage global et à la supervision de la plateforme.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <ContextualHelpButton module="GENERAL" />
+          <Link href="/espace/help" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Centre d'Aide & Guides</Link>
+          <Link href="/espace/mailings" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Bibliothèque Mailings</Link>
           <Link href="/espace/owner/archivage" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Archive Centralisée</Link>
           <Link href="/espace/owner/cv-matching" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">CV & Matching transversal</Link>
           <Link href="/espace/documents/cv-library" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65">Bibliothèque CV</Link>
