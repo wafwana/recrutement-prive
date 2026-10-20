@@ -33,7 +33,7 @@ describe("France–Switzerland cross-border matching", () => {
 
   it("detects country when a sourced profile only has a combined location field", () => {
     const result = matchCandidateToJob({ ...candidate, country: undefined, location: "Lille, France" }, { ...swissJob, country: "CH" });
-    expect(result.countryFit).toBe("FRANCE_SWITZERLAND_CROSS_BORDER");
+    assert.equal(result.countryFit, "FRANCE_SWITZERLAND_CROSS_BORDER");
   });
 
   it("normalizes country aliases", () => {
