@@ -66,3 +66,14 @@ Toujours distinguer :
 - **Vérifié en production** : le scénario réel a été exécuté et son résultat observé.
 
 Une conversation ne doit jamais relancer un problème uniquement parce qu'une ancienne PR reste ouverte. Elle doit d'abord prouver que le défaut subsiste dans le code et le déploiement actuels.
+
+
+## Incident actif — quota Neon et environnement temporaire (vérifié le 22 octobre 2026)
+
+- **Production Vercel :** déploiement `dpl_xgSuU8j1FABurSN6SZsvTjVkb3XJ`, état `READY`, SHA `a432e114573533e3f72f6f152428284ec22ee64f`. Le déploiement READY ne confirme pas le fonctionnement des pages nécessitant PostgreSQL.
+- **Neon production :** projet `sweet-cake-49440995`; transfert lu à environ 5,59 Go pour la période du 1er octobre au 1er novembre 2026. Démarrage d’endpoint refusé avec `HTTP 423 quota exceeded`.
+- **Impact Vercel observé :** sur les dernières 24 heures au moment de la vérification, 99 erreurs `PrismaClientInitializationError`, 95 utilisateurs, notamment sur `/espace/owner` et des routes cron de sourcing/rematching ; connexion PostgreSQL impossible.
+- **Environnement temporaire :** projet `winter-grass-62377440`, branche `br-rough-pine-b5036ihx`, endpoint actif. Liste des tables vide. Aucun transfert de données de production effectué.
+- **Actions sûres restantes :** initialiser/tester le schéma temporaire depuis les migrations actuelles ; poursuivre les tests indépendants ; ne pas basculer la production vers cette base vide. Au retour du quota, inspecter le schéma et `_prisma_migrations` en lecture seule avant toute migration, puis valider Owner et les parcours réels.
+- **Statuts à ne pas confondre :** environnement temporaire créé ≠ schéma initialisé ; Vercel READY ≠ base accessible ; build réussi ≠ interface connectée validée. Connexion de production et retour complet des espaces connectés : **bloqués / non vérifiés** à cette date.
+- **Cahier des charges maître :** voir la section « Incident Neon — environnement temporaire et reprise contrôlée (22 octobre 2026) ».
