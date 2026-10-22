@@ -106,6 +106,28 @@ export const HELP_GUIDES: HelpGuide[] = [
     ],
     keywords: ["partenaires", "écoles", "expatriés", "sources", "conventions", "partenariats"],
   },
+  {
+    id: "guide-database-offline-recovery",
+    title: "Procédure de continuité d'activité en cas de maintenance PostgreSQL / Neon",
+    module: "ADMIN",
+    summary: "Mode opératoire de secours permettant de maintenir la consultation des guides, des modèles de mailings et le build Next.js lorsque la base de données distante est en cours de maintenance ou hors quota.",
+    prerequisites: ["Accès staff OWNER ou ADMIN", "Exécution des builds Vercel avec prisma generate isolée"],
+    requiredPermissions: ["ADMIN"],
+    expectedResult: "Maintien de la disponibilité des interfaces statiques, du Centre d'Aide et de la compilation sans régression de sécurité.",
+    steps: [
+      { title: "Isolation de la Build Vercel", detail: "La commande npm run build exécute uniquement 'prisma generate && next build' sans tenter de connexion migrate deploy." },
+      { title: "Tests hors-ligne", detail: "Les tests unitaires vérifient la présence de process.env.DATABASE_URL avant toute tentative d'intégration." },
+      { title: "Restauration ou Bascule", detail: "En cas de déblocage du quota Neon, rejouer le workflow GitHub Actions manuel 'Verify & Recover Prisma Production Migrations'." },
+    ],
+    troubleshooting: [
+      { problem: "Erreur PrismentClientInitializationError pendant le build", solution: "S'assurer que le script de build ne déclenche aucun appel DB au moment de la génération statique." },
+    ],
+    relatedLinks: [
+      { label: "Centre d'Aide", href: "/espace/help" },
+      { label: "Configuration Système", href: "/espace/admin/configuration" },
+    ],
+    keywords: ["base de données", "neon", "maintenance", "hors-ligne", "postgresql", "restauration", "backup"],
+  },
 ];
 
 // Generate dynamic help entries for taxonomy categories

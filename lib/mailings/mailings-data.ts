@@ -168,3 +168,20 @@ Recrutement Privé`,
     version: 1,
   },
 ];
+
+/**
+ * Substitute variables in template subject or body text safely using values mapping.
+ * Unresolved variables are replaced with their declared example or bracketed placeholder.
+ */
+export function interpolateMailingTemplate(
+  templateText: string,
+  variables: Array<{ code: string; example: string }>,
+  customValues: Record<string, string> = {}
+): string {
+  let result = templateText;
+  for (const v of variables) {
+    const val = customValues[v.code] || v.example || `[${v.code}]`;
+    result = result.replace(new RegExp(`{{\\s*${v.code}\\s*}}`, "g"), val);
+  }
+  return result;
+}
