@@ -116,3 +116,28 @@ Le projet utilise notamment Next.js App Router, TypeScript, React, Tailwind CSS,
 ## 7. Définition de « terminé »
 
 Une tâche n'est terminée que lorsque le besoin est implémenté sur le socle existant, les contrôles pertinents passent, les protections OWNER/ADMIN et les non-régressions sont vérifiées, le changement est fusionné et déployé sur le SHA attendu, et les parcours de production concernés sont testés. Tout point non testable faute d'accès est déclaré explicitement **bloqué par accès externe** et ne doit pas être présenté comme validé.
+
+
+## 9. Incident Neon — environnement temporaire et reprise contrôlée (22 octobre 2026)
+
+### Constat vérifié
+- Le projet Neon principal `sweet-cake-49440995` (`recrutement-prive`) reste limité par un dépassement de quota. La dernière lecture de son compteur indiquait environ 5,59 Go de transfert sur la période du 1er octobre au 1er novembre 2026 ; les tentatives de démarrage d’endpoint ont répondu `HTTP 423 quota exceeded`.
+- Le déploiement Vercel de production `dpl_xgSuU8j1FABurSN6SZsvTjVkb3XJ` est `READY` sur le SHA `a432e114573533e3f72f6f152428284ec22ee64f`, mais ce statut ne rétablit pas la base de données.
+- Les journaux Vercel consultés le 22 octobre ont regroupé 99 erreurs `PrismaClientInitializationError` touchant 95 utilisateurs sur les dernières 24 heures ; la connexion au serveur PostgreSQL de production était impossible. Les espaces connectés et les routes dépendantes de Prisma ne doivent donc pas être déclarés fonctionnels sans un nouveau test.
+- Un projet Neon séparé a été créé pour les essais : `winter-grass-62377440`, nom `recrutement-prive-temporary-staging-20261021`, branche `br-rough-pine-b5036ihx`, endpoint actif à la dernière vérification. La liste des tables était vide : le schéma Prisma n’est pas encore initialisé et aucune donnée de production n’a été copiée.
+
+### Règles de reprise
+1. Conserver la base principale, ses données, l’historique des migrations et le compte OWNER ; ne pas rediriger la production vers la base temporaire vide.
+2. Utiliser la base temporaire uniquement pour initialiser le schéma et tester les migrations/corrections après inspection des migrations du dépôt. Toute commande doit cibler explicitement ce projet temporaire.
+3. Ne pas copier des données de production tant que la base source est inaccessible et que la stratégie de sauvegarde/transfert n’est pas validée.
+4. À la reprise du quota principal, vérifier en lecture seule le schéma et l’état réel de `_prisma_migrations`, puis réconcilier avant toute migration de production.
+5. Réintégrer uniquement les changements de schéma validés et, si nécessaire, migrer explicitement les données utiles. Prévoir un point de restauration vérifiable avant toute opération à risque.
+6. Après rétablissement, vérifier la connexion, les migrations, l’accès OWNER et les parcours de CVthèque, sourcing, matching, mise en relation et espaces utilisateurs. Distinguer code testé, base accessible, déploiement READY et parcours production réellement vérifié.
+
+### État
+- Projet temporaire créé : **confirmé**.
+- Endpoint temporaire actif : **confirmé**.
+- Schéma Prisma initialisé sur la base temporaire : **non effectué / non vérifié**.
+- Connexion à la base de production : **bloquée par quota lors de la dernière vérification**.
+- Transfert ou fusion des bases : **non effectué** ; aucune fusion automatique n’est supposée.
+- Retour complet de l’interface connectée : **non vérifié**, à confirmer après rétablissement de la base.
