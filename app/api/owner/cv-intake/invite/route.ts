@@ -44,6 +44,11 @@ export async function POST(request: Request) {
         error: "Aucun compte candidat lié à ce CV. Vérifie l’adresse et le rattachement du profil avant d’envoyer une invitation.",
       }, { status: 409 });
     }
+    if (intake.candidateId && intake.candidateId !== user.candidat.id) {
+      return NextResponse.json({
+        error: "Le compte candidat trouvé ne correspond pas au profil rattaché à ce CV. Vérifie le rattachement avant d’envoyer une invitation.",
+      }, { status: 409 });
+    }
     if (user.passwordHash) {
       return NextResponse.json({ error: "Ce candidat dispose déjà d’un accès avec mot de passe. Aucune nouvelle invitation n’a été envoyée." }, { status: 409 });
     }
