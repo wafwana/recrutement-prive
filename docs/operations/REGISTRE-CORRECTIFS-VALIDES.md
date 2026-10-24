@@ -66,3 +66,16 @@ Toujours distinguer :
 - **Vérifié en production** : le scénario réel a été exécuté et son résultat observé.
 
 Une conversation ne doit jamais relancer un problème uniquement parce qu'une ancienne PR reste ouverte. Elle doit d'abord prouver que le défaut subsiste dans le code et le déploiement actuels.
+
+
+## Accès de secours OWNER sans base de données — en préparation
+
+- **Statut : implémentation sur branche, non testée localement et non déployée.**
+- Objectif : fournir une session OWNER temporaire strictement limitée lorsque l'accès PostgreSQL échoue, sans modifier ni recréer le compte OWNER.
+- Branche : `fix/owner-emergency-access-without-neon`.
+- Fichiers concernés : `lib/auth-credentials.ts`, `auth.ts`, `app/espace/page.tsx`, `app/espace/owner/secours/page.tsx`.
+- Garde-fous prévus : double activation explicite par `OWNER_EMERGENCY_ACCESS_ENABLED=true) et secret distinct `OWNER_EMERGENCY_PASSWORD`; correspondance exacte avec `OWNER_EMAIL); le mécanisme de secours n'est appelé qu'en cas d'exception de la base; la session de secours est redirigée vers un écran limité sans requête métier.
+- **À vérifier avant toute mise en production :** typecheck, tests auth/OWNER, build, comportement Auth.js si Prisma échoue, expiration/révocation de session, et validation sur un déploiement Preview.
+- **Configuration requise, sans exposer les valeurs :** définir `OWNER_EMERGENCY_ACCESS_ENABLED=true` et créer un secret aléatoire dédié `OWNER_EMERGENCY_PASSWORD) dans les variables Vercel Production. Ne pas réutiliser `OWNER_INIT_SECRET), le mot de passe enregistré du compte, ni un secret déjà utilisé ailleurs.
+- **Limite explicite :** cet écran n'expose aucune donnée opérationnelle et ne rétablit pas les fonctions dépendantes de PostgreSQL. Désactiver le mécanisme en remettant `OWNER_EMERGENCY_ACCESS_ENABLED=false) après rétablissement de la base.
+- Référence de production à revalider avant déploiement : SHA courant noté dans le contexte d'intervention `a432e114573533e3f72f6f152428284ec22ee64f`; la vérification fonctionnelle de la connexion OWNER reste **non vérifiée**.
