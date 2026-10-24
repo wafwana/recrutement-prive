@@ -14,6 +14,7 @@ const spaces = [
 export default async function EspacePage() {
   const session = await auth();
   if (!session?.user) redirect("/connexion");
+  if (session.user.id === "owner-emergency-session" && session.user.role === "OWNER") redirect("/espace/owner/secours");
 
   const allowed = spaces.filter((space) => session.user.role === space.role || (session.user.role === "ADMIN" && space.role !== "OWNER"));
 
