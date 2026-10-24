@@ -35,7 +35,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     ...authConfig.callbacks,
     async jwt({ token, user }) {
-      if (user) token.role = user.role;
+      if (user) {
+        token.role = user.role;
+        token.emergencyAccess = Boolean((user as typeof user & { emergencyAccess?: boolean }).emergencyAccess);
+      }
       return token;
     },
     async session({ session, token }) {
@@ -44,6 +47,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Protected candidate pages use it to load the user's own profile/data.
         if (token.sub) session.user.id = token.sub;
         session.user.role = token.role as string | undefined;
+        (session.user as typeof session.user & { emergencyAccess?: boolean }).emergencyAccess = Boolean(token.emergencyAccess);
       }
       return session;
     },
