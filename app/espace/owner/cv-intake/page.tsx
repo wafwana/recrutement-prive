@@ -103,7 +103,7 @@ export default function RealCvRegistryPage() {
       setMessage("Sélectionne un dossier contenant les CV à intégrer.");
       return;
     }
-    const supported = bulkFiles.filter((item) => /\\.(pdf|doc|docx|jpe?g)$/i.test(item.name));
+    const supported = bulkFiles.filter((item) => /\.(pdf|doc|docx|jpe?g)$/i.test(item.name));
     const skipped = bulkFiles.length - supported.length;
     if (!supported.length) {
       setMessage("Aucun CV compatible trouvé. Formats acceptés : PDF, DOC, DOCX, JPG et JPEG.");
