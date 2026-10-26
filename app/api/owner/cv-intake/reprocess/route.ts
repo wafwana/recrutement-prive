@@ -62,7 +62,7 @@ export async function POST(request: Request) {
 
   const records = await prisma.cvIntake.findMany({
     where: { id: { in: ids } },
-    select: { id: true, name: true, mimeType: true, fileData: true, originalSha256: true, status: true, analysis: true },
+    select: { id: true, name: true, mimeType: true, fileData: true, originalSha256: true, status: true, analysis: true, matching: true },
   });
   if (records.length !== ids.length) {
     return NextResponse.json({ error: "Au moins un CV demandé est introuvable." }, { status: 404 });
@@ -91,7 +91,11 @@ export async function POST(request: Request) {
     const previousAnalysis = record.analysis && typeof record.analysis === "object"
       ? record.analysis as Record<string, unknown>
       : {};
-    if (record.status === "ANALYSE_OK" && !previousAnalysis.error) {
+    const previousMatching = record.matching && typeof record.matching === "object"
+      ? record.matching as Record<string, unknown>
+      : {};
+    const hasMatchingResult = typeof previousMatching.generatedAt === "string" && previousMatching.generatedAt.length > 0;
+    if (record.status === "ANALYSE_OK" && !previousAnalysis.error && hasMatchingResult) {
       results.push({ id: record.id, status: "SKIPPED_ALREADY_ANALYZED" });
       continue;
     }
