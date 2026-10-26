@@ -49,6 +49,9 @@ export default function RealCvRegistryPage() {
   const [folder, setFolder] = useState("");
   const [search, setSearch] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [bulkFiles, setBulkFiles] = useState<File[]>([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState("");
   const [candidateName, setCandidateName] = useState("");
   const [candidateEmail, setCandidateEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -92,6 +95,51 @@ export default function RealCvRegistryPage() {
       setMessage(e instanceof Error ? e.message : "Import impossible.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function importFolder() {
+    if (!bulkFiles.length) {
+      setMessage("Sélectionne un dossier contenant les CV à intégrer.");
+      return;
+    }
+    const supported = bulkFiles.filter((item) => /\\.(pdf|doc|docx|jpe?g)$/i.test(item.name));
+    const skipped = bulkFiles.length - supported.length;
+    if (!supported.length) {
+      setMessage("Aucun CV compatible trouvé. Formats acceptés : PDF, DOC, DOCX, JPG et JPEG.");
+      return;
+    }
+    setBulkBusy(true);
+    setBulkProgress(`Préparation de ${supported.length} CV…`);
+    setMessage("");
+    let imported = 0;
+    let duplicates = 0;
+    const failures: string[] = [];
+    try {
+      for (let index = 0; index < supported.length; index += 1) {
+        const current = supported[index];
+        setBulkProgress(`Traitement individuel ${index + 1}/${supported.length} : ${current.name}`);
+        const form = new FormData();
+        form.set("file", current);
+        form.set("bulkImport", "true");
+        try {
+          const response = await fetch("/api/owner/cv-intake", { method: "POST", body: form });
+          const data = await response.json();
+          if (response.ok) imported += 1;
+          else if (response.status === 409 && data.duplicateId) duplicates += 1;
+          else failures.push(`${current.name} : ${data.error || "Import impossible."}`);
+        } catch {
+          failures.push(`${current.name} : erreur réseau pendant l’import.`);
+        }
+      }
+      setMessage(`Import du dossier terminé : ${imported} CV intégré(s), ${duplicates} doublon(s) ignoré(s), ${failures.length} échec(s), ${skipped} fichier(s) non-CV ignoré(s). Aucun compte candidat ni e-mail d’invitation n’a été créé par l’import en lot.${failures.length ? ` Premiers problèmes : ${failures.slice(0, 3).join(" | ")}` : ""}`);
+      setBulkFiles([]);
+      const input = document.getElementById("real-cv-folder") as HTMLInputElement | null;
+      if (input) input.value = "";
+      await load();
+    } finally {
+      setBulkBusy(false);
+      setBulkProgress("");
     }
   }
 
@@ -166,6 +214,20 @@ export default function RealCvRegistryPage() {
           <button disabled={busy} onClick={importCv} className="border border-[#c7a15a] px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a] disabled:opacity-40">{busy ? "Analyse…" : "Intégrer et analyser"}</button>
         </div>
         {message ? <p className="mt-4 border border-white/10 px-4 py-3 text-xs text-white/60">{message}</p> : null}
+      </div>
+
+      <div className="mt-8 border border-[#c7a15a]/40 bg-[#111] p-6">
+        <h2 className="font-serif text-2xl text-white">Intégrer un dossier complet du vivier</h2>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-white/50">Sélectionne un dossier contenant plusieurs CV. Chaque fichier est envoyé séparément, validé, analysé, classé et rapproché des offres ouvertes. Les doublons sont ignorés sans arrêter le lot. Cet import ne crée pas de compte candidat et n’envoie aucune invitation automatiquement.</p>
+        <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+          <div>
+            <label htmlFor="real-cv-folder" className="mb-2 block text-[9px] uppercase tracking-[0.16em] text-white/35">Choisir le dossier de CV</label>
+            <input id="real-cv-folder" type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg" {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} onChange={(e) => setBulkFiles(Array.from(e.target.files || []))} className="block w-full cursor-pointer border border-white/10 bg-[#0b0b0b] px-3 py-3 text-sm text-white/70 file:mr-4 file:border-0 file:bg-[#c7a15a] file:px-4 file:py-2 file:text-[10px] file:uppercase file:tracking-[0.14em] file:text-[#111]" />
+            <p className="mt-2 text-[10px] text-white/30">{bulkFiles.length ? `${bulkFiles.length} fichier(s) repéré(s) dans le dossier sélectionné.` : "PDF, DOC, DOCX, JPG/JPEG. Les autres fichiers seront ignorés."}</p>
+          </div>
+          <button disabled={bulkBusy || !bulkFiles.length} onClick={importFolder} className="border border-[#c7a15a] px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a] disabled:opacity-40">{bulkBusy ? "Traitement en cours…" : "Intégrer le dossier"}</button>
+        </div>
+        {bulkProgress ? <p role="status" className="mt-4 border border-white/10 px-4 py-3 text-xs text-[#c7a15a]">{bulkProgress}</p> : null}
       </div>
 
       <div className="mt-8 grid gap-3 md:grid-cols-[1fr_320px_auto]">
