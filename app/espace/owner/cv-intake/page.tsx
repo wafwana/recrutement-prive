@@ -78,6 +78,7 @@ export default function RealCvRegistryPage() {
   const [candidateEmail, setCandidateEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [showCompleted, setShowCompleted] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -273,6 +274,30 @@ export default function RealCvRegistryPage() {
   async function retryFailedFiles() {
     if (!failedFiles.length) return;
     await processBatch(failedFiles);
+  }
+
+  async function inviteCandidate(cv: Cv) {
+    if (!cv.candidateEmail?.trim()) {
+      setMessage("Aucune adresse e-mail n’est associée à ce CV. Renseigne ou corrige l’adresse avant d’inviter le candidat.");
+      return;
+    }
+    if (!window.confirm(`Envoyer une invitation à ${cv.candidateEmail} pour valider son profil et créer son accès ?`)) return;
+    setInvitingId(cv.id);
+    setMessage("");
+    try {
+      const res = await fetch("/api/owner/cv-intake/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intakeId: cv.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Invitation impossible.");
+      setMessage(`Invitation envoyée à ${cv.candidateEmail}. Le lien est valable 7 jours.`);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Échec de l’envoi de l’invitation.");
+    } finally {
+      setInvitingId(null);
+    }
   }
 
   async function retryLocalAnalysis(cv: Cv) {
@@ -508,6 +533,15 @@ export default function RealCvRegistryPage() {
                 <p className="mt-1 text-[10px] text-white/25">SHA-256 : {cv.originalSha256}</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                {cv.candidateEmail ? (
+                  <button
+                    disabled={invitingId === cv.id}
+                    onClick={() => inviteCandidate(cv)}
+                    className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a] disabled:opacity-40"
+                  >
+                    {invitingId === cv.id ? "Envoi…" : "Inviter candidat"}
+                  </button>
+                ) : null}
                 {cv.status !== "ANALYSE_OK" || cv.analysis?.error ? (
                   <button disabled={retryingId === cv.id} onClick={() => retryLocalAnalysis(cv)} className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a] disabled:opacity-40">
                     {retryingId === cv.id ? "Analyse locale…" : "Relancer analyse locale"}
