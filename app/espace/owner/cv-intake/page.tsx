@@ -37,7 +37,7 @@ type Cv = {
   candidateEmail: string | null;
   folderPath: string;
   analysis: Analysis | null;
-  matching: { suggestedMatches?: Array<{ jobId: string; title: string; score: number }> } | null;
+  matching: { suggestedMatches?: Array<{ jobId: string; title: string; score: number }>; generatedAt?: string } | null;
   analyzedAt: string | null;
   status: string;
   createdAt: string;
@@ -58,6 +58,9 @@ export default function RealCvRegistryPage() {
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [invitingId, setInvitingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [processingAll, setProcessingAll] = useState(false);
 
   async function load() {
     const query = search.trim() ? `?q=${encodeURIComponent(search.trim())}` : "";
@@ -190,7 +193,50 @@ export default function RealCvRegistryPage() {
     }
   }
 
-  const visible = useMemo(() => folder ? items.filter((item) => item.folderPath === folder) : items, [items, folder]);
+  const isCompleted = (cv: Cv) => cv.status === "ANALYSE_OK" && Boolean(cv.analyzedAt) && Boolean(cv.matching?.generatedAt) && !cv.analysis?.error;
+  const activeItems = useMemo(() => items.filter((item) => !isCompleted(item)), [items]);
+  const displayedItems = showCompleted ? items : activeItems;
+  const visible = useMemo(() => folder ? displayedItems.filter((item) => item.folderPath === folder) : displayedItems, [displayedItems, folder]);
+
+  async function processSelected() {
+    const ids = selectedIds.filter((id) => activeItems.some((item) => item.id === id));
+    if (!ids.length) {
+      setMessage("Aucun CV en attente n’est sélectionné.");
+      return;
+    }
+    setProcessingAll(true);
+    setMessage("");
+    let processed = 0;
+    let failed = 0;
+    try {
+      for (let offset = 0; offset < ids.length; offset += 20) {
+        const batch = ids.slice(offset, offset + 20);
+        setBulkProgress(`Traitement automatique des CV : ${Math.min(offset + batch.length, ids.length)}/${ids.length}…`);
+        const response = await fetch("/api/owner/cv-intake/reprocess", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: batch }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          failed += batch.length;
+          continue;
+        }
+        for (const result of data.results || []) {
+          if (result.status === "ANALYSE_OK" || result.status === "SKIPPED_ALREADY_ANALYZED") processed += 1;
+          else failed += 1;
+        }
+      }
+      setSelectedIds([]);
+      setMessage(`Traitement terminé : ${processed} CV traité(s) ou déjà à jour, ${failed} échec(s). Les originaux sont conservés.`);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Le traitement collectif a échoué.");
+    } finally {
+      setProcessingAll(false);
+      setBulkProgress("");
+    }
+  }
 
   return (
     <section className="mx-auto w-[min(1280px,calc(100%-40px))] py-12 md:py-20">
@@ -230,10 +276,16 @@ export default function RealCvRegistryPage() {
         {bulkProgress ? <p role="status" className="mt-4 border border-white/10 px-4 py-3 text-xs text-[#c7a15a]">{bulkProgress}</p> : null}
       </div>
 
+      <div className="mt-8 flex flex-wrap items-center gap-3">
+        <button disabled={processingAll || !activeItems.length} onClick={() => setSelectedIds(activeItems.map((item) => item.id))} className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-white/70 disabled:opacity-40">Sélectionner les CV en attente ({activeItems.length})</button>
+        <button disabled={processingAll || !selectedIds.length} onClick={processSelected} className="border border-[#c7a15a] px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-[#c7a15a] disabled:opacity-40">{processingAll ? "Traitement…" : `Traiter les CV sélectionnés (${selectedIds.length})`}</button>
+        <button disabled={processingAll} onClick={() => setShowCompleted((value) => !value)} className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-white/70">{showCompleted ? "Masquer les CV finalisés" : "Afficher l’historique des CV finalisés"}</button>
+      </div>
+      {bulkProgress ? <p role="status" className="mt-3 border border-white/10 px-4 py-3 text-xs text-[#c7a15a]">{bulkProgress}</p> : null}
       <div className="mt-8 grid gap-3 md:grid-cols-[1fr_320px_auto]">
         <input value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load()} placeholder="Rechercher un CV, candidat ou dossier…" className="border border-white/10 bg-[#111] px-4 py-3 text-sm text-white outline-none" />
         <select value={folder} onChange={(e) => setFolder(e.target.value)} className="border border-white/10 bg-[#111] px-4 py-3 text-sm text-white outline-none">
-          <option value="">Tous les dossiers ({items.length})</option>
+          <option value="">Tous les dossiers ({displayedItems.length})</option>
           {folders.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
         <button onClick={() => load().catch((e) => setMessage(e.message))} className="border border-white/15 px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-white/60">Actualiser</button>
@@ -242,6 +294,7 @@ export default function RealCvRegistryPage() {
       <div className="mt-8 space-y-4">
         {visible.map((cv) => (
           <article key={cv.id} className="border border-white/10 bg-[#111] p-6">
+            {!isCompleted(cv) ? <label className="mb-4 flex items-center gap-2 text-xs text-white/55"><input type="checkbox" checked={selectedIds.includes(cv.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, cv.id])] : current.filter((id) => id !== cv.id))} /> Sélectionner pour traitement collectif</label> : <p className="mb-4 text-[10px] uppercase tracking-[0.12em] text-emerald-300">Traitement finalisé · conservé dans l’historique</p>}
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -290,7 +343,7 @@ export default function RealCvRegistryPage() {
             ) : <p className="mt-5 text-sm text-white/40">Analyse non disponible : le CV reste conservé et classé en attente.</p>}
           </article>
         ))}
-        {!visible.length ? <p className="border border-white/10 p-6 text-sm text-white/40">Aucun CV réel intégré.</p> : null}
+        {!visible.length ? <p className="border border-white/10 p-6 text-sm text-white/40">Aucun CV dans cette vue.</p> : null}
       </div>
     </section>
   );
