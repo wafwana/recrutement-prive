@@ -106,7 +106,7 @@ export default function RealCvRegistryPage() {
       setMessage("Sélectionne un dossier contenant les CV à intégrer.");
       return;
     }
-    const supported = bulkFiles.filter((item) => /\.(pdf|doc|docx|jpe?g)$/i.test(item.name));
+    const supported = bulkFiles.filter((item) => /\\.(pdf|doc|docx|jpe?g)$/i.test(item.name));
     const skipped = bulkFiles.length - supported.length;
     if (!supported.length) {
       setMessage("Aucun CV compatible trouvé. Formats acceptés : PDF, DOC, DOCX, JPG et JPEG.");
@@ -117,28 +117,52 @@ export default function RealCvRegistryPage() {
     setMessage("");
     let imported = 0;
     let duplicates = 0;
+    let failedCount = 0;
     const failures: string[] = [];
     try {
       for (let index = 0; index < supported.length; index += 1) {
         const current = supported[index];
-        setBulkProgress(`Traitement individuel ${index + 1}/${supported.length} : ${current.name}`);
-        const form = new FormData();
-        form.set("file", current);
-        form.set("bulkImport", "true");
-        try {
-          const response = await fetch("/api/owner/cv-intake", { method: "POST", body: form });
-          const data = await response.json();
-          if (response.ok) imported += 1;
-          else if (response.status === 409 && data.duplicateId) duplicates += 1;
-          else failures.push(`${current.name} : ${data.error || "Import impossible."}`);
-        } catch {
-          failures.push(`${current.name} : erreur réseau pendant l’import.`);
+        setBulkProgress(`Fichier ${index + 1}/${supported.length} — ${current.name} (intégrés : ${imported}, doublons ignorés : ${duplicates}, échecs : ${failedCount})`);
+        let completed = false;
+        for (let attempt = 1; attempt <= 3 && !completed; attempt += 1) {
+          const form = new FormData();
+          form.set("file", current);
+          form.set("bulkImport", "true");
+          try {
+            const response = await fetch("/api/owner/cv-intake", { method: "POST", body: form });
+            const data = await response.json().catch(() => ({}));
+            if (response.ok) {
+              imported += 1;
+              completed = true;
+            } else if (response.status === 409 && data.duplicateId) {
+              duplicates += 1;
+              completed = true;
+            } else if ((response.status === 429 || response.status >= 500) && attempt < 3) {
+              setBulkProgress(`Nouvelle tentative ${attempt + 1}/3 — ${current.name}`);
+              await new Promise((resolve) => setTimeout(resolve, 700 * attempt));
+            } else {
+              failedCount += 1;
+              failures.push(`${current.name} : ${data.error || `Import impossible (HTTP ${response.status}).`}`);
+              completed = true;
+            }
+          } catch {
+            if (attempt < 3) {
+              setBulkProgress(`Erreur réseau, nouvelle tentative ${attempt + 1}/3 — ${current.name}`);
+              await new Promise((resolve) => setTimeout(resolve, 700 * attempt));
+            } else {
+              failedCount += 1;
+              failures.push(`${current.name} : échec réseau après 3 tentatives.`);
+              completed = true;
+            }
+          }
         }
       }
-      setMessage(`Import du dossier terminé : ${imported} CV intégré(s), ${duplicates} doublon(s) ignoré(s), ${failures.length} échec(s), ${skipped} fichier(s) non-CV ignoré(s). Aucun compte candidat ni e-mail d’invitation n’a été créé par l’import en lot.${failures.length ? ` Premiers problèmes : ${failures.slice(0, 3).join(" | ")}` : ""}`);
-      setBulkFiles([]);
-      const input = document.getElementById("real-cv-folder") as HTMLInputElement | null;
-      if (input) input.value = "";
+      setMessage(`Import du dossier terminé : ${imported} CV intégré(s), ${duplicates} doublon(s) ignoré(s), ${failures.length} échec(s), ${skipped} fichier(s) non-CV ignoré(s). ${failures.length ? "Les fichiers sélectionnés sont conservés : tu peux relancer le lot. Les fichiers déjà intégrés seront reconnus comme doublons et ignorés. " : "Le lot a été traité sans échec. "}${failures.length ? `Premiers problèmes : ${failures.slice(0, 3).join(" | ")}. ` : ""}Aucun compte candidat ni e-mail d’invitation n’a été créé par l’import en lot.`);
+      if (!failures.length) {
+        setBulkFiles([]);
+        const input = document.getElementById("real-cv-folder") as HTMLInputElement | null;
+        if (input) input.value = "";
+      }
       await load();
     } finally {
       setBulkBusy(false);
