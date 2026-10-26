@@ -5,17 +5,21 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { matchCandidateToJob, CriterionDetail } from "@/lib/matching/candidate-job";
 import { z } from "zod";
 
+const presentationSchema = z.object({
+  action: z.literal("present"),
+  candidateId: z.string().trim().min(1).max(128),
+  jobId: z.string().trim().min(1).max(128),
+});
+
+const recalculateSchema = z.object({
+  action: z.literal("recalculate"),
+  candidateId: z.string().trim().min(1).max(128).optional(),
+  jobId: z.string().trim().min(1).max(128).optional(),
+});
+
 const matchingPostSchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("present"),
-    candidateId: z.string().trim().min(1).max(128),
-    jobId: z.string().trim().min(1).max(128),
-  }),
-  z.object({
-    action: z.literal("recalculate"),
-    candidateId: z.string().trim().min(1).max(128).optional(),
-    jobId: z.string().trim().min(1).max(128).optional(),
-  }),
+  presentationSchema,
+  recalculateSchema,
 ]);
 
 function candidateAlias(id: string) {
