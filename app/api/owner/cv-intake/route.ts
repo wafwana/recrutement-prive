@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash, randomBytes } from "node:crypto";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { analyzeCvDocument } from "@/lib/cv/analyzer";
+import { analyzeCvDocument, analyzeCvDocumentLocally } from "@/lib/cv/analyzer";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { buildCandidateFolder, buildCandidateFolderFromAnalysis, resolveCvTaxonomySelection } from "@/lib/cv/folders";
 import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
@@ -112,6 +112,17 @@ export async function POST(request: Request) {
       // l'analyse IA est momentanément indisponible ou rejette le format.
       analysisError = error instanceof Error ? error.message : "Erreur d'analyse IA";
       console.error("[owner cv analysis]", error);
+      // Provider failure must not leave a CV unprocessed when local text extraction works.
+      try {
+        analysis = await analyzeCvDocumentLocally({
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          buffer,
+          taxonomy: taxonomyItems,
+        });
+      } catch {
+        analysis = null;
+      }
     }
 
     const jobs = await prisma.job.findMany({
