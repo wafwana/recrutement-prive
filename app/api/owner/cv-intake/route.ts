@@ -134,19 +134,20 @@ export async function POST(request: Request) {
     const candidateName = (typeof formData.get("candidateName") === "string"
       ? String(formData.get("candidateName")).trim() || null
       : null) || [analysis?.firstName, analysis?.lastName].filter(Boolean).join(" ").trim() || null;
+    const bulkImport = formData.get("bulkImport") === "true";
     const requestedCandidateId = typeof formData.get("candidateId") === "string" ? String(formData.get("candidateId")).trim() || null : null;
-    let candidate = requestedCandidateId
+    let candidate = bulkImport ? null : requestedCandidateId
       ? await prisma.candidateProfile.findUnique({ where: { id: requestedCandidateId }, select: { id: true, preferences: true } })
       : candidateEmail
         ? await prisma.candidateProfile.findFirst({ where: { user: { email: { equals: candidateEmail, mode: "insensitive" } } }, select: { id: true, preferences: true } })
         : null;
 
-    if (requestedCandidateId && !candidate) {
+    if (!bulkImport && requestedCandidateId && !candidate) {
       return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
     }
 
     let candidateInviteSent = false;
-    if (!candidate && candidateEmail && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(candidateEmail)) {
+    if (!bulkImport && !candidate && candidateEmail && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(candidateEmail)) {
       let user = await prisma.user.findUnique({
         where: { email: candidateEmail },
         select: { id: true, name: true, passwordHash: true, role: true, candidat: { select: { id: true, preferences: true } } },
