@@ -15,6 +15,7 @@ export type MatchingJob = {
   title?: string | null;
   description?: string | null;
   location?: string | null;
+  country?: string | null;
   categoryCode?: string | null;
   subCategoryCode?: string | null;
 };
@@ -29,6 +30,7 @@ export type MatchingResult = {
   missingSkills: string[];
   reasons: string[];
   categoryMatchLevel: "EXACT_SUBCATEGORY" | "PARENT_CATEGORY" | "NONE";
+  countryFit: "SAME_COUNTRY" | "FRANCE_SWITZERLAND_CROSS_BORDER" | "OTHER_CROSS_BORDER" | "UNKNOWN";
 };
 
 const normalize = (value: string) =>
@@ -47,6 +49,24 @@ function toSkills(value: unknown): string[] {
 
 function keywordContext(job: MatchingJob): string[] {
   return [job.title, job.description, job.location].filter((v): v is string => Boolean(v)).flatMap((v) => normalize(v).split(/[^a-z0-9+#.-]+/).filter((x) => x.length >= 4));
+}
+
+function countryFromLocation(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const parts = value.split(/[,|]/).map((part) => part.trim()).filter(Boolean);
+  for (const part of parts.reverse()) {
+    const normalized = normalizeCountry(part);
+    if (normalized === "FR" || normalized === "CH") return normalized;
+  }
+  return null;
+}
+
+function normalizeCountry(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const country = normalize(value).replace(/[^a-z]/g, "");
+  if (["france", "fr", "frenchrepublic"].includes(country)) return "FR";
+  if (["suisse", "switzerland", "ch", "schweiz", "svizzera"].includes(country)) return "CH";
+  return country.length ? country : null;
 }
 
 export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJob): MatchingResult {
@@ -95,6 +115,18 @@ export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJ
     categoryMatchLevel = "PARENT_CATEGORY";
   }
 
+  // Cross-border fit is a verification signal, not an eligibility decision.
+  // Never infer work authorization, commute, language or permit eligibility.
+  const candidateCountry = normalizeCountry(candidate.country) ?? countryFromLocation(candidate.location);
+  const jobCountry = normalizeCountry(job.country);
+  const countryFit: MatchingResult["countryFit"] = !candidateCountry || !jobCountry
+    ? "UNKNOWN"
+    : candidateCountry === jobCountry
+      ? "SAME_COUNTRY"
+      : [candidateCountry, jobCountry].sort().join("") === "CHFR"
+        ? "FRANCE_SWITZERLAND_CROSS_BORDER"
+        : "OTHER_CROSS_BORDER";
+
   const score = Math.max(0, Math.min(100, skillScore + experienceScore + contextScore + categoryScore));
 
   const categoryReason =
@@ -111,5 +143,13 @@ export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJ
     contextHits ? `${contextHits} élément(s) de contexte de l'offre sont retrouvés dans le profil.` : "Peu d'éléments de contexte sont encore disponibles pour le profil.",
   ];
 
-  return { score, skillScore, experienceScore, contextScore, categoryScore, matchedSkills, missingSkills, reasons, categoryMatchLevel };
+  if (countryFit === "FRANCE_SWITZERLAND_CROSS_BORDER") {
+    reasons.push("Mobilité France–Suisse à confirmer : permis/autorisation de travail, lieu de résidence, trajet, langue et conditions contractuelles ne sont pas déduits automatiquement.");
+  } else if (countryFit === "UNKNOWN") {
+    reasons.push("Pays du candidat ou de l’entreprise manquant : vérifier la mobilité et les conditions de travail avant présentation.");
+  } else if (countryFit === "OTHER_CROSS_BORDER") {
+    reasons.push("Recrutement transfrontalier détecté : vérifier droit au travail, mobilité, langue et conditions locales avant présentation.");
+  }
+
+  return { score, skillScore, experienceScore, contextScore, categoryScore, matchedSkills, missingSkills, reasons, categoryMatchLevel, countryFit };
 }

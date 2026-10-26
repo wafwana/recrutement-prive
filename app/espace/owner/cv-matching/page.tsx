@@ -11,7 +11,7 @@ type Suggestion = {
   candidateId: string; candidateAlias: string; candidateHeadline: string | null; candidateLocation: string | null;
   candidateCountry: string | null; experienceYears: number | null; jobId: string; jobTitle: string;
   companyAlias: string; jobLocation: string | null; score: number; matchedSkills: string[]; missingSkills: string[];
-  reasons: string[]; categoryMatchLevel: string; applicationStatus: string | null;
+  reasons: string[]; categoryMatchLevel: string; countryFit: string; applicationStatus: string | null;
   presentationExists: boolean; presentationState: string | null;
 };
 type Overview = { canPresent: boolean; candidateCount: number; jobCount: number; totalMatches: number; truncated: boolean; suggestions: Suggestion[]; candidateSuggestions: Suggestion[]; offerSuggestions: Suggestion[] };
@@ -44,7 +44,7 @@ function PairCard({ match, canPresent, busy, onPresent }: {
           <p className="mt-1 text-xs text-white/35">
             {[match.candidateLocation, match.candidateCountry, match.experienceYears !== null ? match.experienceYears + " an(s) d’expérience" : null].filter(Boolean).join(" · ") || "Informations de profil limitées"}
           </p>
-          <p className="mt-3 text-xs leading-5 text-white/55">{match.reasons.join(" ") || "Score calculé à partir des informations disponibles."}</p>
+          <p className="mt-3 text-xs leading-5 text-white/55">{match.reasons.join(" ") || "Score calculé à partir des informations disponibles."}</p>{match.countryFit === "FRANCE_SWITZERLAND_CROSS_BORDER" ? <p className="mt-2 border border-amber-400/30 bg-amber-400/5 px-2 py-1.5 text-[10px] text-amber-200">France ↔ Suisse : permis, mobilité et conditions locales à vérifier</p> : null}
         </div>
         <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-end">
           <div className={"border px-3 py-2 text-center " + scoreClass(match.score)}>
