@@ -84,8 +84,8 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const sha256 = createHash("sha256").update(buffer).digest("hex");
-    const duplicate = await prisma.cvIntake.findFirst({ where: { originalSha256: sha256 }, select: { id: true, name: true } });
-    if (duplicate) return NextResponse.json({ error: "Ce CV original est déjà répertorié.", duplicateId: duplicate.id, name: duplicate.name }, { status: 409 });
+    const duplicate = await prisma.cvIntake.findFirst({ where: { originalSha256: sha256 }, select: { id: true, name: true, folderPath: true } });
+    if (duplicate) return NextResponse.json({ error: "Ce CV original est déjà répertorié.", duplicateId: duplicate.id, name: duplicate.name, originalSha256: sha256, folderPath: duplicate.folderPath }, { status: 409 });
 
     const taxonomy = await prisma.jobCategory.findMany({
       where: { isActive: true },
