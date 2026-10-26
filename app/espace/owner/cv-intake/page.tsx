@@ -53,6 +53,7 @@ export default function RealCvRegistryPage() {
   const [candidateEmail, setCandidateEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   async function load() {
@@ -78,7 +79,9 @@ export default function RealCvRegistryPage() {
       const res = await fetch("/api/owner/cv-intake", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Import impossible.");
-      setMessage(`CV intégré et original verrouillé : ${data.document.name}`);
+      setMessage(data.candidateInviteSent
+        ? `CV intégré. Invitation envoyée à ${data.document.candidateEmail || candidateEmail.trim()} ; le lien expire dans 7 jours.`
+        : `CV intégré : ${data.document.name}. Aucune invitation n’a été confirmée lors de cet import. Vérifie l’adresse e-mail et utilise l’action d’invitation sur la fiche ci-dessous si le profil est lié.`);
       setFile(null);
       setCandidateName("");
       setCandidateEmail("");
@@ -89,6 +92,30 @@ export default function RealCvRegistryPage() {
       setMessage(e instanceof Error ? e.message : "Import impossible.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function inviteCandidate(cv: Cv) {
+    if (!cv.candidateEmail?.trim()) {
+      setMessage("Aucune adresse e-mail n’est associée à ce CV. Renseigne ou corrige l’adresse avant d’inviter le candidat.");
+      return;
+    }
+    if (!window.confirm(`Envoyer une invitation à ${cv.candidateEmail} pour valider son profil et créer son accès ?`)) return;
+    setInvitingId(cv.id);
+    setMessage("");
+    try {
+      const res = await fetch("/api/owner/cv-intake/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intakeId: cv.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Invitation impossible.");
+      setMessage(`Invitation envoyée à ${cv.candidateEmail}. Le lien est valable 7 jours.`);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Échec de l’envoi de l’invitation.");
+    } finally {
+      setInvitingId(null);
     }
   }
 
