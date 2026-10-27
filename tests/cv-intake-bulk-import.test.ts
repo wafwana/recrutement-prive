@@ -2,6 +2,35 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 
+test("Brique A - Supported file extensions regex correctly matches ordinary CV filenames", () => {
+  const extensionRegex = /\.(pdf|doc|docx|jpe?g)$/i;
+
+  const validNames = [
+    "cv.pdf",
+    "CANDIDAT_2026.PDF",
+    "mon_cv.docx",
+    "resume.doc",
+    "cv_photo.jpg",
+    "SCAN_CV.JPEG",
+  ];
+
+  for (const name of validNames) {
+    assert.ok(extensionRegex.test(name), `Filename "${name}" must be recognized as supported CV format`);
+  }
+
+  const invalidNames = [
+    "script.exe",
+    "archive.zip",
+    "document.txt",
+    "data.json",
+    "cv.pdf.exe",
+  ];
+
+  for (const name of invalidNames) {
+    assert.ok(!extensionRegex.test(name), `Filename "${name}" must be rejected from CV bulk folder import`);
+  }
+});
+
 test("Brique A - SHA-256 hash formatting and calculation consistency", async () => {
   const dummyCvContent = Buffer.from("Jean Dupont - Senior Software Engineer CV Content");
   const expectedHash = createHash("sha256").update(dummyCvContent).digest("hex");
