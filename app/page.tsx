@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { getSectorVisual } from "@/lib/taxonomy/sector-visuals";
 
 const images = {
-  hero: "/visuals/samya-et-emery.jpeg?v=rp-hero-owner-20261027",
+  hero: "/visuals/rp-global-skyline.webp?v=rp-global-skyline-20261014",
   talents: "https://images.unsplash.com/photo-1770992225308-154250075727?auto=format&fit=crop&fm=jpg&q=88&w=1400",
   enterprise: "https://images.unsplash.com/photo-1521790797524-b2497295b8a0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
   intelligence: "https://images.unsplash.com/photo-1677442135136-760c813028c0?auto=format&fit=crop&fm=jpg&q=88&w=1400",
