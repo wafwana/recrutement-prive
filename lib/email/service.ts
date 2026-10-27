@@ -33,7 +33,7 @@ export async function sendEmail(options: {
   html: string;
   from?: string;
   replyTo?: string;
-}): Promise<{ ok: boolean; id?: string; error?: string }> {
+}): Promise<{ ok: boolean; id?: string; error?: string; simulated?: boolean }> {
   const client = getResendClient();
   const from = options.from || process.env.EMAIL_FROM || DEFAULT_EMAIL_FROM;
   const replyTo = options.replyTo || PUBLIC_CONTACT_EMAIL;
@@ -43,7 +43,7 @@ export async function sendEmail(options: {
   if (!client) {
     if (isNonProd) {
       console.log(`[EMAIL DISPATCH MOCK] Subject: ${options.subject}`);
-      return { ok: true, id: `mock-${Date.now()}` };
+      return { ok: true, id: `mock-${Date.now()}`, simulated: true };
     }
     console.error("[EMAIL DISPATCH] RESEND_API_KEY is not configured; delivery skipped.");
     return { ok: false, error: "Service email non configuré." };
@@ -62,18 +62,18 @@ export async function sendEmail(options: {
       console.error("[Resend Email Error]", result.error);
       if (isNonProd) {
         console.log(`[EMAIL DISPATCH FALLBACK MOCK] Subject: ${options.subject}`);
-        return { ok: true, id: `mock-${Date.now()}` };
+        return { ok: true, id: `mock-${Date.now()}`, simulated: true };
       }
       return { ok: false, error: result.error.message };
     }
 
-    return { ok: true, id: result.data?.id };
+    return { ok: true, id: result.data?.id, simulated: false };
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error("[Email Dispatch Exception]", errorMessage);
     if (isNonProd) {
       console.log(`[EMAIL DISPATCH FALLBACK MOCK EXCEPTION] Subject: ${options.subject}`);
-      return { ok: true, id: `mock-${Date.now()}` };
+      return { ok: true, id: `mock-${Date.now()}`, simulated: true };
     }
     return { ok: false, error: errorMessage };
   }
