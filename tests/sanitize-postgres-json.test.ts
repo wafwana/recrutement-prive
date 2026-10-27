@@ -13,7 +13,7 @@ test("sanitizePostgresJson removes NUL characters recursively from parsed CV dat
   assert.deepEqual(result, {
     headline: "Senior Engineer",
     skills: ["TypeScript", "PostgreSQL"],
-    nested: { key: "value" },
+    nested: { summary: "Experience details", key: "value" },
     unchanged: 7,
   });
 });
