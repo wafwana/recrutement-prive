@@ -356,3 +356,14 @@
     min-height: 52px;
   }
 }
+
+/* Approved navigation correction: keep ESPACE CONNECTÉ fully legible without changing the layout. */
+@media (min-width: 1181px) {
+  .rp-login { font-size: 14px; font-weight: 700; padding: 12px 16px; letter-spacing: .01em; }
+}
+@media (max-width: 1180px) {
+  .rp-login { font-size: 11px; padding: 10px 12px; }
+}
+@media (max-width: 640px) {
+  .rp-login { font-size: 10px; padding: 9px 10px; }
+}
