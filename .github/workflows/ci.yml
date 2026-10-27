@@ -64,6 +64,7 @@ jobs:
       - run: npm run test:candidate-auth
       - run: npm run test:candidate-flow
       - run: npm run test:company-flow
+      - run: npm run test:company-registration
       - run: npm run test:taxonomy-cv-protection
       - run: npm run test:cv-intelligence
       - run: npm run test:cv-folder-classification
