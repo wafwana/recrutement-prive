@@ -78,7 +78,7 @@ export async function registerCompany(formData: FormData) {
 
     let verifiedCompany: Awaited<ReturnType<typeof lookupCompanyBySiret>> = null;
     if (country.toLocaleLowerCase("fr").trim() === "france") {
-      if (!/^\\d{14}$/.test(siret)) {
+      if (!/^\d{14}$/.test(siret)) {
         return { ok: false, error: "Pour une entreprise domiciliée en France, le SIRET à 14 chiffres est obligatoire." };
       }
       try {
