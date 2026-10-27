@@ -23,10 +23,12 @@ export function CompanySiretLookup({
   value,
   onChange,
   onFound,
+  required = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   onFound: (company: CompanyLookupResult) => void;
+  required?: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -60,6 +62,7 @@ export function CompanySiretLookup({
           <input
             value={value}
             onChange={(event) => onChange(event.target.value)}
+            required={required}
             inputMode="numeric"
             maxLength={17}
             placeholder="14 chiffres"

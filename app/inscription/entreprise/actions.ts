@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { validatePassword } from "@/lib/password-policy";
+import { lookupCompanyBySiret } from "@/lib/company/public-registry";
 import { z } from "zod";
 
 const registerCompanySchema = z.object({
@@ -75,6 +76,20 @@ export async function registerCompany(formData: FormData) {
       };
     }
 
+    let verifiedCompany: Awaited<ReturnType<typeof lookupCompanyBySiret>> = null;
+    if (country.toLocaleLowerCase("fr").trim() === "france") {
+      if (!/^\d{14}$/.test(siret)) {
+        return { ok: false, error: "Pour une entreprise domiciliée en France, le SIRET à 14 chiffres est obligatoire." };
+      }
+      try {
+        verifiedCompany = await lookupCompanyBySiret(siret);
+      } catch {
+        return { ok: false, error: "Le registre public des entreprises est momentanément indisponible. Réessayez dans quelques instants ; aucun compte n’a été créé." };
+      }
+      if (!verifiedCompany || verifiedCompany.siret !== siret) {
+        return { ok: false, error: "Ce SIRET n’a pas été confirmé par le registre public. Vérifiez le numéro et utilisez « Préremplir » avant de valider." };
+      }
+    }
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -98,15 +113,15 @@ export async function registerCompany(formData: FormData) {
             company: {
               create: {
                 name: companyName,
-                siren: siren || null,
+                siren: verifiedCompany?.siren || siren || null,
                 siret: siret || null,
-                legalForm: legalForm || null,
-                apeCode: apeCode || null,
-                address: address || null,
-                sourceType: sourceType || null,
-                sourceUrl: sourceUrl || null,
-                sourceCollectedAt: sourceCollectedAt ? new Date(sourceCollectedAt) : null,
-                website: website || null,
+                legalForm: verifiedCompany?.legalForm || legalForm || null,
+                apeCode: verifiedCompany?.apeCode || apeCode || null,
+                address: address || [verifiedCompany?.address, [verifiedCompany?.postalCode, verifiedCompany?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null,
+                sourceType: verifiedCompany?.sourceType || sourceType || null,
+                sourceUrl: verifiedCompany?.sourceUrl || sourceUrl || null,
+                sourceCollectedAt: verifiedCompany?.collectedAt ? new Date(verifiedCompany.collectedAt) : sourceCollectedAt ? new Date(sourceCollectedAt) : null,
+                website: website || verifiedCompany?.website || null,
                 country: country || "France",
                 phonePrefix: phonePrefix || "+33",
                 phone: fullPhone,
