@@ -83,6 +83,7 @@ export async function POST(request: Request) {
     const fileCheck = await validateUploadedDocument(file, { allowedTypes: CV_INTAKE_ALLOWED_TYPES });
     if (!fileCheck.ok) return NextResponse.json({ error: fileCheck.error || "Fichier non conforme." }, { status: 400 });
 
+    const safeFileName = file.name.replace(/\u0000/g, "");
     const buffer = Buffer.from(await file.arrayBuffer());
     const sha256 = createHash("sha256").update(buffer).digest("hex");
     const duplicate = await prisma.cvIntake.findFirst({ where: { originalSha256: sha256 }, select: { id: true, name: true, folderPath: true } });
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
     let analysisError: string | null = null;
     try {
       analysis = await analyzeCvDocument({
-        fileName: file.name,
+        fileName: safeFileName,
         mimeType: file.type || "application/octet-stream",
         buffer,
         taxonomy: taxonomyItems,
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
       // Provider failure must not leave a CV unprocessed when local text extraction works.
       try {
         analysis = await analyzeCvDocumentLocally({
-          fileName: file.name,
+          fileName: safeFileName,
           mimeType: file.type || "application/octet-stream",
           buffer,
           taxonomy: taxonomyItems,
@@ -145,10 +146,10 @@ export async function POST(request: Request) {
 
     const extractedEmail = analysis?.email || null;
     const candidateEmail = (typeof formData.get("candidateEmail") === "string"
-      ? String(formData.get("candidateEmail")).trim().toLowerCase() || null
+      ? String(formData.get("candidateEmail")).replace(/\u0000/g, "").trim().toLowerCase() || null
       : null) || extractedEmail;
     const candidateName = (typeof formData.get("candidateName") === "string"
-      ? String(formData.get("candidateName")).trim() || null
+      ? String(formData.get("candidateName")).replace(/\u0000/g, "").trim() || null
       : null) || [analysis?.firstName, analysis?.lastName].filter(Boolean).join(" ").trim() || null;
     const bulkImport = formData.get("bulkImport") === "true";
     const requestedCandidateId = typeof formData.get("candidateId") === "string" ? String(formData.get("candidateId")).trim() || null : null;
@@ -259,8 +260,8 @@ export async function POST(request: Request) {
 
     const record = await prisma.cvIntake.create({
       data: {
-        name: file.name,
-        originalName: file.name,
+        name: safeFileName,
+        originalName: safeFileName,
         mimeType: file.type || "application/octet-stream",
         fileData: buffer,
         size: file.size,
@@ -283,7 +284,7 @@ export async function POST(request: Request) {
 
     if (candidate?.id) {
       const existingCandidateDocument = await prisma.candidateDocument.findFirst({
-        where: { candidateId: candidate.id, name: file.name, docType: "CV" },
+        where: { candidateId: candidate.id, name: safeFileName, docType: "CV" },
         select: { id: true },
       });
 
@@ -291,7 +292,7 @@ export async function POST(request: Request) {
         await prisma.candidateDocument.create({
           data: {
             candidateId: candidate.id,
-            name: file.name,
+            name: safeFileName,
             fileData: buffer,
             type: file.type || "application/octet-stream",
             docType: "CV",
@@ -312,7 +313,7 @@ export async function POST(request: Request) {
         targetType: "CV_INTAKE",
         targetId: record.id,
         details: {
-          originalName: file.name,
+          originalName: safeFileName,
           candidateInviteSent,
           candidateProfileLinked: Boolean(candidate?.id),
           originalSha256: sha256,
