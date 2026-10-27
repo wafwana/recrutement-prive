@@ -55,7 +55,14 @@ export default function InscriptionEntreprisePage() {
 
     setPending(true);
 
-    const result = await registerCompany(formData);
+    let result: Awaited<ReturnType<typeof registerCompany>>;
+    try {
+      result = await registerCompany(formData);
+    } catch {
+      setError("La création du compte a échoué. Vérifiez les informations et réessayez. Si le compte a peut-être déjà été créé, essayez d’abord de vous connecter.");
+      setPending(false);
+      return;
+    }
 
     if (!result.ok) {
       setError(result.error || "Impossible de créer le compte entreprise.");
@@ -64,17 +71,21 @@ export default function InscriptionEntreprisePage() {
     }
 
     const email = String(formData.get("email") ?? "");
-    const signInResult = await signIn("credentials", {
-      email,
-      password: pass,
-      redirect: false,
-      callbackUrl: "/espace/entreprise",
-    });
+    try {
+      const signInResult = await signIn("credentials", {
+        email,
+        password: pass,
+        redirect: false,
+        callbackUrl: "/espace/entreprise",
+      });
 
-    if (signInResult?.error) {
+      if (signInResult?.error) {
+        window.location.assign("/connexion?registered=true");
+      } else {
+        window.location.assign(signInResult?.url ?? "/espace/entreprise");
+      }
+    } catch {
       window.location.assign("/connexion?registered=true");
-    } else {
-      window.location.assign(signInResult?.url ?? "/espace/entreprise");
     }
   }
 
@@ -88,12 +99,11 @@ export default function InscriptionEntreprisePage() {
         </p>
 
         <form className="mt-10 space-y-6" onSubmit={handleSubmit}>
-          <CompanySiretLookup value={siret} onChange={setSiret} onFound={applyCompanyLookup} />
+          <CompanySiretLookup value={siret} onChange={setSiret} onFound={applyCompanyLookup} required={country.trim().toLocaleLowerCase("fr") === "france"} />
           <input type="hidden" name="siren" value={siren} />
           <input type="hidden" name="siret" value={siret} />
           <input type="hidden" name="legalForm" value={legalForm} />
           <input type="hidden" name="apeCode" value={apeCode} />
-          <input type="hidden" name="address" value={address} />
           <input type="hidden" name="sourceType" value={sourceType} />
           <input type="hidden" name="sourceUrl" value={sourceUrl} />
           <input type="hidden" name="sourceCollectedAt" value={sourceCollectedAt} />
@@ -103,6 +113,8 @@ export default function InscriptionEntreprisePage() {
               name="companyName"
               type="text"
               required
+              value={companyName}
+              onChange={(event) => setCompanyName(event.target.value)}
               maxLength={120}
               placeholder="ex: AcroCorp SA"
               className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"
@@ -134,10 +146,48 @@ export default function InscriptionEntreprisePage() {
           </label>
 
           <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
+            Adresse du siège social
+            <input
+              name="address"
+              type="text"
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
+              maxLength={300}
+              placeholder="Numéro, rue, code postal, ville"
+              className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"
+            />
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
+              Forme juridique
+              <input
+                value={legalForm}
+                onChange={(event) => setLegalForm(event.target.value)}
+                maxLength={120}
+                placeholder="Préremplie depuis le registre"
+                className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"
+              />
+            </label>
+            <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
+              Code APE / activité
+              <input
+                value={apeCode}
+                onChange={(event) => setApeCode(event.target.value)}
+                maxLength={20}
+                placeholder="Prérempli depuis le registre"
+                className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"
+              />
+            </label>
+          </div>
+
+          <label className="block text-xs uppercase tracking-[0.18em] text-white/40">
             Site web de l&apos;entreprise
             <input
               name="website"
               type="url"
+              value={website}
+              onChange={(event) => setWebsite(event.target.value)}
               maxLength={250}
               placeholder="https://www.acrocorp.com"
               className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"
@@ -150,7 +200,8 @@ export default function InscriptionEntreprisePage() {
               <input
                 name="country"
                 type="text"
-                defaultValue="France"
+                value={country}
+                onChange={(event) => setCountry(event.target.value)}
                 maxLength={120}
                 placeholder="ex: France"
                 className="mt-2 w-full border border-white/10 bg-transparent px-4 py-3 text-sm text-white outline-none"
