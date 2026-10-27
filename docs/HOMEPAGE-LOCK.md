@@ -7,7 +7,7 @@ Cette homepage est la référence visuelle et fonctionnelle officielle de Recrut
 - Conserver exactement la structure, l'ordre des sections, la navigation, les CTA, le footer et la direction visuelle validés.
 - Conserver exactement le contenu éditorial validé du Hero.
 - Conserver exactement la composition du Hero avec les deux personnes dos à dos.
-- Utiliser exclusivement `public/visuals/hero-final.webp` pour l'image Hero.
+- Utiliser exclusivement `public/visuals/samya-et-emery.jpeg` pour l'image Hero.
 - Ne jamais substituer cette image par une autre image, une image distante, un placeholder ou une variante générée automatiquement.
 - Ne pas modifier le cadrage, la composition ou le rôle visuel du Hero sans autorisation explicite.
 - Conserver les fonctionnalités et les liens existants de la homepage : navigation, changement de langue, accès à l'espace connecté, dépôt de CV, recrutement, ancres de sections, offres, espaces candidat/entreprise, mentions légales, confidentialité et contact.
@@ -26,9 +26,9 @@ Recrutement Privé ne vend pas les coordonnées des candidats, Recrutement Priv�
 
 ## Asset Hero approuvé
 
-`public/visuals/hero-final.webp`
+`public/visuals/samya-et-emery.jpeg`
 
-Cet asset est l'image de référence du Hero : deux personnes en tenue professionnelle, positionnées dos à dos, dans la composition approuvée.
+Cet asset est la photo exacte fournie par le propriétaire et l'image de référence du Hero : deux personnes en tenue professionnelle, positionnées dos à dos, dans la composition approuvée.
 
 ## Principe de non-régression
 
