@@ -8,6 +8,8 @@ export function sanitizePostgresJson<T>(value: T): T {
   if (typeof value === "string") {
     return value.replace(/\u0000/g, "") as T;
   }
+  // Buffers hold the original uploaded bytes and must never be traversed as JSON objects.
+  if (typeof Buffer !== "undefined" && Buffer.isBuffer(value)) return value as T;
   if (Array.isArray(value)) {
     return value.map((item) => sanitizePostgresJson(item)) as T;
   }
