@@ -29,6 +29,7 @@
     "test:cron-schedule": "node --import tsx --test tests/cron-schedule.test.ts",
     "test:global-jobs-cron-batch": "node --import tsx --test tests/global-jobs-cron-batch.test.ts",
     "test:owner-cv-intake": "tsx tests/owner-cv-intake-integration.ts",
+    "test:sanitize-postgres-json": "node --import tsx --test tests/sanitize-postgres-json.test.ts",
     "test:owner-compatibility": "node --import tsx --test tests/owner-compatibility.test.ts",
     "test:migration-check": "node --import tsx --test tests/migration-check.test.ts",
     "test:internal-messaging": "node --import tsx --test tests/internal-messaging-unit.test.ts tests/internal-messaging-and-document-privacy.test.ts",
