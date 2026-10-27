@@ -30,7 +30,7 @@ test("Email Service - no-key non-production result is explicitly simulated", asy
   const origNodeEnv = process.env.NODE_ENV;
   try {
     delete process.env.RESEND_API_KEY;
-    process.env.NODE_ENV = "test";
+    Reflect.set(process.env, "NODE_ENV", "test");
 
     const result = await sendEmail({
       to: "test-candidat@recrutement-prive.com",
@@ -52,7 +52,7 @@ test("Email Service - missing key fails explicitly in production", async () => {
   const origNodeEnv = process.env.NODE_ENV;
   try {
     delete process.env.RESEND_API_KEY;
-    process.env.NODE_ENV = "production";
+    Reflect.set(process.env, "NODE_ENV", "production");
 
     const result = await sendEmail({
       to: "test-candidat@recrutement-prive.com",
@@ -74,7 +74,7 @@ test("Email Service - sendDepositConfirmation marks mock delivery as simulated",
   const origNodeEnv = process.env.NODE_ENV;
   try {
     delete process.env.RESEND_API_KEY;
-    process.env.NODE_ENV = "test";
+    Reflect.set(process.env, "NODE_ENV", "test");
 
     const result = await sendDepositConfirmation(
       "candidat@test.com",
@@ -98,7 +98,7 @@ test("Email Service - sendOwnerAlert targets owner email box and exposes simulat
   const origNodeEnv = process.env.NODE_ENV;
   try {
     delete process.env.RESEND_API_KEY;
-    process.env.NODE_ENV = "test";
+    Reflect.set(process.env, "NODE_ENV", "test");
 
     const result = await sendOwnerAlert("Alerte système", "<p>Alerte de test</p>");
     assert.equal(result.ok, true);
