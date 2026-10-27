@@ -10,6 +10,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { hashToken } from "@/lib/password-crypto";
 import { sendEmail } from "@/lib/email/service";
 import { getAppBaseUrl } from "@/lib/url";
+import { sanitizePostgresJson } from "@/lib/security/sanitize-postgres-json";
 
 const CV_INTAKE_ALLOWED_TYPES = new Set([
   ...Array.from(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg"]),
@@ -124,6 +125,10 @@ export async function POST(request: Request) {
         analysis = null;
       }
     }
+
+    // Extractors may return U+0000 from binary-heavy or malformed documents.
+    // Preserve the original fileData bytes, but sanitize all parsed fields before DB/JSON persistence.
+    analysis = sanitizePostgresJson(analysis);
 
     const jobs = await prisma.job.findMany({
       where: { status: "OPEN" },
