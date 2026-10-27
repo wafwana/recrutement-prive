@@ -488,26 +488,137 @@ export async function POST(request: Request) {
   if (parsed.data.action === "recalculate") {
     const { candidateId, jobId } = parsed.data;
 
-    await prisma.auditLog.create({
-      data: {
-        actorUserId: access.userId,
-        actorRole: access.role,
-        action: "CV_MATCHING_RECALCULATED",
-        targetType: jobId ? "JOB" : candidateId ? "CANDIDATE" : "OVERVIEW",
-        targetId: jobId || candidateId || "GLOBAL",
-        details: {
-          candidateId: candidateId || null,
-          jobId: jobId || null,
-          recalculatedAt: new Date().toISOString(),
-        },
-      },
-    });
+    try {
+      const [candidates, jobs] = await Promise.all([
+        prisma.candidateProfile.findMany({
+          where: {
+            status: "ACTIVE",
+            ...(candidateId ? { id: candidateId } : {}),
+          },
+          select: {
+            id: true,
+            headline: true,
+            bio: true,
+            skills: true,
+            experienceYears: true,
+            location: true,
+            country: true,
+            subCategoryIds: true,
+            primaryCategory: { select: { code: true } },
+          },
+        }),
+        prisma.job.findMany({
+          where: {
+            status: "OPEN",
+            ...(jobId ? { id: jobId } : {}),
+          },
+          select: {
+            id: true,
+            title: true,
+            location: true,
+            company: { select: { country: true } },
+            description: true,
+            requiredSkills: true,
+            requiredExperienceYears: true,
+            jobCategory: { select: { code: true } },
+            subCategory: { select: { code: true } },
+          },
+        }),
+      ]);
 
-    return NextResponse.json({
-      success: true,
-      message: "Recalcul du matching effectué avec succès.",
-      recalculatedAt: new Date().toISOString(),
-    });
+      if (candidateId && candidates.length === 0) {
+        return NextResponse.json({ error: "Le candidat actif demandé est introuvable." }, { status: 404 });
+      }
+      if (jobId && jobs.length === 0) {
+        return NextResponse.json({ error: "L’offre ouverte demandée est introuvable." }, { status: 404 });
+      }
+
+      const allSubCategoryIds = [...new Set(candidates.flatMap((candidate) => stringIds(candidate.subCategoryIds)))];
+      const subCategoryRows = allSubCategoryIds.length
+        ? await prisma.jobCategory.findMany({
+            where: { id: { in: allSubCategoryIds } },
+            select: { id: true, code: true },
+          })
+        : [];
+      const subCategoryCodeById = new Map(subCategoryRows.map((row) => [row.id, row.code]));
+
+      let evaluatedPairs = 0;
+      let eligibleMatches = 0;
+      let highestScore = 0;
+      const recalculatedAt = new Date().toISOString();
+
+      for (const candidate of candidates) {
+        const candidateSubCategories = stringIds(candidate.subCategoryIds)
+          .map((id) => subCategoryCodeById.get(id))
+          .filter((code): code is string => Boolean(code));
+
+        for (const job of jobs) {
+          const result = matchCandidateToJob(
+            {
+              skills: candidate.skills,
+              experienceYears: candidate.experienceYears,
+              headline: candidate.headline,
+              bio: candidate.bio,
+              location: candidate.location,
+              country: candidate.country,
+              primaryCategoryCode: candidate.primaryCategory?.code,
+              subCategoryCodes: candidateSubCategories,
+            },
+            {
+              requiredSkills: job.requiredSkills,
+              requiredExperienceYears: job.requiredExperienceYears,
+              title: job.title,
+              description: job.description,
+              location: job.location,
+              country: job.company?.country,
+              categoryCode: job.jobCategory?.code,
+              subCategoryCode: job.subCategory?.code,
+            }
+          );
+          evaluatedPairs += 1;
+          if (result.score >= 25) eligibleMatches += 1;
+          highestScore = Math.max(highestScore, result.score);
+        }
+      }
+
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: access.userId,
+          actorRole: access.role,
+          action: "CV_MATCHING_RECALCULATED",
+          targetType: jobId ? "JOB" : candidateId ? "CANDIDATE" : "OVERVIEW",
+          targetId: jobId || candidateId || "GLOBAL",
+          details: {
+            candidateId: candidateId || null,
+            jobId: jobId || null,
+            candidateCount: candidates.length,
+            jobCount: jobs.length,
+            evaluatedPairs,
+            eligibleMatches,
+            highestScore,
+            recalculatedAt,
+          },
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Recalcul du matching exécuté avec succès.",
+        scope: jobId ? "JOB" : candidateId ? "CANDIDATE" : "GLOBAL",
+        candidateCount: candidates.length,
+        jobCount: jobs.length,
+        evaluatedPairs,
+        eligibleMatches,
+        highestScore,
+        recalculatedAt,
+      });
+    } catch (error) {
+      console.error("[CV_MATCHING_RECALCULATED] Échec du recalcul", error);
+      return NextResponse.json(
+        { success: false, error: "Le recalcul du matching a échoué. Aucune réussite n’a été déclarée." },
+        { status: 500 }
+      );
+    }
   }
 
   const canPresent = access.role === "OWNER" || (
