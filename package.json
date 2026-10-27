@@ -12,6 +12,7 @@
     "test:candidate-auth": "node --import tsx --test tests/candidate-auth.test.ts",
     "test:candidate-flow": "node --import tsx --test tests/candidate-flow.test.ts",
     "test:company-flow": "node --import tsx --test tests/company-flow.test.ts",
+    "test:company-registration": "node --import tsx --test tests/company-registration-form.test.ts",
     "test:taxonomy-cv-protection": "node --import tsx --test tests/taxonomy-and-cv-protection.test.ts",
     "test:candidate-integration": "tsx tests/candidate-integration.ts",
     "db:generate": "prisma generate",
