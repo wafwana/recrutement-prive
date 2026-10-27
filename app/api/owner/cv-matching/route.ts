@@ -2,15 +2,25 @@ import { NextResponse } from "next/server";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
-import { matchCandidateToJob } from "@/lib/matching/candidate-job";
+import { matchCandidateToJob, CriterionDetail } from "@/lib/matching/candidate-job";
 import { z } from "zod";
-
 
 const presentationSchema = z.object({
   action: z.literal("present"),
   candidateId: z.string().trim().min(1).max(128),
   jobId: z.string().trim().min(1).max(128),
 });
+
+const recalculateSchema = z.object({
+  action: z.literal("recalculate"),
+  candidateId: z.string().trim().min(1).max(128).optional(),
+  jobId: z.string().trim().min(1).max(128).optional(),
+});
+
+const matchingPostSchema = z.discriminatedUnion("action", [
+  presentationSchema,
+  recalculateSchema,
+]);
 
 function candidateAlias(id: string) {
   return "Profil #" + id.slice(-6).toUpperCase();
@@ -24,17 +34,6 @@ function stringIds(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string" && item.length > 0)
     : [];
-}
-
-async function subCategoryCodes(value: unknown) {
-  const ids = stringIds(value);
-  if (!ids.length) return [];
-  const rows = await prisma.jobCategory.findMany({
-    where: { id: { in: ids } },
-    select: { id: true, code: true },
-  });
-  const byId = new Map(rows.map((row) => [row.id, row.code]));
-  return ids.map((id) => byId.get(id)).filter((code): code is string => Boolean(code));
 }
 
 async function requireMatchingAccess() {
@@ -154,6 +153,11 @@ export async function GET(request: Request) {
       reasons: string[];
       categoryMatchLevel: string;
       countryFit: string;
+      criteriaDetails: CriterionDetail[];
+      evidenceProofs: string[];
+      strengths: string[];
+      risksAndReserves: string[];
+      calculatedAt: string;
       applicationStatus: string | null;
       presentationExists: boolean;
       presentationState: string | null;
@@ -206,6 +210,11 @@ export async function GET(request: Request) {
           reasons: result.reasons,
           categoryMatchLevel: result.categoryMatchLevel,
           countryFit: result.countryFit,
+          criteriaDetails: result.criteriaDetails,
+          evidenceProofs: result.evidenceProofs,
+          strengths: result.strengths,
+          risksAndReserves: result.risksAndReserves,
+          calculatedAt: result.calculatedAt,
           applicationStatus: application?.status ?? null,
           presentationExists: Boolean(presentation),
           presentationState: presentation?.state ?? null,
@@ -338,6 +347,11 @@ export async function GET(request: Request) {
           reasons: result.reasons,
           categoryMatchLevel: result.categoryMatchLevel,
           countryFit: result.countryFit,
+          criteriaDetails: result.criteriaDetails,
+          evidenceProofs: result.evidenceProofs,
+          strengths: result.strengths,
+          risksAndReserves: result.risksAndReserves,
+          calculatedAt: result.calculatedAt,
         };
       })
       .sort((a, b) => b.score - a.score)
@@ -359,6 +373,7 @@ export async function GET(request: Request) {
       matches,
     });
   }
+
   if (!candidateId) return NextResponse.json({ error: "candidateId requis." }, { status: 400 });
 
   const candidate = await prisma.candidateProfile.findUnique({
@@ -419,6 +434,11 @@ export async function GET(request: Request) {
         reasons: result.reasons,
         categoryMatchLevel: result.categoryMatchLevel,
         countryFit: result.countryFit,
+        criteriaDetails: result.criteriaDetails,
+        evidenceProofs: result.evidenceProofs,
+        strengths: result.strengths,
+        risksAndReserves: result.risksAndReserves,
+        calculatedAt: result.calculatedAt,
       };
     })
     .sort((a, b) => b.score - a.score);
@@ -448,18 +468,10 @@ export async function GET(request: Request) {
   });
 }
 
-
 export async function POST(request: Request) {
   const access = await requireMatchingAccess();
   if (!access) {
     return NextResponse.json({ error: "Permission de matching non accordée." }, { status: 403 });
-  }
-  const canPresent = access.role === "OWNER" || (
-    access.role === "ADMIN" &&
-    await hasPermission(access.userId, access.role, "PRESENTATIONS_MANAGE")
-  );
-  if (!canPresent) {
-    return NextResponse.json({ error: "La mise en relation est réservée à l’OWNER ou à un ADMIN explicitement habilité." }, { status: 403 });
   }
 
   let raw: unknown;
@@ -468,9 +480,42 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "JSON invalide." }, { status: 400 });
   }
-  const parsed = presentationSchema.safeParse(raw);
+  const parsed = matchingPostSchema.safeParse(raw);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Candidat ou offre invalide." }, { status: 400 });
+    return NextResponse.json({ error: "Action, candidat ou offre invalide." }, { status: 400 });
+  }
+
+  if (parsed.data.action === "recalculate") {
+    const { candidateId, jobId } = parsed.data;
+
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: access.userId,
+        actorRole: access.role,
+        action: "CV_MATCHING_RECALCULATED",
+        targetType: jobId ? "JOB" : candidateId ? "CANDIDATE" : "OVERVIEW",
+        targetId: jobId || candidateId || "GLOBAL",
+        details: {
+          candidateId: candidateId || null,
+          jobId: jobId || null,
+          recalculatedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Recalcul du matching effectué avec succès.",
+      recalculatedAt: new Date().toISOString(),
+    });
+  }
+
+  const canPresent = access.role === "OWNER" || (
+    access.role === "ADMIN" &&
+    await hasPermission(access.userId, access.role, "PRESENTATIONS_MANAGE")
+  );
+  if (!canPresent) {
+    return NextResponse.json({ error: "La mise en relation est réservée à l’OWNER ou à un ADMIN explicitement habilité." }, { status: 403 });
   }
 
   const [candidate, job] = await Promise.all([
@@ -509,8 +554,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Le candidat ou l’offre n’est plus disponible." }, { status: 404 });
   }
 
+  const subCategoryIds = Array.isArray(candidate.subCategoryIds)
+    ? candidate.subCategoryIds.filter((v): v is string => typeof v === "string")
+    : [];
+
   const [candidateSubCategories, companyUser] = await Promise.all([
-    subCategoryCodes(candidate.subCategoryIds),
+    prisma.jobCategory.findMany({
+      where: { id: { in: subCategoryIds } },
+      select: { code: true },
+    }).then((rows) => rows.map((r) => r.code)),
     prisma.user.findFirst({
       where: {
         status: "ACTIVE",
@@ -520,6 +572,7 @@ export async function POST(request: Request) {
       select: { id: true },
     }),
   ]);
+
   if (!companyUser) {
     return NextResponse.json({
       error: "Aucun compte entreprise actif n’est relié à cette offre. Reliez d’abord un recruteur à l’entreprise avant de préparer une présentation sécurisée.",

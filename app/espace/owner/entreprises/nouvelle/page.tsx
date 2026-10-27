@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { createOwnerCompany } from "./actions";
 import OwnerCompanyForm from "./OwnerCompanyForm";
-
-async function submitOwnerCompany(formData: FormData) {
-  "use server";
-  await createOwnerCompany(formData);
-}
 
 export default async function NewOwnerCompanyPage() {
   const session = await auth();
@@ -24,7 +18,7 @@ export default async function NewOwnerCompanyPage() {
         <Link href="/espace/owner" className="border border-white/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/55">Retour OWNER</Link>
       </div>
 
-      <OwnerCompanyForm action={submitOwnerCompany} />
+      <OwnerCompanyForm />
     </main>
   );
 }

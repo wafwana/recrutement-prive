@@ -9,6 +9,7 @@ export type PublicCompanyIdentity = {
   city?: string;
   country?: string;
   website?: string;
+  contactEmail?: string;
   sourceType: "API_RECHERCHE_ENTREPRISES";
   sourceUrl: string;
   collectedAt: string;
@@ -64,6 +65,7 @@ export async function lookupCompanyBySiret(rawSiret: string): Promise<PublicComp
     city: text(adresse?.libelle_commune),
     country: "France",
     website: text(result.site_web),
+    contactEmail: text(result.email) ?? text(siege?.email),
     sourceType: "API_RECHERCHE_ENTREPRISES",
     sourceUrl,
     collectedAt: new Date().toISOString(),

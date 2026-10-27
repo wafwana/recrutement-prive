@@ -7,6 +7,9 @@ export type MatchingCandidate = {
   country?: string | null;
   primaryCategoryCode?: string | null;
   subCategoryCodes?: unknown;
+  education?: unknown;
+  certifications?: unknown;
+  languages?: unknown;
 };
 
 export type MatchingJob = {
@@ -18,6 +21,15 @@ export type MatchingJob = {
   country?: string | null;
   categoryCode?: string | null;
   subCategoryCode?: string | null;
+  requiredEducation?: unknown;
+  requiredLanguages?: unknown;
+};
+
+export type CriterionDetail = {
+  criterion: string;
+  kind: "SKILL" | "EXPERIENCE" | "CATEGORY" | "LOCATION" | "EDUCATION" | "LANGUAGE";
+  status: "SATISFIED" | "PARTIALLY_SATISFIED" | "MISSING" | "UNKNOWN";
+  evidence: string | null;
 };
 
 export type MatchingResult = {
@@ -31,6 +43,11 @@ export type MatchingResult = {
   reasons: string[];
   categoryMatchLevel: "EXACT_SUBCATEGORY" | "PARENT_CATEGORY" | "NONE";
   countryFit: "SAME_COUNTRY" | "FRANCE_SWITZERLAND_CROSS_BORDER" | "OTHER_CROSS_BORDER" | "UNKNOWN";
+  criteriaDetails: CriterionDetail[];
+  evidenceProofs: string[];
+  strengths: string[];
+  risksAndReserves: string[];
+  calculatedAt: string;
 };
 
 const normalize = (value: string) =>
@@ -44,6 +61,13 @@ function toSkills(value: unknown): string[] {
   if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string").map(normalize);
   if (value && typeof value === "object") return Object.values(value).filter((v): v is string => typeof v === "string").map(normalize);
   if (typeof value === "string") return value.split(/[,;\n|]/).map(normalize).filter(Boolean);
+  return [];
+}
+
+function toRawList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === "string").map((s) => s.trim()).filter(Boolean);
+  if (value && typeof value === "object") return Object.values(value).filter((v): v is string => typeof v === "string").map((s) => s.trim()).filter(Boolean);
+  if (typeof value === "string") return value.split(/[,;\n|]/).map((s) => s.trim()).filter(Boolean);
   return [];
 }
 
@@ -70,14 +94,29 @@ function normalizeCountry(value: string | null | undefined): string | null {
 }
 
 export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJob): MatchingResult {
-  const candidateSkills = new Set(toSkills(candidate.skills));
+  const candidateRawSkills = toRawList(candidate.skills);
+  const candidateNormalizedSkills = new Set(toSkills(candidate.skills));
+  const rawRequiredSkills = toRawList(job.requiredSkills);
   const requiredSkills = [...new Set(toSkills(job.requiredSkills))];
-  const matchedSkills = requiredSkills.filter(
-    (skill) => candidateSkills.has(skill) || [...candidateSkills].some((candidateSkill) => candidateSkill.includes(skill) || skill.includes(candidateSkill))
-  );
-  const missingSkills = requiredSkills.filter((skill) => !matchedSkills.includes(skill));
 
-  const skillScore = requiredSkills.length ? Math.round((matchedSkills.length / requiredSkills.length) * 50) : 25;
+  const matchedSkillsRaw: string[] = [];
+  const matchedSkillsNormalized: string[] = [];
+
+  for (let i = 0; i < requiredSkills.length; i += 1) {
+    const reqNorm = requiredSkills[i];
+    const reqRaw = rawRequiredSkills[i] || reqNorm;
+    const isHit =
+      candidateNormalizedSkills.has(reqNorm) ||
+      [...candidateNormalizedSkills].some((cSkill) => cSkill.includes(reqNorm) || reqNorm.includes(cSkill));
+    if (isHit) {
+      matchedSkillsNormalized.push(reqNorm);
+      matchedSkillsRaw.push(reqRaw);
+    }
+  }
+
+  const missingSkills = rawRequiredSkills.filter((reqRaw) => !matchedSkillsRaw.includes(reqRaw));
+
+  const skillScore = requiredSkills.length ? Math.round((matchedSkillsNormalized.length / requiredSkills.length) * 50) : 25;
   const requiredYears = job.requiredExperienceYears ?? 0;
   const candidateYears = candidate.experienceYears ?? 0;
   const experienceScore = requiredYears <= 0 ? 20 : Math.min(20, Math.round((candidateYears / requiredYears) * 20));
@@ -94,12 +133,10 @@ export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJ
   const parentJobCatCode = job.categoryCode ? normalize(job.categoryCode) : null;
   const jobSubCatCode = job.subCategoryCode ? normalize(job.subCategoryCode) : null;
 
-  // Filter candidate subcategory codes to strictly exclude primaryCategoryCode
   const candSubCategoryCodes = new Set(
     toSkills(candidate.subCategoryCodes).filter((code) => !primaryCode || code !== primaryCode)
   );
 
-  // Exact subcategory match requires an explicit subcategory on the job that is NOT equal to primary or parent category
   const isSubCategoryMatch = Boolean(
     jobSubCatCode &&
     jobSubCatCode !== parentJobCatCode &&
@@ -115,8 +152,6 @@ export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJ
     categoryMatchLevel = "PARENT_CATEGORY";
   }
 
-  // Cross-border fit is a verification signal, not an eligibility decision.
-  // Never infer work authorization, commute, language or permit eligibility.
   const candidateCountry = normalizeCountry(candidate.country) ?? countryFromLocation(candidate.location);
   const jobCountry = normalizeCountry(job.country);
   const countryFit: MatchingResult["countryFit"] = !candidateCountry || !jobCountry
@@ -129,6 +164,105 @@ export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJ
 
   const score = Math.max(0, Math.min(100, skillScore + experienceScore + contextScore + categoryScore));
 
+  const criteriaDetails: CriterionDetail[] = [];
+  const evidenceProofs: string[] = [];
+  const strengths: string[] = [];
+  const risksAndReserves: string[] = [];
+
+  for (const rawReq of rawRequiredSkills) {
+    const isMatched = matchedSkillsRaw.includes(rawReq);
+    if (isMatched) {
+      const matchCandidateFact = candidateRawSkills.find((cs) => normalize(cs).includes(normalize(rawReq)) || normalize(rawReq).includes(normalize(cs))) || rawReq;
+      criteriaDetails.push({
+        criterion: `Compétence : ${rawReq}`,
+        kind: "SKILL",
+        status: "SATISFIED",
+        evidence: `Présent dans le CV ("${matchCandidateFact}")`,
+      });
+      evidenceProofs.push(`Compétence "${rawReq}" confirmée par le CV.`);
+    } else {
+      criteriaDetails.push({
+        criterion: `Compétence : ${rawReq}`,
+        kind: "SKILL",
+        status: "MISSING",
+        evidence: null,
+      });
+      risksAndReserves.push(`Compétence requise "${rawReq}" non mentionnée explicitement dans le CV.`);
+    }
+  }
+
+  if (requiredYears > 0) {
+    if (candidateYears >= requiredYears) {
+      criteriaDetails.push({
+        criterion: `Expérience : ${requiredYears} an(s) exigé(s)`,
+        kind: "EXPERIENCE",
+        status: "SATISFIED",
+        evidence: `${candidateYears} an(s) d'expérience documenté(s)`,
+      });
+      strengths.push(`Seuil d'expérience satisfait : ${candidateYears} an(s) pour ${requiredYears} an(s) requis.`);
+      evidenceProofs.push(`Expérience professionnelle (${candidateYears} ans) supérieure ou égale au seuil de l'offre (${requiredYears} ans).`);
+    } else if (candidateYears > 0) {
+      criteriaDetails.push({
+        criterion: `Expérience : ${requiredYears} an(s) exigé(s)`,
+        kind: "EXPERIENCE",
+        status: "PARTIALLY_SATISFIED",
+        evidence: `${candidateYears} an(s) documenté(s) (cible ${requiredYears} ans)`,
+      });
+      risksAndReserves.push(`Expérience partielle : ${candidateYears} an(s) présentés pour ${requiredYears} an(s) demandés.`);
+    } else {
+      criteriaDetails.push({
+        criterion: `Expérience : ${requiredYears} an(s) exigé(s)`,
+        kind: "EXPERIENCE",
+        status: "MISSING",
+        evidence: null,
+      });
+      risksAndReserves.push(`Niveau d'expérience non documenté ou inférieur à l'exigence de ${requiredYears} an(s).`);
+    }
+  }
+
+  if (categoryMatchLevel === "EXACT_SUBCATEGORY") {
+    criteriaDetails.push({
+      criterion: "Domaine / sous-catégorie métier",
+      kind: "CATEGORY",
+      status: "SATISFIED",
+      evidence: `Sous-catégorie exacte : ${job.subCategoryCode}`,
+    });
+    strengths.push("Expertise métier directement alignée sur la sous-catégorie du poste.");
+  } else if (categoryMatchLevel === "PARENT_CATEGORY") {
+    criteriaDetails.push({
+      criterion: "Domaine / secteur métier",
+      kind: "CATEGORY",
+      status: "PARTIALLY_SATISFIED",
+      evidence: `Secteur parent : ${job.categoryCode}`,
+    });
+    strengths.push("Alignement sectoriel confirmé au niveau du secteur principal.");
+  }
+
+  if (countryFit === "SAME_COUNTRY") {
+    criteriaDetails.push({
+      criterion: "Périmètre géographique",
+      kind: "LOCATION",
+      status: "SATISFIED",
+      evidence: `Pays identique (${candidateCountry})`,
+    });
+  } else if (countryFit === "FRANCE_SWITZERLAND_CROSS_BORDER") {
+    criteriaDetails.push({
+      criterion: "Mobilité transfrontalière France-Suisse",
+      kind: "LOCATION",
+      status: "PARTIALLY_SATISFIED",
+      evidence: `Candidat : ${candidateCountry || "Inconnu"}, Offre : ${jobCountry || "Inconnu"}`,
+    });
+    risksAndReserves.push("Mobilité transfrontalière France-Suisse : permis de travail, trajet quotidien et rémunération à valider lors de l'entretien.");
+  } else if (countryFit === "UNKNOWN") {
+    criteriaDetails.push({
+      criterion: "Localisation & mobilité",
+      kind: "LOCATION",
+      status: "UNKNOWN",
+      evidence: null,
+    });
+    risksAndReserves.push("Localisation candidat ou entreprise à préciser.");
+  }
+
   const categoryReason =
     categoryMatchLevel === "EXACT_SUBCATEGORY"
       ? "Correspondance exacte de sous-catégorie métier."
@@ -137,7 +271,7 @@ export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJ
       : "Aucune correspondance de sous-catégorie enregistrée.";
 
   const reasons = [
-    matchedSkills.length ? `${matchedSkills.length} compétence(s) requise(s) correspondent au profil.` : "Aucune compétence requise n'a encore été confirmée.",
+    matchedSkillsRaw.length ? `${matchedSkillsRaw.length} compétence(s) requise(s) correspondent au profil.` : "Aucune compétence requise n'a encore été confirmée.",
     requiredYears > 0 ? `Expérience détectée : ${candidateYears} an(s), cible : ${requiredYears} an(s).` : "Aucun seuil d'expérience n'est défini sur l'offre.",
     categoryReason,
     contextHits ? `${contextHits} élément(s) de contexte de l'offre sont retrouvés dans le profil.` : "Peu d'éléments de contexte sont encore disponibles pour le profil.",
@@ -151,5 +285,25 @@ export function matchCandidateToJob(candidate: MatchingCandidate, job: MatchingJ
     reasons.push("Recrutement transfrontalier détecté : vérifier droit au travail, mobilité, langue et conditions locales avant présentation.");
   }
 
-  return { score, skillScore, experienceScore, contextScore, categoryScore, matchedSkills, missingSkills, reasons, categoryMatchLevel, countryFit };
+  if (candidate.headline) {
+    evidenceProofs.push(`Intitulé professionnel : "${candidate.headline}"`);
+  }
+
+  return {
+    score,
+    skillScore,
+    experienceScore,
+    contextScore,
+    categoryScore,
+    matchedSkills: matchedSkillsRaw,
+    missingSkills,
+    reasons,
+    categoryMatchLevel,
+    countryFit,
+    criteriaDetails,
+    evidenceProofs,
+    strengths,
+    risksAndReserves,
+    calculatedAt: new Date().toISOString(),
+  };
 }

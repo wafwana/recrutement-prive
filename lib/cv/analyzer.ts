@@ -1,7 +1,4 @@
 import { executeAiStructuredTask, getActiveAiProvider } from "@/lib/ai/client";
-// pdf-parse v2 uses PDFParse with explicit in-memory data.
-// next.config.ts externalizes pdf-parse so production Node can resolve its worker dependencies.
-// Load the Node worker/canvas adapter before pdf-parse to prevent DOMMatrix crashes on Vercel.
 import { CanvasFactory } from "pdf-parse/worker";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
@@ -13,7 +10,6 @@ async function parsePdfText(buffer: Buffer): Promise<string | null> {
     const result = await parser.getText();
     return result.text ? result.text.trim() : null;
   } catch (error) {
-    // Log only the parser error class; never log the uploaded CV or extracted text.
     console.warn(
       "[cv pdf extraction] parser failed",
       error instanceof Error ? error.name : "UnknownError",
@@ -33,9 +29,6 @@ async function parseDocxText(buffer: Buffer): Promise<string | null> {
   }
 }
 
-/**
- * Extract plain text content from buffer for supported text/plain, PDF, DOCX or markdown byte streams.
- */
 export async function extractTextFromCvBuffer(
   buffer: Buffer,
   mimeType: string,
@@ -45,7 +38,6 @@ export async function extractTextFromCvBuffer(
 
   const lowerName = fileName.toLowerCase();
 
-  // Plain text or markdown
   if (
     mimeType.includes("text/plain") ||
     mimeType.includes("text/markdown") ||
@@ -56,12 +48,10 @@ export async function extractTextFromCvBuffer(
     return raw.length > 0 ? raw : null;
   }
 
-  // PDF
   if (mimeType.includes("pdf") || lowerName.endsWith(".pdf")) {
     return parsePdfText(buffer);
   }
 
-  // DOCX
   if (
     mimeType.includes("wordprocessingml") ||
     mimeType.includes("msword") ||
@@ -70,7 +60,6 @@ export async function extractTextFromCvBuffer(
     return parseDocxText(buffer);
   }
 
-  // Fallback: UTF-8 plain text string extraction for text buffers
   try {
     const str = buffer.toString("utf-8");
     const printableChars = str.replace(/[^\x20-\x7E\xA0-\xFF\n\r\t]/g, "");
@@ -81,8 +70,6 @@ export async function extractTextFromCvBuffer(
 
   return null;
 }
-
-
 
 export type CvTaxonomyItem = {
   code: string;
@@ -125,6 +112,9 @@ export type CvAnalysis = {
   careerLevelEvidence: string | null;
   suggestedFolder: string | null;
   confidence: number;
+  confidenceLevel: "HIGH" | "MEDIUM" | "LOW";
+  evidenceIndices: string[];
+  analysisLimits: string | null;
 };
 
 const schema = {
@@ -144,7 +134,22 @@ const schema = {
     skills: { type: "array", items: { type: "string" } },
     explicitSkills: { type: "array", items: { type: "string" } },
     experienceYears: { type: ["number", "null"] },
-    experiences: { type: "array", items: { type: "object", additionalProperties: false, properties: { title: { type: "string" }, company: { type: ["string","null"] }, start: { type: ["string","null"] }, end: { type: ["string","null"] }, durationYears: { type: ["number","null"] }, evidence: { type: "string" } }, required: ["title","company","start","end","durationYears","evidence"] } },
+    experiences: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          title: { type: "string" },
+          company: { type: ["string", "null"] },
+          start: { type: ["string", "null"] },
+          end: { type: ["string", "null"] },
+          durationYears: { type: ["number", "null"] },
+          evidence: { type: "string" },
+        },
+        required: ["title", "company", "start", "end", "durationYears", "evidence"],
+      },
+    },
     education: { type: "array", items: { type: "string" } },
     certifications: { type: "array", items: { type: "string" } },
     languages: { type: "array", items: { type: "string" } },
@@ -156,6 +161,9 @@ const schema = {
     careerLevelEvidence: { type: ["string", "null"] },
     suggestedFolder: { type: ["string", "null"] },
     confidence: { type: "number" },
+    confidenceLevel: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
+    evidenceIndices: { type: "array", items: { type: "string" } },
+    analysisLimits: { type: ["string", "null"] },
   },
   required: [
     "firstName",
@@ -183,6 +191,9 @@ const schema = {
     "careerLevelEvidence",
     "suggestedFolder",
     "confidence",
+    "confidenceLevel",
+    "evidenceIndices",
+    "analysisLimits",
   ],
 } as const;
 
@@ -190,7 +201,6 @@ export type CvFileContent =
   | { type: "input_image"; image_url: string; detail: "auto" }
   | { type: "input_file"; filename: string; file_data: string };
 
-/** Build Responses API content with MIME-qualified base64 data URLs for file and image inputs. */
 export function buildCvFileContent(input: {
   fileName: string;
   mimeType: string;
@@ -211,13 +221,6 @@ export function buildCvFileContent(input: {
   };
 }
 
-/**
- * Deterministic local text-based CV parser that extracts structured facts without external AI network calls.
- */
-/**
- * Deterministic local parser. It only returns data backed by literal text in the CV;
- * missing identity, education, certifications and experience details stay empty.
- */
 export function parseCvTextLocally(rawText: string, taxonomy: CvTaxonomyItem[]): CvAnalysis {
   const lines = rawText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const lower = rawText.toLocaleLowerCase();
@@ -255,30 +258,73 @@ export function parseCvTextLocally(rawText: string, taxonomy: CvTaxonomyItem[]):
   }
   let primaryCategoryCode: string | null = null;
   const subCategoryCodes: string[] = [];
+  const evidenceIndices: string[] = [];
+
   for (const item of taxonomy) {
     if (!item.code) continue;
     const nameMatch = Boolean(item.name) && lower.includes(item.name.toLocaleLowerCase());
     const codeMatch = new RegExp("(^|[^a-z0-9_])" + item.code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").toLocaleLowerCase() + "([^a-z0-9_]|$)", "i").test(rawText);
     if (nameMatch || codeMatch) {
+      evidenceIndices.push(`Mention textuelle correspondant à la catégorie ${item.name} (${item.code})`);
       if (item.parentCode) {
         if (!subCategoryCodes.includes(item.code)) subCategoryCodes.push(item.code);
         if (!primaryCategoryCode) primaryCategoryCode = item.parentCode;
       } else if (!primaryCategoryCode) primaryCategoryCode = item.code;
     }
   }
+
   const headline = lines.find((line) => !/^CV\s+TEST\b/i.test(line))?.slice(0, 160) ?? null;
+  if (headline) {
+    evidenceIndices.push(`Intitulé professionnel détecté: "${headline}"`);
+  }
+
   const summary = lines.length > 1 ? lines.slice(1, 4).join(" ").slice(0, 500) || null : null;
   const hasDirectFacts = explicitSkills.length > 0 || languages.length > 0 || experienceYears !== null || primaryCategoryCode !== null;
+
+  const confidenceLevel: "HIGH" | "MEDIUM" | "LOW" =
+    explicitSkills.length >= 2 && (primaryCategoryCode !== null || experienceYears !== null)
+      ? "HIGH"
+      : hasDirectFacts
+      ? "MEDIUM"
+      : "LOW";
+
+  const analysisLimits =
+    confidenceLevel === "LOW"
+      ? "Extraits factuels réduits dans le document. Classification minimale conservée d'après l'intitulé professionnel source."
+      : null;
+
   return {
-    firstName: null, lastName: null, email: null, phone: null, address: null, location: null, country: null,
-    headline, summary, improvedSummary: summary,
-    skills: explicitSkills, explicitSkills, experienceYears, experiences: [], education: [], certifications: [], languages,
-    primaryCategoryCode, subCategoryCodes, alternativeCategoryCodes: [],
-    suggestedPositioning: explicitSkills.slice(0, 3), careerLevel: "NON_SPECIFIE", careerLevelEvidence: null,
+    firstName: null,
+    lastName: null,
+    email: null,
+    phone: null,
+    address: null,
+    location: null,
+    country: null,
+    headline,
+    summary,
+    improvedSummary: summary,
+    skills: explicitSkills,
+    explicitSkills,
+    experienceYears,
+    experiences: [],
+    education: [],
+    certifications: [],
+    languages,
+    primaryCategoryCode,
+    subCategoryCodes,
+    alternativeCategoryCodes: [],
+    suggestedPositioning: explicitSkills.slice(0, 3),
+    careerLevel: "NON_SPECIFIE",
+    careerLevelEvidence: null,
     suggestedFolder: primaryCategoryCode ? "CANDIDATS/" + primaryCategoryCode : "CANDIDATS/A_CLASSER/CV",
-    confidence: hasDirectFacts ? 0.6 : 0.1,
+    confidence: confidenceLevel === "HIGH" ? 0.9 : confidenceLevel === "MEDIUM" ? 0.6 : 0.2,
+    confidenceLevel,
+    evidenceIndices,
+    analysisLimits,
   };
 }
+
 export async function analyzeCvDocumentLocally(input: {
   fileName: string;
   mimeType: string;
@@ -297,9 +343,6 @@ export async function analyzeCvDocument(input: {
 }): Promise<CvAnalysis | null> {
   const provider = getActiveAiProvider();
 
-  // Gemini Free must never receive a real CV, its attachment, or extracted candidate PII.
-  // The rematching cron can also call the local-only entrypoint explicitly so batch
-  // analysis never sends candidate documents to an external provider.
   if (!provider || provider === "gemini") {
     return analyzeCvDocumentLocally(input);
   }
@@ -311,11 +354,8 @@ export async function analyzeCvDocument(input: {
   const promptText = `Analyse ce CV pour le moteur de recrutement Recrutement Privé.
 Extrais uniquement les informations professionnelles utiles au recrutement. Lorsque le document contient des coordonnées directement affichées par le candidat, extrais aussi le prénom, nom, e-mail, téléphone, adresse, ville/localisation et pays. Ces coordonnées doivent être reprises telles qu’elles apparaissent, sans les inventer ni les compléter.
 Ne déduis pas de données sensibles non nécessaires et ne crée aucune expérience ou compétence absente du document.
-Sépare les faits explicitement présents du positionnement suggéré. Détermine aussi un niveau de carrière uniquement lorsqu'il est étayé par le CV (SPECIALISTE, MANAGER, CADRE, HAUT_CADRE, DIRECTION), sinon NON_SPECIFIE, et fournis une preuve courte. Pour chaque expérience, conserve un élément de preuve textuel court. Extrait aussi formations et certifications. improvedSummary peut reformuler et mieux présenter les faits, mais ne doit ajouter aucun fait absent du CV.
-Retourne les compétences normalisées, l'expérience totale approximative en années si elle est explicitement estimable, le métier principal et les sous-domaines.
-Retourne aussi jusqu’à 3 secteurs alternatifs réellement compatibles avec le parcours, uniquement s’ils sont suffisamment étayés par le CV et la taxonomie.
-Utilise uniquement les codes de la taxonomie fournie. Si aucune correspondance fiable n'existe, utilise null / [].
-Le CV doit pouvoir être rematché ensuite avec des offres différentes de celle qui aurait éventuellement conduit à son dépôt.
+Sépare les faits explicitement présents (explicitSkills) du positionnement ou compétences normalisées (skills). Détermine un niveau de confiance (confidenceLevel: HIGH, MEDIUM, LOW) et liste les preuves textuelles (evidenceIndices) qui justifient la classification. S'il manque des éléments essentiels, renseigne analysisLimits.
+Utilise uniquement les codes de la taxonomie fournie.
 
 Taxonomie disponible:
 ${taxonomyText || "Aucune taxonomie fournie."}`;
@@ -336,6 +376,8 @@ ${taxonomyText || "Aucune taxonomie fournie."}`;
   if (!response.data) return null;
 
   const parsed = response.data;
+  const confidenceLevel = ["HIGH", "MEDIUM", "LOW"].includes(parsed.confidenceLevel) ? parsed.confidenceLevel : "MEDIUM";
+
   return {
     firstName: typeof parsed.firstName === "string" ? parsed.firstName.trim() || null : null,
     lastName: typeof parsed.lastName === "string" ? parsed.lastName.trim() || null : null,
@@ -363,6 +405,9 @@ ${taxonomyText || "Aucune taxonomie fournie."}`;
     careerLevel: ["SPECIALISTE", "MANAGER", "CADRE", "HAUT_CADRE", "DIRECTION"].includes(parsed.careerLevel) ? parsed.careerLevel : "NON_SPECIFIE",
     careerLevelEvidence: typeof parsed.careerLevelEvidence === "string" ? parsed.careerLevelEvidence.trim() || null : null,
     suggestedFolder: typeof parsed.suggestedFolder === "string" ? parsed.suggestedFolder.trim() || null : null,
-    confidence: typeof parsed.confidence === "number" && Number.isFinite(parsed.confidence) ? Math.max(0, Math.min(1, parsed.confidence)) : 0,
+    confidence: typeof parsed.confidence === "number" && Number.isFinite(parsed.confidence) ? Math.max(0, Math.min(1, parsed.confidence)) : 0.5,
+    confidenceLevel,
+    evidenceIndices: Array.isArray(parsed.evidenceIndices) ? parsed.evidenceIndices.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter(Boolean) : [],
+    analysisLimits: typeof parsed.analysisLimits === "string" ? parsed.analysisLimits.trim() || null : null,
   };
 }

@@ -13,6 +13,7 @@ export type CompanyLookupResult = {
   city?: string;
   country?: string;
   website?: string;
+  contactEmail?: string;
   sourceType: string;
   sourceUrl: string;
   collectedAt: string;
