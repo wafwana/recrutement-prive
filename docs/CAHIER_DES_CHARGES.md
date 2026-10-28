@@ -160,3 +160,19 @@ Lorsqu'un utilisateur effectue un test après déploiement et signale qu'une act
 7. remettre à l'utilisateur uniquement le nouveau test nécessaire et conserver le même identifiant de suivi jusqu'à validation réelle.
 
 Le retour utilisateur est une preuve de défaut à investiguer, non une clôture. La correction n'est terminée qu'après un nouveau test concluant. Si l'information fournie ne permet pas de reproduire le défaut, demander seulement le détail minimal manquant (étapes, message d'erreur non sensible ou capture expurgée), sans lui demander de refaire les vérifications déjà réalisées.
+
+
+## 10. Registre des décisions de référence — obligatoire dès le départ
+
+Toute décision validée relative au produit, à son périmètre, à ses règles métier, à ses accès, à ses données, à sa sécurité, à son architecture ou à ses livraisons doit être enregistrée dans un registre durable. Une conversation ne constitue pas à elle seule une trace de référence.
+
+Pour chaque décision, consigner au minimum : identifiant stable, date, formulation exacte, statut (proposition, à confirmer, validée, en application, appliquée, remplacée), périmètre concerné, motif, conséquences attendues, personne ayant validé l'arbitrage et liens vers les exigences, tickets, PR, commits et tests concernés.
+
+Règles obligatoires :
+- Avant de proposer ou d'exécuter une modification, consulter les décisions existantes et vérifier qu'elle ne les contredit pas et ne duplique pas une action déjà suivie.
+- Ne jamais modifier silencieusement une décision validée. Si une contradiction apparaît, l'exposer et demander un nouvel arbitrage lorsque celui-ci relève de l'utilisateur.
+- Lorsqu'une décision est remplacée, conserver l'ancienne entrée, sa date, son historique et le motif du remplacement ; relier les deux versions.
+- Relier les exigences et tâches à la décision d'origine afin de garder une traçabilité jusqu'aux tests et à la production.
+- Les décisions et registres propres à chaque plateforme restent séparés. Seule la méthode de gouvernance est commune ; les codes, données, accès, budgets, tickets et livraisons des plateformes ne sont pas mélangés.
+
+Cette méthode doit être intégrée dès la création du cahier des charges de référence de chaque plateforme. Pour une plateforme déjà en cours, l'intégration se fait par évolution contrôlée des documents existants, sans effacer l'historique ni recommencer les travaux.
