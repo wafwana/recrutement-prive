@@ -295,3 +295,18 @@ Pour chaque livraison, consigner : fonctionnalité/parcours, ticket, PR et SHA d
 - [ ] Résultat, date, environnement et SHA déployé consignés dans le registre.
 
 Ne cocher que les contrôles pertinents à la livraison ; une checklist adaptée ne doit pas devenir une répétition inutile. Les parcours qui nécessitent une identité OWNER, CANDIDAT ou ENTREPRISE authentifiée sont à remettre explicitement à l'OWNER si l'agent ne peut pas les exécuter lui-même. Une action reste « à tester par l'OWNER » jusqu'à son retour réel ; elle ne devient pas « validée » par présomption.
+
+
+## 13. Cycle d'acceptation après retour de l'utilisateur
+
+Chaque exigence testable doit avoir un résultat attendu observable et un identifiant de suivi stable. Lorsqu'un test utilisateur échoue :
+- [ ] consigner le scénario échoué et le résultat observé dans la même ligne de suivi ;
+- [ ] marquer l'exigence **Échec du test utilisateur — à corriger** ;
+- [ ] relier le ticket de correction à l'identifiant initial, sans dupliquer la fonctionnalité ;
+- [ ] reproduire l'échec avec un test automatisé lorsque cela est raisonnablement possible ;
+- [ ] corriger et exécuter les contrôles techniques avant fusion ;
+- [ ] confirmer le SHA de production après fusion ;
+- [ ] fournir une checklist de retest courte ;
+- [ ] clôturer uniquement après le retest utilisateur concluant.
+
+Le test utilisateur doit être précis : préconditions, étapes, résultat attendu et comportement en cas d'erreur. L'utilisateur ne doit pas avoir à diagnostiquer le code ou à inventer la solution ; il signale le symptôme, l'équipe technique prend en charge l'analyse et le déblocage.
