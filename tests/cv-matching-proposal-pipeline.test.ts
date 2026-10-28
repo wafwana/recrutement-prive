@@ -109,8 +109,8 @@ test("5. Proposition anonymisée sans fuite d'identité", async () => {
 });
 
 test("6. Proposition complète avec contrôle des permissions et du consentement", async () => {
-  // Check that candidate preferences without explicit positive consent default to refusal
-  function verifyPositiveConsent(preferences: unknown): boolean {
+  // Verify strict positive consent evaluation logic
+  function checkExplicitPositiveConsent(preferences: unknown): boolean {
     const prefs = preferences && typeof preferences === "object" && !Array.isArray(preferences)
       ? preferences as Record<string, unknown>
       : {};
@@ -122,11 +122,11 @@ test("6. Proposition complète avec contrôle des permissions et du consentement
     );
   }
 
-  assert.equal(verifyPositiveConsent(null), false);
-  assert.equal(verifyPositiveConsent({}), false);
-  assert.equal(verifyPositiveConsent({ communicationConsent: false }), false);
-  assert.equal(verifyPositiveConsent({ communicationConsent: true }), true);
-  assert.equal(verifyPositiveConsent({ fullProposalConsent: true }), true);
+  assert.equal(checkExplicitPositiveConsent(null), false, "Null preferences must be rejected");
+  assert.equal(checkExplicitPositiveConsent({}), false, "Empty preferences must be rejected");
+  assert.equal(checkExplicitPositiveConsent({ communicationConsent: false }), false, "False consent must be rejected");
+  assert.equal(checkExplicitPositiveConsent({ communicationConsent: true }), true, "Explicit positive consent must pass");
+  assert.equal(checkExplicitPositiveConsent({ fullProposalConsent: true }), true, "Explicit full proposal consent must pass");
 
   // Unauthenticated call to POST /api/owner/cv-matching
   const req = new Request("http://localhost:3000/api/owner/cv-matching", {
