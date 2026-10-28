@@ -17,6 +17,28 @@ test("company registration displays and submits the values filled by SIRET looku
   assert.match(lookup, /required=\{required\}/);
 });
 
+test("SIRET lookup button is outside the label and explicitly cannot submit the parent form", () => {
+  const lookup = read("app/components/CompanySiretLookup.tsx");
+
+  assert.match(lookup, /htmlFor="company-siret"/);
+  assert.match(lookup, /id="company-siret"/);
+  assert.match(lookup, /type="button"/);
+  assert.match(lookup, /onClick=\{lookup\}/);
+  assert.match(lookup, /aria-busy=\{pending\}/);
+  assert.match(lookup, /role="status"/);
+  assert.match(lookup, /aria-live="polite"/);
+  assert.doesNotMatch(lookup, /<label[^>]*>[\s\S]*?<button[\s\S]*?<\/label>/);
+});
+
+test("SIRET lookup displays provider and network errors instead of failing silently", () => {
+  const lookup = read("app/components/CompanySiretLookup.tsx");
+
+  assert.match(lookup, /response\.json\(\)\.catch\(\(\) => null\)/);
+  assert.match(lookup, /La recherche a échoué/);
+  assert.match(lookup, /La recherche est momentanément impossible/);
+  assert.match(lookup, /setMessageIsError\(true\)/);
+});
+
 test("company registration reports failures and always gives the user a next step", () => {
   const page = read("app/inscription/entreprise/page.tsx");
 
