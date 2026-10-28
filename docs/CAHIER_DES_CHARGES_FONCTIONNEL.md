@@ -276,3 +276,46 @@ Toute évolution suit le cahier des charges maître et la séquence suivante :
 10. mettre à jour le registre des correctifs et ce cahier des charges si le périmètre ou l'état change.
 
 « Terminé » signifie : code intégré, contrôles techniques réussis, déploiement du bon SHA confirmé et test fonctionnel réel réussi pour le périmètre concerné. Toute absence d'accès, d'identité ou de source est signalée précisément comme blocage externe, jamais masquée par une CI verte ou un déploiement READY.
+
+
+## 12. Suivi d'acceptation et tests OWNER — registre unique
+
+Chaque fonctionnalité décrite dans ce cahier des charges doit être reliée à une ligne unique du registre `docs/operations/REGISTRE-CORRECTIFS-VALIDES.md`. Le cahier des charges définit ce qui doit fonctionner ; le registre indique l'état prouvé de chaque action et les tests qui restent à faire. Ne pas créer une deuxième liste concurrente dans un autre document : ajouter des liens vers le registre.
+
+Pour chaque livraison, consigner : fonctionnalité/parcours, ticket, PR et SHA de fusion, contrôles techniques sur ce SHA, contrôle de compatibilité OWNER/ADMIN, SHA et URL de production si confirmés, tests réels déjà exécutés, puis les étapes restantes pour le test OWNER.
+
+### Checklist de validation en production (à générer selon les changements livrés)
+- [ ] Connexion et accès OWNER ; compte, rôle et permissions inchangés.
+- [ ] Parcours métier concerné, avec données réelles autorisées et résultat attendu.
+- [ ] Autorisations : accès permis accepté, accès interdit refusé côté serveur.
+- [ ] Données et documents : association correcte, accès protégé, aucune donnée ni aucun lien inventé.
+- [ ] États d'erreur, cas vide, doublons et reprise après échec.
+- [ ] Affichage responsive et navigation, si la livraison touche l'interface.
+- [ ] Vérification des journaux et de la provenance sans exposer de secrets ou de données personnelles.
+- [ ] Résultat, date, environnement et SHA déployé consignés dans le registre.
+
+Ne cocher que les contrôles pertinents à la livraison ; une checklist adaptée ne doit pas devenir une répétition inutile. Les parcours qui nécessitent une identité OWNER, CANDIDAT ou ENTREPRISE authentifiée sont à remettre explicitement à l'OWNER si l'agent ne peut pas les exécuter lui-même. Une action reste « à tester par l'OWNER » jusqu'à son retour réel ; elle ne devient pas « validée » par présomption.
+
+
+## 13. Cycle d'acceptation après retour de l'utilisateur
+
+Chaque exigence testable doit avoir un résultat attendu observable et un identifiant de suivi stable. Lorsqu'un test utilisateur échoue :
+- [ ] consigner le scénario échoué et le résultat observé dans la même ligne de suivi ;
+- [ ] marquer l'exigence **Échec du test utilisateur — à corriger** ;
+- [ ] relier le ticket de correction à l'identifiant initial, sans dupliquer la fonctionnalité ;
+- [ ] reproduire l'échec avec un test automatisé lorsque cela est raisonnablement possible ;
+- [ ] corriger et exécuter les contrôles techniques avant fusion ;
+- [ ] confirmer le SHA de production après fusion ;
+- [ ] fournir une checklist de retest courte ;
+- [ ] clôturer uniquement après le retest utilisateur concluant.
+
+Le test utilisateur doit être précis : préconditions, étapes, résultat attendu et comportement en cas d'erreur. L'utilisateur ne doit pas avoir à diagnostiquer le code ou à inventer la solution ; il signale le symptôme, l'équipe technique prend en charge l'analyse et le déblocage.
+
+
+## 14. Traçabilité des décisions validées
+
+Toute décision validée qui affecte les exigences fonctionnelles, les parcours, les rôles, la confidentialité, les données ou les critères d'acceptation doit posséder une entrée dans le registre de décisions propre à la plateforme. Chaque exigence importante doit pouvoir être reliée à cette décision et à sa tâche de suivi.
+
+L'entrée contient un identifiant stable, une date, le libellé de la décision, son statut, son périmètre, sa justification, ses impacts et les références vers les tickets/PR/tests concernés. Une idée ou une hypothèse ne doit pas être présentée comme une décision validée.
+
+Aucune décision validée ne peut être écartée ou remplacée implicitement. Tout conflit est signalé ; tout remplacement conserve l'historique et le motif. Cette gouvernance doit être présente dès le premier cahier des charges de référence de chaque plateforme, tout en conservant un registre opérationnel distinct pour chaque projet.

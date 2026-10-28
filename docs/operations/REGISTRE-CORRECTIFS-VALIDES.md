@@ -66,3 +66,95 @@ Toujours distinguer :
 - **Vérifié en production** : le scénario réel a été exécuté et son résultat observé.
 
 Une conversation ne doit jamais relancer un problème uniquement parce qu'une ancienne PR reste ouverte. Elle doit d'abord prouver que le défaut subsiste dans le code et le déploiement actuels.
+
+
+## Registre maître de clôture — suivi sans oubli ni doublon
+
+> Cette section est la source de suivi opérationnel. Avant de créer un ticket ou de recommencer une correction, comparer l'état de `main`, les PR/commits récents et les lignes ci-dessous. Le registre GitHub [issue #325](https://github.com/wafwana/recrutement-prive/issues/325) centralise les tickets de clôture, mais cette liste versionnée garde les preuves techniques et les tests à remettre à l'OWNER.
+
+### Statuts et cases à cocher
+
+- [ ] **À faire** — pas encore exécuté.
+- [ ] **En cours** — travail actif sur une branche dédiée.
+- [ ] **Bloqué** — obstacle, preuve et prochaine action documentés.
+- [ ] **Corrigé** — code modifié, validation incomplète.
+- [ ] **Contrôles techniques réussis** — CI/tests/typecheck/build et garde-fous sécurité/OWNER vérifiés sur le SHA cité.
+- [ ] **Fusionné** — PR fusionnée et SHA de fusion noté.
+- [ ] **Déployé** — SHA de fusion exact retrouvé dans le déploiement de production, statut READY vérifié.
+- [ ] **À tester par l'OWNER** — étapes précises et résultat attendu fournis.
+- [ ] **Validé en production** — test réel concluant documenté.
+- [ ] **Terminé** — preuves complètes et aucun blocage critique restant.
+
+Ne jamais cocher sans preuve. Le code fusionné, la CI verte, Vercel READY et le test réel en production sont quatre faits différents.
+
+### Première action du nouveau registre : SIRET OWNER
+
+- [x] **PR fusionnée** — [PR #323](https://github.com/wafwana/recrutement-prive/pull/323).
+- [x] **Correctif code ciblé ajouté** — label/champ/bouton, bouton `type="button"`, retours d'état et erreurs, tests statiques.
+- [ ] **SHA de production actuel confirmé** — les notifications Vercel sur la PR affichaient READY, mais cela ne prouve pas à lui seul le SHA actuellement servi sur le domaine de production.
+- [ ] **À tester par l'OWNER** :
+  1. Ouvrir le formulaire entreprise dans l'espace OWNER.
+  2. Entrer un SIRET valide de 14 chiffres et cliquer « Préremplir ».
+  3. Confirmer que les champs attendus sont remplis et que le formulaire n'est pas soumis automatiquement.
+  4. Tester un SIRET mal formé, introuvable et une erreur réseau ; un message clair doit apparaître.
+  5. Modifier les données préremplies et vérifier qu'elles ne sont pas validées automatiquement.
+- [ ] **Validé en production** — à cocher seulement après le retour du test réel.
+
+### Format obligatoire pour toute nouvelle ligne de suivi
+
+`[ ] Identifiant | Fonctionnalité/parcours | Ticket/PR/commit | SHA contrôlé | Statut prouvé | Contrôles et preuves | Déploiement/SHA production | Test OWNER restant | Résultat/date | Blocage/prochaine action`
+
+Une fonctionnalité livrée garde son identifiant lorsque l'on ajoute son test de production : ne pas créer une nouvelle tâche pour le même correctif. Si une ancienne issue est déjà résolue par un commit récent, lier la preuve et ne la rouvrir que si un échec actuel est reproduit.
+
+### Règles de décision de fusion
+
+- **Fusion possible après contrôles techniques** : correction circonscrite, diff relu, CI/tests pertinents réussis, typecheck/build validés, contrôle de non-régression et compatibilité OWNER/ADMIN passés, aucun risque de données/migration non maîtrisé. Les tests d'usage nécessitant le compte OWNER peuvent alors rester à faire après déploiement.
+- **Fusion bloquée** : contrôle rouge/inconnu, régression probable, exposition de données, permission non sûre, risque sur OWNER, migration non réconciliée, absence de sauvegarde/restauration vérifiée ou dépendance de production incertaine.
+- Ne jamais éditer `main` directement, ne jamais fusionner aveuglément une branche ancienne, ne jamais prétendre qu'une tâche est terminée sans preuves alignées sur le SHA.
+
+
+### Boucle de retour utilisateur — défauts signalés après les tests
+
+**Règle : le signalement d'un échec ouvre le travail de correction, il ne crée pas une action indépendante si le même identifiant existe déjà.**
+
+Statut normalisé supplémentaire :
+- [ ] **Échec du test utilisateur — à corriger** : le test réel a échoué ; conserver la fonctionnalité dans le registre, noter le symptôme et assigner la prochaine action technique.
+
+Pour chaque retour de l'OWNER ou d'un utilisateur autorisé :
+1. conserver l'identifiant de suivi original et inscrire le test effectué, l'environnement, le résultat observé, le résultat attendu et la date ;
+2. lier un ticket/issue de correction à cet identifiant si nécessaire ; vérifier d'abord qu'aucun ticket équivalent n'existe ;
+3. examiner le SHA de production réellement servi et reproduire l'échec avant de modifier le code ;
+4. corriger sur une branche dédiée et ajouter un test de non-régression reproduisant le défaut ;
+5. vérifier CI/tests, typecheck/build, droits, isolation des entreprises et compatibilité OWNER/ADMIN selon le périmètre ;
+6. fusionner la correction sûre, confirmer le déploiement du SHA exact, puis donner à l'OWNER une checklist de retest courte ;
+7. ne passer à **Validé en production** qu'après un retest réel concluant.
+
+Format du retour :
+`Date | Identifiant de suivi | Environnement/SHA si connu | Parcours et étapes | Résultat observé | Résultat attendu | Message d'erreur non sensible | Statut | Ticket/PR de correction | Retest`
+
+L'utilisateur n'a pas à diagnostiquer la cause technique : il décrit ce qui se passe et, si possible, fournit le message d'erreur ou une capture sans données sensibles. L'équipe doit déterminer la cause, corriger et débloquer le parcours. Ne jamais demander un mot de passe, une clé API, un token ou un document personnel complet pour reproduire un incident.
+
+
+## Registre des décisions de référence
+
+Ce registre documente les décisions validées qui gouvernent le projet. Il complète le registre des tâches sans le remplacer. Toute décision doit être consultée avant une évolution susceptible de la modifier.
+
+Format obligatoire d'une entrée :
+`DEC-ID | Date | Décision exacte | Statut | Périmètre | Motif | Impacts/exigences liées | Tickets/PR/commits/tests | Décision remplacée ou remplaçante | Preuve de validation`
+
+Règles :
+- Distinguer clairement proposition, décision à confirmer et décision validée.
+- Ne pas transformer une discussion en décision sans validation explicite.
+- Ne pas modifier silencieusement une décision validée ; faire apparaître tout conflit et obtenir un nouvel arbitrage lorsque nécessaire.
+- Conserver les anciennes décisions remplacées et l'explication du changement.
+- Relier chaque décision aux tâches et preuves d'acceptation concernées ; rechercher les entrées existantes avant de créer une nouvelle.
+- Garder les registres et les ressources de chaque plateforme séparés. Le principe de gouvernance est commun, les projets ne sont pas fusionnés.
+
+### DEC-RP-001 — Suivi durable des décisions et du travail
+- Date : 2026-10-28
+- Décision : toute décision validée doit être consignée comme référence durable, et non considérée comme une simple discussion.
+- Statut : validée par l'utilisateur ; intégration documentaire en cours dans cette PR.
+- Périmètre : Recrutement Privé ; méthode à reprendre dès la création des cahiers des charges de référence des autres plateformes, dans leurs propres documents et registres.
+- Conséquences : identifiants stables, historique, liens vers exigences/tickets/PR/tests, prévention des doublons, procédure de correction et retest jusqu'à validation réelle.
+- Référence : PR #326 ; issue de pilotage #325.
+- Vérification documentaire : à confirmer après fusion ; ne pas considérer cette entrée comme livrée avant cette preuve.

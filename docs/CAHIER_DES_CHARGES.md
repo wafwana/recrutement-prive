@@ -116,3 +116,63 @@ Le projet utilise notamment Next.js App Router, TypeScript, React, Tailwind CSS,
 ## 7. Définition de « terminé »
 
 Une tâche n'est terminée que lorsque le besoin est implémenté sur le socle existant, les contrôles pertinents passent, les protections OWNER/ADMIN et les non-régressions sont vérifiées, le changement est fusionné et déployé sur le SHA attendu, et les parcours de production concernés sont testés. Tout point non testable faute d'accès est déclaré explicitement **bloqué par accès externe** et ne doit pas être présenté comme validé.
+
+
+## 8. Registre de suivi maître, sans oubli ni doublon
+
+Le registre opérationnel partagé `docs/operations/REGISTRE-CORRECTIFS-VALIDES.md` est la liste de suivi unique des correctifs, livraisons et tests restant à faire. Le registre GitHub de clôture finale ([issue #325](https://github.com/wafwana/recrutement-prive/issues/325)) sert d'index de pilotage des tickets ; il ne remplace pas le registre versionné.
+
+Pour chaque action, tenir une ligne unique avec : identifiant stable, domaine, ticket/PR/commit, SHA contrôlé, statut, preuve technique, SHA de production et déploiement si confirmés, test OWNER restant, résultat/date et éventuel blocage. Avant d'ajouter un travail, rechercher dans le registre et dans les PR récentes pour éviter les doublons et ne pas refaire un correctif déjà livré.
+
+Statuts obligatoires, à ne jamais confondre :
+- [ ] **À faire** — non commencé.
+- [ ] **En cours** — exécution active sur branche dédiée.
+- [ ] **Bloqué** — obstacle précis, preuve et prochaine action indiqués.
+- [ ] **Corrigé** — changement présent sur la branche, validation incomplète.
+- [ ] **Contrôles techniques réussis** — tests pertinents, CI, typecheck/build et contrôles sécurité/OWNER vérifiés sur le SHA cité.
+- [ ] **Fusionné** — PR fusionnée dans `main`, avec lien et SHA de fusion.
+- [ ] **Déployé** — SHA de fusion exact identifié dans le déploiement de production et état READY confirmé.
+- [ ] **À tester par l’OWNER** — action utilisateur concrète, courte et reproductible fournie.
+- [ ] **Validé en production** — résultat d'un test réel consigné, avec date et environnement.
+- [ ] **Terminé** — toutes les preuves requises réunies ; aucun blocage critique restant.
+
+Une case ne peut être cochée que sur preuve. Une PR fusionnée ne vaut pas validation de production. Un déploiement READY ne prouve pas le bon fonctionnement métier. Si un contrôle n'est pas accessible, inscrire **non vérifié** et préciser exactement ce qui manque.
+
+### Mode de livraison
+Les corrections sans risque connu peuvent être fusionnées dès que le diff, les contrôles techniques, les droits, la non-régression et la compatibilité OWNER sont vérifiés ; les essais d'usage qui nécessitent le compte OWNER sont alors listés pour l'utilisateur après déploiement. Ne pas bloquer inutilement une correction sûre uniquement parce que le test utilisateur final doit être effectué par l'OWNER.
+
+Bloquer en revanche toute fusion/activation présentant un risque non maîtrisé pour les données, les permissions, la confidentialité, le compte OWNER, les migrations ou la disponibilité. Toute migration de production exige diagnostic préalable en lecture seule, sauvegarde/point de restauration vérifié et autorisation explicite.
+
+Le rapport final doit montrer seulement les actions réellement restantes pour l'OWNER, avec cases à cocher, étapes concrètes et résultat attendu. Le suivi des livraisons et le suivi des tests utilisateur restent liés par le même identifiant pour ne créer ni oubli ni doublon.
+
+
+## 9. Boucle obligatoire de retour utilisateur et déblocage
+
+Tout cahier des charges nouveau ou révisé doit intégrer dès le départ le registre de suivi, les statuts, les critères d'acceptation et la procédure de retour utilisateur ci-dessous. Cette règle s'applique à chaque nouveau projet et à chaque cahier des charges, pas seulement à Recrutement Privé.
+
+Lorsqu'un utilisateur effectue un test après déploiement et signale qu'une action ne fonctionne pas :
+1. enregistrer son retour dans la ligne de suivi de l'action existante, avec la date, l'environnement, le parcours, le résultat observé et le résultat attendu ;
+2. faire passer cette action au statut **Échec du test utilisateur — à corriger** ; ne pas la marquer « validée en production » ;
+3. créer ou mettre à jour un ticket lié à l'identifiant de suivi existant, sans créer un doublon ;
+4. examiner le SHA réellement déployé, les journaux non sensibles, les autorisations, les données, la route/API et les dépendances ;
+5. corriger sur une branche dédiée, ajouter un test de non-régression qui reproduit l'échec, exécuter les contrôles requis et ouvrir une PR ;
+6. fusionner lorsque les contrôles techniques et les garde-fous sont satisfaits, puis confirmer le déploiement du SHA exact ;
+7. remettre à l'utilisateur uniquement le nouveau test nécessaire et conserver le même identifiant de suivi jusqu'à validation réelle.
+
+Le retour utilisateur est une preuve de défaut à investiguer, non une clôture. La correction n'est terminée qu'après un nouveau test concluant. Si l'information fournie ne permet pas de reproduire le défaut, demander seulement le détail minimal manquant (étapes, message d'erreur non sensible ou capture expurgée), sans lui demander de refaire les vérifications déjà réalisées.
+
+
+## 10. Registre des décisions de référence — obligatoire dès le départ
+
+Toute décision validée relative au produit, à son périmètre, à ses règles métier, à ses accès, à ses données, à sa sécurité, à son architecture ou à ses livraisons doit être enregistrée dans un registre durable. Une conversation ne constitue pas à elle seule une trace de référence.
+
+Pour chaque décision, consigner au minimum : identifiant stable, date, formulation exacte, statut (proposition, à confirmer, validée, en application, appliquée, remplacée), périmètre concerné, motif, conséquences attendues, personne ayant validé l'arbitrage et liens vers les exigences, tickets, PR, commits et tests concernés.
+
+Règles obligatoires :
+- Avant de proposer ou d'exécuter une modification, consulter les décisions existantes et vérifier qu'elle ne les contredit pas et ne duplique pas une action déjà suivie.
+- Ne jamais modifier silencieusement une décision validée. Si une contradiction apparaît, l'exposer et demander un nouvel arbitrage lorsque celui-ci relève de l'utilisateur.
+- Lorsqu'une décision est remplacée, conserver l'ancienne entrée, sa date, son historique et le motif du remplacement ; relier les deux versions.
+- Relier les exigences et tâches à la décision d'origine afin de garder une traçabilité jusqu'aux tests et à la production.
+- Les décisions et registres propres à chaque plateforme restent séparés. Seule la méthode de gouvernance est commune ; les codes, données, accès, budgets, tickets et livraisons des plateformes ne sont pas mélangés.
+
+Cette méthode doit être intégrée dès la création du cahier des charges de référence de chaque plateforme. Pour une plateforme déjà en cours, l'intégration se fait par évolution contrôlée des documents existants, sans effacer l'historique ni recommencer les travaux.
