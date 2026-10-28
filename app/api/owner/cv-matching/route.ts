@@ -516,10 +516,11 @@ export async function POST(request: Request) {
     const { candidateId, jobId } = parsed.data;
     const [candidate, job] = await Promise.all([
       prisma.candidateProfile.findFirst({
-        where: { id: candidateId, status: "ACTIVE" },
+        where: { id: candidateId },
         select: {
           id: true,
           userId: true,
+          status: true,
           headline: true,
           bio: true,
           skills: true,
@@ -528,6 +529,7 @@ export async function POST(request: Request) {
           country: true,
           subCategoryIds: true,
           primaryCategory: { select: { code: true } },
+          user: { select: { status: true } },
         },
       }),
       prisma.job.findFirst({
@@ -549,6 +551,10 @@ export async function POST(request: Request) {
 
     if (!candidate || !job) {
       return NextResponse.json({ error: "Le candidat ou l’offre n’est plus disponible pour une proposition anonymisée." }, { status: 404 });
+    }
+
+    if (candidate.status !== "ACTIVE" || candidate.user.status !== "ACTIVE") {
+      return NextResponse.json({ error: "Consentement non confirmé : le candidat est inactif ou exclu." }, { status: 403 });
     }
 
     const subCategoryIds = Array.isArray(candidate.subCategoryIds)
@@ -603,22 +609,28 @@ export async function POST(request: Request) {
       applicationId = app.id;
     }
 
-    await prisma.recruitmentHistory.create({
-      data: {
-        applicationId,
-        jobId: job.id,
-        actorUserId: access.userId,
-        action: "PROPOSE_ANONYMIZED",
-        fromStatus: existingApplication?.status || null,
-        toStatus: existingApplication?.status || "REVIEWING",
-        details: {
-          candidateAlias: candidateAlias(candidate.id),
-          companyAlias: companyAlias(job.companyId),
-          score: match.score,
-          anonymized: true,
-        },
-      },
+    const existingHistory = await prisma.recruitmentHistory.findFirst({
+      where: { applicationId, action: "PROPOSE_ANONYMIZED" },
     });
+
+    if (!existingHistory) {
+      await prisma.recruitmentHistory.create({
+        data: {
+          applicationId,
+          jobId: job.id,
+          actorUserId: access.userId,
+          action: "PROPOSE_ANONYMIZED",
+          fromStatus: existingApplication?.status || null,
+          toStatus: existingApplication?.status || "REVIEWING",
+          details: {
+            candidateAlias: candidateAlias(candidate.id),
+            companyAlias: companyAlias(job.companyId),
+            score: match.score,
+            anonymized: true,
+          },
+        },
+      });
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -665,9 +677,9 @@ export async function POST(request: Request) {
     const { candidateId, jobId } = parsed.data;
     const [candidate, job] = await Promise.all([
       prisma.candidateProfile.findFirst({
-        where: { id: candidateId, status: "ACTIVE" },
+        where: { id: candidateId },
         include: {
-          user: { select: { name: true, email: true } },
+          user: { select: { name: true, email: true, status: true } },
           documents: { where: { docType: "CV" }, select: { id: true, name: true, createdAt: true } },
           primaryCategory: { select: { code: true } },
         },
@@ -686,8 +698,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Le candidat ou l’offre n’est plus disponible pour une proposition complète." }, { status: 404 });
     }
 
-    if (candidate.status !== "ACTIVE") {
-      return NextResponse.json({ error: "Consentement non confirmé : le statut de ce candidat n'est pas actif pour le partage de données." }, { status: 403 });
+    if (candidate.status !== "ACTIVE" || candidate.user.status !== "ACTIVE") {
+      return NextResponse.json({ error: "Consentement non confirmé : le candidat est inactif ou exclu du partage de données." }, { status: 403 });
+    }
+
+    const prefs = candidate.preferences && typeof candidate.preferences === "object" && !Array.isArray(candidate.preferences)
+      ? candidate.preferences as Record<string, unknown>
+      : {};
+    if (prefs.fullProposalAllowed === false || prefs.communicationConsent === false) {
+      return NextResponse.json({ error: "Le candidat a révoqué son consentement pour la communication complète de ses données personnellement identifiables." }, { status: 403 });
     }
 
     const subCategoryIds = Array.isArray(candidate.subCategoryIds)
@@ -742,21 +761,27 @@ export async function POST(request: Request) {
       applicationId = app.id;
     }
 
-    await prisma.recruitmentHistory.create({
-      data: {
-        applicationId,
-        jobId: job.id,
-        actorUserId: access.userId,
-        action: "PROPOSE_FULL",
-        fromStatus: existingApplication?.status || null,
-        toStatus: existingApplication?.status || "SHORTLISTED",
-        details: {
-          candidateName: candidate.user.name,
-          companyName: job.company.name,
-          score: match.score,
-        },
-      },
+    const existingHistory = await prisma.recruitmentHistory.findFirst({
+      where: { applicationId, action: "PROPOSE_FULL" },
     });
+
+    if (!existingHistory) {
+      await prisma.recruitmentHistory.create({
+        data: {
+          applicationId,
+          jobId: job.id,
+          actorUserId: access.userId,
+          action: "PROPOSE_FULL",
+          fromStatus: existingApplication?.status || null,
+          toStatus: existingApplication?.status || "SHORTLISTED",
+          details: {
+            candidateName: candidate.user.name,
+            companyName: job.company.name,
+            score: match.score,
+          },
+        },
+      });
+    }
 
     await prisma.auditLog.create({
       data: {
