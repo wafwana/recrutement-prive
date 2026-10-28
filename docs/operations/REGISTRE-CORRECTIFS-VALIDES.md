@@ -111,3 +111,25 @@ Une fonctionnalité livrée garde son identifiant lorsque l'on ajoute son test d
 - **Fusion possible après contrôles techniques** : correction circonscrite, diff relu, CI/tests pertinents réussis, typecheck/build validés, contrôle de non-régression et compatibilité OWNER/ADMIN passés, aucun risque de données/migration non maîtrisé. Les tests d'usage nécessitant le compte OWNER peuvent alors rester à faire après déploiement.
 - **Fusion bloquée** : contrôle rouge/inconnu, régression probable, exposition de données, permission non sûre, risque sur OWNER, migration non réconciliée, absence de sauvegarde/restauration vérifiée ou dépendance de production incertaine.
 - Ne jamais éditer `main` directement, ne jamais fusionner aveuglément une branche ancienne, ne jamais prétendre qu'une tâche est terminée sans preuves alignées sur le SHA.
+
+
+### Boucle de retour utilisateur — défauts signalés après les tests
+
+**Règle : le signalement d'un échec ouvre le travail de correction, il ne crée pas une action indépendante si le même identifiant existe déjà.**
+
+Statut normalisé supplémentaire :
+- [ ] **Échec du test utilisateur — à corriger** : le test réel a échoué ; conserver la fonctionnalité dans le registre, noter le symptôme et assigner la prochaine action technique.
+
+Pour chaque retour de l'OWNER ou d'un utilisateur autorisé :
+1. conserver l'identifiant de suivi original et inscrire le test effectué, l'environnement, le résultat observé, le résultat attendu et la date ;
+2. lier un ticket/issue de correction à cet identifiant si nécessaire ; vérifier d'abord qu'aucun ticket équivalent n'existe ;
+3. examiner le SHA de production réellement servi et reproduire l'échec avant de modifier le code ;
+4. corriger sur une branche dédiée et ajouter un test de non-régression reproduisant le défaut ;
+5. vérifier CI/tests, typecheck/build, droits, isolation des entreprises et compatibilité OWNER/ADMIN selon le périmètre ;
+6. fusionner la correction sûre, confirmer le déploiement du SHA exact, puis donner à l'OWNER une checklist de retest courte ;
+7. ne passer à **Validé en production** qu'après un retest réel concluant.
+
+Format du retour :
+`Date | Identifiant de suivi | Environnement/SHA si connu | Parcours et étapes | Résultat observé | Résultat attendu | Message d'erreur non sensible | Statut | Ticket/PR de correction | Retest`
+
+L'utilisateur n'a pas à diagnostiquer la cause technique : il décrit ce qui se passe et, si possible, fournit le message d'erreur ou une capture sans données sensibles. L'équipe doit déterminer la cause, corriger et débloquer le parcours. Ne jamais demander un mot de passe, une clé API, un token ou un document personnel complet pour reproduire un incident.
