@@ -116,3 +116,31 @@ Le projet utilise notamment Next.js App Router, TypeScript, React, Tailwind CSS,
 ## 7. Définition de « terminé »
 
 Une tâche n'est terminée que lorsque le besoin est implémenté sur le socle existant, les contrôles pertinents passent, les protections OWNER/ADMIN et les non-régressions sont vérifiées, le changement est fusionné et déployé sur le SHA attendu, et les parcours de production concernés sont testés. Tout point non testable faute d'accès est déclaré explicitement **bloqué par accès externe** et ne doit pas être présenté comme validé.
+
+
+## 8. Registre de suivi maître, sans oubli ni doublon
+
+Le registre opérationnel partagé `docs/operations/REGISTRE-CORRECTIFS-VALIDES.md` est la liste de suivi unique des correctifs, livraisons et tests restant à faire. Le registre GitHub de clôture finale ([issue #325](https://github.com/wafwana/recrutement-prive/issues/325)) sert d'index de pilotage des tickets ; il ne remplace pas le registre versionné.
+
+Pour chaque action, tenir une ligne unique avec : identifiant stable, domaine, ticket/PR/commit, SHA contrôlé, statut, preuve technique, SHA de production et déploiement si confirmés, test OWNER restant, résultat/date et éventuel blocage. Avant d'ajouter un travail, rechercher dans le registre et dans les PR récentes pour éviter les doublons et ne pas refaire un correctif déjà livré.
+
+Statuts obligatoires, à ne jamais confondre :
+- [ ] **À faire** — non commencé.
+- [ ] **En cours** — exécution active sur branche dédiée.
+- [ ] **Bloqué** — obstacle précis, preuve et prochaine action indiqués.
+- [ ] **Corrigé** — changement présent sur la branche, validation incomplète.
+- [ ] **Contrôles techniques réussis** — tests pertinents, CI, typecheck/build et contrôles sécurité/OWNER vérifiés sur le SHA cité.
+- [ ] **Fusionné** — PR fusionnée dans `main`, avec lien et SHA de fusion.
+- [ ] **Déployé** — SHA de fusion exact identifié dans le déploiement de production et état READY confirmé.
+- [ ] **À tester par l’OWNER** — action utilisateur concrète, courte et reproductible fournie.
+- [ ] **Validé en production** — résultat d'un test réel consigné, avec date et environnement.
+- [ ] **Terminé** — toutes les preuves requises réunies ; aucun blocage critique restant.
+
+Une case ne peut être cochée que sur preuve. Une PR fusionnée ne vaut pas validation de production. Un déploiement READY ne prouve pas le bon fonctionnement métier. Si un contrôle n'est pas accessible, inscrire **non vérifié** et préciser exactement ce qui manque.
+
+### Mode de livraison
+Les corrections sans risque connu peuvent être fusionnées dès que le diff, les contrôles techniques, les droits, la non-régression et la compatibilité OWNER sont vérifiés ; les essais d'usage qui nécessitent le compte OWNER sont alors listés pour l'utilisateur après déploiement. Ne pas bloquer inutilement une correction sûre uniquement parce que le test utilisateur final doit être effectué par l'OWNER.
+
+Bloquer en revanche toute fusion/activation présentant un risque non maîtrisé pour les données, les permissions, la confidentialité, le compte OWNER, les migrations ou la disponibilité. Toute migration de production exige diagnostic préalable en lecture seule, sauvegarde/point de restauration vérifié et autorisation explicite.
+
+Le rapport final doit montrer seulement les actions réellement restantes pour l'OWNER, avec cases à cocher, étapes concrètes et résultat attendu. Le suivi des livraisons et le suivi des tests utilisateur restent liés par le même identifiant pour ne créer ni oubli ni doublon.
