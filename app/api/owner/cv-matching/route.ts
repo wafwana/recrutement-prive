@@ -5,6 +5,24 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { matchCandidateToJob, CriterionDetail } from "@/lib/matching/candidate-job";
 import { z } from "zod";
 
+const proposeAnonymizedSchema = z.object({
+  action: z.literal("propose_anonymized"),
+  candidateId: z.string().trim().min(1).max(128),
+  jobId: z.string().trim().min(1).max(128),
+});
+
+const proposeFullSchema = z.object({
+  action: z.literal("propose_full"),
+  candidateId: z.string().trim().min(1).max(128),
+  jobId: z.string().trim().min(1).max(128),
+});
+
+const connectMatchmakingSchema = z.object({
+  action: z.literal("connect_matchmaking"),
+  candidateId: z.string().trim().min(1).max(128),
+  jobId: z.string().trim().min(1).max(128),
+});
+
 const presentationSchema = z.object({
   action: z.literal("present"),
   candidateId: z.string().trim().min(1).max(128),
@@ -18,6 +36,9 @@ const recalculateSchema = z.object({
 });
 
 const matchingPostSchema = z.discriminatedUnion("action", [
+  proposeAnonymizedSchema,
+  proposeFullSchema,
+  connectMatchmakingSchema,
   presentationSchema,
   recalculateSchema,
 ]);
@@ -485,6 +506,417 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Action, candidat ou offre invalide." }, { status: 400 });
   }
 
+  if (parsed.data.action === "propose_anonymized") {
+    const { candidateId, jobId } = parsed.data;
+    const [candidate, job] = await Promise.all([
+      prisma.candidateProfile.findFirst({
+        where: { id: candidateId, status: "ACTIVE" },
+        select: {
+          id: true,
+          headline: true,
+          bio: true,
+          skills: true,
+          experienceYears: true,
+          location: true,
+          country: true,
+          subCategoryIds: true,
+          primaryCategory: { select: { code: true } },
+        },
+      }),
+      prisma.job.findFirst({
+        where: { id: jobId, status: "OPEN" },
+        select: {
+          id: true,
+          title: true,
+          companyId: true,
+          location: true,
+          company: { select: { country: true } },
+          description: true,
+          requiredSkills: true,
+          requiredExperienceYears: true,
+          jobCategory: { select: { code: true } },
+          subCategory: { select: { code: true } },
+        },
+      }),
+    ]);
+
+    if (!candidate || !job) {
+      return NextResponse.json({ error: "Le candidat ou l’offre n’est plus disponible pour une proposition anonymisée." }, { status: 404 });
+    }
+
+    const subCategoryIds = Array.isArray(candidate.subCategoryIds)
+      ? candidate.subCategoryIds.filter((v): v is string => typeof v === "string")
+      : [];
+
+    const candidateSubCategories = await prisma.jobCategory.findMany({
+      where: { id: { in: subCategoryIds } },
+      select: { code: true },
+    }).then((rows) => rows.map((r) => r.code));
+
+    const match = matchCandidateToJob(
+      {
+        skills: candidate.skills,
+        experienceYears: candidate.experienceYears,
+        headline: candidate.headline,
+        bio: candidate.bio,
+        location: candidate.location,
+        country: candidate.country,
+        primaryCategoryCode: candidate.primaryCategory?.code,
+        subCategoryCodes: candidateSubCategories,
+      },
+      {
+        requiredSkills: job.requiredSkills,
+        requiredExperienceYears: job.requiredExperienceYears,
+        title: job.title,
+        description: job.description,
+        location: job.location,
+        country: job.company?.country,
+        categoryCode: job.jobCategory?.code,
+        subCategoryCode: job.subCategory?.code,
+      }
+    );
+
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: access.userId,
+        actorRole: access.role,
+        action: "PROPOSAL_ANONYMIZED_PREPARED",
+        targetType: "PROPOSAL",
+        targetId: `${candidate.id}::${job.id}`,
+        details: {
+          candidateAlias: candidateAlias(candidate.id),
+          companyAlias: companyAlias(job.companyId),
+          score: match.score,
+          anonymized: true,
+        },
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      action: "propose_anonymized",
+      proposal: {
+        candidateAlias: candidateAlias(candidate.id),
+        companyAlias: companyAlias(job.companyId),
+        headline: candidate.headline,
+        experienceYears: candidate.experienceYears,
+        score: match.score,
+        matchedSkills: match.matchedSkills,
+        missingSkills: match.missingSkills,
+        reasons: match.reasons,
+      },
+      message: "Dossier anonymisé préparé avec succès. Les identités et coordonnées restent strictement masquées.",
+    });
+  }
+
+  if (parsed.data.action === "propose_full") {
+    const canManagePresentations = access.role === "OWNER" || (
+      access.role === "ADMIN" && await hasPermission(access.userId, access.role, "PRESENTATIONS_MANAGE")
+    );
+    if (!canManagePresentations) {
+      return NextResponse.json({ error: "La préparation d'une proposition complète est réservée à l’OWNER ou à un ADMIN autorisé." }, { status: 403 });
+    }
+
+    const { candidateId, jobId } = parsed.data;
+    const [candidate, job] = await Promise.all([
+      prisma.candidateProfile.findFirst({
+        where: { id: candidateId, status: "ACTIVE" },
+        include: {
+          user: { select: { name: true, email: true } },
+          documents: { where: { docType: "CV" }, select: { id: true, name: true, createdAt: true } },
+          primaryCategory: { select: { code: true } },
+        },
+      }),
+      prisma.job.findFirst({
+        where: { id: jobId, status: "OPEN" },
+        include: {
+          company: { select: { id: true, name: true, country: true } },
+          jobCategory: { select: { code: true } },
+          subCategory: { select: { code: true } },
+        },
+      }),
+    ]);
+
+    if (!candidate || !job) {
+      return NextResponse.json({ error: "Le candidat ou l’offre n’est plus disponible pour une proposition complète." }, { status: 404 });
+    }
+
+    const subCategoryIds = Array.isArray(candidate.subCategoryIds)
+      ? candidate.subCategoryIds.filter((v): v is string => typeof v === "string")
+      : [];
+
+    const candidateSubCategories = await prisma.jobCategory.findMany({
+      where: { id: { in: subCategoryIds } },
+      select: { code: true },
+    }).then((rows) => rows.map((r) => r.code));
+
+    const match = matchCandidateToJob(
+      {
+        skills: candidate.skills,
+        experienceYears: candidate.experienceYears,
+        headline: candidate.headline,
+        bio: candidate.bio,
+        location: candidate.location,
+        country: candidate.country,
+        primaryCategoryCode: candidate.primaryCategory?.code,
+        subCategoryCodes: candidateSubCategories,
+      },
+      {
+        requiredSkills: job.requiredSkills,
+        requiredExperienceYears: job.requiredExperienceYears,
+        title: job.title,
+        description: job.description,
+        location: job.location,
+        country: job.company?.country,
+        categoryCode: job.jobCategory?.code,
+        subCategoryCode: job.subCategory?.code,
+      }
+    );
+
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: access.userId,
+        actorRole: access.role,
+        action: "PROPOSAL_FULL_PREPARED",
+        targetType: "PROPOSAL",
+        targetId: `${candidate.id}::${job.id}`,
+        details: {
+          candidateId: candidate.id,
+          candidateName: candidate.user.name,
+          companyName: job.company.name,
+          score: match.score,
+          cvCount: candidate.documents.length,
+        },
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      action: "propose_full",
+      proposal: {
+        candidateId: candidate.id,
+        candidateAlias: candidateAlias(candidate.id),
+        candidateName: candidate.user.name,
+        companyName: job.company.name,
+        jobTitle: job.title,
+        score: match.score,
+        matchedSkills: match.matchedSkills,
+        missingSkills: match.missingSkills,
+        cvDocuments: candidate.documents,
+      },
+      message: "Dossier complet préparé avec succès pour le traitement habilité.",
+    });
+  }
+
+  if (parsed.data.action === "connect_matchmaking" || parsed.data.action === "present") {
+    const canPresent = access.role === "OWNER" || (
+      access.role === "ADMIN" &&
+      await hasPermission(access.userId, access.role, "PRESENTATIONS_MANAGE")
+    );
+    if (!canPresent) {
+      return NextResponse.json({ error: "La mise en relation est réservée à l’OWNER ou à un ADMIN explicitement habilité." }, { status: 403 });
+    }
+
+    const { candidateId, jobId } = parsed.data;
+
+    const [candidate, job] = await Promise.all([
+      prisma.candidateProfile.findFirst({
+        where: { id: candidateId, status: "ACTIVE" },
+        select: {
+          id: true,
+          userId: true,
+          headline: true,
+          bio: true,
+          skills: true,
+          experienceYears: true,
+          location: true,
+          country: true,
+          subCategoryIds: true,
+          primaryCategory: { select: { code: true } },
+        },
+      }),
+      prisma.job.findFirst({
+        where: { id: jobId, status: "OPEN" },
+        select: {
+          id: true,
+          title: true,
+          companyId: true,
+          location: true,
+          company: { select: { country: true } },
+          description: true,
+          requiredSkills: true,
+          requiredExperienceYears: true,
+          jobCategory: { select: { code: true } },
+          subCategory: { select: { code: true } },
+        },
+      }),
+    ]);
+    if (!candidate || !job) {
+      return NextResponse.json({ error: "Le candidat ou l’offre n’est plus disponible." }, { status: 404 });
+    }
+
+    const subCategoryIds = Array.isArray(candidate.subCategoryIds)
+      ? candidate.subCategoryIds.filter((v): v is string => typeof v === "string")
+      : [];
+
+    const [candidateSubCategories, companyUser] = await Promise.all([
+      prisma.jobCategory.findMany({
+        where: { id: { in: subCategoryIds } },
+        select: { code: true },
+      }).then((rows) => rows.map((r) => r.code)),
+      prisma.user.findFirst({
+        where: {
+          status: "ACTIVE",
+          companyLinks: { some: { companyId: job.companyId } },
+        },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!companyUser) {
+      return NextResponse.json({
+        error: "Aucun compte entreprise actif n’est relié à cette offre. Reliez d’abord un recruteur à l’entreprise avant de préparer une présentation sécurisée.",
+      }, { status: 409 });
+    }
+
+    const match = matchCandidateToJob(
+      {
+        skills: candidate.skills,
+        experienceYears: candidate.experienceYears,
+        headline: candidate.headline,
+        bio: candidate.bio,
+        location: candidate.location,
+        country: candidate.country,
+        primaryCategoryCode: candidate.primaryCategory?.code,
+        subCategoryCodes: candidateSubCategories,
+      },
+      {
+        requiredSkills: job.requiredSkills,
+        requiredExperienceYears: job.requiredExperienceYears,
+        title: job.title,
+        description: job.description,
+        location: job.location,
+        country: job.company?.country,
+        categoryCode: job.jobCategory?.code,
+        subCategoryCode: job.subCategory?.code,
+      }
+    );
+    if (match.score < 25) {
+      return NextResponse.json({ error: "La compatibilité a changé et se situe maintenant sous le seuil requis. Actualisez les propositions." }, { status: 409 });
+    }
+
+    const outcome = await prisma.$transaction(async (tx) => {
+      const duplicate = await tx.missionPresentation.findFirst({
+        where: {
+          candidateId: candidate.id,
+          missionId: job.id,
+          companyId: job.companyId,
+        },
+        select: { id: true },
+      });
+      if (duplicate) return { conflict: "Ce profil est déjà présenté à cette entreprise pour cette mission." };
+
+      const existingApplication = await tx.application.findFirst({
+        where: { candidateId: candidate.id, jobId: job.id },
+        select: { id: true, status: true },
+      });
+      if (existingApplication && ["REJECTED", "HIRED"].includes(existingApplication.status)) {
+        return { conflict: "Ce dossier est clôturé et ne peut pas être présenté à nouveau depuis le matching." };
+      }
+
+      let applicationId: string;
+      if (existingApplication) {
+        applicationId = existingApplication.id;
+        if (["SUBMITTED", "REVIEWING"].includes(existingApplication.status)) {
+          await tx.application.update({
+            where: { id: existingApplication.id },
+            data: { status: "SHORTLISTED" },
+          });
+        }
+      } else {
+        const application = await tx.application.create({
+          data: {
+            candidateId: candidate.id,
+            userId: candidate.userId,
+            jobId: job.id,
+            status: "SHORTLISTED",
+            notes: "Présélection interne par Recrutement Privé après validation explicite du matching. Cette entrée ne constitue pas une candidature déposée par le candidat.",
+          },
+          select: { id: true },
+        });
+        applicationId = application.id;
+      }
+
+      const presentation = await tx.missionPresentation.create({
+        data: {
+          missionId: job.id,
+          applicationId,
+          candidateId: candidate.id,
+          companyId: job.companyId,
+          state: "MISSION_ACTIVE",
+          anonymousMessagingEnabled: true,
+          candidateAlias: candidateAlias(candidate.id),
+          companyAlias: companyAlias(job.companyId),
+          candidateUserId: candidate.userId,
+          companyUserId: companyUser.id,
+          financialConditionStatus: "PENDING",
+          securityDetails: {
+            identityProtected: true,
+            directCoordinatesBlocked: true,
+            createdFrom: "OWNER_MATCHING",
+            matchingScore: match.score,
+          },
+        },
+        select: { id: true, applicationId: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: access.userId,
+          actorRole: access.role,
+          action: "CANDIDATE_MATCH_PRESENTED",
+          targetType: "MISSION_PRESENTATION",
+          targetId: presentation.id,
+          details: {
+            source: "CV_MATCHING",
+            score: match.score,
+            candidateAlias: candidateAlias(candidate.id),
+            companyAlias: companyAlias(job.companyId),
+            applicationCreated: !existingApplication,
+          },
+        },
+      });
+
+      await tx.recruitmentHistory.create({
+        data: {
+          applicationId,
+          jobId: job.id,
+          actorUserId: access.userId,
+          action: "CONNECT_MATCHMAKING",
+          fromStatus: existingApplication?.status || null,
+          toStatus: "SHORTLISTED",
+          details: {
+            presentationId: presentation.id,
+            score: match.score,
+          },
+        },
+      });
+
+      return { presentationId: presentation.id, applicationId: presentation.applicationId };
+    });
+
+    if ("conflict" in outcome) {
+      return NextResponse.json({ error: outcome.conflict }, { status: 409 });
+    }
+    return NextResponse.json({
+      success: true,
+      action: parsed.data.action,
+      presentationId: outcome.presentationId,
+      message: "Mise en relation confidentielle déclenchée avec succès. Les identités restent protégées ; aucun e-mail ni contact externe n’a été envoyé automatiquement.",
+    }, { status: 201 });
+  }
+
   if (parsed.data.action === "recalculate") {
     const { candidateId, jobId } = parsed.data;
 
@@ -621,191 +1053,5 @@ export async function POST(request: Request) {
     }
   }
 
-  const canPresent = access.role === "OWNER" || (
-    access.role === "ADMIN" &&
-    await hasPermission(access.userId, access.role, "PRESENTATIONS_MANAGE")
-  );
-  if (!canPresent) {
-    return NextResponse.json({ error: "La mise en relation est réservée à l’OWNER ou à un ADMIN explicitement habilité." }, { status: 403 });
-  }
-
-  const [candidate, job] = await Promise.all([
-    prisma.candidateProfile.findFirst({
-      where: { id: parsed.data.candidateId, status: "ACTIVE" },
-      select: {
-        id: true,
-        userId: true,
-        headline: true,
-        bio: true,
-        skills: true,
-        experienceYears: true,
-        location: true,
-        country: true,
-        subCategoryIds: true,
-        primaryCategory: { select: { code: true } },
-      },
-    }),
-    prisma.job.findFirst({
-      where: { id: parsed.data.jobId, status: "OPEN" },
-      select: {
-        id: true,
-        title: true,
-        companyId: true,
-        location: true,
-        company: { select: { country: true } },
-        description: true,
-        requiredSkills: true,
-        requiredExperienceYears: true,
-        jobCategory: { select: { code: true } },
-        subCategory: { select: { code: true } },
-      },
-    }),
-  ]);
-  if (!candidate || !job) {
-    return NextResponse.json({ error: "Le candidat ou l’offre n’est plus disponible." }, { status: 404 });
-  }
-
-  const subCategoryIds = Array.isArray(candidate.subCategoryIds)
-    ? candidate.subCategoryIds.filter((v): v is string => typeof v === "string")
-    : [];
-
-  const [candidateSubCategories, companyUser] = await Promise.all([
-    prisma.jobCategory.findMany({
-      where: { id: { in: subCategoryIds } },
-      select: { code: true },
-    }).then((rows) => rows.map((r) => r.code)),
-    prisma.user.findFirst({
-      where: {
-        status: "ACTIVE",
-        companyLinks: { some: { companyId: job.companyId } },
-      },
-      orderBy: { createdAt: "asc" },
-      select: { id: true },
-    }),
-  ]);
-
-  if (!companyUser) {
-    return NextResponse.json({
-      error: "Aucun compte entreprise actif n’est relié à cette offre. Reliez d’abord un recruteur à l’entreprise avant de préparer une présentation sécurisée.",
-    }, { status: 409 });
-  }
-
-  const match = matchCandidateToJob(
-    {
-      skills: candidate.skills,
-      experienceYears: candidate.experienceYears,
-      headline: candidate.headline,
-      bio: candidate.bio,
-      location: candidate.location,
-      country: candidate.country,
-      primaryCategoryCode: candidate.primaryCategory?.code,
-      subCategoryCodes: candidateSubCategories,
-    },
-    {
-      requiredSkills: job.requiredSkills,
-      requiredExperienceYears: job.requiredExperienceYears,
-      title: job.title,
-      description: job.description,
-      location: job.location,
-      country: job.company?.country,
-      categoryCode: job.jobCategory?.code,
-      subCategoryCode: job.subCategory?.code,
-    }
-  );
-  if (match.score < 25) {
-    return NextResponse.json({ error: "La compatibilité a changé et se situe maintenant sous le seuil requis. Actualisez les propositions." }, { status: 409 });
-  }
-
-  const outcome = await prisma.$transaction(async (tx) => {
-    const duplicate = await tx.missionPresentation.findFirst({
-      where: {
-        candidateId: candidate.id,
-        missionId: job.id,
-        companyId: job.companyId,
-      },
-      select: { id: true },
-    });
-    if (duplicate) return { conflict: "Ce profil est déjà présenté à cette entreprise pour cette mission." };
-
-    const existingApplication = await tx.application.findFirst({
-      where: { candidateId: candidate.id, jobId: job.id },
-      select: { id: true, status: true },
-    });
-    if (existingApplication && ["REJECTED", "HIRED"].includes(existingApplication.status)) {
-      return { conflict: "Ce dossier est clôturé et ne peut pas être présenté à nouveau depuis le matching." };
-    }
-
-    let applicationId: string;
-    if (existingApplication) {
-      applicationId = existingApplication.id;
-      if (["SUBMITTED", "REVIEWING"].includes(existingApplication.status)) {
-        await tx.application.update({
-          where: { id: existingApplication.id },
-          data: { status: "SHORTLISTED" },
-        });
-      }
-    } else {
-      const application = await tx.application.create({
-        data: {
-          candidateId: candidate.id,
-          userId: candidate.userId,
-          jobId: job.id,
-          status: "SHORTLISTED",
-          notes: "Présélection interne par Recrutement Privé après validation explicite du matching. Cette entrée ne constitue pas une candidature déposée par le candidat.",
-        },
-        select: { id: true },
-      });
-      applicationId = application.id;
-    }
-
-    const presentation = await tx.missionPresentation.create({
-      data: {
-        missionId: job.id,
-        applicationId,
-        candidateId: candidate.id,
-        companyId: job.companyId,
-        state: "MISSION_ACTIVE",
-        anonymousMessagingEnabled: true,
-        candidateAlias: candidateAlias(candidate.id),
-        companyAlias: companyAlias(job.companyId),
-        candidateUserId: candidate.userId,
-        companyUserId: companyUser.id,
-        financialConditionStatus: "PENDING",
-        securityDetails: {
-          identityProtected: true,
-          directCoordinatesBlocked: true,
-          createdFrom: "OWNER_MATCHING",
-          matchingScore: match.score,
-        },
-      },
-      select: { id: true, applicationId: true },
-    });
-
-    await tx.auditLog.create({
-      data: {
-        actorUserId: access.userId,
-        actorRole: access.role,
-        action: "CANDIDATE_MATCH_PRESENTED",
-        targetType: "MISSION_PRESENTATION",
-        targetId: presentation.id,
-        details: {
-          source: "CV_MATCHING",
-          score: match.score,
-          candidateAlias: candidateAlias(candidate.id),
-          companyAlias: companyAlias(job.companyId),
-          applicationCreated: !existingApplication,
-        },
-      },
-    });
-    return { presentationId: presentation.id, applicationId: presentation.applicationId };
-  });
-
-  if ("conflict" in outcome) {
-    return NextResponse.json({ error: outcome.conflict }, { status: 409 });
-  }
-  return NextResponse.json({
-    success: true,
-    presentationId: outcome.presentationId,
-    message: "Présentation confidentielle créée. Les identités restent protégées ; aucun email ni contact externe n’a été envoyé automatiquement.",
-  }, { status: 201 });
+  return NextResponse.json({ error: "Action non prise en charge." }, { status: 400 });
 }
