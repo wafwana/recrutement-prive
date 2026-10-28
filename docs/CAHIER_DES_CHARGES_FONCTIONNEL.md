@@ -276,3 +276,22 @@ Toute évolution suit le cahier des charges maître et la séquence suivante :
 10. mettre à jour le registre des correctifs et ce cahier des charges si le périmètre ou l'état change.
 
 « Terminé » signifie : code intégré, contrôles techniques réussis, déploiement du bon SHA confirmé et test fonctionnel réel réussi pour le périmètre concerné. Toute absence d'accès, d'identité ou de source est signalée précisément comme blocage externe, jamais masquée par une CI verte ou un déploiement READY.
+
+
+## 12. Suivi d'acceptation et tests OWNER — registre unique
+
+Chaque fonctionnalité décrite dans ce cahier des charges doit être reliée à une ligne unique du registre `docs/operations/REGISTRE-CORRECTIFS-VALIDES.md`. Le cahier des charges définit ce qui doit fonctionner ; le registre indique l'état prouvé de chaque action et les tests qui restent à faire. Ne pas créer une deuxième liste concurrente dans un autre document : ajouter des liens vers le registre.
+
+Pour chaque livraison, consigner : fonctionnalité/parcours, ticket, PR et SHA de fusion, contrôles techniques sur ce SHA, contrôle de compatibilité OWNER/ADMIN, SHA et URL de production si confirmés, tests réels déjà exécutés, puis les étapes restantes pour le test OWNER.
+
+### Checklist de validation en production (à générer selon les changements livrés)
+- [ ] Connexion et accès OWNER ; compte, rôle et permissions inchangés.
+- [ ] Parcours métier concerné, avec données réelles autorisées et résultat attendu.
+- [ ] Autorisations : accès permis accepté, accès interdit refusé côté serveur.
+- [ ] Données et documents : association correcte, accès protégé, aucune donnée ni aucun lien inventé.
+- [ ] États d'erreur, cas vide, doublons et reprise après échec.
+- [ ] Affichage responsive et navigation, si la livraison touche l'interface.
+- [ ] Vérification des journaux et de la provenance sans exposer de secrets ou de données personnelles.
+- [ ] Résultat, date, environnement et SHA déployé consignés dans le registre.
+
+Ne cocher que les contrôles pertinents à la livraison ; une checklist adaptée ne doit pas devenir une répétition inutile. Les parcours qui nécessitent une identité OWNER, CANDIDAT ou ENTREPRISE authentifiée sont à remettre explicitement à l'OWNER si l'agent ne peut pas les exécuter lui-même. Une action reste « à tester par l'OWNER » jusqu'à son retour réel ; elle ne devient pas « validée » par présomption.
