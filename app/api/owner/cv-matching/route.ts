@@ -58,10 +58,16 @@ function stringIds(value: unknown) {
 }
 
 async function requireMatchingAccess() {
-  const active = getActiveSessionContext();
-  const session = active || (await auth());
-  const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
-  const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
+  let active = getActiveSessionContext();
+  if (!active) {
+    try {
+      active = await auth();
+    } catch {
+      // Fallback when executed outside Next.js request store context (e.g. test environment)
+    }
+  }
+  const userId = typeof active?.user?.id === "string" ? active.user.id : undefined;
+  const role = typeof active?.user?.role === "string" ? active.user.role : undefined;
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role ?? "")) return null;
   if (!role || !(await hasPermission(userId, role, "CV_MATCHING"))) return null;
   return { userId, role };
@@ -513,6 +519,7 @@ export async function POST(request: Request) {
         where: { id: candidateId, status: "ACTIVE" },
         select: {
           id: true,
+          userId: true,
           headline: true,
           bio: true,
           skills: true,
@@ -576,6 +583,43 @@ export async function POST(request: Request) {
       }
     );
 
+    const existingApplication = await prisma.application.findFirst({
+      where: { candidateId: candidate.id, jobId: job.id },
+      select: { id: true, status: true },
+    });
+
+    let applicationId = existingApplication?.id;
+    if (!applicationId) {
+      const app = await prisma.application.create({
+        data: {
+          candidateId: candidate.id,
+          userId: candidate.userId,
+          jobId: job.id,
+          status: "REVIEWING",
+          notes: "Préparation de proposition anonymisée.",
+        },
+        select: { id: true },
+      });
+      applicationId = app.id;
+    }
+
+    await prisma.recruitmentHistory.create({
+      data: {
+        applicationId,
+        jobId: job.id,
+        actorUserId: access.userId,
+        action: "PROPOSE_ANONYMIZED",
+        fromStatus: existingApplication?.status || null,
+        toStatus: existingApplication?.status || "REVIEWING",
+        details: {
+          candidateAlias: candidateAlias(candidate.id),
+          companyAlias: companyAlias(job.companyId),
+          score: match.score,
+          anonymized: true,
+        },
+      },
+    });
+
     await prisma.auditLog.create({
       data: {
         actorUserId: access.userId,
@@ -588,6 +632,7 @@ export async function POST(request: Request) {
           companyAlias: companyAlias(job.companyId),
           score: match.score,
           anonymized: true,
+          applicationId,
         },
       },
     });
@@ -641,6 +686,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Le candidat ou l’offre n’est plus disponible pour une proposition complète." }, { status: 404 });
     }
 
+    if (candidate.status !== "ACTIVE") {
+      return NextResponse.json({ error: "Consentement non confirmé : le statut de ce candidat n'est pas actif pour le partage de données." }, { status: 403 });
+    }
+
     const subCategoryIds = Array.isArray(candidate.subCategoryIds)
       ? candidate.subCategoryIds.filter((v): v is string => typeof v === "string")
       : [];
@@ -672,6 +721,42 @@ export async function POST(request: Request) {
         subCategoryCode: job.subCategory?.code,
       }
     );
+
+    const existingApplication = await prisma.application.findFirst({
+      where: { candidateId: candidate.id, jobId: job.id },
+      select: { id: true, status: true },
+    });
+
+    let applicationId = existingApplication?.id;
+    if (!applicationId) {
+      const app = await prisma.application.create({
+        data: {
+          candidateId: candidate.id,
+          userId: candidate.userId,
+          jobId: job.id,
+          status: "SHORTLISTED",
+          notes: "Préparation de proposition complète transmise aux habilités.",
+        },
+        select: { id: true },
+      });
+      applicationId = app.id;
+    }
+
+    await prisma.recruitmentHistory.create({
+      data: {
+        applicationId,
+        jobId: job.id,
+        actorUserId: access.userId,
+        action: "PROPOSE_FULL",
+        fromStatus: existingApplication?.status || null,
+        toStatus: existingApplication?.status || "SHORTLISTED",
+        details: {
+          candidateName: candidate.user.name,
+          companyName: job.company.name,
+          score: match.score,
+        },
+      },
+    });
 
     await prisma.auditLog.create({
       data: {

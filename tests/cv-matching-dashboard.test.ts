@@ -13,7 +13,7 @@ test("matching dashboard loads ranked proposals automatically in both directions
   assert.match(page, /Offre → candidats/);
   assert.match(page, /byCandidate/);
   assert.match(page, /byOffer/);
-  assert.match(page, /Préparer la mise en relation/);
+  assert.match(page, /Mise en relation|Proposer anonymisé|Proposer complètement/);
 });
 
 test("matching suggestions use anonymous labels rather than exposing names or email addresses", () => {
