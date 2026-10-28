@@ -133,3 +133,28 @@ Format du retour :
 `Date | Identifiant de suivi | Environnement/SHA si connu | Parcours et étapes | Résultat observé | Résultat attendu | Message d'erreur non sensible | Statut | Ticket/PR de correction | Retest`
 
 L'utilisateur n'a pas à diagnostiquer la cause technique : il décrit ce qui se passe et, si possible, fournit le message d'erreur ou une capture sans données sensibles. L'équipe doit déterminer la cause, corriger et débloquer le parcours. Ne jamais demander un mot de passe, une clé API, un token ou un document personnel complet pour reproduire un incident.
+
+
+## Registre des décisions de référence
+
+Ce registre documente les décisions validées qui gouvernent le projet. Il complète le registre des tâches sans le remplacer. Toute décision doit être consultée avant une évolution susceptible de la modifier.
+
+Format obligatoire d'une entrée :
+`DEC-ID | Date | Décision exacte | Statut | Périmètre | Motif | Impacts/exigences liées | Tickets/PR/commits/tests | Décision remplacée ou remplaçante | Preuve de validation`
+
+Règles :
+- Distinguer clairement proposition, décision à confirmer et décision validée.
+- Ne pas transformer une discussion en décision sans validation explicite.
+- Ne pas modifier silencieusement une décision validée ; faire apparaître tout conflit et obtenir un nouvel arbitrage lorsque nécessaire.
+- Conserver les anciennes décisions remplacées et l'explication du changement.
+- Relier chaque décision aux tâches et preuves d'acceptation concernées ; rechercher les entrées existantes avant de créer une nouvelle.
+- Garder les registres et les ressources de chaque plateforme séparés. Le principe de gouvernance est commun, les projets ne sont pas fusionnés.
+
+### DEC-RP-001 — Suivi durable des décisions et du travail
+- Date : 2026-10-28
+- Décision : toute décision validée doit être consignée comme référence durable, et non considérée comme une simple discussion.
+- Statut : validée par l'utilisateur ; intégration documentaire en cours dans cette PR.
+- Périmètre : Recrutement Privé ; méthode à reprendre dès la création des cahiers des charges de référence des autres plateformes, dans leurs propres documents et registres.
+- Conséquences : identifiants stables, historique, liens vers exigences/tickets/PR/tests, prévention des doublons, procédure de correction et retest jusqu'à validation réelle.
+- Référence : PR #326 ; issue de pilotage #325.
+- Vérification documentaire : à confirmer après fusion ; ne pas considérer cette entrée comme livrée avant cette preuve.
