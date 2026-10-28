@@ -310,3 +310,12 @@ Chaque exigence testable doit avoir un résultat attendu observable et un identi
 - [ ] clôturer uniquement après le retest utilisateur concluant.
 
 Le test utilisateur doit être précis : préconditions, étapes, résultat attendu et comportement en cas d'erreur. L'utilisateur ne doit pas avoir à diagnostiquer le code ou à inventer la solution ; il signale le symptôme, l'équipe technique prend en charge l'analyse et le déblocage.
+
+
+## 14. Traçabilité des décisions validées
+
+Toute décision validée qui affecte les exigences fonctionnelles, les parcours, les rôles, la confidentialité, les données ou les critères d'acceptation doit posséder une entrée dans le registre de décisions propre à la plateforme. Chaque exigence importante doit pouvoir être reliée à cette décision et à sa tâche de suivi.
+
+L'entrée contient un identifiant stable, une date, le libellé de la décision, son statut, son périmètre, sa justification, ses impacts et les références vers les tickets/PR/tests concernés. Une idée ou une hypothèse ne doit pas être présentée comme une décision validée.
+
+Aucune décision validée ne peut être écartée ou remplacée implicitement. Tout conflit est signalé ; tout remplacement conserve l'historique et le motif. Cette gouvernance doit être présente dès le premier cahier des charges de référence de chaque plateforme, tout en conservant un registre opérationnel distinct pour chaque projet.
