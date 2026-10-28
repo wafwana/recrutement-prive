@@ -66,3 +66,48 @@ Toujours distinguer :
 - **Vérifié en production** : le scénario réel a été exécuté et son résultat observé.
 
 Une conversation ne doit jamais relancer un problème uniquement parce qu'une ancienne PR reste ouverte. Elle doit d'abord prouver que le défaut subsiste dans le code et le déploiement actuels.
+
+
+## Registre maître de clôture — suivi sans oubli ni doublon
+
+> Cette section est la source de suivi opérationnel. Avant de créer un ticket ou de recommencer une correction, comparer l'état de `main`, les PR/commits récents et les lignes ci-dessous. Le registre GitHub [issue #325](https://github.com/wafwana/recrutement-prive/issues/325) centralise les tickets de clôture, mais cette liste versionnée garde les preuves techniques et les tests à remettre à l'OWNER.
+
+### Statuts et cases à cocher
+
+- [ ] **À faire** — pas encore exécuté.
+- [ ] **En cours** — travail actif sur une branche dédiée.
+- [ ] **Bloqué** — obstacle, preuve et prochaine action documentés.
+- [ ] **Corrigé** — code modifié, validation incomplète.
+- [ ] **Contrôles techniques réussis** — CI/tests/typecheck/build et garde-fous sécurité/OWNER vérifiés sur le SHA cité.
+- [ ] **Fusionné** — PR fusionnée et SHA de fusion noté.
+- [ ] **Déployé** — SHA de fusion exact retrouvé dans le déploiement de production, statut READY vérifié.
+- [ ] **À tester par l'OWNER** — étapes précises et résultat attendu fournis.
+- [ ] **Validé en production** — test réel concluant documenté.
+- [ ] **Terminé** — preuves complètes et aucun blocage critique restant.
+
+Ne jamais cocher sans preuve. Le code fusionné, la CI verte, Vercel READY et le test réel en production sont quatre faits différents.
+
+### Première action du nouveau registre : SIRET OWNER
+
+- [x] **PR fusionnée** — [PR #323](https://github.com/wafwana/recrutement-prive/pull/323).
+- [x] **Correctif code ciblé ajouté** — label/champ/bouton, bouton `type="button"`, retours d'état et erreurs, tests statiques.
+- [ ] **SHA de production actuel confirmé** — les notifications Vercel sur la PR affichaient READY, mais cela ne prouve pas à lui seul le SHA actuellement servi sur le domaine de production.
+- [ ] **À tester par l'OWNER** :
+  1. Ouvrir le formulaire entreprise dans l'espace OWNER.
+  2. Entrer un SIRET valide de 14 chiffres et cliquer « Préremplir ».
+  3. Confirmer que les champs attendus sont remplis et que le formulaire n'est pas soumis automatiquement.
+  4. Tester un SIRET mal formé, introuvable et une erreur réseau ; un message clair doit apparaître.
+  5. Modifier les données préremplies et vérifier qu'elles ne sont pas validées automatiquement.
+- [ ] **Validé en production** — à cocher seulement après le retour du test réel.
+
+### Format obligatoire pour toute nouvelle ligne de suivi
+
+`[ ] Identifiant | Fonctionnalité/parcours | Ticket/PR/commit | SHA contrôlé | Statut prouvé | Contrôles et preuves | Déploiement/SHA production | Test OWNER restant | Résultat/date | Blocage/prochaine action`
+
+Une fonctionnalité livrée garde son identifiant lorsque l'on ajoute son test de production : ne pas créer une nouvelle tâche pour le même correctif. Si une ancienne issue est déjà résolue par un commit récent, lier la preuve et ne la rouvrir que si un échec actuel est reproduit.
+
+### Règles de décision de fusion
+
+- **Fusion possible après contrôles techniques** : correction circonscrite, diff relu, CI/tests pertinents réussis, typecheck/build validés, contrôle de non-régression et compatibilité OWNER/ADMIN passés, aucun risque de données/migration non maîtrisé. Les tests d'usage nécessitant le compte OWNER peuvent alors rester à faire après déploiement.
+- **Fusion bloquée** : contrôle rouge/inconnu, régression probable, exposition de données, permission non sûre, risque sur OWNER, migration non réconciliée, absence de sauvegarde/restauration vérifiée ou dépendance de production incertaine.
+- Ne jamais éditer `main` directement, ne jamais fusionner aveuglément une branche ancienne, ne jamais prétendre qu'une tâche est terminée sans preuves alignées sur le SHA.
