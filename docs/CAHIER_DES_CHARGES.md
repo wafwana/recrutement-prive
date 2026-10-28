@@ -144,3 +144,19 @@ Les corrections sans risque connu peuvent être fusionnées dès que le diff, le
 Bloquer en revanche toute fusion/activation présentant un risque non maîtrisé pour les données, les permissions, la confidentialité, le compte OWNER, les migrations ou la disponibilité. Toute migration de production exige diagnostic préalable en lecture seule, sauvegarde/point de restauration vérifié et autorisation explicite.
 
 Le rapport final doit montrer seulement les actions réellement restantes pour l'OWNER, avec cases à cocher, étapes concrètes et résultat attendu. Le suivi des livraisons et le suivi des tests utilisateur restent liés par le même identifiant pour ne créer ni oubli ni doublon.
+
+
+## 9. Boucle obligatoire de retour utilisateur et déblocage
+
+Tout cahier des charges nouveau ou révisé doit intégrer dès le départ le registre de suivi, les statuts, les critères d'acceptation et la procédure de retour utilisateur ci-dessous. Cette règle s'applique à chaque nouveau projet et à chaque cahier des charges, pas seulement à Recrutement Privé.
+
+Lorsqu'un utilisateur effectue un test après déploiement et signale qu'une action ne fonctionne pas :
+1. enregistrer son retour dans la ligne de suivi de l'action existante, avec la date, l'environnement, le parcours, le résultat observé et le résultat attendu ;
+2. faire passer cette action au statut **Échec du test utilisateur — à corriger** ; ne pas la marquer « validée en production » ;
+3. créer ou mettre à jour un ticket lié à l'identifiant de suivi existant, sans créer un doublon ;
+4. examiner le SHA réellement déployé, les journaux non sensibles, les autorisations, les données, la route/API et les dépendances ;
+5. corriger sur une branche dédiée, ajouter un test de non-régression qui reproduit l'échec, exécuter les contrôles requis et ouvrir une PR ;
+6. fusionner lorsque les contrôles techniques et les garde-fous sont satisfaits, puis confirmer le déploiement du SHA exact ;
+7. remettre à l'utilisateur uniquement le nouveau test nécessaire et conserver le même identifiant de suivi jusqu'à validation réelle.
+
+Le retour utilisateur est une preuve de défaut à investiguer, non une clôture. La correction n'est terminée qu'après un nouveau test concluant. Si l'information fournie ne permet pas de reproduire le défaut, demander seulement le détail minimal manquant (étapes, message d'erreur non sensible ou capture expurgée), sans lui demander de refaire les vérifications déjà réalisées.
