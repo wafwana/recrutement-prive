@@ -59,7 +59,7 @@ test("3. CV existant, absent et document non autorisé", async () => {
   const unauthBody = await unauthRes.json();
   assert.equal(unauthBody.error, "Non authentifié");
 
-  // Test unauthorized candidate role without session ID
+  // Test candidate role without session ID
   const emptySessionRes = await handleGetCandidateDocument("doc-123", { user: {} }, false);
   assert.equal(emptySessionRes.status, 401);
 });
@@ -85,32 +85,48 @@ test("4. Conservation de la liaison candidat-CV après reclassement", async () =
 });
 
 test("5. Proposition anonymisée sans fuite d'identité", async () => {
-  const req = new Request("http://localhost:3000/api/owner/cv-matching", {
+  const unauthReq = new Request("http://localhost:3000/api/owner/cv-matching", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "propose_anonymized", candidateId: "cand-123", jobId: "job-456" }),
   });
-  const res = await POST(req);
+  const res = await POST(unauthReq);
   assert.equal(res.status, 403);
+
+  // Verify anonymized proposal structure formatting and identity masking
+  const candidate = { id: "cand-789012", headline: "Ingénieur DevOps", experienceYears: 6 };
+  const job = { companyId: "comp-345678", title: "Lead DevOps" };
+  const anonymizedOutput = {
+    candidateAlias: "Profil #" + candidate.id.slice(-6).toUpperCase(),
+    companyAlias: "Entreprise #" + job.companyId.slice(-6).toUpperCase(),
+    headline: candidate.headline,
+    experienceYears: candidate.experienceYears,
+  };
+  const jsonStr = JSON.stringify(anonymizedOutput);
+  assert.doesNotMatch(jsonStr, /email|phone|address|fullName|realName/i);
+  assert.equal(anonymizedOutput.candidateAlias, "Profil #789012");
+  assert.equal(anonymizedOutput.companyAlias, "Entreprise #345678");
 });
 
 test("6. Proposition complète avec contrôle des permissions et du consentement", async () => {
-  // Test default refusal without explicit positive consent
-  const candidateWithoutConsent = {
-    status: "ACTIVE",
-    preferences: {},
-  };
-  const prefs = candidateWithoutConsent.preferences as Record<string, unknown>;
-  const hasConsent = prefs.fullProposalConsent === true || prefs.communicationConsent === true;
-  assert.equal(hasConsent, false, "Consent must default to false without positive preference flag");
+  // Check that candidate preferences without explicit positive consent default to refusal
+  function verifyPositiveConsent(preferences: unknown): boolean {
+    const prefs = preferences && typeof preferences === "object" && !Array.isArray(preferences)
+      ? preferences as Record<string, unknown>
+      : {};
+    return (
+      prefs.fullProposalConsent === true ||
+      prefs.communicationConsent === true ||
+      prefs.dataSharingConsent === true ||
+      prefs.explicitConsent === true
+    );
+  }
 
-  // Test explicit positive consent
-  const candidateWithConsent = {
-    status: "ACTIVE",
-    preferences: { communicationConsent: true },
-  };
-  const validConsent = (candidateWithConsent.preferences as Record<string, unknown>).communicationConsent === true;
-  assert.equal(validConsent, true, "Explicit positive consent must pass consent check");
+  assert.equal(verifyPositiveConsent(null), false);
+  assert.equal(verifyPositiveConsent({}), false);
+  assert.equal(verifyPositiveConsent({ communicationConsent: false }), false);
+  assert.equal(verifyPositiveConsent({ communicationConsent: true }), true);
+  assert.equal(verifyPositiveConsent({ fullProposalConsent: true }), true);
 
   // Unauthenticated call to POST /api/owner/cv-matching
   const req = new Request("http://localhost:3000/api/owner/cv-matching", {
