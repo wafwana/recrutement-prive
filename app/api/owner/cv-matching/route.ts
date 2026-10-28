@@ -705,8 +705,17 @@ export async function POST(request: Request) {
     const prefs = candidate.preferences && typeof candidate.preferences === "object" && !Array.isArray(candidate.preferences)
       ? candidate.preferences as Record<string, unknown>
       : {};
-    if (prefs.fullProposalAllowed === false || prefs.communicationConsent === false) {
-      return NextResponse.json({ error: "Le candidat a révoqué son consentement pour la communication complète de ses données personnellement identifiables." }, { status: 403 });
+
+    const hasExplicitPositiveConsent =
+      prefs.fullProposalAllowed === true ||
+      prefs.communicationConsent === true ||
+      prefs.dataSharingConsent === true ||
+      prefs.explicitConsent === true;
+
+    if (!hasExplicitPositiveConsent) {
+      return NextResponse.json({
+        error: "Consentement non confirmé : le candidat n'a pas enregistré d'accord positif explicite pour la communication de ses données personnelles.",
+      }, { status: 403 });
     }
 
     const subCategoryIds = Array.isArray(candidate.subCategoryIds)

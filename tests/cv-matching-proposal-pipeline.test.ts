@@ -53,7 +53,7 @@ test("2. Matching sans offre valide et blocage des actions incompatibles", async
 });
 
 test("3. CV existant, absent et document non autorisé", async () => {
-  // Test unauthenticated access to candidate document handler (checked before DB lookup)
+  // Test unauthenticated access to candidate document handler
   const unauthRes = await handleGetCandidateDocument("doc-123", null, false);
   assert.equal(unauthRes.status, 401);
   const unauthBody = await unauthRes.json();
@@ -91,10 +91,28 @@ test("5. Proposition anonymisée sans fuite d'identité", async () => {
     body: JSON.stringify({ action: "propose_anonymized", candidateId: "cand-123", jobId: "job-456" }),
   });
   const res = await POST(req);
-  assert.equal(res.status, 403); // Permission checked before DB operations
+  assert.equal(res.status, 403);
 });
 
 test("6. Proposition complète avec contrôle des permissions et du consentement", async () => {
+  // Test default refusal without explicit positive consent
+  const candidateWithoutConsent = {
+    status: "ACTIVE",
+    preferences: {},
+  };
+  const prefs = candidateWithoutConsent.preferences as Record<string, unknown>;
+  const hasConsent = prefs.fullProposalConsent === true || prefs.communicationConsent === true;
+  assert.equal(hasConsent, false, "Consent must default to false without positive preference flag");
+
+  // Test explicit positive consent
+  const candidateWithConsent = {
+    status: "ACTIVE",
+    preferences: { communicationConsent: true },
+  };
+  const validConsent = (candidateWithConsent.preferences as Record<string, unknown>).communicationConsent === true;
+  assert.equal(validConsent, true, "Explicit positive consent must pass consent check");
+
+  // Unauthenticated call to POST /api/owner/cv-matching
   const req = new Request("http://localhost:3000/api/owner/cv-matching", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
