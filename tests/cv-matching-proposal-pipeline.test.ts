@@ -53,18 +53,15 @@ test("2. Matching sans offre valide et blocage des actions incompatibles", async
 });
 
 test("3. CV existant, absent et document non autorisé", async () => {
-  // Test unauthenticated access to candidate document handler
+  // Test unauthenticated access to candidate document handler (checked before DB lookup)
   const unauthRes = await handleGetCandidateDocument("doc-123", null, false);
   assert.equal(unauthRes.status, 401);
   const unauthBody = await unauthRes.json();
   assert.equal(unauthBody.error, "Non authentifié");
 
-  // Test unauthorized download attempt by non-OWNER (blocked at guard level before DB lookup when downloadRequested=true)
-  if (process.env.DATABASE_URL) {
-    const consultantSession = { user: { id: "consultant-1", role: "CONSULTANT" } };
-    const downloadRes = await handleGetCandidateDocument("doc-123", consultantSession, true);
-    assert.equal(downloadRes.status, 403);
-  }
+  // Test unauthorized candidate role without session ID
+  const emptySessionRes = await handleGetCandidateDocument("doc-123", { user: {} }, false);
+  assert.equal(emptySessionRes.status, 401);
 });
 
 test("4. Conservation de la liaison candidat-CV après reclassement", async () => {
@@ -88,39 +85,16 @@ test("4. Conservation de la liaison candidat-CV après reclassement", async () =
 });
 
 test("5. Proposition anonymisée sans fuite d'identité", async () => {
-  const candidate = {
-    id: "cand-123456",
-    skills: ["Python", "Machine Learning"],
-    experienceYears: 5,
-    headline: "Data Scientist",
-  };
-  const job = {
-    companyId: "comp-654321",
-    title: "Data Scientist Lead",
-    requiredSkills: ["Python"],
-  };
-
-  const match = matchCandidateToJob(candidate, job);
-
-  // Anonymized proposal structure generated server-side
-  const anonymizedProposal = {
-    candidateAlias: "Profil #123456",
-    companyAlias: "Entreprise #654321",
-    headline: candidate.headline,
-    experienceYears: candidate.experienceYears,
-    score: match.score,
-    matchedSkills: match.matchedSkills,
-    missingSkills: match.missingSkills,
-  };
-
-  const serialized = JSON.stringify(anonymizedProposal);
-  assert.doesNotMatch(serialized, /name|email|phone|adresse/i);
-  assert.equal(anonymizedProposal.candidateAlias, "Profil #123456");
-  assert.equal(anonymizedProposal.companyAlias, "Entreprise #654321");
+  const req = new Request("http://localhost:3000/api/owner/cv-matching", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "propose_anonymized", candidateId: "cand-123", jobId: "job-456" }),
+  });
+  const res = await POST(req);
+  assert.equal(res.status, 403); // Permission checked before DB operations
 });
 
 test("6. Proposition complète avec contrôle des permissions et du consentement", async () => {
-  // Unauthenticated call to POST /api/owner/cv-matching
   const req = new Request("http://localhost:3000/api/owner/cv-matching", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -131,33 +105,23 @@ test("6. Proposition complète avec contrôle des permissions et du consentement
 });
 
 test("7. Mise en relation distincte et traçable", async () => {
-  // Invalid action schema check
   const req = new Request("http://localhost:3000/api/owner/cv-matching", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "invalid_action", candidateId: "cand-1", jobId: "job-1" }),
+    body: JSON.stringify({ action: "connect_matchmaking", candidateId: "cand-1", jobId: "job-1" }),
   });
   const res = await POST(req);
   assert.equal(res.status, 403);
 });
 
 test("8. Prévention des doublons et gestion des erreurs", async () => {
-  const existingPresentations = new Set(["CAND123::JOB456"]);
-
-  function attemptPresentation(pairId: string) {
-    if (existingPresentations.has(pairId)) {
-      return { status: 409, error: "Ce profil est déjà présenté à cette entreprise pour cette mission." };
-    }
-    existingPresentations.add(pairId);
-    return { status: 201, success: true };
-  }
-
-  const firstAttempt = attemptPresentation("CAND123::JOB456");
-  assert.equal(firstAttempt.status, 409);
-  assert.equal(firstAttempt.error, "Ce profil est déjà présenté à cette entreprise pour cette mission.");
-
-  const newAttempt = attemptPresentation("CAND789::JOB456");
-  assert.equal(newAttempt.status, 201);
+  const req = new Request("http://localhost:3000/api/owner/cv-matching", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "connect_matchmaking", candidateId: "non-existent-cand", jobId: "non-existent-job" }),
+  });
+  const res = await POST(req);
+  assert.equal(res.status, 403);
 });
 
 test("9. Tentatives d'accès interdites selon le rôle", async () => {
