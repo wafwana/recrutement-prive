@@ -116,25 +116,38 @@ function statusBadgeClass(status: CriterionDetail["status"]) {
 function PairCard({
   match,
   canPresent,
-  busy,
-  onPresent,
+  activeActionKey,
+  onProposeAnonymized,
+  onProposeFull,
+  onConnectMatchmaking,
   onRecalculate,
 }: {
   match: Suggestion;
   canPresent: boolean;
-  busy: boolean;
-  onPresent: (match: Suggestion) => void;
+  activeActionKey: string | null;
+  onProposeAnonymized: (match: Suggestion) => void;
+  onProposeFull: (match: Suggestion) => void;
+  onConnectMatchmaking: (match: Suggestion) => void;
   onRecalculate: (match: Suggestion) => void;
 }) {
   const [showDetails, setShowDetails] = useState(false);
+  const pairKey = match.candidateId + "::" + match.jobId;
 
   return (
     <article className="border border-white/10 bg-[#0d1117] p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[9px] uppercase tracking-[0.15em] text-white/35">
-            {match.candidateAlias} ↔ {match.companyAlias}
-          </p>
+          <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.15em] text-white/35">
+            <span>{match.candidateAlias} ↔ {match.companyAlias}</span>
+            <a
+              href={`/offres/${match.jobId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#c7a15a] underline hover:text-[#e0bc74]"
+            >
+              Fiche Offre ↗
+            </a>
+          </div>
           <h4 className="mt-2 text-base leading-6 text-white">{match.jobTitle}</h4>
           {match.candidateHeadline ? <p className="mt-1 text-xs text-white/65">{match.candidateHeadline}</p> : null}
           <p className="mt-1 text-xs text-white/35">
@@ -243,31 +256,48 @@ function PairCard({
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-3">
         <p className="text-[9px] uppercase tracking-wider text-white/30">
-          {match.presentationExists ? "Dossier dans le parcours confidentiel" : "Proposition indicative · validation humaine requise"}
+          Trois actions distinctes disponibles :
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => onRecalculate(match)}
-            className="border border-white/20 px-3 py-2 text-[9px] uppercase tracking-wider text-white/70 hover:border-white/40"
+            disabled={activeActionKey === pairKey + "::anonymized"}
+            onClick={() => onProposeAnonymized(match)}
+            className="border border-sky-400/40 bg-sky-400/10 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-sky-300 hover:bg-sky-400/20 disabled:opacity-40"
           >
-            Recalculer
+            {activeActionKey === pairKey + "::anonymized" ? "Traitement…" : "1. Proposer anonymisé"}
+          </button>
+          <button
+            type="button"
+            disabled={!canPresent || activeActionKey === pairKey + "::full"}
+            onClick={() => onProposeFull(match)}
+            className="border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-amber-300 hover:bg-amber-400/20 disabled:opacity-40"
+            title={!canPresent ? "Action réservée à un rôle autorisé." : undefined}
+          >
+            {activeActionKey === pairKey + "::full" ? "Traitement…" : "2. Proposer complètement"}
           </button>
           {match.presentationExists ? (
-            <span className="px-3 py-2 text-[10px] uppercase tracking-wider text-emerald-300/80">Présentation existante</span>
+            <span className="px-3 py-2 text-[10px] uppercase tracking-wider text-emerald-300/80 border border-emerald-500/20">Présentation existante</span>
           ) : (
             <button
               type="button"
-              disabled={!canPresent || busy}
-              onClick={() => onPresent(match)}
-              className="border border-[#F97316] px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-[#F97316] transition hover:bg-[#F97316]/10 disabled:cursor-not-allowed disabled:opacity-35"
+              disabled={!canPresent || activeActionKey === pairKey + "::connect"}
+              onClick={() => onConnectMatchmaking(match)}
+              className="border border-[#F97316] bg-[#F97316]/10 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#F97316] hover:bg-[#F97316]/20 disabled:opacity-40"
               title={!canPresent ? "Action réservée à un rôle autorisé." : undefined}
             >
-              {busy ? "Préparation…" : "Préparer la mise en relation"}
+              {activeActionKey === pairKey + "::connect" ? "Mise en relation…" : "3. Mise en relation"}
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => onRecalculate(match)}
+            className="border border-white/20 px-2.5 py-2 text-[9px] uppercase tracking-wider text-white/60 hover:border-white/40 ml-auto"
+          >
+            Recalculer
+          </button>
         </div>
       </div>
     </article>
@@ -288,7 +318,7 @@ export default function CvMatchingPage() {
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const [message, setMessage] = useState("");
   const [presentationMessage, setPresentationMessage] = useState("");
-  const [presentingPairKey, setPresentingPairKey] = useState<string | null>(null);
+  const [activeActionKey, setActiveActionKey] = useState<string | null>(null);
 
   async function fetchOverview() {
     const response = await fetch("/api/owner/cv-matching?mode=overview", { cache: "no-store" });
@@ -405,29 +435,74 @@ export default function CvMatchingPage() {
     }
   }
 
-  async function preparePresentation(match: Suggestion) {
-    if (!overview?.canPresent || match.presentationExists) return;
-    const confirmed = window.confirm(
-      "Créer une présentation confidentielle pour ce profil et cette offre ? L’identité restera protégée. Aucun email ni contact externe ne sera envoyé automatiquement."
-    );
-    if (!confirmed) return;
-    const key = match.candidateId + "::" + match.jobId;
-    setPresentingPairKey(key);
+  async function handleProposeAnonymized(match: Suggestion) {
+    const key = match.candidateId + "::" + match.jobId + "::anonymized";
+    setActiveActionKey(key);
     setPresentationMessage("");
     try {
       const response = await fetch("/api/owner/cv-matching", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "present", candidateId: match.candidateId, jobId: match.jobId }),
+        body: JSON.stringify({ action: "propose_anonymized", candidateId: match.candidateId, jobId: match.jobId }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "La présentation n’a pas pu être préparée.");
-      setPresentationMessage(data.message || "Présentation confidentielle créée.");
+      if (!response.ok) throw new Error(data.error || "Action anonymisée impossible.");
+      setPresentationMessage(`[Proposer anonymisé] ${data.message}`);
+    } catch (error) {
+      setPresentationMessage(error instanceof Error ? error.message : "Erreur lors de la proposition anonymisée.");
+    } finally {
+      setActiveActionKey(null);
+    }
+  }
+
+  async function handleProposeFull(match: Suggestion) {
+    if (!overview?.canPresent) return;
+    const confirmed = window.confirm(
+      `Préparer une proposition complète pour ${match.candidateAlias} et l’offre "${match.jobTitle}" ? Vérifiez les autorisations de communication.`
+    );
+    if (!confirmed) return;
+    const key = match.candidateId + "::" + match.jobId + "::full";
+    setActiveActionKey(key);
+    setPresentationMessage("");
+    try {
+      const response = await fetch("/api/owner/cv-matching", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "propose_full", candidateId: match.candidateId, jobId: match.jobId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Action proposition complète impossible.");
+      setPresentationMessage(`[Proposer complètement] ${data.message}`);
+    } catch (error) {
+      setPresentationMessage(error instanceof Error ? error.message : "Erreur lors de la proposition complète.");
+    } finally {
+      setActiveActionKey(null);
+    }
+  }
+
+  async function handleConnectMatchmaking(match: Suggestion) {
+    if (!overview?.canPresent || match.presentationExists) return;
+    const confirmed = window.confirm(
+      "Déclencher une mise en relation confidentielle pour ce profil et cette offre ? L’identité restera protégée. Aucun e-mail ni contact externe ne sera envoyé automatiquement."
+    );
+    if (!confirmed) return;
+    const key = match.candidateId + "::" + match.jobId + "::connect";
+    setActiveActionKey(key);
+    setPresentationMessage("");
+    try {
+      const response = await fetch("/api/owner/cv-matching", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "connect_matchmaking", candidateId: match.candidateId, jobId: match.jobId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Mise en relation impossible.");
+      setPresentationMessage(`[Mise en relation] ${data.message}`);
       await fetchOverview();
     } catch (error) {
-      setPresentationMessage(error instanceof Error ? error.message : "Erreur de présentation.");
+      setPresentationMessage(error instanceof Error ? error.message : "Erreur lors de la mise en relation.");
     } finally {
-      setPresentingPairKey(null);
+      setActiveActionKey(null);
     }
   }
 
@@ -525,8 +600,10 @@ export default function CvMatchingPage() {
                       key={match.jobId + match.candidateId}
                       match={match}
                       canPresent={Boolean(overview?.canPresent)}
-                      busy={presentingPairKey === match.candidateId + "::" + match.jobId}
-                      onPresent={preparePresentation}
+                      activeActionKey={activeActionKey}
+                      onProposeAnonymized={handleProposeAnonymized}
+                      onProposeFull={handleProposeFull}
+                      onConnectMatchmaking={handleConnectMatchmaking}
                       onRecalculate={recalculateMatch}
                     />
                   ))}
@@ -566,8 +643,10 @@ export default function CvMatchingPage() {
                       key={match.jobId + match.candidateId}
                       match={match}
                       canPresent={Boolean(overview?.canPresent)}
-                      busy={presentingPairKey === match.candidateId + "::" + match.jobId}
-                      onPresent={preparePresentation}
+                      activeActionKey={activeActionKey}
+                      onProposeAnonymized={handleProposeAnonymized}
+                      onProposeFull={handleProposeFull}
+                      onConnectMatchmaking={handleConnectMatchmaking}
                       onRecalculate={recalculateMatch}
                     />
                   ))}
@@ -646,11 +725,11 @@ export default function CvMatchingPage() {
               {findPair(candidateId, match.jobId) ? (
                 <button
                   type="button"
-                  onClick={() => void preparePresentation(findPair(candidateId, match.jobId)!)}
+                  onClick={() => void handleConnectMatchmaking(findPair(candidateId, match.jobId)!)}
                   disabled={!overview?.canPresent || findPair(candidateId, match.jobId)?.presentationExists}
                   className="mt-4 border border-[#F97316] px-4 py-2.5 text-[10px] uppercase tracking-wider text-[#F97316] disabled:opacity-35"
                 >
-                  {findPair(candidateId, match.jobId)?.presentationExists ? "Déjà présenté" : "Préparer la mise en relation"}
+                  {findPair(candidateId, match.jobId)?.presentationExists ? "Déjà présenté" : "Mise en relation"}
                 </button>
               ) : null}
             </article>
@@ -679,11 +758,11 @@ export default function CvMatchingPage() {
                 {suggested ? (
                   <button
                     type="button"
-                    onClick={() => void preparePresentation(suggested)}
+                    onClick={() => void handleConnectMatchmaking(suggested)}
                     disabled={!overview?.canPresent || suggested.presentationExists}
                     className="mt-4 border border-[#F97316] px-4 py-2.5 text-[10px] uppercase tracking-wider text-[#F97316] disabled:opacity-35"
                   >
-                    {suggested.presentationExists ? "Déjà présenté" : "Préparer la mise en relation"}
+                    {suggested.presentationExists ? "Déjà présenté" : "Mise en relation"}
                   </button>
                 ) : (
                   <p className="mt-3 text-xs text-white/35">Aucune proposition disponible pour cette paire dans les résultats chargés ; actualisez avant décision.</p>

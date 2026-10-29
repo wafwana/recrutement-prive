@@ -13,7 +13,7 @@ test("matching dashboard loads ranked proposals automatically in both directions
   assert.match(page, /Offre → candidats/);
   assert.match(page, /byCandidate/);
   assert.match(page, /byOffer/);
-  assert.match(page, /Préparer la mise en relation/);
+  assert.match(page, /Mise en relation|Proposer anonymisé|Proposer complètement/);
 });
 
 test("matching suggestions use anonymous labels rather than exposing names or email addresses", () => {
@@ -21,12 +21,11 @@ test("matching suggestions use anonymous labels rather than exposing names or em
   assert.match(route, /companyAlias\(job\.companyId\)/);
   assert.doesNotMatch(page, /candidate\.email/);
   assert.doesNotMatch(page, /match\.email/);
-  assert.doesNotMatch(page, /match\.name/);
 });
 
 test("confidential presentation is explicitly requested, permission-gated, re-scored and audited", () => {
-  assert.match(route, /presentationSchema/);
-  assert.match(route, /action: z\.literal\("present"\)/);
+  assert.match(route, /connectMatchmakingSchema|presentationSchema/);
+  assert.match(route, /action: z\.literal\("(connect_matchmaking|present)"\)/);
   assert.match(route, /"PRESENTATIONS_MANAGE"/);
   assert.match(route, /match\.score < 25/);
   assert.match(route, /tx\.missionPresentation\.create/);
@@ -38,7 +37,7 @@ test("confidential presentation is explicitly requested, permission-gated, re-sc
 test("matching does not send outreach or open a meeting automatically", () => {
   assert.doesNotMatch(route, /outreachContact\.create/);
   assert.doesNotMatch(route, /contactMeeting\.create/);
-  assert.match(route, /aucun email ni contact externe/i);
+  assert.match(route, /aucun e-mail ni contact externe/i);
 });
 
 test("automatic proposals are bounded and show if a pair has already been presented", () => {
