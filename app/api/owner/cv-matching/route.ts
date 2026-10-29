@@ -706,15 +706,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Consentement non confirmé : le candidat est inactif ou exclu du partage de données." }, { status: 403 });
     }
 
-    const prefs = candidate.preferences && typeof candidate.preferences === "object" && !Array.isArray(candidate.preferences)
-      ? candidate.preferences as Record<string, unknown>
-      : {};
-
-    const hasExplicitPositiveConsent =
-      prefs.fullProposalAllowed === true ||
-      prefs.communicationConsent === true ||
-      prefs.dataSharingConsent === true ||
-      prefs.explicitConsent === true;
+    // Fail closed: CandidateProfile.preferences is unstructured JSON and does not
+    // establish a verifiable, purpose-specific consent record. Do not disclose
+    // identity/contact data until the candidate consent workflow persists a
+    // verifiable positive record that this endpoint can validate.
+    const hasExplicitPositiveConsent = false;
 
     if (!hasExplicitPositiveConsent) {
       return NextResponse.json({
