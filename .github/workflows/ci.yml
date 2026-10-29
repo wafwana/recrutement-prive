@@ -48,6 +48,8 @@ jobs:
           node-version: 20
           cache: ''
       - run: npm ci
+      - name: Audit npm dependency vulnerabilities
+        run: npm audit
       - name: OWNER compatibility gate — FIRST verification
         run: npm run test:owner-compatibility
       - name: Verify Gemini structured-output schema contract
