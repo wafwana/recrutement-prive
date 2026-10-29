@@ -14,7 +14,7 @@ test("company registration displays and submits the values filled by SIRET looku
   assert.match(page, /name="address"/);
   assert.match(page, /Forme juridique/);
   assert.match(page, /Code APE \/ activité/);
-  assert.match(lookup, /required=\{required\}/);
+  assert.match(lookup, /required=\{required\}/);\n  assert.match(lookup, /SIREN ou SIRET/);\n  assert.match(lookup, /normalized.length !== 9 && normalized.length !== 14/);\n  assert.match(lookup, /identifier=\$\{encodeURIComponent\(normalized\)\}/);
 });
 
 test("SIRET lookup button is outside the label and explicitly cannot submit the parent form", () => {
@@ -58,4 +58,16 @@ test("French company SIRET is checked on the server before account creation", ()
   assert.match(action, /role: "ENTREPRISE"/);
   assert.match(action, /role: "OWNER"/);
   assert.match(action, /sourceUrl: verifiedCompany\?\.sourceUrl/);
+});
+
+test("public registry lookup supports SIREN and resolves the head-office SIRET", () => {
+  const registry = read("lib/company/public-registry.ts");
+  const route = read("app/api/company/siret/route.ts");
+
+  assert.match(registry, /export async function lookupCompanyBySiren/);
+  assert.match(registry, /text\(item\.siren\) === siren/);
+  assert.match(registry, /text\(siege\?\.siret\)/);
+  assert.match(route, /lookupCompanyBySiren/);
+  assert.match(route, /identifier/);
+  assert.match(route, /SIREN à 9 chiffres ou un SIRET à 14 chiffres/);
 });
