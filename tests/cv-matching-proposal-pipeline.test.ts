@@ -178,7 +178,6 @@ test("10. Compatibilité OWNER et non-régression des flux existants", async () 
 
 
 // Restored regression coverage from the pre-PR baseline; preserve existing AI/CV/matching/identity behavior.
-import { isIdentityUnlocked } from "@/lib/mission-lock";
 
 test("CV & AI Pipeline: getActiveAiProvider resolves provider or returns null when unset", () => {
   const origOpenAi = process.env.OPENAI_API_KEY;
