@@ -27,25 +27,7 @@ export function normalizeSiret(value: string): string {
   return value.replace(/\D/g, "");
 }
 
-export async function lookupCompanyBySiret(rawSiret: string): Promise<PublicCompanyIdentity | null> {
-  const siret = normalizeSiret(rawSiret);
-  if (!/^\d{14}$/.test(siret)) return null;
-
-  const sourceUrl = `https://recherche-entreprises.api.gouv.fr/search?q=${encodeURIComponent(siret)}`;
-  const response = await fetch(sourceUrl, {
-    headers: { accept: "application/json" },
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(`Service public entreprises indisponible (HTTP ${response.status}).`);
-
-  const payload = asRecord(await response.json());
-  const results = Array.isArray(payload?.results) ? payload.results : [];
-  const result = results
-    .map(asRecord)
-    .find((item) => text(item?.siret) === siret || text(asRecord(item?.siege)?.siret) === siret);
-
-  if (!result) return null;
-
+function toCompanyIdentity(result: Record<string, unknown>, sourceUrl: string, requestedSiret?: string): PublicCompanyIdentity {
   const siege = asRecord(result.siege);
   const adresse = asRecord(siege?.adresse);
   const addressParts = [
@@ -56,7 +38,7 @@ export async function lookupCompanyBySiret(rawSiret: string): Promise<PublicComp
 
   return {
     siren: text(result.siren),
-    siret,
+    siret: requestedSiret || text(siege?.siret) || text(result.siret),
     name: text(result.nom_complet ?? result.nom_raison_sociale ?? result.denomination),
     legalForm: text(result.nature_juridique),
     apeCode: text(siege?.activite_principale ?? result.activite_principale),
@@ -70,4 +52,42 @@ export async function lookupCompanyBySiret(rawSiret: string): Promise<PublicComp
     sourceUrl,
     collectedAt: new Date().toISOString(),
   };
+}
+
+async function searchPublicCompanies(identifier: string): Promise<{ results: Record<string, unknown>[]; sourceUrl: string }> {
+  const sourceUrl = `https://recherche-entreprises.api.gouv.fr/search?q=${encodeURIComponent(identifier)}`;
+  const response = await fetch(sourceUrl, {
+    headers: { accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Service public entreprises indisponible (HTTP ${response.status}).`);
+
+  const payload = asRecord(await response.json());
+  const results = (Array.isArray(payload?.results) ? payload.results : [])
+    .map(asRecord)
+    .filter((item): item is Record<string, unknown> => item !== null);
+  return { results, sourceUrl };
+}
+
+export async function lookupCompanyBySiret(rawSiret: string): Promise<PublicCompanyIdentity | null> {
+  const siret = normalizeSiret(rawSiret);
+  if (!/^\d{14}$/.test(siret)) return null;
+
+  const { results, sourceUrl } = await searchPublicCompanies(siret);
+  const result = results.find((item) => text(item.siret) === siret || text(asRecord(item.siege)?.siret) === siret);
+  if (!result) return null;
+  return toCompanyIdentity(result, sourceUrl, siret);
+}
+
+export async function lookupCompanyBySiren(rawSiren: string): Promise<PublicCompanyIdentity | null> {
+  const siren = normalizeSiret(rawSiren);
+  if (!/^\d{9}$/.test(siren)) return null;
+
+  const { results, sourceUrl } = await searchPublicCompanies(siren);
+  const result = results.find((item) => text(item.siren) === siren);
+  if (!result) return null;
+
+  const company = toCompanyIdentity(result, sourceUrl);
+  if (company.siren !== siren || !company.siret || !/^\d{14}$/.test(company.siret)) return null;
+  return company;
 }

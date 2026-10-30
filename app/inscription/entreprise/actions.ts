@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { validatePassword } from "@/lib/password-policy";
-import { lookupCompanyBySiret } from "@/lib/company/public-registry";
+import { lookupCompanyBySiren, lookupCompanyBySiret } from "@/lib/company/public-registry";
 import { z } from "zod";
 
 const registerCompanySchema = z.object({
@@ -29,8 +29,10 @@ export async function registerCompany(formData: FormData) {
   try {
     const companyName = String(formData.get("companyName") ?? "").trim();
     const userName = String(formData.get("userName") ?? "").trim();
-    const siren = String(formData.get("siren") ?? "").trim();
-    const siret = String(formData.get("siret") ?? "").replace(/\D/g, "");
+    const rawIdentifier = String(formData.get("siret") ?? "").replace(/\D/g, "");
+    const sirenFromForm = String(formData.get("siren") ?? "").replace(/\D/g, "");
+    const siren = /^\d{9}$/.test(rawIdentifier) ? rawIdentifier : sirenFromForm;
+    const siret = /^\d{14}$/.test(rawIdentifier) ? rawIdentifier : "";
     const legalForm = String(formData.get("legalForm") ?? "").trim();
     const apeCode = String(formData.get("apeCode") ?? "").trim();
     const address = String(formData.get("address") ?? "").trim();
@@ -46,8 +48,8 @@ export async function registerCompany(formData: FormData) {
 
     const parseResult = registerCompanySchema.safeParse({
       companyName,
-      siren,
-      siret,
+      siren: /^\d{9}$/.test(siren) ? siren : undefined,
+      siret: /^\d{14}$/.test(siret) ? siret : undefined,
       legalForm,
       apeCode,
       address,
@@ -78,16 +80,22 @@ export async function registerCompany(formData: FormData) {
 
     let verifiedCompany: Awaited<ReturnType<typeof lookupCompanyBySiret>> = null;
     if (country.toLocaleLowerCase("fr").trim() === "france") {
-      if (!/^\d{14}$/.test(siret)) {
-        return { ok: false, error: "Pour une entreprise domiciliée en France, le SIRET à 14 chiffres est obligatoire." };
+      if (!siret && !/^\d{9}$/.test(siren)) {
+        return { ok: false, error: "Saisissez un SIREN à 9 chiffres ou un SIRET à 14 chiffres pour une entreprise domiciliée en France." };
       }
       try {
-        verifiedCompany = await lookupCompanyBySiret(siret);
+        verifiedCompany = siret ? await lookupCompanyBySiret(siret) : await lookupCompanyBySiren(siren);
       } catch {
         return { ok: false, error: "Le registre public des entreprises est momentanément indisponible. Réessayez dans quelques instants ; aucun compte n’a été créé." };
       }
-      if (!verifiedCompany || verifiedCompany.siret !== siret) {
-        return { ok: false, error: "Ce SIRET n’a pas été confirmé par le registre public. Vérifiez le numéro et utilisez « Préremplir » avant de valider." };
+      if (
+        !verifiedCompany ||
+        !verifiedCompany.siret ||
+        !/^\d{14}$/.test(verifiedCompany.siret) ||
+        (siret && verifiedCompany.siret !== siret) ||
+        (siren && verifiedCompany.siren !== siren)
+      ) {
+        return { ok: false, error: "Ce SIREN ou SIRET n’a pas été confirmé par le registre public. Vérifiez le numéro et réessayez." };
       }
     }
     const existingUser = await prisma.user.findUnique({
@@ -114,7 +122,7 @@ export async function registerCompany(formData: FormData) {
               create: {
                 name: companyName,
                 siren: verifiedCompany?.siren || siren || null,
-                siret: siret || null,
+                siret: verifiedCompany?.siret || siret || null,
                 legalForm: verifiedCompany?.legalForm || legalForm || null,
                 apeCode: verifiedCompany?.apeCode || apeCode || null,
                 address: address || [verifiedCompany?.address, [verifiedCompany?.postalCode, verifiedCompany?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null,
