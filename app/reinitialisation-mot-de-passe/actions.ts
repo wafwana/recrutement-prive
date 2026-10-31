@@ -58,28 +58,11 @@ export async function resetPassword(formData: FormData) {
         return { ok: false, error: "Ce lien de réinitialisation a déjà été utilisé." };
       }
 
-      const user = await tx.user.update({
+      await tx.user.update({
         where: { email: existingToken.email },
         data: { passwordHash: newHash },
-        select: { id: true, candidat: { select: { id: true, preferences: true } } },
+        select: { id: true },
       });
-
-      if (user.candidat) {
-        const current = user.candidat.preferences;
-        const prefs = current && typeof current === "object" && !Array.isArray(current)
-          ? current as Record<string, unknown>
-          : {};
-        await tx.candidateProfile.update({
-          where: { id: user.candidat.id },
-          data: {
-            preferences: {
-              ...prefs,
-              consentStatus: prefs.consentStatus === "PENDING" ? "ACCEPTED" : (prefs.consentStatus || "ACCEPTED"),
-              consentAcceptedAt: now.toISOString(),
-            },
-          },
-        });
-      }
 
       return { ok: true };
     });
