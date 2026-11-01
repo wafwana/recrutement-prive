@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const identifier = normalizeSiret(url.searchParams.get("identifier") ?? url.searchParams.get("siret") ?? "");
 
-  if (!/^\\d{9}$/.test(identifier) && !/^\\d{14}$/.test(identifier)) {
+  if (!/^\d{9}$/.test(identifier) && !/^\d{14}$/.test(identifier)) {
     return NextResponse.json(
       { error: "Identifiant invalide. Saisissez un SIREN à 9 chiffres ou un SIRET à 14 chiffres." },
       { status: 400 },
@@ -34,13 +34,13 @@ export async function GET(request: Request) {
   }
 
   try {
-    const company = /^\\d{9}$/.test(identifier)
+    const company = /^\d{9}$/.test(identifier)
       ? await lookupCompanyBySiren(identifier)
       : await lookupCompanyBySiret(identifier);
 
     if (!company) {
       return NextResponse.json(
-        { error: /^\\d{9}$/.test(identifier)
+        { error: /^\d{9}$/.test(identifier)
           ? "Aucune entreprise correspondant à ce SIREN n'a été trouvée."
           : "Aucun établissement correspondant à ce SIRET n'a été trouvé." },
         { status: 404 },
