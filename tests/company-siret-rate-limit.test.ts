@@ -10,6 +10,6 @@ test("public company registry lookup has a per-client first-line rate limit", ()
   assert.match(route, /x-real-ip/);
   assert.match(route, /status: 429/);
   assert.match(route, /"Retry-After"/);
-  assert.ok(route.indexOf("if (!limit.allowed)") < route.indexOf("lookupCompanyBySiren"));
-  assert.ok(route.indexOf("if (!limit.allowed)") < route.indexOf("lookupCompanyBySiret"));
+  assert.ok(route.indexOf("if (!limit.allowed)") < route.indexOf("await lookupCompanyBySiren"));
+  assert.ok(route.indexOf("if (!limit.allowed)") < route.indexOf("await lookupCompanyBySiret"));
 });
