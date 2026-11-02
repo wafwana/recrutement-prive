@@ -86,6 +86,8 @@ jobs:
       - run: npm run test:secure-contact-authorization
       - run: npm run test:cv-matching-dashboard
       - run: npm run test:secure-contact-payments
+      - name: Validate public contact form input and abuse guard
+        run: node --import tsx --test tests/public-contact-validation.test.ts
       - run: npm run test:executive-search
       - run: npx tsx tests/candidate-integration.ts
       - run: npx tsx tests/final-validation.ts
