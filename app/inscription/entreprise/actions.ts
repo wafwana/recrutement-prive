@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/password";
+import { hashPassword } from "@/lib/password-crypto";
 import { validatePassword } from "@/lib/password-policy";
 import { lookupCompanyBySiren, lookupCompanyBySiret } from "@/lib/company/public-registry";
 import { z } from "zod";
@@ -98,6 +98,25 @@ export async function registerCompany(formData: FormData) {
         return { ok: false, error: "Ce SIREN ou SIRET n’a pas été confirmé par le registre public. Vérifiez le numéro et réessayez." };
       }
     }
+    const finalSiren = verifiedCompany?.siren || siren || null;
+    const finalSiret = verifiedCompany?.siret || siret || null;
+
+    if (finalSiret) {
+      const existingCompanySiret = await prisma.company.findUnique({
+        where: { siret: finalSiret },
+      });
+      if (existingCompanySiret) {
+        return { ok: false, error: "Une entreprise avec ce SIRET est déjà inscrite sur la plateforme." };
+      }
+    } else if (finalSiren) {
+      const existingCompanySiren = await prisma.company.findUnique({
+        where: { siren: finalSiren },
+      });
+      if (existingCompanySiren) {
+        return { ok: false, error: "Une entreprise avec ce SIREN est déjà inscrite sur la plateforme." };
+      }
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -109,39 +128,71 @@ export async function registerCompany(formData: FormData) {
     const passwordHash = await hashPassword(password);
     const fullPhone = phoneInput ? (phoneInput.startsWith("+") ? phoneInput : `${phonePrefix} ${phoneInput}`) : null;
 
-    const user = await prisma.user.create({
-      data: {
-        name: userName,
-        email,
-        passwordHash,
-        role: "ENTREPRISE",
-        companyLinks: {
-          create: {
-            role: "OWNER",
-            company: {
-              create: {
-                name: companyName,
-                siren: verifiedCompany?.siren || siren || null,
-                siret: verifiedCompany?.siret || siret || null,
-                legalForm: verifiedCompany?.legalForm || legalForm || null,
-                apeCode: verifiedCompany?.apeCode || apeCode || null,
-                address: address || [verifiedCompany?.address, [verifiedCompany?.postalCode, verifiedCompany?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null,
-                sourceType: verifiedCompany?.sourceType || sourceType || null,
-                sourceUrl: verifiedCompany?.sourceUrl || sourceUrl || null,
-                sourceCollectedAt: verifiedCompany?.collectedAt ? new Date(verifiedCompany.collectedAt) : sourceCollectedAt ? new Date(sourceCollectedAt) : null,
-                website: website || verifiedCompany?.website || null,
-                country: country || "France",
-                phonePrefix: phonePrefix || "+33",
-                phone: fullPhone,
+    // Transaction atomique : création du compte, de l'entreprise et de son adhésion (OWNER de l'entreprise)
+    await prisma.$transaction(async (tx) => {
+      const concurrentUser = await tx.user.findUnique({ where: { email } });
+      if (concurrentUser) {
+        throw new Error("EMAIL_ALREADY_EXISTS");
+      }
+
+      if (finalSiret) {
+        const concurrentSiret = await tx.company.findUnique({ where: { siret: finalSiret } });
+        if (concurrentSiret) {
+          throw new Error("SIRET_ALREADY_EXISTS");
+        }
+      } else if (finalSiren) {
+        const concurrentSiren = await tx.company.findUnique({ where: { siren: finalSiren } });
+        if (concurrentSiren) {
+          throw new Error("SIREN_ALREADY_EXISTS");
+        }
+      }
+
+      const user = await tx.user.create({
+        data: {
+          name: userName,
+          email,
+          passwordHash,
+          role: "ENTREPRISE",
+          companyLinks: {
+            create: {
+              role: "OWNER",
+              company: {
+                create: {
+                  name: companyName,
+                  siren: verifiedCompany?.siren || siren || null,
+                  siret: verifiedCompany?.siret || siret || null,
+                  legalForm: verifiedCompany?.legalForm || legalForm || null,
+                  apeCode: verifiedCompany?.apeCode || apeCode || null,
+                  address: address || [verifiedCompany?.address, [verifiedCompany?.postalCode, verifiedCompany?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null,
+                  sourceType: verifiedCompany?.sourceType || sourceType || null,
+                  sourceUrl: verifiedCompany?.sourceUrl || sourceUrl || null,
+                  sourceCollectedAt: verifiedCompany?.collectedAt ? new Date(verifiedCompany.collectedAt) : sourceCollectedAt ? new Date(sourceCollectedAt) : null,
+                  website: website || verifiedCompany?.website || null,
+                  country: country || "France",
+                  phonePrefix: phonePrefix || "+33",
+                  phone: fullPhone,
+                },
               },
             },
           },
         },
-      },
+      });
+      return user;
     });
 
     return { ok: true, email };
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "EMAIL_ALREADY_EXISTS") {
+        return { ok: false, error: "Un compte existe déjà avec cette adresse e-mail." };
+      }
+      if (error.message === "SIRET_ALREADY_EXISTS") {
+        return { ok: false, error: "Une entreprise avec ce SIRET est déjà inscrite sur la plateforme." };
+      }
+      if (error.message === "SIREN_ALREADY_EXISTS") {
+        return { ok: false, error: "Une entreprise avec ce SIREN est déjà inscrite sur la plateforme." };
+      }
+    }
     console.error("[registerCompany] error:", error);
     return { ok: false, error: "Une erreur est survenue lors de la création du compte entreprise." };
   }

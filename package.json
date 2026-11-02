@@ -12,7 +12,7 @@
     "test:candidate-auth": "node --import tsx --test tests/candidate-auth.test.ts",
     "test:candidate-flow": "node --import tsx --test tests/candidate-flow.test.ts",
     "test:company-flow": "node --import tsx --test tests/company-flow.test.ts",
-    "test:company-registration": "node --import tsx --test tests/company-registration-form.test.ts",
+    "test:company-registration": "node --import tsx --test tests/company-registration-form.test.ts tests/company-registration-real.test.ts tests/company-siret-rate-limit.test.ts",
     "test:taxonomy-cv-protection": "node --import tsx --test tests/taxonomy-and-cv-protection.test.ts",
     "test:candidate-integration": "tsx tests/candidate-integration.ts",
     "db:generate": "prisma generate",
@@ -92,6 +92,7 @@
     "postcss": "^8.5.28",
     "source-map-js": "^1.2.2",
     "sharp": "^0.35.5",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "minimatch": "^11.0.4"
   }
 }
