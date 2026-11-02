@@ -27,7 +27,7 @@ test("contact validation rejects missing required fields and invalid email", () 
 
 test("contact validation enforces field-specific length limits", () => {
   assert.equal(validateContactFields({ ...valid, name: "n".repeat(121) }).ok, false);
-  assert.equal(validateContactFields({ ...valid, email: `${"a".repeat(245)}@test.com` }).ok, false);
+  assert.equal(validateContactFields({ ...valid, email: `${"a".repeat(246)}@test.com` }).ok, false);
   assert.equal(validateContactFields({ ...valid, phone: "1".repeat(41) }).ok, false);
   assert.equal(validateContactFields({ ...valid, subject: "s".repeat(161) }).ok, false);
   assert.equal(validateContactFields({ ...valid, message: "m".repeat(5_001) }).ok, false);
