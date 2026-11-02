@@ -32,17 +32,33 @@ test("company registration: rejection of weak passwords", async () => {
 });
 
 test("company registration: non-existent SIRET/SIREN returns confirmation error", async () => {
-  const formNotFound = new FormData();
-  formNotFound.set("companyName", "Entreprise Inexistante");
-  formNotFound.set("userName", "Inconnu Test");
-  formNotFound.set("email", "notfound@example.com");
-  formNotFound.set("password", "Recrutement@2026!");
-  formNotFound.set("country", "France");
-  formNotFound.set("siret", "00000000000000");
+  const originalFetch = global.fetch;
+  global.fetch = async (url: RequestInfo | URL) => {
+    const urlStr = String(url);
+    if (urlStr.includes("recherche-entreprises.api.gouv.fr/search?q=00000000000000")) {
+      return new Response(JSON.stringify({ results: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return originalFetch(url);
+  };
 
-  const resNotFound = await registerCompany(formNotFound);
-  assert.equal(resNotFound.ok, false);
-  assert.match(resNotFound.error || "", /Ce SIREN ou SIRET n’a pas été confirmé par le registre public/);
+  try {
+    const formNotFound = new FormData();
+    formNotFound.set("companyName", "Entreprise Inexistante");
+    formNotFound.set("userName", "Inconnu Test");
+    formNotFound.set("email", "notfound@example.com");
+    formNotFound.set("password", "Recrutement@2026!");
+    formNotFound.set("country", "France");
+    formNotFound.set("siret", "00000000000000");
+
+    const resNotFound = await registerCompany(formNotFound);
+    assert.equal(resNotFound.ok, false);
+    assert.match(resNotFound.error || "", /Ce SIREN ou SIRET n’a pas été confirmé par le registre public/);
+  } finally {
+    global.fetch = originalFetch;
+  }
 });
 
 test("company registration: public registry unavailability error handling", async () => {
