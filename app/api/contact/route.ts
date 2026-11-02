@@ -1,41 +1,65 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { validateContactFields } from "@/lib/contact/validation";
 
 const CONTACT_TO = "recrutement.prive@hotmail.com";
 const CONTACT_FROM = "contact@recrutement-prive.com";
-
-function getRequired(value: FormDataEntryValue | null) {
-  return String(value ?? "").trim();
-}
+const CONTACT_LIMIT = 5;
+const CONTACT_WINDOW_MS = 10 * 60_000;
+const MAX_BODY_BYTES = 32 * 1024;
 
 export async function POST(request: Request) {
+  const clientIp =
+    request.headers.get("x-real-ip")?.trim() ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown";
+  const limit = rateLimit(`public-contact:${clientIp}`, CONTACT_LIMIT, CONTACT_WINDOW_MS);
+
+  if (!limit.allowed) {
+    const retryAfter = Math.max(1, Math.ceil((limit.resetAt - Date.now()) / 1000));
+    return NextResponse.json(
+      { ok: false, error: "Trop de messages envoyés. Réessayez dans quelques instants." },
+      { status: 429, headers: { "Retry-After": String(retryAfter), "Cache-Control": "no-store" } },
+    );
+  }
+
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: "Le message est trop volumineux." }, { status: 413 });
+  }
+
+  let body: FormData;
   try {
-    const body = await request.formData();
-    const name = getRequired(body.get("name"));
-    const email = getRequired(body.get("email"));
-    const phone = getRequired(body.get("phone"));
-    const subject = getRequired(body.get("subject"));
-    const message = getRequired(body.get("message"));
+    body = await request.formData();
+  } catch {
+    return NextResponse.json({ ok: false, error: "Format de formulaire invalide." }, { status: 400 });
+  }
 
-    if (!name || !email || !subject || !message) {
-      return NextResponse.json({ ok: false, error: "Champs requis manquants." }, { status: 400 });
-    }
+  const validation = validateContactFields({
+    name: String(body.get("name") ?? ""),
+    email: String(body.get("email") ?? ""),
+    phone: String(body.get("phone") ?? ""),
+    subject: String(body.get("subject") ?? ""),
+    message: String(body.get("message") ?? ""),
+  });
 
-    const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!validEmail) {
-      return NextResponse.json({ ok: false, error: "Adresse email invalide." }, { status: 400 });
-    }
+  if (!validation.ok) {
+    return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
+  }
 
-    const apiKey = process.env.RESEND_API_KEY;
+  const { name, email, phone, subject, message } = validation.data;
+  const apiKey = process.env.RESEND_API_KEY;
 
-    if (!apiKey) {
-      console.error("[contact] email delivery is not configured");
-      return NextResponse.json(
-        { ok: false, error: "Le service de contact est temporairement indisponible." },
-        { status: 503 },
-      );
-    }
+  if (!apiKey) {
+    console.error("[contact] email delivery is not configured");
+    return NextResponse.json(
+      { ok: false, error: "Le service de contact est temporairement indisponible." },
+      { status: 503 },
+    );
+  }
 
+  try {
     const resend = new Resend(apiKey);
     const result = await resend.emails.send({
       from: CONTACT_FROM,
@@ -62,10 +86,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
-    console.error("[contact] unexpected error", error);
+    console.error("[contact] email delivery failed", error);
     return NextResponse.json(
-      { ok: false, error: "Impossible de traiter le message." },
-      { status: 500 },
+      { ok: false, error: "Impossible d'envoyer le message pour le moment." },
+      { status: 502 },
     );
   }
 }
