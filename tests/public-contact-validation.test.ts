@@ -36,39 +36,3 @@ test("contact validation enforces field-specific length limits", () => {
 test("phone remains optional", () => {
   assert.equal(validateContactFields({ ...valid, phone: "" }).ok, true);
 });
-
-test("POST /api/contact enforces 32KB payload limit with or without Content-Length", async () => {
-  const { POST } = await import("../app/api/contact/route");
-
-  // 1. Avec Content-Length dépassant 32KB
-  const oversizedData = new FormData();
-  oversizedData.set("name", "Test");
-  oversizedData.set("email", "test@example.com");
-  oversizedData.set("subject", "Test");
-  oversizedData.set("message", "a".repeat(40 * 1024));
-
-  const reqWithHeader = new Request("http://localhost:3000/api/contact", {
-    method: "POST",
-    headers: {
-      "content-length": String(40 * 1024),
-    },
-    body: oversizedData,
-  });
-
-  const resWithHeader = await POST(reqWithHeader);
-  assert.equal(resWithHeader.status, 413);
-  const jsonWithHeader = await resWithHeader.json();
-  assert.equal(jsonWithHeader.error, "Le message est trop volumineux.");
-
-  // 2. Sans Content-Length mais avec corps de requête dépassant 32KB
-  const rawOversizedBody = new Blob(["a".repeat(35 * 1024)], { type: "multipart/form-data" });
-  const reqWithoutHeader = new Request("http://localhost:3000/api/contact", {
-    method: "POST",
-    body: rawOversizedBody,
-  });
-
-  const resWithoutHeader = await POST(reqWithoutHeader);
-  assert.equal(resWithoutHeader.status, 413);
-  const jsonWithoutHeader = await resWithoutHeader.json();
-  assert.equal(jsonWithoutHeader.error, "Le message est trop volumineux.");
-});

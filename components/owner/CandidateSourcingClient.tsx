@@ -67,6 +67,7 @@ export default function CandidateSourcingClient({
   const [running, setRunning] = useState(false);
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [selectedCandidateForDetail, setSelectedCandidateForDetail] = useState<SourcedCandidateItem | null>(null);
 
   const [sourcesList, setSourcesList] = useState<string[]>(candidateSources);
   const [newSourceInput, setNewSourceInput] = useState("");
@@ -109,9 +110,13 @@ export default function CandidateSourcingClient({
     }
   }
 
+  const [runStatusType, setRunStatusType] = useState<"success" | "error" | "info" | null>(null);
+
   async function handleRunSourcing() {
+    if (running) return;
     setRunning(true);
-    setRunMessage(null);
+    setRunMessage("Lancement de la collecte en cours...");
+    setRunStatusType("info");
     try {
       const res = await fetch("/api/sourcing/global-candidates", {
         method: "POST",
@@ -123,18 +128,22 @@ export default function CandidateSourcingClient({
         }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || "Erreur lors du sourcing candidats.");
+      if (!res.ok) {
+        throw new Error(data?.error || `Erreur serveur (${res.status}) lors du sourcing candidats.`);
+      }
 
       if (data.ok === false) {
-        setRunMessage(data.message || "Aucune source active.");
+        setRunMessage(data.message || "Aucune source active disponible.");
+        setRunStatusType("error");
       } else {
-        setRunMessage(
-          `${data.fetched || 0} candidat(s) extrait(s), ${data.created || 0} nouveau(x), ${data.matched || 0} correspondu(s).`
-        );
-        setTimeout(() => window.location.reload(), 1500);
+        const msg = `${data.fetched || 0} candidat(s) extrait(s), ${data.created || 0} nouveau(x), ${data.matched || 0} correspondu(s).`;
+        setRunMessage(msg);
+        setRunStatusType("success");
+        setTimeout(() => window.location.reload(), 2000);
       }
     } catch (err) {
-      setRunMessage(err instanceof Error ? err.message : "Erreur pendant le sourcing.");
+      setRunMessage(err instanceof Error ? err.message : "Erreur réseau pendant le sourcing.");
+      setRunStatusType("error");
     } finally {
       setRunning(false);
     }
@@ -358,16 +367,47 @@ export default function CandidateSourcingClient({
         <div className="flex flex-col justify-end">
           <button
             type="button"
+            data-testid="btn-sourcing-manuel"
             onClick={handleRunSourcing}
             disabled={running}
-            className="w-full border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-2 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a] hover:bg-[#c7a15a]/20 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 border border-[#c7a15a] bg-[#c7a15a]/15 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c7a15a] transition hover:bg-[#c7a15a]/25 disabled:cursor-wait disabled:opacity-50"
           >
-            {running ? "Collecte..." : "Sourcing Manuel"}
+            {running ? (
+              <>
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#c7a15a] border-t-transparent" />
+                <span>Collecte en cours…</span>
+              </>
+            ) : (
+              <span>Sourcing Manuel</span>
+            )}
           </button>
         </div>
       </div>
 
-      {runMessage && <p className="text-xs text-[#c7a15a]">{runMessage}</p>}
+      {runMessage && (
+        <div
+          data-testid="sourcing-run-feedback"
+          className={`rounded border px-4 py-3 text-xs transition-all ${
+            runStatusType === "success"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+              : runStatusType === "error"
+              ? "border-red-500/40 bg-red-500/10 text-red-300"
+              : "border-[#c7a15a]/40 bg-[#c7a15a]/10 text-[#c7a15a]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-medium">{runMessage}</span>
+            <button
+              type="button"
+              onClick={() => setRunMessage(null)}
+              className="text-white/40 hover:text-white"
+              aria-label="Fermer l'alerte"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Candidate List Table */}
       <div className="overflow-hidden border border-white/10">
@@ -383,16 +423,25 @@ export default function CandidateSourcingClient({
           {filteredCandidates.map((candidate) => (
             <article key={candidate.id} className="grid grid-cols-1 gap-3 px-5 py-5 md:grid-cols-[2fr_1.2fr_1.2fr_1fr_1.2fr] md:items-center">
               <div>
-                <h4 className="text-sm font-medium text-white/90">
-                  {candidate.headline || candidate.name || "Profil Découvert"}
-                </h4>
-                {candidate.name && (
-                  <p className="mt-0.5 text-xs text-white/50">{candidate.name}</p>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedCandidateForDetail(candidate)}
+                  className="group text-left"
+                  title="Cliquer pour afficher la fiche détaillée du profil"
+                >
+                  <h4 className="text-sm font-medium text-white/90 transition group-hover:text-[#c7a15a] group-hover:underline">
+                    {candidate.headline || candidate.name || "Profil Découvert"}
+                  </h4>
+                  {candidate.name && (
+                    <p className="mt-0.5 text-xs text-white/50">{candidate.name}</p>
+                  )}
+                </button>
                 {candidate.matchingScore !== null && candidate.matchingScore !== undefined && (
-                  <span className="mt-1 inline-block bg-[#c7a15a]/20 px-2 py-0.5 text-[10px] text-[#c7a15a]">
-                    Score Match: {candidate.matchingScore}/100
-                  </span>
+                  <div>
+                    <span className="mt-1 inline-block bg-[#c7a15a]/20 px-2 py-0.5 text-[10px] text-[#c7a15a]">
+                      Score Match: {candidate.matchingScore}/100
+                    </span>
+                  </div>
                 )}
               </div>
 
@@ -481,6 +530,184 @@ export default function CandidateSourcingClient({
           )}
         </div>
       </div>
+
+      {/* Modal Fiche Détaillée Profil Candidat Détecté */}
+      {selectedCandidateForDetail && (
+        <div
+          data-testid="modal-detail-candidat"
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        >
+          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-white/15 bg-[#111] p-6 shadow-2xl md:p-8">
+            <div className="flex items-start justify-between border-b border-white/10 pb-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#c7a15a]">
+                  Fiche Profil Détecté · Sourcing RP
+                </p>
+                <h3 className="mt-1 text-xl font-medium text-white">
+                  {selectedCandidateForDetail.headline || selectedCandidateForDetail.name || "Intitulé non renseigné"}
+                </h3>
+                {selectedCandidateForDetail.name && (
+                  <p className="text-sm text-white/50">{selectedCandidateForDetail.name}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedCandidateForDetail(null)}
+                className="border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/60 hover:bg-white/10 hover:text-white"
+              >
+                Fermer ✕
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-6 text-xs">
+              <div className="grid grid-cols-2 gap-4 border border-white/5 bg-white/[0.02] p-4">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Statut de Traitement</span>
+                  <div className="mt-1">
+                    <span
+                      className={`inline-block px-2 py-0.5 text-[10px] uppercase tracking-wider ${
+                        selectedCandidateForDetail.status === "VALIDATED"
+                          ? "border border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                          : selectedCandidateForDetail.status === "REJECTED"
+                          ? "border border-red-500/50 bg-red-500/10 text-red-400"
+                          : selectedCandidateForDetail.status === "MATCHED"
+                          ? "border border-[#c7a15a]/50 bg-[#c7a15a]/10 text-[#c7a15a]"
+                          : "border border-white/20 text-white/50"
+                      }`}
+                    >
+                      {selectedCandidateForDetail.status}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Score de Matching</span>
+                  <p className="mt-1 font-mono text-sm text-[#c7a15a]">
+                    {selectedCandidateForDetail.matchingScore !== null && selectedCandidateForDetail.matchingScore !== undefined
+                      ? `${selectedCandidateForDetail.matchingScore} / 100`
+                      : "Non calculé (aucune offre cible associée)"}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Localisation</span>
+                  <p className="mt-1 text-white/80">{selectedCandidateForDetail.location || "Non spécifiée"}</p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Expérience Détectée</span>
+                  <p className="mt-1 text-white/80">
+                    {selectedCandidateForDetail.experienceYears !== null && selectedCandidateForDetail.experienceYears !== undefined
+                      ? `${selectedCandidateForDetail.experienceYears} an(s)`
+                      : "Non renseigné"}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Provenance de la source</span>
+                  <p className="mt-1 text-white/80">
+                    {selectedCandidateForDetail.source === "PLATFORM_CVTHEQUE"
+                      ? "CVthèque interne (Recrutement Privé)"
+                      : selectedCandidateForDetail.source}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Date de détection</span>
+                  <p className="mt-1 text-white/80">
+                    {new Date(selectedCandidateForDetail.createdAt).toLocaleString("fr-FR")}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-white/40">Compétences Détectées</span>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {selectedCandidateForDetail.skills && selectedCandidateForDetail.skills.length > 0 ? (
+                    selectedCandidateForDetail.skills.map((skill, i) => (
+                      <span key={i} className="border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80">
+                        {skill}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-white/40">Aucune compétence isolée identifiée.</span>
+                  )}
+                </div>
+              </div>
+
+              {selectedCandidateForDetail.notes && (
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Notes & Diagnostics</span>
+                  <p className="mt-1 whitespace-pre-wrap border border-white/5 bg-black/40 p-3 font-mono text-[11px] text-white/70">
+                    {selectedCandidateForDetail.notes}
+                  </p>
+                </div>
+              )}
+
+              {selectedCandidateForDetail.sourceProfileUrl && (
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Lien Public Source</span>
+                  <div className="mt-1">
+                    <a
+                      href={selectedCandidateForDetail.sourceProfileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[#F97316] underline hover:text-[#ea580c]"
+                    >
+                      {selectedCandidateForDetail.sourceProfileUrl}
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded border border-[#c7a15a]/20 bg-[#c7a15a]/5 p-3 text-[11px] leading-relaxed text-white/60">
+                <strong className="text-[#c7a15a]">🔒 Confidentialité & Validation Humaine :</strong> Les profils découverts ne sont jamais contactés automatiquement. La validation ou le rejet modifie le statut interne dans le vivier sans diffusion de données privées.
+              </div>
+            </div>
+
+            <div className="mt-8 flex justify-between border-t border-white/10 pt-4">
+              <div className="flex gap-2">
+                {selectedCandidateForDetail.status !== "VALIDATED" && (
+                  <button
+                    type="button"
+                    disabled={actionLoadingId === selectedCandidateForDetail.id}
+                    onClick={async () => {
+                      await handleCandidateAction(selectedCandidateForDetail.id, "VALIDATE");
+                      setSelectedCandidateForDetail((prev) => prev ? { ...prev, status: "VALIDATED" } : null);
+                    }}
+                    className="border border-emerald-500/50 bg-emerald-500/10 px-4 py-2 text-[10px] uppercase tracking-wider text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50"
+                  >
+                    Valider le profil
+                  </button>
+                )}
+                {selectedCandidateForDetail.status !== "REJECTED" && (
+                  <button
+                    type="button"
+                    disabled={actionLoadingId === selectedCandidateForDetail.id}
+                    onClick={async () => {
+                      await handleCandidateAction(selectedCandidateForDetail.id, "REJECT");
+                      setSelectedCandidateForDetail((prev) => prev ? { ...prev, status: "REJECTED" } : null);
+                    }}
+                    className="border border-red-500/50 bg-red-500/10 px-4 py-2 text-[10px] uppercase tracking-wider text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                  >
+                    Rejeter / Archiver
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedCandidateForDetail(null)}
+                className="border border-white/10 px-4 py-2 text-[10px] uppercase tracking-wider text-white/60 hover:bg-white/10 hover:text-white"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

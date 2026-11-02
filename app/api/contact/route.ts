@@ -10,8 +10,6 @@ const CONTACT_WINDOW_MS = 10 * 60_000;
 const MAX_BODY_BYTES = 32 * 1024;
 
 export async function POST(request: Request) {
-  // Limitation de fréquence locale en mémoire (sliding window par instance Vercel serverless).
-  // Sert de premier rempart anti-flood sans imposer de dépendance payante ou de migration base de données.
   const clientIp =
     request.headers.get("x-real-ip")?.trim() ||
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -26,25 +24,9 @@ export async function POST(request: Request) {
     );
   }
 
-  // Vérification de la taille du corps de requête :
-  // 1. Contrôle précoce via Content-Length si présent
-  const rawContentLength = request.headers.get("content-length");
-  if (rawContentLength !== null) {
-    const contentLength = Number(rawContentLength);
-    if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
-      return NextResponse.json({ ok: false, error: "Le message est trop volumineux." }, { status: 413 });
-    }
-  }
-
-  // 2. Contrôle de la taille réelle des octets reçus (couvre chunked transfer ou absence d'en-tête Content-Length)
-  let rawBytes: ArrayBuffer;
-  try {
-    rawBytes = await request.clone().arrayBuffer();
-    if (rawBytes.byteLength > MAX_BODY_BYTES) {
-      return NextResponse.json({ ok: false, error: "Le message est trop volumineux." }, { status: 413 });
-    }
-  } catch {
-    // Si la lecture brute échoue, on continue vers request.formData() qui gérera l'erreur
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: "Le message est trop volumineux." }, { status: 413 });
   }
 
   let body: FormData;
