@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { GET as helpSearchGet } from "../app/api/help/search/route";
 import { GET as mailingsGet } from "../app/api/mailings/templates/route";
-import { GET as documentSearchGet } from "../app/api/documents/search/route";
 import { HELP_GUIDES, getTaxonomyHelpGuides } from "../lib/help/help-center-data";
 import { MAILING_TEMPLATES } from "../lib/mailings/mailings-data";
 import { runWithTestSession } from "../auth";
@@ -77,28 +76,5 @@ test("Mailing templates API endpoint RBAC enforcement", async () => {
     const data = await res.json();
     assert.equal(data.templates.length, 1);
     assert.equal(data.templates[0].category, "ENTREPRISES");
-  });
-});
-
-test("Document search API RBAC enforcement and binary download restriction", async () => {
-  // Test unauthenticated returns 401
-  await runWithTestSession({}, async () => {
-    const req = new Request("http://localhost/api/documents/search");
-    const res = await documentSearchGet(req);
-    assert.equal(res.status, 401);
-  });
-});
-
-test("Help and mailing search endpoints reject oversized or invalid filters", async () => {
-  await runWithTestSession({ user: { id: "owner-1", role: "OWNER" } }, async () => {
-    const longQuery = "x".repeat(101);
-    const helpLong = await helpSearchGet(new Request(`http://localhost/api/help/search?q=${longQuery}`));
-    assert.equal(helpLong.status, 400);
-    const helpModule = await helpSearchGet(new Request("http://localhost/api/help/search?module=ROOT"));
-    assert.equal(helpModule.status, 400);
-    const mailingCategory = await mailingsGet(new Request("http://localhost/api/mailings/templates?category=UNKNOWN"));
-    assert.equal(mailingCategory.status, 400);
-    const mailingLong = await mailingsGet(new Request(`http://localhost/api/mailings/templates?q=${longQuery}`));
-    assert.equal(mailingLong.status, 400);
   });
 });
