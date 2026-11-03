@@ -88,6 +88,8 @@ jobs:
       - run: npm run test:secure-contact-payments
       - name: Validate public contact form input and abuse guard
         run: node --import tsx --test tests/public-contact-validation.test.ts
+      - name: Validate OWNER manual sourcing, candidate history, accessibility and audit contract
+        run: node --import tsx --test tests/owner-sourcing-manual-ui.test.ts
       - run: npm run test:executive-search
       - run: npx tsx tests/candidate-integration.ts
       - run: npx tsx tests/final-validation.ts
