@@ -91,3 +91,17 @@ test("Document search API RBAC enforcement and binary download restriction", asy
     assert.equal(res.status, 401);
   });
 });
+
+test("Help and mailing search endpoints reject oversized or invalid filters", async () => {
+  await runWithTestSession({ user: { id: "owner-1", role: "OWNER" } }, async () => {
+    const longQuery = "x".repeat(101);
+    const helpLong = await helpSearchGet(new Request(`http://localhost/api/help/search?q=${longQuery}`));
+    assert.equal(helpLong.status, 400);
+    const helpModule = await helpSearchGet(new Request("http://localhost/api/help/search?module=ROOT"));
+    assert.equal(helpModule.status, 400);
+    const mailingCategory = await mailingsGet(new Request("http://localhost/api/mailings/templates?category=UNKNOWN"));
+    assert.equal(mailingCategory.status, 400);
+    const mailingLong = await mailingsGet(new Request(`http://localhost/api/mailings/templates?q=${longQuery}`));
+    assert.equal(mailingLong.status, 400);
+  });
+});
