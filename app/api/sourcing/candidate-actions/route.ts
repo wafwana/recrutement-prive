@@ -4,8 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 
 async function requireStaffPermission() {
-  const active = getActiveSessionContext();
-  const session = active || (await auth());
+  let session = getActiveSessionContext();
+  if (!session) {
+    try {
+      session = await auth();
+    } catch {
+      // test context or outside Next.js request scope
+    }
+  }
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
   if (!userId || !role || !["OWNER", "ADMIN", "CONSULTANT"].includes(role)) return null;
@@ -50,28 +56,33 @@ export async function POST(request: Request) {
   else if (action === "REVIEW") newStatus = "REVIEWING";
   else if (action === "RESET") newStatus = "DETECTED";
 
-  const updatedCandidate = await prisma.sourcedCandidate.update({
-    where: { id: candidateId },
-    data: {
-      status: newStatus,
-      notes: notes ? `${candidate.notes ? candidate.notes + " | " : ""}${notes}` : candidate.notes,
-      updatedAt: new Date(),
-    },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      actorUserId: staff.userId,
-      actorRole: staff.role,
-      action: `SOURCED_CANDIDATE_${action}`,
-      targetType: "SOURCED_CANDIDATE",
-      targetId: candidateId,
-      details: {
-        previousStatus: candidate.status,
-        newStatus,
-        notes,
+  // Transaction atomique : mise à jour du statut candidat ET écriture du journal d'audit
+  const updatedCandidate = await prisma.$transaction(async (tx) => {
+    const updated = await tx.sourcedCandidate.update({
+      where: { id: candidateId },
+      data: {
+        status: newStatus,
+        notes: notes ? `${candidate.notes ? candidate.notes + " | " : ""}${notes}` : candidate.notes,
+        updatedAt: new Date(),
       },
-    },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorUserId: staff.userId,
+        actorRole: staff.role,
+        action: `SOURCED_CANDIDATE_${action}`,
+        targetType: "SOURCED_CANDIDATE",
+        targetId: candidateId,
+        details: {
+          previousStatus: candidate.status,
+          newStatus,
+          notes,
+        },
+      },
+    });
+
+    return updated;
   });
 
   return NextResponse.json({ ok: true, candidate: updatedCandidate });

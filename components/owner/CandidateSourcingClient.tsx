@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 type SourcedCandidateItem = {
   id: string;
@@ -28,6 +28,19 @@ type AuditSummary = {
   createdAt: string;
   details: unknown;
 } | null;
+
+type CandidateAuditLogItem = {
+  id: string;
+  actorUserId: string;
+  actorRole: string;
+  action: string;
+  details: {
+    previousStatus?: string;
+    newStatus?: string;
+    notes?: string;
+  } | null;
+  createdAt: string;
+};
 
 function displaySourceUrl(raw: string): string {
   try {
@@ -68,6 +81,49 @@ export default function CandidateSourcingClient({
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [selectedCandidateForDetail, setSelectedCandidateForDetail] = useState<SourcedCandidateItem | null>(null);
+  const [candidateAuditLogs, setCandidateAuditLogs] = useState<CandidateAuditLogItem[]>([]);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+  const detailModalCloseBtnRef = useRef<HTMLButtonElement | null>(null);
+  const lastTriggerElementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!selectedCandidateForDetail) {
+      setCandidateAuditLogs([]);
+      return;
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedCandidateForDetail(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    detailModalCloseBtnRef.current?.focus();
+
+    // Fetch audit history for this candidate
+    let isCancelled = false;
+    setLoadingAuditLogs(true);
+    fetch(`/api/sourcing/candidate-history?candidateId=${encodeURIComponent(selectedCandidateForDetail.id)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isCancelled && data?.ok && Array.isArray(data.logs)) {
+          setCandidateAuditLogs(data.logs);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) setCandidateAuditLogs([]);
+      })
+      .finally(() => {
+        if (!isCancelled) setLoadingAuditLogs(false);
+      });
+
+    return () => {
+      isCancelled = true;
+      window.removeEventListener("keydown", handleKeyDown);
+      if (lastTriggerElementRef.current) {
+        lastTriggerElementRef.current.focus();
+      }
+    };
+  }, [selectedCandidateForDetail]);
 
   const [sourcesList, setSourcesList] = useState<string[]>(candidateSources);
   const [newSourceInput, setNewSourceInput] = useState("");
@@ -135,11 +191,22 @@ export default function CandidateSourcingClient({
       if (data.ok === false) {
         setRunMessage(data.message || "Aucune source active disponible.");
         setRunStatusType("error");
+      } else if (data.fetched === 0) {
+        const failedSourcesCount = Array.isArray(data.results)
+          ? data.results.filter((r: { error?: string }) => Boolean(r.error)).length
+          : 0;
+        const note = failedSourcesCount > 0
+          ? ` (${failedSourcesCount} source(s) en erreur ou inaccessible(s))`
+          : "";
+        setRunMessage(`Collecte terminée : aucun profil candidat détecté ou correspondant aux critères actuels${note}.`);
+        setRunStatusType("info");
       } else {
-        const msg = `${data.fetched || 0} candidat(s) extrait(s), ${data.created || 0} nouveau(x), ${data.matched || 0} correspondu(s).`;
+        const fallbackNote = data.fallbackSource === "PLATFORM_CVTHEQUE"
+          ? " (relais automatique via CVthèque interne)"
+          : "";
+        const msg = `Collecte réussie : ${data.fetched || 0} candidat(s) extrait(s), ${data.created || 0} nouveau(x), ${data.matched || 0} correspondu(s)${fallbackNote}.`;
         setRunMessage(msg);
         setRunStatusType("success");
-        setTimeout(() => window.location.reload(), 2000);
       }
     } catch (err) {
       setRunMessage(err instanceof Error ? err.message : "Erreur réseau pendant le sourcing.");
@@ -149,7 +216,8 @@ export default function CandidateSourcingClient({
     }
   }
 
-  async function handleCandidateAction(candidateId: string, action: "VALIDATE" | "REJECT" | "REVIEW" | "RESET") {
+  async function handleCandidateAction(candidateId: string, action: "VALIDATE" | "REJECT" | "REVIEW" | "RESET"): Promise<boolean> {
+    if (actionLoadingId) return false;
     setActionLoadingId(candidateId);
     try {
       const res = await fetch("/api/sourcing/candidate-actions", {
@@ -157,28 +225,40 @@ export default function CandidateSourcingClient({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ candidateId, action }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Action échouée.");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `Action échouée (${res.status}).`);
 
+      const confirmedStatus = typeof data?.candidate?.status === "string" ? data.candidate.status : null;
+      if (!confirmedStatus) {
+        throw new Error("Le serveur n'a pas confirmé le statut du candidat.");
+      }
+
+      // Synchronisation exclusive sur confirmation effective du statut par le serveur
       setCandidates((prev) =>
-        prev.map((c) =>
-          c.id === candidateId
-            ? {
-                ...c,
-                status:
-                  action === "VALIDATE"
-                    ? "VALIDATED"
-                    : action === "REJECT"
-                    ? "REJECTED"
-                    : action === "REVIEW"
-                    ? "REVIEWING"
-                    : "DETECTED",
-              }
-            : c
-        )
+        prev.map((c) => (c.id === candidateId ? { ...c, status: confirmedStatus } : c))
       );
+
+      // Synchronisation de la fiche détaillée si ouverte
+      setSelectedCandidateForDetail((prev) =>
+        prev && prev.id === candidateId ? { ...prev, status: confirmedStatus } : prev
+      );
+
+      // Rafraîchir l'historique d'audit
+      fetch(`/api/sourcing/candidate-history?candidateId=${encodeURIComponent(candidateId)}`)
+        .then((res) => res.json())
+        .then((hData) => {
+          if (hData?.ok && Array.isArray(hData.logs)) {
+            setCandidateAuditLogs(hData.logs);
+          }
+        })
+        .catch(() => null);
+
+      return true;
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur action.");
+      const errorMsg = err instanceof Error ? err.message : "Erreur lors de la mise à jour.";
+      setRunMessage(`Erreur action : ${errorMsg}`);
+      setRunStatusType("error");
+      return false;
     } finally {
       setActionLoadingId(null);
     }
@@ -425,7 +505,10 @@ export default function CandidateSourcingClient({
               <div>
                 <button
                   type="button"
-                  onClick={() => setSelectedCandidateForDetail(candidate)}
+                  onClick={(e) => {
+                    lastTriggerElementRef.current = e.currentTarget;
+                    setSelectedCandidateForDetail(candidate);
+                  }}
                   className="group text-left"
                   title="Cliquer pour afficher la fiche détaillée du profil"
                 >
@@ -537,6 +620,8 @@ export default function CandidateSourcingClient({
           data-testid="modal-detail-candidat"
           role="dialog"
           aria-modal="true"
+          aria-labelledby="modal-candidate-detail-title"
+          aria-describedby="modal-candidate-detail-desc"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
         >
           <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-white/15 bg-[#111] p-6 shadow-2xl md:p-8">
@@ -545,7 +630,7 @@ export default function CandidateSourcingClient({
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#c7a15a]">
                   Fiche Profil Détecté · Sourcing RP
                 </p>
-                <h3 className="mt-1 text-xl font-medium text-white">
+                <h3 id="modal-candidate-detail-title" className="mt-1 text-xl font-medium text-white">
                   {selectedCandidateForDetail.headline || selectedCandidateForDetail.name || "Intitulé non renseigné"}
                 </h3>
                 {selectedCandidateForDetail.name && (
@@ -553,13 +638,19 @@ export default function CandidateSourcingClient({
                 )}
               </div>
               <button
+                ref={detailModalCloseBtnRef}
                 type="button"
                 onClick={() => setSelectedCandidateForDetail(null)}
                 className="border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/60 hover:bg-white/10 hover:text-white"
+                aria-label="Fermer la fiche détaillée du candidat"
               >
                 Fermer ✕
               </button>
             </div>
+
+            <p id="modal-candidate-detail-desc" className="sr-only">
+              Détails, compétences, matching et historique d&apos;actions pour le profil candidat sélectionné.
+            </p>
 
             <div className="mt-6 space-y-6 text-xs">
               <div className="grid grid-cols-2 gap-4 border border-white/5 bg-white/[0.02] p-4">
@@ -662,6 +753,52 @@ export default function CandidateSourcingClient({
                 </div>
               )}
 
+              {/* Historique des Actions & AuditLog (Brique 2) */}
+              <div data-testid="section-historique-actions" className="border border-white/10 bg-black/40 p-4">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c7a15a]">
+                    Historique & Traçabilité des Actions (AuditLog)
+                  </span>
+                  <span className="text-[10px] text-white/40">
+                    {loadingAuditLogs ? "Chargement..." : `${candidateAuditLogs.length} entrée(s)`}
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {loadingAuditLogs ? (
+                    <p className="text-[11px] text-white/40">Chargement de la traçabilité...</p>
+                  ) : candidateAuditLogs.length > 0 ? (
+                    candidateAuditLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="flex flex-col gap-1 border-b border-white/5 pb-2 text-[11px] last:border-b-0 last:pb-0"
+                      >
+                        <div className="flex items-center justify-between text-white/70">
+                          <span className="font-medium text-white/90">
+                            {log.action.replace("SOURCED_CANDIDATE_", "ACTION : ")}
+                          </span>
+                          <span className="text-[10px] text-white/40 font-mono">
+                            {new Date(log.createdAt).toLocaleString("fr-FR")}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[10px] text-white/50">
+                          <span>Acteur : <strong className="text-white/70">{log.actorRole}</strong></span>
+                          {log.details?.previousStatus && log.details?.newStatus && (
+                            <span>
+                              Transition : <span className="font-mono text-white/60">{log.details.previousStatus}</span> → <span className="font-mono text-[#c7a15a]">{log.details.newStatus}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[11px] text-white/40">
+                      Aucune action enregistrée pour le moment. Le profil est au statut initial.
+                    </p>
+                  )}
+                </div>
+              </div>
+
               <div className="rounded border border-[#c7a15a]/20 bg-[#c7a15a]/5 p-3 text-[11px] leading-relaxed text-white/60">
                 <strong className="text-[#c7a15a]">🔒 Confidentialité & Validation Humaine :</strong> Les profils découverts ne sont jamais contactés automatiquement. La validation ou le rejet modifie le statut interne dans le vivier sans diffusion de données privées.
               </div>
@@ -673,26 +810,20 @@ export default function CandidateSourcingClient({
                   <button
                     type="button"
                     disabled={actionLoadingId === selectedCandidateForDetail.id}
-                    onClick={async () => {
-                      await handleCandidateAction(selectedCandidateForDetail.id, "VALIDATE");
-                      setSelectedCandidateForDetail((prev) => prev ? { ...prev, status: "VALIDATED" } : null);
-                    }}
+                    onClick={() => handleCandidateAction(selectedCandidateForDetail.id, "VALIDATE")}
                     className="border border-emerald-500/50 bg-emerald-500/10 px-4 py-2 text-[10px] uppercase tracking-wider text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50"
                   >
-                    Valider le profil
+                    {actionLoadingId === selectedCandidateForDetail.id ? "Validation..." : "Valider le profil"}
                   </button>
                 )}
                 {selectedCandidateForDetail.status !== "REJECTED" && (
                   <button
                     type="button"
                     disabled={actionLoadingId === selectedCandidateForDetail.id}
-                    onClick={async () => {
-                      await handleCandidateAction(selectedCandidateForDetail.id, "REJECT");
-                      setSelectedCandidateForDetail((prev) => prev ? { ...prev, status: "REJECTED" } : null);
-                    }}
+                    onClick={() => handleCandidateAction(selectedCandidateForDetail.id, "REJECT")}
                     className="border border-red-500/50 bg-red-500/10 px-4 py-2 text-[10px] uppercase tracking-wider text-red-400 hover:bg-red-500/20 disabled:opacity-50"
                   >
-                    Rejeter / Archiver
+                    {actionLoadingId === selectedCandidateForDetail.id ? "Rejet..." : "Rejeter / Archiver"}
                   </button>
                 )}
               </div>
