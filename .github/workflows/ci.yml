@@ -109,6 +109,8 @@ jobs:
       - run: npm run test:owner-workspace-navigation
       - run: npm run test:role-workspace-navigation
       - run: npm run test:workspace-navigation-locales
+      - name: Validate Help Center and mailing templates
+        run: node --import tsx --test tests/help-center-mailings-search.test.ts
       - run: npm run typecheck
       - run: npm run build
       - name: End-to-end Auth.js login, CV intake and OWNER outflows over HTTP
