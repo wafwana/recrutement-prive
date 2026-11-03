@@ -4,8 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 
 async function requireStaffPermission() {
-  const active = getActiveSessionContext();
-  const session = active || (await auth());
+  let session = getActiveSessionContext();
+  if (!session) {
+    try {
+      session = await auth();
+    } catch {
+      // test context or outside Next.js request scope
+    }
+  }
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
   if (!userId || !role || !["OWNER", "ADMIN", "CONSULTANT"].includes(role)) return null;
@@ -34,45 +40,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "candidateId et action sont requis." }, { status: 400 });
   }
 
-  const candidate = await prisma.sourcedCandidate.findUnique({
-    where: { id: candidateId },
-  });
-
-  if (!candidate) {
-    return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
+  const statusByAction: Record<string, "VALIDATED" | "REJECTED" | "DETECTED" | "REVIEWING"> = {
+    VALIDATE: "VALIDATED", REJECT: "REJECTED", ARCHIVE: "REJECTED", REVIEW: "REVIEWING", RESET: "DETECTED",
+  };
+  if (!Object.prototype.hasOwnProperty.call(statusByAction, action)) {
+    return NextResponse.json({ error: "Action de sourcing invalide." }, { status: 400 });
   }
-
-  let newStatus: "VALIDATED" | "REJECTED" | "DETECTED" | "REVIEWING" | "MATCHED" | "CONTACTED" = candidate.status;
-
-  if (action === "VALIDATE") newStatus = "VALIDATED";
-  else if (action === "REJECT") newStatus = "REJECTED";
-  else if (action === "ARCHIVE") newStatus = "REJECTED";
-  else if (action === "REVIEW") newStatus = "REVIEWING";
-  else if (action === "RESET") newStatus = "DETECTED";
-
-  const updatedCandidate = await prisma.sourcedCandidate.update({
-    where: { id: candidateId },
-    data: {
-      status: newStatus,
-      notes: notes ? `${candidate.notes ? candidate.notes + " | " : ""}${notes}` : candidate.notes,
-      updatedAt: new Date(),
-    },
+  const newStatus = statusByAction[action];
+  // La lecture, la mise à jour du statut et l’AuditLog sont atomiques.
+  const updatedCandidate = await prisma.$transaction(async (tx) => {
+    const candidate = await tx.sourcedCandidate.findUnique({ where: { id: candidateId } });
+    if (!candidate) return null;
+    const updated = await tx.sourcedCandidate.update({
+      where: { id: candidateId },
+      data: { status: newStatus, notes: notes ? `${candidate.notes ? candidate.notes + " | " : ""}${notes}` : candidate.notes, updatedAt: new Date() },
+    });
+    await tx.auditLog.create({
+      data: { actorUserId: staff.userId, actorRole: staff.role, action: `SOURCED_CANDIDATE_${action}`, targetType: "SOURCED_CANDIDATE", targetId: candidateId, details: { previousStatus: candidate.status, newStatus, notes } },
+    });
+    return updated;
   });
-
-  await prisma.auditLog.create({
-    data: {
-      actorUserId: staff.userId,
-      actorRole: staff.role,
-      action: `SOURCED_CANDIDATE_${action}`,
-      targetType: "SOURCED_CANDIDATE",
-      targetId: candidateId,
-      details: {
-        previousStatus: candidate.status,
-        newStatus,
-        notes,
-      },
-    },
-  });
-
+  if (!updatedCandidate) return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
   return NextResponse.json({ ok: true, candidate: updatedCandidate });
 }
