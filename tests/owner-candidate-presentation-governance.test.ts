@@ -50,3 +50,28 @@ test("ADMIN cannot present a candidate on behalf of the OWNER", async () => {
     /Seul l'OWNER peut présenter un candidat/,
   );
 });
+
+test("legacy presentation API rejects ADMIN and CONSULTANT even with delegated permission", async () => {
+  const { POST } = await import("../app/api/consultant/presentations/route");
+  const { runWithTestSession } = await import("../auth");
+  const body = JSON.stringify({
+    missionId: "mission-test",
+    applicationId: "application-test",
+    candidateId: "candidate-test",
+    companyId: "company-test",
+  });
+
+  for (const role of ["ADMIN", "CONSULTANT"]) {
+    const response = await runWithTestSession(
+      { user: { id: `user-${role.toLowerCase()}`, role } },
+      () => POST(new Request("http://localhost/api/consultant/presentations", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      })),
+    );
+    assert.equal(response.status, 403);
+    const payload = await response.json();
+    assert.equal(payload.error, "Seul l'OWNER peut présenter un candidat.");
+  }
+});
