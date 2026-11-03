@@ -83,6 +83,7 @@ export default function QuiSommesNousPage() {
       <footer className="rp-footer">
         <div className="rp-footer-brand"><a href="/" className="rp-brand"><span className="rp-logo">RP</span><span className="rp-brand-copy"><strong>RECRUTEMENT PRIVÉ</strong><small>EXPERT RECRUTEMENT</small></span></a><p>{t("footer_tagline_line_1")}<br />{t("footer_tagline_line_2")}</p></div>
         <div><h3>{t("footer_navigation")}</h3>{nav.map(([key, href]) => <a key={key} href={href}>{t(key)}</a>)}</div>
+        <div><h3>Informations légales</h3><a href="/mentions-legales">Mentions légales</a><a href="/politique-confidentialite">Politique de confidentialité</a></div>
         <div id="contact"><h3>{t("footer_contact")}</h3><a href="mailto:contact@recrutement-prive.com">✉ &nbsp; contact@recrutement-prive.com</a><span>⌖ &nbsp; Saint-Amand-les-Eaux, France</span></div>
         <div className="rp-copyright">© 2026 Recrutement Privé. {t("footer_rights")}</div>
       </footer>
