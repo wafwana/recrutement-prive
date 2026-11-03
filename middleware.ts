@@ -9,6 +9,8 @@ const PUBLIC_PATHS = new Set([
   "/",
   "/offres",
   "/qui-sommes-nous",
+  "/mentions-legales",
+  "/politique-confidentialite",
   "/connexion",
   "/maintenance",
   "/mot-de-passe-oublie",
