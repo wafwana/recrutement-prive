@@ -196,7 +196,10 @@ export default async function OfferPoolPage({
               <p className="text-xs text-white/55">{offer.categoryCode || "À qualifier"}{offer.subCategoryCode ? " · " + offer.subCategoryCode : ""}</p>
               <div>
                 <p className={`text-xs font-medium ${matchingStatus.colorClass}`}>{matchingStatus.label}</p>
-                <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/30">{offer.source}</p>
+                <Link href={`/espace/owner/offres-vivier/${offer.id}`} className="mt-2 inline-block border border-[#c7a15a]/70 px-3 py-2 text-[9px] uppercase tracking-[0.12em] text-[#c7a15a] hover:bg-[#c7a15a]/10">
+                  Voir l’offre complète
+                </Link>
+                <p className="mt-2 text-[10px] uppercase tracking-[0.12em] text-white/30">{offer.source}</p>
                 {offer.sourceUrl && <a href={offer.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[10px] text-[#F97316] hover:underline">Source</a>}
                 <form action={submitRawOffer} className="mt-2"><input type="hidden" name="externalJobId" value={offer.id}/><button className="border border-[#c7a15a]/70 px-3 py-2 text-[9px] uppercase tracking-[0.12em] text-[#c7a15a]">Rentrer une offre</button></form>
               </div>
