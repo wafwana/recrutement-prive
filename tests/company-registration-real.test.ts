@@ -32,6 +32,19 @@ test("company registration: rejection of weak passwords", async () => {
 });
 
 test("company registration: non-existent SIRET/SIREN returns confirmation error", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async (url: RequestInfo | URL) => {
+    const urlStr = String(url);
+    if (urlStr.includes("recherche-entreprises.api.gouv.fr/search?q=00000000000000")) {
+      return new Response(JSON.stringify({ results: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return originalFetch(url);
+  };
+
+  try {
   const formNotFound = new FormData();
   formNotFound.set("companyName", "Entreprise Inexistante");
   formNotFound.set("userName", "Inconnu Test");
@@ -43,6 +56,9 @@ test("company registration: non-existent SIRET/SIREN returns confirmation error"
   const resNotFound = await registerCompany(formNotFound);
   assert.equal(resNotFound.ok, false);
   assert.match(resNotFound.error || "", /Ce SIREN ou SIRET n’a pas été confirmé par le registre public/);
+  } finally {
+    global.fetch = originalFetch;
+  }
 });
 
 test("company registration: public registry unavailability error handling", async () => {
