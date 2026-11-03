@@ -43,14 +43,11 @@ test("Help search API endpoint permission checks and search matching", async () 
     assert.equal(res.status, 401);
   });
 
-  // Test authenticated candidate search returns guides
+  // Internal operating guides must not be exposed to candidates.
   await runWithTestSession({ user: { id: "cand-1", role: "CANDIDAT" } }, async () => {
     const req = new Request("http://localhost/api/help/search?q=sourcing");
     const res = await helpSearchGet(req);
-    assert.equal(res.status, 200);
-    const data = await res.json();
-    assert.ok(data.guides.length > 0);
-    assert.equal(data.templates.length, 0, "Non-staff roles must not see mailing templates");
+    assert.equal(res.status, 403);
   });
 
   // Test authenticated staff sees both guides and mailing templates
