@@ -37,3 +37,16 @@ test("OWNER has a dedicated queue to decide candidate presentations", () => {
   assert.match(page, /action=\{presentCandidateToCompany\.bind\(null, application\.id\)\}/);
   assert.match(dashboard, /"\/espace\/owner\/candidatures"/);
 });
+
+test("ADMIN cannot present a candidate on behalf of the OWNER", async () => {
+  const { presentCandidateToCompany } = await import("../app/espace/owner/candidatures/actions");
+  const { runWithTestSession } = await import("../auth");
+
+  await assert.rejects(
+    runWithTestSession(
+      { user: { id: "admin-without-owner-authority", role: "ADMIN" } },
+      () => presentCandidateToCompany("application-test"),
+    ),
+    /Seul l'OWNER peut présenter un candidat/,
+  );
+});
