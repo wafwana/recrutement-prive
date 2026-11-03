@@ -2,7 +2,6 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireCompanyAccess } from "@/lib/company-access";
-import { presentCandidateToCompany } from "../../actions";
 import { isIdentityUnlocked } from "@/lib/mission-lock";
 import ApplicationStatusForm from "./ApplicationStatusForm";
 import MissionEditForm from "./MissionEditForm";
@@ -21,7 +20,7 @@ export default async function CompanyJobPage({ params }: { params: Promise<{ job
     where: { id: jobId, companyId: access.companyId },
     include: {
       applications: {
-        where: {},
+        where: { presentations: { some: { companyId: access.companyId } } },
         include: {
           candidate: {
             include: {
@@ -83,14 +82,6 @@ export default async function CompanyJobPage({ params }: { params: Promise<{ job
                       <div>
                         <div className="flex items-center gap-3">
                           <h2 className="font-serif text-xl text-white">{displayName}</h2>
-                          {!presentation && (
-                      <form action={presentCandidateToCompany.bind(null, application.id)} className="mt-4">
-                        <button type="submit" className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a]">
-                          Présenter ce candidat →
-                        </button>
-                      </form>
-                    )}
-
                     {!unlocked && presentation && (
                             <span className="border border-[#c7a15a]/30 bg-[#c7a15a]/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.15em] text-[#c7a15a]">
                               Présentation Confidentielle
