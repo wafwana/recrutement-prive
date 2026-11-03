@@ -32,7 +32,7 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
         <div className="mx-auto flex min-h-20 w-[min(1180px,calc(100%-40px))] items-center justify-between gap-8 md:w-[min(1180px,calc(100%-72px))]">
           <Link href="/" className="font-serif text-xl tracking-[0.22em]">RP</Link>
           <nav aria-label="Navigation générale" className="flex flex-wrap items-center justify-end gap-4 text-[10px] uppercase tracking-[0.2em] text-white/60">
-            <Link href="/espace/help" className="hover:text-[#f1ce8b]">Centre d’aide</Link>
+            {role === "OWNER" || role === "ADMIN" || role === "CONSULTANT" ? <Link href="/espace/help" className="hover:text-[#f1ce8b]">Centre d’aide</Link> : null}
             {role === "OWNER" || role === "ADMIN" || role === "CONSULTANT" ? <Link href="/espace/mailings" className="hover:text-[#f1ce8b]">Bibliothèque de mailings</Link> : null}
             <ReturnToSiteLink />
           </nav>
