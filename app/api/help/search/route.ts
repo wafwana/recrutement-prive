@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth, getActiveSessionContext } from "@/auth";
 import { HELP_GUIDES, getTaxonomyHelpGuides, type HelpGuide } from "@/lib/help/help-center-data";
 import { MAILING_TEMPLATES } from "@/lib/mailings/mailings-data";
+import { getUserPermissions } from "@/lib/auth/permissions";
 
 export async function GET(request: Request) {
   const activeSession = getActiveSessionContext();
@@ -12,6 +13,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }
 
+  const userRole = user.role || "";
+  const isStaff = ["OWNER", "ADMIN", "CONSULTANT"].includes(userRole);
+  if (!isStaff) return NextResponse.json({ error: "Centre d'aide réservé aux collaborateurs." }, { status: 403 });
+  const userPermissions = userRole === "OWNER" ? null : await getUserPermissions(user.id);
   const { searchParams } = new URL(request.url);
   const rawQuery = (searchParams.get("q") || "").trim();
   if (rawQuery.length > 100) return NextResponse.json({ error: "Recherche limitée à 100 caractères." }, { status: 400 });
@@ -23,8 +28,14 @@ export async function GET(request: Request) {
   if (categoryFilter && categoryFilter.length > 80) return NextResponse.json({ error: "Catégorie invalide." }, { status: 400 });
 
   const allGuides = [...HELP_GUIDES, ...getTaxonomyHelpGuides()];
+  const visibleGuides = allGuides.filter((guide) =>
+    userRole === "OWNER" ||
+    guide.requiredPermissions.some((permission) =>
+      permission === userRole || (Array.isArray(userPermissions) && userPermissions.includes(permission as never)),
+    ),
+  );
 
-  let filteredGuides = allGuides.filter((guide) => {
+  let filteredGuides = visibleGuides.filter((guide) => {
     if (moduleFilter && guide.module !== moduleFilter) return false;
     if (categoryFilter && guide.categoryCode !== categoryFilter) return false;
 
@@ -38,10 +49,7 @@ export async function GET(request: Request) {
     return inTitle || inSummary || inKeywords || inSteps;
   });
 
-  // Filter mailing templates if authorized for staff
-  const userRole = user.role || "";
-  const isStaff = ["OWNER", "ADMIN", "CONSULTANT"].includes(userRole);
-
+  // Mailing templates are available to authenticated staff roles only.
   const matchedTemplates = isStaff
     ? MAILING_TEMPLATES.filter((tpl) => {
         if (!q) return true;
