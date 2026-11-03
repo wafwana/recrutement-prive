@@ -165,6 +165,30 @@ test("Internal Messaging & Document Confidentiality — Complete Audit & Verific
     assert.match(ownerDownloadResponse.headers.get("Content-Disposition") || "", /attachment/);
   });
 
+  await t.test("ADMIN document viewing requires explicit OWNER permission or an active transfer", async () => {
+    const denied = await handleGetCandidateDocument(
+      candidateDoc.id,
+      { user: { id: adminUser.id, role: "ADMIN" } },
+      false
+    );
+    assert.equal(denied.status, 403);
+
+    const permissionKey = `permissions:${adminUser.id}`;
+    try {
+      await prisma.systemSetting.create({
+        data: { key: permissionKey, value: ["DOCUMENTS_VIEW"] },
+      });
+      const granted = await handleGetCandidateDocument(
+        candidateDoc.id,
+        { user: { id: adminUser.id, role: "ADMIN" } },
+        false
+      );
+      assert.equal(granted.status, 200);
+    } finally {
+      await prisma.systemSetting.deleteMany({ where: { key: permissionKey } });
+    }
+  });
+
   await t.test("Requirement 12: OWNER can revoke transfer and collaborator loses access", async () => {
     // Create active transfer
     const transfer = await prisma.internalTransfer.create({

@@ -86,7 +86,7 @@ export async function handleGetCandidateDocument(
       },
     });
 
-    if (!hasDocPermission && !activeTransfer && userRole !== "ADMIN") {
+    if (!hasDocPermission && !activeTransfer) {
       return NextResponse.json({ error: "Permission documentaire non accordée par l'Owner." }, { status: 403 });
     }
   } else if (userRole !== "OWNER") {
