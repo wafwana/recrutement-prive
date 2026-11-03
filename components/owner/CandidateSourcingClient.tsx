@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 type SourcedCandidateItem = {
   id: string;
@@ -28,6 +28,19 @@ type AuditSummary = {
   createdAt: string;
   details: unknown;
 } | null;
+
+type CandidateAuditLogItem = {
+  id: string;
+  actorUserId: string;
+  actorRole: string;
+  action: string;
+  details: {
+    previousStatus?: string;
+    newStatus?: string;
+    notes?: string;
+  } | null;
+  createdAt: string;
+};
 
 function displaySourceUrl(raw: string): string {
   try {
@@ -65,8 +78,78 @@ export default function CandidateSourcingClient({
   const [statusFilter, setStatusFilter] = useState("ALL");
 
   const [running, setRunning] = useState(false);
+  const runningRef = useRef(false);
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [selectedCandidateForDetail, setSelectedCandidateForDetail] = useState<SourcedCandidateItem | null>(null);
+  const [candidateAuditLogs, setCandidateAuditLogs] = useState<CandidateAuditLogItem[]>([]);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+  const detailModalCloseBtnRef = useRef<HTMLButtonElement | null>(null);
+  const detailModalRef = useRef<HTMLDivElement | null>(null);
+  const lastTriggerElementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const candidateId = selectedCandidateForDetail?.id;
+    if (!candidateId) {
+      setCandidateAuditLogs([]);
+      return;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setSelectedCandidateForDetail(null);
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const dialog = detailModalRef.current;
+      if (!dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      if (focusable.length === 0) {
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const focusOutsideDialog = !dialog.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || focusOutsideDialog)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || focusOutsideDialog)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    detailModalCloseBtnRef.current?.focus();
+    let isCancelled = false;
+    setLoadingAuditLogs(true);
+    fetch("/api/sourcing/candidate-history?candidateId=" + encodeURIComponent(candidateId))
+      .then((res) => {
+        if (!res.ok) throw new Error("Historique indisponible.");
+        return res.json();
+      })
+      .then((data) => {
+        if (!isCancelled && data?.ok && Array.isArray(data.logs)) setCandidateAuditLogs(data.logs);
+      })
+      .catch(() => {
+        if (!isCancelled) setCandidateAuditLogs([]);
+      })
+      .finally(() => {
+        if (!isCancelled) setLoadingAuditLogs(false);
+      });
+
+    return () => {
+      isCancelled = true;
+      window.removeEventListener("keydown", handleKeyDown);
+      if (lastTriggerElementRef.current?.isConnected) lastTriggerElementRef.current.focus();
+    };
+  }, [selectedCandidateForDetail?.id]);
 
   const [sourcesList, setSourcesList] = useState<string[]>(candidateSources);
   const [newSourceInput, setNewSourceInput] = useState("");
@@ -109,38 +192,57 @@ export default function CandidateSourcingClient({
     }
   }
 
+  const [runStatusType, setRunStatusType] = useState<"success" | "error" | "info" | null>(null);
+
   async function handleRunSourcing() {
+    if (runningRef.current) return;
+    runningRef.current = true;
     setRunning(true);
-    setRunMessage(null);
+    setRunMessage("Lancement de la collecte en cours...");
+    setRunStatusType("info");
     try {
       const res = await fetch("/api/sourcing/global-candidates", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          jobId: selectedJobId || undefined,
-          query: query || undefined,
-          country: selectedCountry || undefined,
-        }),
+        body: JSON.stringify({ jobId: selectedJobId || undefined, query: query || undefined, country: selectedCountry || undefined }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || "Erreur lors du sourcing candidats.");
+      if (!res.ok) throw new Error(data?.error || "Erreur serveur (" + res.status + ") lors du sourcing candidats.");
 
-      if (data.ok === false) {
-        setRunMessage(data.message || "Aucune source active.");
+      if (data?.ok === false) {
+        setRunMessage(data.message || "Aucune source active disponible.");
+        setRunStatusType("error");
       } else {
-        setRunMessage(
-          `${data.fetched || 0} candidat(s) extrait(s), ${data.created || 0} nouveau(x), ${data.matched || 0} correspondu(s).`
-        );
-        setTimeout(() => window.location.reload(), 1500);
+        const sourceResults = Array.isArray(data?.results) ? data.results : [];
+        const failedSourcesCount = sourceResults.filter((result: { error?: string }) => Boolean(result?.error)).length;
+        const fetchedCount = typeof data?.fetched === "number" ? data.fetched : 0;
+        const sourceFailureNote = failedSourcesCount > 0 ? " " + failedSourcesCount + " source(s) en échec ou inaccessible(s)." : "";
+        if (fetchedCount === 0 && failedSourcesCount > 0) {
+          setRunMessage("Aucun profil extrait." + sourceFailureNote + " Vérifiez les sources avant de relancer.");
+          setRunStatusType("error");
+        } else if (fetchedCount === 0) {
+          setRunMessage("Collecte terminée : aucun profil candidat détecté ou correspondant aux critères actuels.");
+          setRunStatusType("info");
+        } else if (failedSourcesCount > 0) {
+          setRunMessage("Collecte partielle : " + fetchedCount + " profil(s) extrait(s), " + (data.created || 0) + " nouveau(x), " + (data.matched || 0) + " correspondu(s)." + sourceFailureNote);
+          setRunStatusType("info");
+        } else {
+          const fallbackNote = data.fallbackSource === "PLATFORM_CVTHEQUE" ? " (relais automatique via CVthèque interne)" : "";
+          setRunMessage("Collecte réussie : " + fetchedCount + " profil(s) extrait(s), " + (data.created || 0) + " nouveau(x), " + (data.matched || 0) + " correspondu(s)" + fallbackNote + ".");
+          setRunStatusType("success");
+        }
       }
     } catch (err) {
-      setRunMessage(err instanceof Error ? err.message : "Erreur pendant le sourcing.");
+      setRunMessage(err instanceof Error ? err.message : "Erreur réseau pendant le sourcing.");
+      setRunStatusType("error");
     } finally {
+      runningRef.current = false;
       setRunning(false);
     }
   }
 
-  async function handleCandidateAction(candidateId: string, action: "VALIDATE" | "REJECT" | "REVIEW" | "RESET") {
+  async function handleCandidateAction(candidateId: string, action: "VALIDATE" | "REJECT" | "REVIEW" | "RESET"): Promise<boolean> {
+    if (actionLoadingId) return false;
     setActionLoadingId(candidateId);
     try {
       const res = await fetch("/api/sourcing/candidate-actions", {
@@ -148,28 +250,40 @@ export default function CandidateSourcingClient({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ candidateId, action }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Action échouée.");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `Action échouée (${res.status}).`);
 
+      const confirmedStatus = typeof data?.candidate?.status === "string" ? data.candidate.status : null;
+      if (!confirmedStatus) {
+        throw new Error("Le serveur n'a pas confirmé le statut du candidat.");
+      }
+
+      // Synchronisation exclusive sur confirmation effective du statut par le serveur
       setCandidates((prev) =>
-        prev.map((c) =>
-          c.id === candidateId
-            ? {
-                ...c,
-                status:
-                  action === "VALIDATE"
-                    ? "VALIDATED"
-                    : action === "REJECT"
-                    ? "REJECTED"
-                    : action === "REVIEW"
-                    ? "REVIEWING"
-                    : "DETECTED",
-              }
-            : c
-        )
+        prev.map((c) => (c.id === candidateId ? { ...c, status: confirmedStatus } : c))
       );
+
+      // Synchronisation de la fiche détaillée si ouverte
+      setSelectedCandidateForDetail((prev) =>
+        prev && prev.id === candidateId ? { ...prev, status: confirmedStatus } : prev
+      );
+
+      // Rafraîchir l'historique d'audit
+      fetch(`/api/sourcing/candidate-history?candidateId=${encodeURIComponent(candidateId)}`)
+        .then((res) => res.json())
+        .then((hData) => {
+          if (hData?.ok && Array.isArray(hData.logs)) {
+            setCandidateAuditLogs(hData.logs);
+          }
+        })
+        .catch(() => null);
+
+      return true;
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur action.");
+      const errorMsg = err instanceof Error ? err.message : "Erreur lors de la mise à jour.";
+      setRunMessage(`Erreur action : ${errorMsg}`);
+      setRunStatusType("error");
+      return false;
     } finally {
       setActionLoadingId(null);
     }
@@ -358,16 +472,49 @@ export default function CandidateSourcingClient({
         <div className="flex flex-col justify-end">
           <button
             type="button"
+            data-testid="btn-sourcing-manuel"
             onClick={handleRunSourcing}
             disabled={running}
-            className="w-full border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-2 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a] hover:bg-[#c7a15a]/20 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 border border-[#c7a15a] bg-[#c7a15a]/15 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c7a15a] transition hover:bg-[#c7a15a]/25 disabled:cursor-wait disabled:opacity-50"
           >
-            {running ? "Collecte..." : "Sourcing Manuel"}
+            {running ? (
+              <>
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[#c7a15a] border-t-transparent" />
+                <span>Collecte en cours…</span>
+              </>
+            ) : (
+              <span>Sourcing Manuel</span>
+            )}
           </button>
         </div>
       </div>
 
-      {runMessage && <p className="text-xs text-[#c7a15a]">{runMessage}</p>}
+      {runMessage && (
+        <div
+          data-testid="sourcing-run-feedback"
+            role="status"
+            aria-live="polite"
+          className={`rounded border px-4 py-3 text-xs transition-all ${
+            runStatusType === "success"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+              : runStatusType === "error"
+              ? "border-red-500/40 bg-red-500/10 text-red-300"
+              : "border-[#c7a15a]/40 bg-[#c7a15a]/10 text-[#c7a15a]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-medium">{runMessage}</span>
+            <button
+              type="button"
+              onClick={() => setRunMessage(null)}
+              className="text-white/40 hover:text-white"
+              aria-label="Fermer l'alerte"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Candidate List Table */}
       <div className="overflow-hidden border border-white/10">
@@ -383,16 +530,28 @@ export default function CandidateSourcingClient({
           {filteredCandidates.map((candidate) => (
             <article key={candidate.id} className="grid grid-cols-1 gap-3 px-5 py-5 md:grid-cols-[2fr_1.2fr_1.2fr_1fr_1.2fr] md:items-center">
               <div>
-                <h4 className="text-sm font-medium text-white/90">
-                  {candidate.headline || candidate.name || "Profil Découvert"}
-                </h4>
-                {candidate.name && (
-                  <p className="mt-0.5 text-xs text-white/50">{candidate.name}</p>
-                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    lastTriggerElementRef.current = e.currentTarget;
+                    setSelectedCandidateForDetail(candidate);
+                  }}
+                  className="group text-left"
+                  title="Cliquer pour afficher la fiche détaillée du profil"
+                >
+                  <h4 className="text-sm font-medium text-white/90 transition group-hover:text-[#c7a15a] group-hover:underline">
+                    {candidate.headline || candidate.name || "Profil Découvert"}
+                  </h4>
+                  {candidate.name && (
+                    <p className="mt-0.5 text-xs text-white/50">{candidate.name}</p>
+                  )}
+                </button>
                 {candidate.matchingScore !== null && candidate.matchingScore !== undefined && (
-                  <span className="mt-1 inline-block bg-[#c7a15a]/20 px-2 py-0.5 text-[10px] text-[#c7a15a]">
-                    Score Match: {candidate.matchingScore}/100
-                  </span>
+                  <div>
+                    <span className="mt-1 inline-block bg-[#c7a15a]/20 px-2 py-0.5 text-[10px] text-[#c7a15a]">
+                      Score Match: {candidate.matchingScore}/100
+                    </span>
+                  </div>
                 )}
               </div>
 
@@ -481,6 +640,234 @@ export default function CandidateSourcingClient({
           )}
         </div>
       </div>
+
+      {/* Modal Fiche Détaillée Profil Candidat Détecté */}
+      {selectedCandidateForDetail && (
+        <div
+          data-testid="modal-detail-candidat"
+          ref={detailModalRef}
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          aria-labelledby="modal-candidate-detail-title"
+          aria-describedby="modal-candidate-detail-desc"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        >
+          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-white/15 bg-[#111] p-6 shadow-2xl md:p-8">
+            <div className="flex items-start justify-between border-b border-white/10 pb-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#c7a15a]">
+                  Fiche Profil Détecté · Sourcing RP
+                </p>
+                <h3 id="modal-candidate-detail-title" className="mt-1 text-xl font-medium text-white">
+                  {selectedCandidateForDetail.headline || selectedCandidateForDetail.name || "Intitulé non renseigné"}
+                </h3>
+                {selectedCandidateForDetail.name && (
+                  <p className="text-sm text-white/50">{selectedCandidateForDetail.name}</p>
+                )}
+              </div>
+              <button
+                ref={detailModalCloseBtnRef}
+                type="button"
+                onClick={() => setSelectedCandidateForDetail(null)}
+                className="border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/60 hover:bg-white/10 hover:text-white"
+                aria-label="Fermer la fiche détaillée du candidat"
+              >
+                Fermer ✕
+              </button>
+            </div>
+
+            <p id="modal-candidate-detail-desc" className="sr-only">
+              Détails, compétences, matching et historique d&apos;actions pour le profil candidat sélectionné.
+            </p>
+
+            <div className="mt-6 space-y-6 text-xs">
+              <div className="grid grid-cols-2 gap-4 border border-white/5 bg-white/[0.02] p-4">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Statut de Traitement</span>
+                  <div className="mt-1">
+                    <span
+                      className={`inline-block px-2 py-0.5 text-[10px] uppercase tracking-wider ${
+                        selectedCandidateForDetail.status === "VALIDATED"
+                          ? "border border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                          : selectedCandidateForDetail.status === "REJECTED"
+                          ? "border border-red-500/50 bg-red-500/10 text-red-400"
+                          : selectedCandidateForDetail.status === "MATCHED"
+                          ? "border border-[#c7a15a]/50 bg-[#c7a15a]/10 text-[#c7a15a]"
+                          : "border border-white/20 text-white/50"
+                      }`}
+                    >
+                      {selectedCandidateForDetail.status}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Score de Matching</span>
+                  <p className="mt-1 font-mono text-sm text-[#c7a15a]">
+                    {selectedCandidateForDetail.matchingScore !== null && selectedCandidateForDetail.matchingScore !== undefined
+                      ? `${selectedCandidateForDetail.matchingScore} / 100`
+                      : "Non calculé (aucune offre cible associée)"}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Localisation</span>
+                  <p className="mt-1 text-white/80">{selectedCandidateForDetail.location || "Non spécifiée"}</p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Expérience Détectée</span>
+                  <p className="mt-1 text-white/80">
+                    {selectedCandidateForDetail.experienceYears !== null && selectedCandidateForDetail.experienceYears !== undefined
+                      ? `${selectedCandidateForDetail.experienceYears} an(s)`
+                      : "Non renseigné"}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Provenance de la source</span>
+                  <p className="mt-1 text-white/80">
+                    {selectedCandidateForDetail.source === "PLATFORM_CVTHEQUE"
+                      ? "CVthèque interne (Recrutement Privé)"
+                      : selectedCandidateForDetail.source}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Date de détection</span>
+                  <p className="mt-1 text-white/80">
+                    {new Date(selectedCandidateForDetail.createdAt).toLocaleString("fr-FR")}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-white/40">Compétences Détectées</span>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {selectedCandidateForDetail.skills && selectedCandidateForDetail.skills.length > 0 ? (
+                    selectedCandidateForDetail.skills.map((skill, i) => (
+                      <span key={i} className="border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80">
+                        {skill}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-white/40">Aucune compétence isolée identifiée.</span>
+                  )}
+                </div>
+              </div>
+
+              {selectedCandidateForDetail.notes && (
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Notes & Diagnostics</span>
+                  <p className="mt-1 whitespace-pre-wrap border border-white/5 bg-black/40 p-3 font-mono text-[11px] text-white/70">
+                    {selectedCandidateForDetail.notes}
+                  </p>
+                </div>
+              )}
+
+              {selectedCandidateForDetail.sourceProfileUrl && (
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-white/40">Lien Public Source</span>
+                  <div className="mt-1">
+                    <a
+                      href={selectedCandidateForDetail.sourceProfileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[#F97316] underline hover:text-[#ea580c]"
+                    >
+                      {selectedCandidateForDetail.sourceProfileUrl}
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Historique des Actions & AuditLog (Brique 2) */}
+              <div data-testid="section-historique-actions" className="border border-white/10 bg-black/40 p-4">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c7a15a]">
+                    Historique & Traçabilité des Actions (AuditLog)
+                  </span>
+                  <span className="text-[10px] text-white/40">
+                    {loadingAuditLogs ? "Chargement..." : `${candidateAuditLogs.length} entrée(s)`}
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {loadingAuditLogs ? (
+                    <p className="text-[11px] text-white/40">Chargement de la traçabilité...</p>
+                  ) : candidateAuditLogs.length > 0 ? (
+                    candidateAuditLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="flex flex-col gap-1 border-b border-white/5 pb-2 text-[11px] last:border-b-0 last:pb-0"
+                      >
+                        <div className="flex items-center justify-between text-white/70">
+                          <span className="font-medium text-white/90">
+                            {log.action.replace("SOURCED_CANDIDATE_", "ACTION : ")}
+                          </span>
+                          <span className="text-[10px] text-white/40 font-mono">
+                            {new Date(log.createdAt).toLocaleString("fr-FR")}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[10px] text-white/50">
+                          <span>Acteur : <strong className="text-white/70">{log.actorRole}</strong></span>
+                          {log.details?.previousStatus && log.details?.newStatus && (
+                            <span>
+                              Transition : <span className="font-mono text-white/60">{log.details.previousStatus}</span> → <span className="font-mono text-[#c7a15a]">{log.details.newStatus}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[11px] text-white/40">
+                      Aucune action enregistrée pour le moment. Le profil est au statut initial.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded border border-[#c7a15a]/20 bg-[#c7a15a]/5 p-3 text-[11px] leading-relaxed text-white/60">
+                <strong className="text-[#c7a15a]">🔒 Confidentialité & Validation Humaine :</strong> Les profils découverts ne sont jamais contactés automatiquement. La validation ou le rejet modifie le statut interne dans le vivier sans diffusion de données privées.
+              </div>
+            </div>
+
+            <div className="mt-8 flex justify-between border-t border-white/10 pt-4">
+              <div className="flex gap-2">
+                {selectedCandidateForDetail.status !== "VALIDATED" && (
+                  <button
+                    type="button"
+                    disabled={actionLoadingId === selectedCandidateForDetail.id}
+                    onClick={() => handleCandidateAction(selectedCandidateForDetail.id, "VALIDATE")}
+                    className="border border-emerald-500/50 bg-emerald-500/10 px-4 py-2 text-[10px] uppercase tracking-wider text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50"
+                  >
+                    {actionLoadingId === selectedCandidateForDetail.id ? "Validation..." : "Valider le profil"}
+                  </button>
+                )}
+                {selectedCandidateForDetail.status !== "REJECTED" && (
+                  <button
+                    type="button"
+                    disabled={actionLoadingId === selectedCandidateForDetail.id}
+                    onClick={() => handleCandidateAction(selectedCandidateForDetail.id, "REJECT")}
+                    className="border border-red-500/50 bg-red-500/10 px-4 py-2 text-[10px] uppercase tracking-wider text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                  >
+                    {actionLoadingId === selectedCandidateForDetail.id ? "Rejet..." : "Rejeter / Archiver"}
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedCandidateForDetail(null)}
+                className="border border-white/10 px-4 py-2 text-[10px] uppercase tracking-wider text-white/60 hover:bg-white/10 hover:text-white"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
