@@ -4,7 +4,7 @@ export default function MentionsLegalesPage() {
       <a href="/" style={{color: "#f97316", fontWeight: 700}}>← Recrutement Privé</a>
       <h1 style={{fontSize: 40, marginTop: 32}}>Mentions légales</h1>
       <h2>Éditeur</h2>
-      <p>Recrutement Privé · Paris, France · contact@recrutement-prive.com</p>
+      <p>Recrutement Privé · Saint-Amand-les-Eaux, France · contact@recrutement-prive.com</p>
       <h2>Responsabilité</h2>
       <p>Les informations publiées sur ce site sont fournies à titre informatif. Les contenus doivent être vérifiés avant toute décision professionnelle ou contractuelle.</p>
       <h2>Données personnelles</h2>
