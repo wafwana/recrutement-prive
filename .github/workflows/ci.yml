@@ -69,6 +69,8 @@ jobs:
       - run: npm run test:company-registration
       - name: Validate enterprise job taxonomy server actions
         run: node --import tsx --test tests/enterprise-job-taxonomy-actions.test.ts
+      - name: Validate OWNER-only candidate presentation governance
+        run: node --import tsx --test tests/owner-candidate-presentation-governance.test.ts
       - run: npm run test:taxonomy-cv-protection
       - run: npm run test:sanitize-postgres-json
       - run: npm run test:cv-intelligence
