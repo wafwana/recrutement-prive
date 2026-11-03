@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { auth, getActiveSessionContext } from "@/auth";
 import { HELP_GUIDES, getTaxonomyHelpGuides, type HelpGuide } from "@/lib/help/help-center-data";
 import { MAILING_TEMPLATES } from "@/lib/mailings/mailings-data";
-import { getUserPermissions } from "@/lib/auth/permissions";
+import { getUserPermissions, type Permission } from "@/lib/auth/permissions";
 
 export async function GET(request: Request) {
   const activeSession = getActiveSessionContext();
   const session = activeSession || (await auth());
   const user = session?.user;
 
-  if (!user) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
   }
 
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
   const visibleGuides = allGuides.filter((guide) =>
     userRole === "OWNER" ||
     guide.requiredPermissions.some((permission) =>
-      permission === userRole || (Array.isArray(userPermissions) && userPermissions.includes(permission as never)),
+      permission === userRole || (Array.isArray(userPermissions) && userPermissions.includes(permission as Permission)),
     ),
   );
 
