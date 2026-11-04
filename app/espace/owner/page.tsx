@@ -18,13 +18,14 @@ export default async function OwnerPage() {
   const role = session?.user?.role;
   if (!session?.user?.id || role !== "OWNER") redirect("/connexion");
 
-  const [users, candidates, documents, companies, jobs, applications, sourcedCandidates, settings, owner] = await Promise.all([
+  const [users, candidates, documents, companies, jobs, applications, pendingPresentations, sourcedCandidates, settings, owner] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, email: true, role: true, createdAt: true } }),
     prisma.user.count({ where: { role: "CANDIDAT", status: "ACTIVE" } }),
     prisma.candidateDocument.count(),
     prisma.company.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { _count: { select: { members: true, jobs: true } } } }),
     prisma.job.findMany({ orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, title: true, status: true, company: { select: { name: true } }, updatedAt: true } }),
     prisma.application.findMany({ orderBy: { updatedAt: "desc" }, take: 200, select: { id: true, status: true, createdAt: true, updatedAt: true } }),
+    prisma.application.count({ where: { presentations: { none: {} }, status: { notIn: ["REJECTED", "HIRED"] } } }),
     prisma.sourcedCandidate.findMany({ orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, name: true, source: true, status: true, matchingScore: true, updatedAt: true } }),
     prisma.systemSetting.count(),
     prisma.user.findFirst({ where: { role: "OWNER" }, select: { name: true, email: true } }),
@@ -52,6 +53,7 @@ export default async function OwnerPage() {
           <Link href="/espace/owner/metiers" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Métiers & dossiers</Link>
           <Link href="/espace/owner/sourcing" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Sourcing automatique</Link>
           <Link href="/espace/owner/recherche-proactive" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Recherche proactive de candidats</Link>
+          <Link href="/espace/owner/solutions-tech" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Pôle 2 · Solutions Tech</Link>
           <Link href="/espace/owner/entreprises/nouvelle" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Rentrer une entreprise</Link>
           <Link href="/espace/owner/offres/nouvelle" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Rentrer une offre</Link>
           <Link href="/espace/owner/partenaires" className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#c7a15a]">Partenaires & Sources</Link>\n          <Link href="/espace/owner/contacts-securises" className="border border-[#F97316] bg-[#F97316]/10 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-[#F97316]">Outreach & Contacts sécurisés</Link>
@@ -123,6 +125,7 @@ export default async function OwnerPage() {
           ["Entreprises", companies.length, "#entreprises", "Voir les entreprises"],
           ["Offres ouvertes", openJobs, "#offres", "Voir les offres"],
           ["Candidatures", applications.length, "/espace/owner/cv-matching", "Ouvrir le suivi"],
+          ["À présenter", pendingPresentations, "/espace/owner/candidatures", "Décider des présentations"],
           ["Profils sourcés", sourcedCandidates.length, "/espace/owner/sourcing", "Ouvrir le sourcing"],
           ["Matching ≥ 80", highMatches, "/espace/owner/cv-matching", "Ouvrir le matching"],
           ["Paramètres système", settings, "/owner/permissions", "Ouvrir les permissions"],

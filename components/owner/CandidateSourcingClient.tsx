@@ -78,36 +78,64 @@ export default function CandidateSourcingClient({
   const [statusFilter, setStatusFilter] = useState("ALL");
 
   const [running, setRunning] = useState(false);
+  const runningRef = useRef(false);
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [selectedCandidateForDetail, setSelectedCandidateForDetail] = useState<SourcedCandidateItem | null>(null);
   const [candidateAuditLogs, setCandidateAuditLogs] = useState<CandidateAuditLogItem[]>([]);
   const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
   const detailModalCloseBtnRef = useRef<HTMLButtonElement | null>(null);
+  const detailModalRef = useRef<HTMLDivElement | null>(null);
   const lastTriggerElementRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!selectedCandidateForDetail) {
+    const candidateId = selectedCandidateForDetail?.id;
+    if (!candidateId) {
       setCandidateAuditLogs([]);
       return;
     }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.preventDefault();
         setSelectedCandidateForDetail(null);
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const dialog = detailModalRef.current;
+      if (!dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      if (focusable.length === 0) {
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const focusOutsideDialog = !dialog.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || focusOutsideDialog)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || focusOutsideDialog)) {
+        e.preventDefault();
+        first.focus();
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     detailModalCloseBtnRef.current?.focus();
-
-    // Fetch audit history for this candidate
     let isCancelled = false;
     setLoadingAuditLogs(true);
-    fetch(`/api/sourcing/candidate-history?candidateId=${encodeURIComponent(selectedCandidateForDetail.id)}`)
-      .then((res) => res.json())
+    fetch("/api/sourcing/candidate-history?candidateId=" + encodeURIComponent(candidateId))
+      .then((res) => {
+        if (!res.ok) throw new Error("Historique indisponible.");
+        return res.json();
+      })
       .then((data) => {
-        if (!isCancelled && data?.ok && Array.isArray(data.logs)) {
-          setCandidateAuditLogs(data.logs);
-        }
+        if (!isCancelled && data?.ok && Array.isArray(data.logs)) setCandidateAuditLogs(data.logs);
       })
       .catch(() => {
         if (!isCancelled) setCandidateAuditLogs([]);
@@ -119,11 +147,9 @@ export default function CandidateSourcingClient({
     return () => {
       isCancelled = true;
       window.removeEventListener("keydown", handleKeyDown);
-      if (lastTriggerElementRef.current) {
-        lastTriggerElementRef.current.focus();
-      }
+      if (lastTriggerElementRef.current?.isConnected) lastTriggerElementRef.current.focus();
     };
-  }, [selectedCandidateForDetail]);
+  }, [selectedCandidateForDetail?.id]);
 
   const [sourcesList, setSourcesList] = useState<string[]>(candidateSources);
   const [newSourceInput, setNewSourceInput] = useState("");
@@ -169,7 +195,8 @@ export default function CandidateSourcingClient({
   const [runStatusType, setRunStatusType] = useState<"success" | "error" | "info" | null>(null);
 
   async function handleRunSourcing() {
-    if (running) return;
+    if (runningRef.current) return;
+    runningRef.current = true;
     setRunning(true);
     setRunMessage("Lancement de la collecte en cours...");
     setRunStatusType("info");
@@ -177,41 +204,39 @@ export default function CandidateSourcingClient({
       const res = await fetch("/api/sourcing/global-candidates", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          jobId: selectedJobId || undefined,
-          query: query || undefined,
-          country: selectedCountry || undefined,
-        }),
+        body: JSON.stringify({ jobId: selectedJobId || undefined, query: query || undefined, country: selectedCountry || undefined }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(data?.error || `Erreur serveur (${res.status}) lors du sourcing candidats.`);
-      }
+      if (!res.ok) throw new Error(data?.error || "Erreur serveur (" + res.status + ") lors du sourcing candidats.");
 
-      if (data.ok === false) {
+      if (data?.ok === false) {
         setRunMessage(data.message || "Aucune source active disponible.");
         setRunStatusType("error");
-      } else if (data.fetched === 0) {
-        const failedSourcesCount = Array.isArray(data.results)
-          ? data.results.filter((r: { error?: string }) => Boolean(r.error)).length
-          : 0;
-        const note = failedSourcesCount > 0
-          ? ` (${failedSourcesCount} source(s) en erreur ou inaccessible(s))`
-          : "";
-        setRunMessage(`Collecte terminée : aucun profil candidat détecté ou correspondant aux critères actuels${note}.`);
-        setRunStatusType("info");
       } else {
-        const fallbackNote = data.fallbackSource === "PLATFORM_CVTHEQUE"
-          ? " (relais automatique via CVthèque interne)"
-          : "";
-        const msg = `Collecte réussie : ${data.fetched || 0} candidat(s) extrait(s), ${data.created || 0} nouveau(x), ${data.matched || 0} correspondu(s)${fallbackNote}.`;
-        setRunMessage(msg);
-        setRunStatusType("success");
+        const sourceResults = Array.isArray(data?.results) ? data.results : [];
+        const failedSourcesCount = sourceResults.filter((result: { error?: string }) => Boolean(result?.error)).length;
+        const fetchedCount = typeof data?.fetched === "number" ? data.fetched : 0;
+        const sourceFailureNote = failedSourcesCount > 0 ? " " + failedSourcesCount + " source(s) en échec ou inaccessible(s)." : "";
+        if (fetchedCount === 0 && failedSourcesCount > 0) {
+          setRunMessage("Aucun profil extrait." + sourceFailureNote + " Vérifiez les sources avant de relancer.");
+          setRunStatusType("error");
+        } else if (fetchedCount === 0) {
+          setRunMessage("Collecte terminée : aucun profil candidat détecté ou correspondant aux critères actuels.");
+          setRunStatusType("info");
+        } else if (failedSourcesCount > 0) {
+          setRunMessage("Collecte partielle : " + fetchedCount + " profil(s) extrait(s), " + (data.created || 0) + " nouveau(x), " + (data.matched || 0) + " correspondu(s)." + sourceFailureNote);
+          setRunStatusType("info");
+        } else {
+          const fallbackNote = data.fallbackSource === "PLATFORM_CVTHEQUE" ? " (relais automatique via CVthèque interne)" : "";
+          setRunMessage("Collecte réussie : " + fetchedCount + " profil(s) extrait(s), " + (data.created || 0) + " nouveau(x), " + (data.matched || 0) + " correspondu(s)" + fallbackNote + ".");
+          setRunStatusType("success");
+        }
       }
     } catch (err) {
       setRunMessage(err instanceof Error ? err.message : "Erreur réseau pendant le sourcing.");
       setRunStatusType("error");
     } finally {
+      runningRef.current = false;
       setRunning(false);
     }
   }
@@ -467,6 +492,8 @@ export default function CandidateSourcingClient({
       {runMessage && (
         <div
           data-testid="sourcing-run-feedback"
+            role="status"
+            aria-live="polite"
           className={`rounded border px-4 py-3 text-xs transition-all ${
             runStatusType === "success"
               ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
@@ -618,8 +645,10 @@ export default function CandidateSourcingClient({
       {selectedCandidateForDetail && (
         <div
           data-testid="modal-detail-candidat"
+          ref={detailModalRef}
           role="dialog"
           aria-modal="true"
+          tabIndex={-1}
           aria-labelledby="modal-candidate-detail-title"
           aria-describedby="modal-candidate-detail-desc"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"

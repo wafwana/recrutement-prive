@@ -17,6 +17,9 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
   const canManagePartners = role === "ADMIN" && session?.user?.id
     ? await hasPermission(session.user.id, role, "PARTNERS_MANAGE").catch(() => false)
     : false;
+  const canManageTechSolutions = role === "ADMIN" && session?.user?.id
+    ? await hasPermission(session.user.id, role, "TECH_SOLUTIONS_MANAGE").catch(() => false)
+    : false;
   const allowedAdminPermissions: WorkspaceNavigationPermission[] = [
     ...(canManagePlatformSettings ? ["PLATFORM_SETTINGS" as const] : []),
     ...(canManagePartners ? ["PARTNERS_MANAGE" as const] : []),
@@ -31,7 +34,9 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
       <header className="border-b border-white/10">
         <div className="mx-auto flex min-h-20 w-[min(1180px,calc(100%-40px))] items-center justify-between gap-8 md:w-[min(1180px,calc(100%-72px))]">
           <Link href="/" className="font-serif text-xl tracking-[0.22em]">RP</Link>
-          <nav aria-label="Navigation générale" className="flex items-center justify-end text-[10px] uppercase tracking-[0.2em] text-white/60">
+          <nav aria-label="Navigation générale" className="flex flex-wrap items-center justify-end gap-4 text-[10px] uppercase tracking-[0.2em] text-white/60">
+            {role === "OWNER" || role === "ADMIN" || role === "CONSULTANT" ? <Link href="/espace/help" className="hover:text-[#f1ce8b]">Centre d’aide</Link> : null}
+            {role === "OWNER" || role === "ADMIN" || role === "CONSULTANT" ? <Link href="/espace/mailings" className="hover:text-[#f1ce8b]">Bibliothèque de mailings</Link> : null}
             <ReturnToSiteLink />
           </nav>
         </div>

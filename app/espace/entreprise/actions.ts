@@ -13,11 +13,36 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
 ]);
 const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([".pdf", ".doc", ".docx"]);
 
-const jobSchema = z.object({ companyId: z.string().optional(), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), missionType: z.string().trim().max(100).optional(), requiredSkills: z.string().trim().max(1500).optional(), requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]).default("DRAFT") });
-const updateJobSchema = z.object({ companyId: z.string().optional(), jobId: z.string().min(1), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), missionType: z.string().trim().max(100).optional(), requiredSkills: z.string().trim().max(1500).optional(), requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]) });
+const jobSchema = z.object({ companyId: z.string().optional(), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), missionType: z.string().trim().max(100).optional(), requiredSkills: z.string().trim().max(1500).optional(), requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]).default("DRAFT"), jobCategoryId: z.string().trim().optional(), subCategoryId: z.string().trim().optional() });
+const updateJobSchema = z.object({ companyId: z.string().optional(), jobId: z.string().min(1), title: z.string().trim().min(2).max(160), location: z.string().trim().max(160).optional(), description: z.string().trim().max(10000).optional(), missionType: z.string().trim().max(100).optional(), requiredSkills: z.string().trim().max(1500).optional(), requiredExperienceYears: z.coerce.number().int().min(0).max(60).optional(), status: z.enum(["DRAFT", "OPEN", "PAUSED", "CLOSED", "ARCHIVED"]), jobCategoryId: z.string().trim().optional(), subCategoryId: z.string().trim().optional() });
 const companyProfileSchema = z.object({ companyId: z.string().optional(), name: z.string().trim().min(2).max(180).optional(), siren: z.string().regex(/^\d{9}$/).optional(), siret: z.string().regex(/^\d{14}$/).optional(), legalForm: z.string().trim().max(120).optional(), apeCode: z.string().trim().max(20).optional(), address: z.string().trim().max(300).optional(), description: z.string().trim().max(2000).optional(), website: z.string().trim().url().or(z.literal("")).optional(), country: z.string().trim().min(2).max(120).optional(), phonePrefix: z.string().trim().max(12).optional(), phone: z.string().trim().max(40).optional() });
 function text(value: FormDataEntryValue | null) { const result = String(value ?? "").trim(); return result || undefined; }
 function csv(value: string | undefined) { return value ? value.split(",").map((item) => item.trim()).filter(Boolean) : []; }
+
+async function validateJobTaxonomy(jobCategoryId?: string, subCategoryId?: string) {
+  if (jobCategoryId) {
+    const parentCategory = await prisma.jobCategory.findUnique({
+      where: { id: jobCategoryId },
+      select: { id: true, isActive: true, parentId: true },
+    });
+    if (!parentCategory || !parentCategory.isActive || parentCategory.parentId !== null) {
+      throw new Error("La catégorie métier sélectionnée est invalide ou inactive.");
+    }
+  }
+
+  if (subCategoryId) {
+    if (!jobCategoryId) {
+      throw new Error("Une sous-catégorie requiert une catégorie métier principale.");
+    }
+    const subCategory = await prisma.jobCategory.findUnique({
+      where: { id: subCategoryId },
+      select: { id: true, isActive: true, parentId: true },
+    });
+    if (!subCategory || !subCategory.isActive || subCategory.parentId !== jobCategoryId) {
+      throw new Error("La sous-catégorie sélectionnée n'appartient pas à la catégorie principale.");
+    }
+  }
+}
 
 function getAttachment(formData: FormData) {
   const value = formData.get("attachment");
@@ -72,13 +97,14 @@ export async function updateCompanyContact(formData: FormData) {
 }
 
 export async function createCompanyJob(formData: FormData) {
-  const parsed = jobSchema.safeParse({ companyId: text(formData.get("companyId")), title: text(formData.get("title")), location: text(formData.get("location")), description: text(formData.get("description")), missionType: text(formData.get("missionType")), requiredSkills: text(formData.get("requiredSkills")), requiredExperienceYears: text(formData.get("requiredExperienceYears")), status: text(formData.get("status")) ?? "DRAFT" });
+  const parsed = jobSchema.safeParse({ companyId: text(formData.get("companyId")), title: text(formData.get("title")), location: text(formData.get("location")), description: text(formData.get("description")), missionType: text(formData.get("missionType")), requiredSkills: text(formData.get("requiredSkills")), requiredExperienceYears: text(formData.get("requiredExperienceYears")), status: text(formData.get("status")) ?? "DRAFT", jobCategoryId: text(formData.get("jobCategoryId")), subCategoryId: text(formData.get("subCategoryId")) });
   if (!parsed.success) throw new Error("Les données de l'offre sont invalides.");
   const access = await requireCompanyAccess(parsed.data.companyId);
+  await validateJobTaxonomy(parsed.data.jobCategoryId, parsed.data.subCategoryId);
   const attachment = getAttachment(formData);
   const attachmentData = attachment ? Buffer.from(await attachment.arrayBuffer()) : undefined;
   await prisma.$transaction(async (tx) => {
-    const job = await tx.job.create({ data: { companyId: access.companyId, title: parsed.data.title, location: parsed.data.location, description: parsed.data.description, missionType: parsed.data.missionType, requiredSkills: csv(parsed.data.requiredSkills), requiredExperienceYears: parsed.data.requiredExperienceYears, ...(attachment ? { attachmentName: attachment.name, attachmentMimeType: attachment.type || "application/octet-stream", attachmentData } : {}), status: parsed.data.status } });
+    const job = await tx.job.create({ data: { companyId: access.companyId, title: parsed.data.title, location: parsed.data.location, description: parsed.data.description, missionType: parsed.data.missionType, requiredSkills: csv(parsed.data.requiredSkills), requiredExperienceYears: parsed.data.requiredExperienceYears, jobCategoryId: parsed.data.jobCategoryId || null, subCategoryId: parsed.data.subCategoryId || null, ...(attachment ? { attachmentName: attachment.name, attachmentMimeType: attachment.type || "application/octet-stream", attachmentData } : {}), status: parsed.data.status } });
     await tx.recruitmentHistory.create({ data: { jobId: job.id, actorUserId: access.userId, action: "JOB_CREATED", toStatus: job.status, details: attachment ? { attachmentName: attachment.name, attachmentSize: attachment.size } : undefined } });
   });
   revalidatePath("/espace/entreprise");
@@ -95,6 +121,8 @@ export async function updateCompanyJob(formData: FormData) {
     requiredSkills: text(formData.get("requiredSkills")),
     requiredExperienceYears: text(formData.get("requiredExperienceYears")),
     status: text(formData.get("status")),
+    jobCategoryId: text(formData.get("jobCategoryId")),
+    subCategoryId: text(formData.get("subCategoryId")),
   });
   if (!parsed.success) throw new Error("Les données de la mission sont invalides.");
   const access = await requireCompanyAccess(parsed.data.companyId);
@@ -103,6 +131,11 @@ export async function updateCompanyJob(formData: FormData) {
     where: { id: parsed.data.jobId, companyId: access.companyId },
   });
   if (!existing) throw new Error("Mission introuvable.");
+
+  const taxonomyProvided = formData.has("jobCategoryId") || formData.has("subCategoryId");
+  if (taxonomyProvided) {
+    await validateJobTaxonomy(parsed.data.jobCategoryId, parsed.data.subCategoryId);
+  }
 
   await prisma.$transaction(async (tx) => {
     const updated = await tx.job.update({
@@ -114,6 +147,7 @@ export async function updateCompanyJob(formData: FormData) {
         missionType: parsed.data.missionType || null,
         requiredSkills: csv(parsed.data.requiredSkills),
         requiredExperienceYears: parsed.data.requiredExperienceYears ?? null,
+        ...(taxonomyProvided ? { jobCategoryId: parsed.data.jobCategoryId || null, subCategoryId: parsed.data.subCategoryId || null } : {}),
         status: parsed.data.status,
       },
     });
@@ -141,67 +175,6 @@ export async function updateCompanyJob(formData: FormData) {
 
   revalidatePath("/espace/entreprise");
   revalidatePath(`/espace/entreprise/offres/${parsed.data.jobId}`);
-}
-
-export async function presentCandidateToCompany(applicationId: string) {
-  const existing = await prisma.application.findUnique({
-    where: { id: applicationId },
-    select: {
-      id: true,
-      jobId: true,
-      candidateId: true,
-      userId: true,
-      status: true,
-      job: { select: { companyId: true, title: true } },
-      candidate: { select: { userId: true } },
-    },
-  });
-  if (!existing) throw new Error("Candidature introuvable.");
-  const access = await requireCompanyAccess(existing.job.companyId);
-
-  await prisma.$transaction(async (tx) => {
-    const current = await tx.missionPresentation.findFirst({
-      where: { applicationId, companyId: access.companyId },
-      select: { id: true },
-    });
-    if (!current) {
-      await tx.missionPresentation.create({
-        data: {
-          missionId: existing.jobId,
-          applicationId: existing.id,
-          candidateId: existing.candidateId,
-          companyId: access.companyId,
-          state: "MISSION_ACTIVE",
-          anonymousMessagingEnabled: true,
-          candidateAlias: `Candidat #${existing.candidateId.slice(-6).toUpperCase()}`,
-          companyAlias: `Entreprise #${access.companyId.slice(-6).toUpperCase()}`,
-          candidateUserId: existing.candidate.userId,
-          companyUserId: access.userId,
-          financialConditionStatus: "PENDING",
-          securityDetails: { identityProtected: true, directCoordinatesBlocked: true },
-        },
-      });
-    }
-
-    if (existing.status !== "SHORTLISTED") {
-      await tx.application.update({ where: { id: existing.id }, data: { status: "SHORTLISTED" } });
-    }
-
-    await tx.recruitmentHistory.create({
-      data: {
-        applicationId: existing.id,
-        jobId: existing.jobId,
-        actorUserId: access.userId,
-        action: "CANDIDATE_PRESENTED",
-        fromStatus: existing.status,
-        toStatus: "SHORTLISTED",
-        details: { companyId: access.companyId, presentationCreated: !current },
-      },
-    });
-  });
-
-  revalidatePath("/espace/entreprise");
-  revalidatePath(`/espace/entreprise/offres/${existing.jobId}`);
 }
 
 export async function updateApplicationStatus(applicationId: string, status: string, notes?: string) {

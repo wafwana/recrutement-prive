@@ -67,6 +67,10 @@ jobs:
       - run: npm run test:candidate-flow
       - run: npm run test:company-flow
       - run: npm run test:company-registration
+      - name: Validate enterprise job taxonomy server actions
+        run: node --import tsx --test tests/enterprise-job-taxonomy-actions.test.ts
+      - name: Validate OWNER-only candidate presentation governance
+        run: node --import tsx --test tests/owner-candidate-presentation-governance.test.ts
       - run: npm run test:taxonomy-cv-protection
       - run: npm run test:sanitize-postgres-json
       - run: npm run test:cv-intelligence
@@ -88,6 +92,8 @@ jobs:
       - run: npm run test:secure-contact-payments
       - name: Validate public contact form input and abuse guard
         run: node --import tsx --test tests/public-contact-validation.test.ts
+      - name: Validate OWNER manual sourcing, candidate history, accessibility and audit contract
+        run: node --import tsx --test tests/owner-sourcing-manual-ui.test.ts
       - run: npm run test:executive-search
       - run: npx tsx tests/candidate-integration.ts
       - run: npx tsx tests/final-validation.ts
@@ -103,6 +109,8 @@ jobs:
       - run: npm run test:owner-workspace-navigation
       - run: npm run test:role-workspace-navigation
       - run: npm run test:workspace-navigation-locales
+      - name: Validate Help Center and mailing templates
+        run: node --import tsx --test tests/help-center-mailings-search.test.ts
       - run: npm run typecheck
       - run: npm run build
       - name: End-to-end Auth.js login, CV intake and OWNER outflows over HTTP

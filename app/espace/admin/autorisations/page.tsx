@@ -28,6 +28,7 @@ const PERMISSION_LABELS: Record<Permission, { title: string; description: string
   ENTERPRISE_OFFER_SOURCING: { title: "Sourcing Offres Entreprises", description: "Collecte et qualification automatisée d'offres externes.", category: "Sourcing" },
   PARTNERS_MANAGE: { title: "Partenaires & Sources", description: "Gestion des partenaires institutionnels, éducatifs, associatifs et réseaux d'expatriés.", category: "Partenaires" },
   SECURE_CONTACTS_AUTHORIZE: { title: "Autorisation des contacts sécurisés", description: "Autoriser ou refuser les contacts sécurisés pour le compte du cabinet.", category: "Executive Search" },
+  TECH_SOLUTIONS_MANAGE: { title: "Solutions Technologiques & Projets", description: "Pilotage du Pôle 2 : prospects technologiques, cahiers des charges et projets sur mesure.", category: "Pôle 2 — Solutions Technologiques" },
 };
 
 export default async function AdminAutorisationsPage() {

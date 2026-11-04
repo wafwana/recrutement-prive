@@ -33,6 +33,7 @@ const labels: Record<string, string> = {
   ENTERPRISE_OFFER_SOURCING: "Sourcing automatisé des offres entreprise",
   PARTNERS_MANAGE: "Partenaires & Sources",
   SECURE_CONTACTS_AUTHORIZE: "Outreach & Contacts sécurisés",
+  TECH_SOLUTIONS_MANAGE: "Solutions Technologiques (Pôle 2)",
 };
 
 export default function OwnerPermissionsPage() {

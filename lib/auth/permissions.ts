@@ -26,6 +26,7 @@ export const PERMISSIONS = [
   "ENTERPRISE_OFFER_SOURCING",
   "PARTNERS_MANAGE",
   "SECURE_CONTACTS_AUTHORIZE",
+  "TECH_SOLUTIONS_MANAGE",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
