@@ -90,8 +90,7 @@ export async function GET(request: Request) {
     const [candidates, jobs] = await Promise.all([
       prisma.candidateProfile.findMany({
         where: { status: "ACTIVE" },
-        orderBy: { updatedAt: "desc" },
-        take: 150,
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
         select: {
           id: true,
           userId: true,
@@ -107,8 +106,7 @@ export async function GET(request: Request) {
       }),
       prisma.job.findMany({
         where: { status: "OPEN" },
-        orderBy: { updatedAt: "desc" },
-        take: 150,
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
         select: {
           id: true,
           title: true,
@@ -317,8 +315,7 @@ export async function GET(request: Request) {
       include: {
         primaryCategory: { select: { code: true } },
       },
-      orderBy: { updatedAt: "desc" },
-      take: 500,
+      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
     });
 
     const candidateIds = candidates.flatMap((candidate) =>
