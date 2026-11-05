@@ -44,7 +44,7 @@ export function assistAndRefineCv(input: {
       clarificationQuestions.push(`Quelles missions avez-vous réellement réalisées dans le poste "${exp.title}" ?`);
     }
   }
-  if (!analysis.skills.length) {
+  if (!analysis.explicitSkills.length) {
     detectedGaps.push("Aucune compétence explicite détectée.");
     clarificationQuestions.push("Quelles compétences souhaitez-vous déclarer ?");
   }
@@ -57,7 +57,7 @@ export function assistAndRefineCv(input: {
     originalEvidence: exp.evidence ?? "",
   }));
 
-  const highlightedSkills = [...analysis.skills];
+  const highlightedSkills = [...analysis.explicitSkills];
   if (targetJob?.requiredSkills?.length) {
     highlightedSkills.sort((a, b) => {
       const aMatch = targetJob.requiredSkills!.some((required) => a.toLocaleLowerCase().includes(required.toLocaleLowerCase()));
