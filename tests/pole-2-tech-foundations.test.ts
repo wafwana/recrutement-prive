@@ -46,6 +46,11 @@ test("Pole 2 Cockpit and Workspace pages server protection contracts", () => {
   assert.match(ownerPageContent, /prisma\.techProspect\.count/);
   assert.match(ownerPageContent, /prisma\.techRequirementDoc\.count/);
   assert.match(ownerPageContent, /prisma\.techProject\.count/);
+  // Les indicateurs doivent refléter les statuts métier et ne pas dépendre de la liste récente limitée.
+  assert.match(ownerPageContent, /techProspect: \{ status: "SIGNE" \}/);
+  assert.match(ownerPageContent, /status: \{ in: \["DEVELOPPEMENT", "RECETTE"\] \}/);
+  assert.match(ownerPageContent, /techProject\.groupBy\([\s\S]*by: \["currency"\][\s\S]*status: "MAINTENANCE"/);
+  assert.doesNotMatch(ownerPageContent, /projectsList\s*\.filter\(/);
 
   const techWorkspaceContent = fs.readFileSync("app/espace/tech/page.tsx", "utf8");
   assert.match(techWorkspaceContent, /hasPermission\(userId, role, "TECH_SOLUTIONS_MANAGE"\)/);
