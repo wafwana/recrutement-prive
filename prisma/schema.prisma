@@ -1050,3 +1050,82 @@ model FinancialOutflow {
   @@index([beneficiaryName])
   @@index([operationDate])
 }
+
+// ==========================================
+// PÔLE 2 : SOLUTIONS TECHNOLOGIQUES & PROJETS
+// Cloisonnement strict et étanchéité Pôle 1
+// ==========================================
+
+model TechProspect {
+  id                  String               @id @default(cuid())
+  companyName         String
+  siren               String?
+  siret               String?
+  country             String?
+  city                String?
+  sector              String?
+  companySize         String?
+  website             String?
+  contactName         String?
+  contactEmail        String?
+  contactRole         String?
+  decisionMakers      Json?
+  detectionSignals    Json?
+  status              String               @default("NOUVEAU") // NOUVEAU, A_QUALIFIER, QUALIFIE, CONTACTE, CDC_RECU, CHIFFRAGE, PROPOSITION, SIGNE, ABANDONNE
+  priority            String               @default("MOYENNE") // BASSE, MOYENNE, HAUTE, URGENTE
+  estimatedBudget     Float?
+  notes               String?
+  assignedToUserId    String?
+  createdByUserId     String?
+  requirements        TechRequirementDoc[]
+  projects            TechProject[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([status, createdAt])
+  @@index([sector, country])
+  @@index([assignedToUserId])
+}
+
+model TechRequirementDoc {
+  id                  String       @id @default(cuid())
+  title               String
+  description         String?
+  documentUrl         String?
+  fileName            String?
+  fileSize            Int?
+  status              String       @default("DEPOSE") // DEPOSE, ANALYSE_EN_COURS, ANALYSE_TERMINEE, VALIDE, REJETE
+  featuresAnalysis    Json?
+  estimatedQuote      Json?
+  techProspectId      String
+  techProspect        TechProspect @relation(fields: [techProspectId], references: [id], onDelete: Restrict)
+  createdByUserId     String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([techProspectId])
+  @@index([status])
+}
+
+model TechProject {
+  id                       String       @id @default(cuid())
+  name                     String
+  description              String?
+  status                   String       @default("CADRAGE") // CADRAGE, DEVELOPPEMENT, RECETTE, LIVRE, MAINTENANCE, CLOTURE
+  setupPrice               Float?
+  monthlySubscriptionPrice Float?
+  currency                 String       @default("EUR")
+  startDate                DateTime?
+  estimatedDeliveryDate    DateTime?
+  deliveryDate             DateTime?
+  repositoryUrl            String?
+  projectManagerUserId     String?
+  techProspectId           String
+  techProspect             TechProspect @relation(fields: [techProspectId], references: [id], onDelete: Restrict)
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+
+  @@index([techProspectId])
+  @@index([status])
+  @@index([projectManagerUserId])
+}

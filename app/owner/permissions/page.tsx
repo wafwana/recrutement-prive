@@ -32,6 +32,7 @@ const labels: Record<string, string> = {
   PLATFORM_SETTINGS: "Configuration de la plateforme",
   ENTERPRISE_OFFER_SOURCING: "Sourcing automatisé des offres entreprise",
   PARTNERS_MANAGE: "Partenaires & Sources",
+  TECH_SOLUTIONS_MANAGE: "Solutions technologiques & plateformes sur mesure (Pôle 2)",
   SECURE_CONTACTS_AUTHORIZE: "Outreach & Contacts sécurisés",
 };
 
