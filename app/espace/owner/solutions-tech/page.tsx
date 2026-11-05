@@ -218,33 +218,17 @@ export default async function OwnerSolutionsTechPage() {
           </section>
         </div>
 
-        {/* Navigation vers les modules opérationnels */}
-        <div className="grid gap-3 sm:grid-cols-3">
+        {/* Accès rapide au Sourcing International */}
+        <div className="border border-white/10 bg-white/[0.02] p-5 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-white">Sourcing International & Prospection B2B (Brique 4)</h3>
+            <p className="text-xs text-white/50 mt-1">Détectez de nouvelles entreprises cibles en France et à l&apos;international, qualifiez leurs besoins technologiques et transférez-les dans le CRM.</p>
+          </div>
           <Link
-            href="/espace/tech/prospects"
-            className="border border-white/10 p-4 bg-white/[0.01] hover:bg-white/[0.03] transition block"
+            href="/espace/tech/sourcing"
+            className="border border-[#c7a15a] bg-[#c7a15a]/10 px-4 py-2 text-[10px] uppercase tracking-wider text-[#c7a15a] hover:bg-[#c7a15a]/20"
           >
-            <span className="text-xs font-semibold text-[#c7a15a] block uppercase">Brique 1 · CRM</span>
-            <p className="text-sm font-medium text-white mt-1">Portefeuille & Pipeline Prospects</p>
-            <span className="text-xs text-white/40 mt-1 block">Accéder aux {totalProspects} prospect(s)</span>
-          </Link>
-
-          <Link
-            href="/espace/tech/requirements"
-            className="border border-white/10 p-4 bg-white/[0.01] hover:bg-white/[0.03] transition block"
-          >
-            <span className="text-xs font-semibold text-[#c7a15a] block uppercase">Brique 2 · CDC & Analyse</span>
-            <p className="text-sm font-medium text-white mt-1">Cahiers des charges & Faisabilité</p>
-            <span className="text-xs text-white/40 mt-1 block">Voir les {requirementsReceived} analyse(s)</span>
-          </Link>
-
-          <Link
-            href="/espace/tech/projects"
-            className="border border-white/10 p-4 bg-white/[0.01] hover:bg-white/[0.03] transition block"
-          >
-            <span className="text-xs font-semibold text-[#c7a15a] block uppercase">Brique 3 · Projets & MRR</span>
-            <p className="text-sm font-medium text-white mt-1">Pilotage des projets & Abonnements</p>
-            <span className="text-xs text-white/40 mt-1 block">Suivre les {projectsActive} projet(s)</span>
+            Accéder au Sourcing →
           </Link>
         </div>
 
