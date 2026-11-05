@@ -1098,7 +1098,7 @@ model TechRequirementDoc {
   featuresAnalysis    Json?
   estimatedQuote      Json?
   techProspectId      String
-  techProspect        TechProspect @relation(fields: [techProspectId], references: [id], onDelete: Cascade)
+  techProspect        TechProspect @relation(fields: [techProspectId], references: [id], onDelete: Restrict)
   createdByUserId     String?
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
@@ -1121,7 +1121,7 @@ model TechProject {
   repositoryUrl            String?
   projectManagerUserId     String?
   techProspectId           String
-  techProspect             TechProspect @relation(fields: [techProspectId], references: [id], onDelete: Cascade)
+  techProspect             TechProspect @relation(fields: [techProspectId], references: [id], onDelete: Restrict)
   createdAt                DateTime     @default(now())
   updatedAt                DateTime     @updatedAt
 
