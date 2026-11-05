@@ -41,7 +41,9 @@ test("matching does not send outreach or open a meeting automatically", () => {
 });
 
 test("automatic proposals are bounded and show if a pair has already been presented", () => {
-  assert.match(route, /take: 150/);
+  // The global evaluation must cover the full active candidate/open job population.
+  // Only the returned overview list is capped for UI payload size.
+  assert.doesNotMatch(route, /take: 150/);
   assert.match(route, /ranked\.slice\(0, 100\)/);
   assert.match(route, /candidateSuggestions/);
   assert.match(route, /offerSuggestions/);
