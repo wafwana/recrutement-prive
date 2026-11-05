@@ -1,4 +1,4 @@
-import { CvAnalysis } from "./analyzer";
+import type { CvAnalysis } from "./analyzer";
 
 export type CvProfessionalTemplate = "CLASSIQUE" | "MODERNE" | "TECHNIQUE" | "CADRE" | "COMMERCIAL" | "OPERATIONNEL";
 

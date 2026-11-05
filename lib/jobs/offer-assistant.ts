@@ -1,4 +1,4 @@
-import { JobAnalysis } from "./analyzer";
+import type { JobAnalysis } from "./analyzer";
 
 export type StructuredJobOfferResult = {
   title: string;
@@ -23,7 +23,7 @@ export function structureAndAssistJobOffer(input: {
   const title = input.title.trim();
   const desc = (input.rawDescription || input.existingAnalysis?.description || "").trim();
   const lines = desc.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const missions = lines.map((line) => line.replace(/^[•*\-]\s*/, "")).filter((line) => /^[•*\-]\s*/.test(lines.find((source) => source.replace(/^[•*\-]\s*/, "") === line) ?? ""));
+  const missions = lines.filter((line) => /^[•*\-]\s*/.test(line)).map((line) => line.replace(/^[•*\-]\s*/, ""));
   const actualMissions = missions.length ? [...new Set(missions)] : [];
   const rawSkills = Array.isArray(input.existingAnalysis?.skills) ? input.existingAnalysis!.skills.filter((s): s is string => typeof s === "string") : [];
   const mandatorySkills: string[] = [];

@@ -6,7 +6,7 @@ import { identifyTargetCompaniesForUnmatchedCandidate } from "../lib/sourcing/en
 
 test("CV assistant does not fabricate summary, mission or professional identity", () => {
   const analysis = {
-    headline: null, summary: null, improvedSummary: null, skills: [], experiences: [],
+    headline: null, summary: null, improvedSummary: null, skills: [], explicitSkills: [], experiences: [],
     experienceYears: null, primaryCategoryCode: null,
   } as never;
   const result = assistAndRefineCv({ analysis });
