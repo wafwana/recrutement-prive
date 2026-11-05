@@ -36,28 +36,55 @@ export default async function TechWorkspacePage() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="border border-white/10 bg-white/[0.02] p-6 space-y-3">
-            <h2 className="font-serif text-lg text-white">Cahiers des charges & Analyse</h2>
-            <p className="text-xs text-white/50 leading-relaxed">
-              Consultez les besoins déposés par les entreprises cibles et évaluez la couverture fonctionnelle avec le référentiel Recrutement Privé.
-            </p>
-            <div className="pt-2">
-              <span className="inline-block border border-white/10 px-3 py-1 text-[10px] uppercase tracking-wider text-white/40">
-                Phase de cadrage · Brique 1
-              </span>
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="border border-white/10 bg-white/[0.02] p-6 space-y-3 flex flex-col justify-between">
+            <div>
+              <h2 className="font-serif text-lg text-white">1. CRM & Prospection</h2>
+              <p className="text-xs text-white/50 leading-relaxed mt-2">
+                Gestion des prospects, qualification des entreprises et suivi du pipeline commercial (Brique 1).
+              </p>
+            </div>
+            <div className="pt-4">
+              <Link
+                href="/espace/tech/prospects"
+                className="inline-block border border-[#c7a15a] bg-[#c7a15a]/10 px-3 py-1.5 text-[10px] uppercase tracking-wider text-[#c7a15a] hover:bg-[#c7a15a]/20"
+              >
+                Gérer les prospects →
+              </Link>
             </div>
           </div>
 
-          <div className="border border-white/10 bg-white/[0.02] p-6 space-y-3">
-            <h2 className="font-serif text-lg text-white">Chiffrages & Scénarios</h2>
-            <p className="text-xs text-white/50 leading-relaxed">
-              Préparez les scénarios de vente (Paiement initial + Mensualités récurrentes) pour les projets validés par l&apos;Owner.
-            </p>
-            <div className="pt-2">
-              <span className="inline-block border border-white/10 px-3 py-1 text-[10px] uppercase tracking-wider text-white/40">
-                Activé en Brique 4
-              </span>
+          <div className="border border-white/10 bg-white/[0.02] p-6 space-y-3 flex flex-col justify-between">
+            <div>
+              <h2 className="font-serif text-lg text-white">2. Cahiers des charges</h2>
+              <p className="text-xs text-white/50 leading-relaxed mt-2">
+                Dépôt des besoins, décomposition fonctionnelle et analyse de faisabilité technique (Brique 2).
+              </p>
+            </div>
+            <div className="pt-4">
+              <Link
+                href="/espace/tech/requirements"
+                className="inline-block border border-white/20 px-3 py-1.5 text-[10px] uppercase tracking-wider text-white/60 hover:text-white"
+              >
+                Cahiers des charges →
+              </Link>
+            </div>
+          </div>
+
+          <div className="border border-white/10 bg-white/[0.02] p-6 space-y-3 flex flex-col justify-between">
+            <div>
+              <h2 className="font-serif text-lg text-white">3. Projets & Abonnements</h2>
+              <p className="text-xs text-white/50 leading-relaxed mt-2">
+                Pilotage du cycle de livraison, suivi des forfaits initiaux et des revenus récurrents MRR (Brique 3).
+              </p>
+            </div>
+            <div className="pt-4">
+              <Link
+                href="/espace/tech/projects"
+                className="inline-block border border-white/20 px-3 py-1.5 text-[10px] uppercase tracking-wider text-white/60 hover:text-white"
+              >
+                Suivi Projets →
+              </Link>
             </div>
           </div>
         </div>

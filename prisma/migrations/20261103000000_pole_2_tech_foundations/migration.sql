@@ -80,7 +80,7 @@ CREATE INDEX IF NOT EXISTS "TechProject_projectManagerUserId_idx" ON "TechProjec
 
 -- Contraintes de clés étrangères
 ALTER TABLE "TechRequirementDoc" DROP CONSTRAINT IF EXISTS "TechRequirementDoc_techProspectId_fkey";
-ALTER TABLE "TechRequirementDoc" ADD CONSTRAINT "TechRequirementDoc_techProspectId_fkey" FOREIGN KEY ("techProspectId") REFERENCES "TechProspect"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "TechRequirementDoc" ADD CONSTRAINT "TechRequirementDoc_techProspectId_fkey" FOREIGN KEY ("techProspectId") REFERENCES "TechProspect"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "TechProject" DROP CONSTRAINT IF EXISTS "TechProject_techProspectId_fkey";
-ALTER TABLE "TechProject" ADD CONSTRAINT "TechProject_techProspectId_fkey" FOREIGN KEY ("techProspectId") REFERENCES "TechProspect"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "TechProject" ADD CONSTRAINT "TechProject_techProspectId_fkey" FOREIGN KEY ("techProspectId") REFERENCES "TechProspect"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

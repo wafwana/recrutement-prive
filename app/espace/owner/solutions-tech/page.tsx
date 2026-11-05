@@ -28,6 +28,7 @@ export default async function OwnerSolutionsTechPage() {
     projectsSigned,
     projectsActive,
     activeSubscriptions,
+    mrrByCurrency,
     prospectsList,
     projectsList,
   ] = await Promise.all([
@@ -36,9 +37,14 @@ export default async function OwnerSolutionsTechPage() {
     prisma.techRequirementDoc.count(),
     prisma.techRequirementDoc.count({ where: { status: "ANALYSE_EN_COURS" } }),
     prisma.techProspect.count({ where: { status: "PROPOSITION" } }),
-    prisma.techProject.count({ where: { status: { in: ["CADRAGE", "DEVELOPPEMENT", "RECETTE"] } } }),
-    prisma.techProject.count({ where: { status: { notIn: ["CLOTURE"] } } }),
+    prisma.techProject.count({ where: { techProspect: { status: "SIGNE" } } }),
+    prisma.techProject.count({ where: { status: { in: ["DEVELOPPEMENT", "RECETTE"] } } }),
     prisma.techProject.count({ where: { status: "MAINTENANCE" } }),
+    prisma.techProject.groupBy({
+      by: ["currency"],
+      where: { status: "MAINTENANCE" },
+      _sum: { monthlySubscriptionPrice: true },
+    }),
     prisma.techProspect.findMany({
       orderBy: { createdAt: "desc" },
       take: 8,
@@ -67,10 +73,11 @@ export default async function OwnerSolutionsTechPage() {
     }),
   ]);
 
-  // Calcul des revenus récurrents mensuels (MRR)
-  const mrrTotal = projectsList
-    .filter((p) => p.status === "MAINTENANCE" || p.status === "LIVRE")
-    .reduce((sum, p) => sum + (p.monthlySubscriptionPrice || 0), 0);
+  // MRR calculé sur tous les projets en maintenance, sans dépendre de la liste récente
+  // limitée à 6 éléments. Les devises restent séparées pour éviter un total incohérent.
+  const mrrTotal = mrrByCurrency
+    .map(({ currency, _sum }) => `${(_sum.monthlySubscriptionPrice ?? 0).toLocaleString("fr-FR")} ${currency}`)
+    .join(" · ") || "0 EUR";
 
   const metrics = [
     { label: "Prospects technologiques", value: totalProspects, desc: "Entreprises identifiées" },
@@ -78,10 +85,10 @@ export default async function OwnerSolutionsTechPage() {
     { label: "Cahiers des charges reçus", value: requirementsReceived, desc: "Dossiers clients déposés" },
     { label: "Analyses en cours", value: requirementsAnalyzing, desc: "Faisabilité & briques RP" },
     { label: "Propositions commerciales", value: proposalsCount, desc: "Devis & scénarios émis" },
-    { label: "Projets signés", value: projectsSigned, desc: "En phase de cadrage / dev" },
+    { label: "Projets signés", value: projectsSigned, desc: "Projets liés à un prospect au statut SIGNE" },
     { label: "Projets en cours", value: projectsActive, desc: "Développement & recette" },
     { label: "Abonnements actifs", value: activeSubscriptions, desc: "Contrats récurrents" },
-    { label: "Revenus récurrents (MRR)", value: `${mrrTotal} €`, desc: "Mensualités prévisionnelles" },
+    { label: "Revenus récurrents (MRR)", value: mrrTotal, desc: "Mensualités des projets en maintenance, par devise" },
   ];
 
   return (
@@ -209,6 +216,36 @@ export default async function OwnerSolutionsTechPage() {
               </div>
             )}
           </section>
+        </div>
+
+        {/* Navigation vers les modules opérationnels */}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Link
+            href="/espace/tech/prospects"
+            className="border border-white/10 p-4 bg-white/[0.01] hover:bg-white/[0.03] transition block"
+          >
+            <span className="text-xs font-semibold text-[#c7a15a] block uppercase">Brique 1 · CRM</span>
+            <p className="text-sm font-medium text-white mt-1">Portefeuille & Pipeline Prospects</p>
+            <span className="text-xs text-white/40 mt-1 block">Accéder aux {totalProspects} prospect(s)</span>
+          </Link>
+
+          <Link
+            href="/espace/tech/requirements"
+            className="border border-white/10 p-4 bg-white/[0.01] hover:bg-white/[0.03] transition block"
+          >
+            <span className="text-xs font-semibold text-[#c7a15a] block uppercase">Brique 2 · CDC & Analyse</span>
+            <p className="text-sm font-medium text-white mt-1">Cahiers des charges & Faisabilité</p>
+            <span className="text-xs text-white/40 mt-1 block">Voir les {requirementsReceived} analyse(s)</span>
+          </Link>
+
+          <Link
+            href="/espace/tech/projects"
+            className="border border-white/10 p-4 bg-white/[0.01] hover:bg-white/[0.03] transition block"
+          >
+            <span className="text-xs font-semibold text-[#c7a15a] block uppercase">Brique 3 · Projets & MRR</span>
+            <p className="text-sm font-medium text-white mt-1">Pilotage des projets & Abonnements</p>
+            <span className="text-xs text-white/40 mt-1 block">Suivre les {projectsActive} projet(s)</span>
+          </Link>
         </div>
 
         {/* Charte & Cloisonnement */}

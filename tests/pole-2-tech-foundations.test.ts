@@ -22,6 +22,9 @@ test("Pole 2 Prisma schema isolation and completeness", () => {
   assert.match(sql, /CREATE TABLE IF NOT EXISTS "TechProspect"/);
   assert.match(sql, /CREATE TABLE IF NOT EXISTS "TechRequirementDoc"/);
   assert.match(sql, /CREATE TABLE IF NOT EXISTS "TechProject"/);
+  assert.equal((sql.match(/ON DELETE RESTRICT ON UPDATE CASCADE/g) || []).length, 2);
+  assert.doesNotMatch(sql, /ON DELETE CASCADE/);
+  assert.equal((schema.match(/techProspect\s+TechProspect\s+@relation\(fields:\s*\[techProspectId\],\s*references:\s*\[id\],\s*onDelete:\s*Restrict\)/g) || []).length, 2);
 });
 
 test("Pole 2 atomic permission TECH_SOLUTIONS_MANAGE configuration and RBAC", async () => {
@@ -46,6 +49,11 @@ test("Pole 2 Cockpit and Workspace pages server protection contracts", () => {
   assert.match(ownerPageContent, /prisma\.techProspect\.count/);
   assert.match(ownerPageContent, /prisma\.techRequirementDoc\.count/);
   assert.match(ownerPageContent, /prisma\.techProject\.count/);
+  // Les indicateurs doivent refléter les statuts métier et ne pas dépendre de la liste récente limitée.
+  assert.match(ownerPageContent, /techProspect: \{ status: "SIGNE" \}/);
+  assert.match(ownerPageContent, /status: \{ in: \["DEVELOPPEMENT", "RECETTE"\] \}/);
+  assert.match(ownerPageContent, /techProject\.groupBy\([\s\S]*by: \["currency"\][\s\S]*status: "MAINTENANCE"/);
+  assert.doesNotMatch(ownerPageContent, /projectsList\s*\.filter\(/);
 
   const techWorkspaceContent = fs.readFileSync("app/espace/tech/page.tsx", "utf8");
   assert.match(techWorkspaceContent, /hasPermission\(userId, role, "TECH_SOLUTIONS_MANAGE"\)/);

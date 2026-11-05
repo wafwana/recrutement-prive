@@ -27,8 +27,8 @@ const PERMISSION_LABELS: Record<Permission, { title: string; description: string
   PLATFORM_SETTINGS: { title: "Configuration Plateforme", description: "Gestion des paramètres globaux de fonctionnement.", category: "Configuration" },
   ENTERPRISE_OFFER_SOURCING: { title: "Sourcing Offres Entreprises", description: "Collecte et qualification automatisée d'offres externes.", category: "Sourcing" },
   PARTNERS_MANAGE: { title: "Partenaires & Sources", description: "Gestion des partenaires institutionnels, éducatifs, associatifs et réseaux d'expatriés.", category: "Partenaires" },
+  TECH_SOLUTIONS_MANAGE: { title: "Solutions technologiques & plateformes sur mesure", description: "Gestion des prospects, cahiers des charges et projets de solutions numériques.", category: "Pôle 2" },
   SECURE_CONTACTS_AUTHORIZE: { title: "Autorisation des contacts sécurisés", description: "Autoriser ou refuser les contacts sécurisés pour le compte du cabinet.", category: "Executive Search" },
-  TECH_SOLUTIONS_MANAGE: { title: "Solutions Technologiques & Projets", description: "Pilotage du Pôle 2 : prospects technologiques, cahiers des charges et projets sur mesure.", category: "Pôle 2 — Solutions Technologiques" },
 };
 
 export default async function AdminAutorisationsPage() {
