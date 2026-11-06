@@ -21,6 +21,8 @@ const statusLabels: Record<string, string> = {
   FILLED: "Pourvue",
   ARCHIVED: "Archivée",
   REJECTED: "Écartée",
+  INTEGRATING: "Intégration en cours",
+  INTEGRATED_DRAFT: "Brouillon interne créé",
 };
 
 export default async function OfferPoolPage({
@@ -42,7 +44,7 @@ export default async function OfferPoolPage({
   const statusFilter = params.status?.trim() || "";
   const countryFilter = params.country?.trim() || "";
 
-  const [offers, total, toQualify, qualified, matching, rejected] = await Promise.all([
+  const [offers, total, toQualify, qualified, matching, rejected, integratedDraft] = await Promise.all([
     prisma.externalJobOpportunity.findMany({
       orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
       take: 5000,
@@ -53,10 +55,11 @@ export default async function OfferPoolPage({
       },
     }),
     prisma.externalJobOpportunity.count(),
-    prisma.externalJobOpportunity.count({ where: { status: { in: ["DETECTED", "A_QUALIFIER", "QUALIFYING"] } } }),
+    prisma.externalJobOpportunity.count({ where: { status: { in: ["DETECTED", "A_QUALIFIER", "QUALIFYING", "INTEGRATING"] } } }),
     prisma.externalJobOpportunity.count({ where: { status: "QUALIFIED" } }),
     prisma.externalJobOpportunity.count({ where: { status: "MATCHING" } }),
     prisma.externalJobOpportunity.count({ where: { status: "REJECTED" } }),
+    prisma.externalJobOpportunity.count({ where: { status: "INTEGRATED_DRAFT" } }),
   ]);
 
   const countries = extractOfferCountries(offers);
@@ -116,13 +119,14 @@ export default async function OfferPoolPage({
         <p className="mt-5 text-xs leading-6 text-white/35">La source affichée sur chaque offre indique l'origine réelle. Le statut MATCHING ne signifie pas « offre sourcée » : il indique qu'un rapprochement offre ↔ candidat a été traité.</p>
       </div>
 
-      <div className="mt-8 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-8 grid gap-px bg-white/10 sm:grid-cols-2 lg:grid-cols-6">
         {[
           ["Offres conservées", total],
           ["À qualifier / En cours", toQualify],
           ["Qualifiées", qualified],
           ["Matchings traités", matching],
           ["Écartées", rejected],
+          ["Brouillons internes", integratedDraft],
         ].map(([label, value]) => (
           <div key={String(label)} className="bg-[#111] p-5">
             <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">{label}</p>
