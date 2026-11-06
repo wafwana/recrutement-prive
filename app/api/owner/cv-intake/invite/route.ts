@@ -111,7 +111,12 @@ export async function POST(request: Request) {
       return { userId: candidateUser.id, candidateId: candidate.id, candidateName: candidateUser.name || intake.candidateName || email.split("@")[0], passwordHash: candidateUser.passwordHash };
     });
 
-    if (linked.passwordHash) return NextResponse.json({ ok: true, linked: true, invitationSent: false, candidateId: linked.candidateId, message: "CV rattaché au compte candidat existant. Aucun nouvel accès n’a été envoyé." });
+    if (linked.passwordHash) {
+      const latest = await prisma.cvIntake.findUnique({ where: { id: intake.id }, select: { matching: true } });
+      const latestMatching = asRecord(latest?.matching);
+      await prisma.cvIntake.update({ where: { id: intake.id }, data: { matching: { ...latestMatching, invitationStatus: "ACCOUNT_ALREADY_ACTIVE", invitationPreparedAt: new Date().toISOString() } } });
+      return NextResponse.json({ ok: true, linked: true, invitationSent: false, candidateId: linked.candidateId, message: "CV rattaché au compte candidat existant. Aucun nouvel accès n’a été envoyé." });
+    }
 
     const rawToken = randomBytes(32).toString("hex");
     const tokenHash = hashToken(rawToken);
@@ -129,6 +134,9 @@ export async function POST(request: Request) {
       await prisma.auditLog.create({ data: { actorUserId: userId, actorRole: "OWNER", action: "CANDIDATE_INVITATION_FAILED", targetType: "CV_INTAKE", targetId: intake.id, details: { candidateId: linked.candidateId, reason: delivery.error || "Email delivery failed" } } });
       return NextResponse.json({ error: delivery.error || "Le service e-mail n’a pas confirmé l’envoi. Le dossier candidat reste préparé ; tu peux relancer l’invitation." }, { status: 502 });
     }
+    const latest = await prisma.cvIntake.findUnique({ where: { id: intake.id }, select: { matching: true } });
+    const latestMatching = asRecord(latest?.matching);
+    await prisma.cvIntake.update({ where: { id: intake.id }, data: { matching: { ...latestMatching, invitationStatus: "SENT", invitationSentAt: new Date().toISOString(), invitationSentTo: email } } });
     await prisma.auditLog.create({ data: { actorUserId: userId, actorRole: "OWNER", action: "CANDIDATE_INVITATION_SENT", targetType: "CV_INTAKE", targetId: intake.id, details: { email, expiresInDays: 7, candidateId: linked.candidateId, consentStatus: "AUTHORIZED" } } });
     return NextResponse.json({ ok: true, linked: true, invitationSent: true, expiresInDays: 7, candidateId: linked.candidateId });
   } catch (error) {
