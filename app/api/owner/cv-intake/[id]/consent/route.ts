@@ -29,14 +29,28 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (!intake) return NextResponse.json({ error: "CV introuvable." }, { status: 404 });
 
   const verifiedAt = new Date();
-  const previousMatching = asRecord(intake.matching);
-  const previousConsent = asRecord(previousMatching.consent);
-  await prisma.$transaction(async (tx) => {
+  const previousConsentStatus = await prisma.$transaction(async (tx) => {
+    const locked = await tx.cvIntake.updateMany({ where: { id }, data: { updatedAt: verifiedAt } });
+    if (!locked.count) return null;
+    const currentIntake = await tx.cvIntake.findUnique({
+      where: { id },
+      select: { id: true, status: true, matching: true, candidateId: true, name: true, originalSha256: true },
+    });
+    if (!currentIntake) return null;
+    const previousMatching = asRecord(currentIntake.matching);
+    const previousConsent = asRecord(previousMatching.consent);
+    const nextMatching: Record<string, unknown> = {
+      ...previousMatching,
+      ...(status === "AUTHORIZED" && previousConsent.status === "REVOKED" ? { invitationStatus: null, invitationSentAt: null } : status === "REVOKED" && previousMatching.invitationStatus === "PREPARING" ? { invitationStatus: null } : {}),
+      consent: { status, evidence, verifiedAt: verifiedAt.toISOString(), verifiedByUserId: userId },
+    };
+    if (status === "REVOKED" && typeof previousMatching.invitationTokenHash === "string") {
+      await tx.passwordResetToken.deleteMany({ where: { tokenHash: previousMatching.invitationTokenHash, usedAt: null } });
+      delete nextMatching.invitationTokenHash;
+    }
     await tx.cvIntake.update({
       where: { id },
-      data: {
-        matching: { ...previousMatching, ...(status === "AUTHORIZED" && previousConsent.status === "REVOKED" ? { invitationStatus: null, invitationSentAt: null } : {}), consent: { status, evidence, verifiedAt: verifiedAt.toISOString(), verifiedByUserId: userId } },
-      },
+      data: { matching: nextMatching as Prisma.InputJsonValue },
     });
     const externalId = "cv-intake:" + id;
     const sourced = await tx.sourcedCandidate.findUnique({
@@ -50,18 +64,19 @@ export async function POST(request: Request, { params }: RouteParams) {
         data: {
           consentStatus: "REVOKED",
           status: "REJECTED",
-          matchingDetails: { ...previous, consentRevokedAt: verifiedAt.toISOString(), consentRevocationEvidence: evidence },
+          matchingScore: 0,
+          matchingDetails: { ...previous, matchedOffers: [], consentRevokedAt: verifiedAt.toISOString(), consentRevocationEvidence: evidence },
           notes: "Autorisation d’exploitation révoquée par l’OWNER. Exclu du matching et du vivier actif.",
         },
       });
     }
-    if (intake.candidateId) {
-      const profile = await tx.candidateProfile.findUnique({ where: { id: intake.candidateId }, select: { preferences: true, status: true } });
+    if (currentIntake.candidateId) {
+      const profile = await tx.candidateProfile.findUnique({ where: { id: currentIntake.candidateId }, select: { preferences: true, status: true } });
       const preferences = asRecord(profile?.preferences);
       const profileComesFromThisIntake = preferences.sourceCvIntakeId === id || preferences.source === "MANUAL_CV_IMPORT";
       if (profile && profileComesFromThisIntake && status === "REVOKED") {
         await tx.candidateProfile.update({
-          where: { id: intake.candidateId },
+          where: { id: currentIntake.candidateId },
           data: { status: "SUSPENDED", preferences: { ...preferences, sourceCvIntakeId: id, consentStatus: "REVOKED", consentRevokedAt: verifiedAt.toISOString(), consentSuspendedAt: verifiedAt.toISOString() } },
         });
       }
@@ -69,18 +84,18 @@ export async function POST(request: Request, { params }: RouteParams) {
         const nextPreferences: Record<string, unknown> = { ...preferences, sourceCvIntakeId: id, consentStatus: "AUTHORIZED", consentVerifiedAt: verifiedAt.toISOString() };
         delete nextPreferences.consentSuspendedAt;
         await tx.candidateProfile.update({
-          where: { id: intake.candidateId },
+          where: { id: currentIntake.candidateId },
           data: { status: typeof preferences.consentSuspendedAt === "string" ? "ACTIVE" : profile.status, preferences: nextPreferences as Prisma.InputJsonValue },
         });
       }
       const candidateDocuments = await tx.candidateDocument.findMany({
-        where: { candidateId: intake.candidateId, docType: "CV", name: intake.name },
+        where: { candidateId: currentIntake.candidateId, docType: "CV", name: currentIntake.name },
         select: { id: true, fileData: true, analysis: true },
       });
       for (const document of candidateDocuments) {
         if (!document.fileData) continue;
         const fileHash = createHash("sha256").update(Buffer.from(document.fileData)).digest("hex");
-        if (fileHash !== intake.originalSha256) continue;
+        if (fileHash !== currentIntake.originalSha256) continue;
         if (status === "REVOKED") {
           await tx.candidateDocument.delete({ where: { id: document.id } });
         } else {
@@ -99,10 +114,12 @@ export async function POST(request: Request, { params }: RouteParams) {
         action: status === "AUTHORIZED" ? "CV_INTAKE_CONSENT_AUTHORIZED" : "CV_INTAKE_CONSENT_REVOKED",
         targetType: "CV_INTAKE",
         targetId: id,
-        details: { consentStatus: status, evidence, previousConsentStatus: typeof previousConsent.status === "string" ? previousConsent.status : "PENDING", verifiedAt: verifiedAt.toISOString(), sourceStatus: intake.status },
+        details: { consentStatus: status, evidence, previousConsentStatus: typeof previousConsent.status === "string" ? previousConsent.status : "PENDING", verifiedAt: verifiedAt.toISOString(), sourceStatus: currentIntake.status },
       },
     });
+    return typeof previousConsent.status === "string" ? previousConsent.status : "PENDING";
   });
+  if (previousConsentStatus === null) return NextResponse.json({ error: "CV introuvable." }, { status: 404 });
 
   let sync: unknown = null;
   if (status === "AUTHORIZED") {

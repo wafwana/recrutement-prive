@@ -16,7 +16,7 @@ test("CV intake stores pending consent and never creates a user, candidate profi
 
 test("CV intake consent is OWNER-only, evidence-backed, audited and revocable", () => {
   const route = read("app/api/owner/cv-intake/[id]/consent/route.ts");
-  for (const fragment of ['role !== "OWNER"', "evidence.length < 10", "matching: { ...previousMatching", "previousConsent.status === \"REVOKED\"", "verifiedAt: verifiedAt.toISOString()", "verifiedByUserId: userId", "tx.auditLog.create", "CV_INTAKE_CONSENT_AUTHORIZED", "CV_INTAKE_CONSENT_REVOKED", 'status: "REJECTED"', 'consentStatus: "REVOKED"', "MANUAL_CV_IMPORT", 'status: "SUSPENDED"', "createHash("]) {
+  for (const fragment of ['role !== "OWNER"', "evidence.length < 10", "previousConsent.status === \"REVOKED\"", "verifiedAt: verifiedAt.toISOString()", "verifiedByUserId: userId", "tx.auditLog.create", "CV_INTAKE_CONSENT_AUTHORIZED", "CV_INTAKE_CONSENT_REVOKED", 'status: "REJECTED"', 'consentStatus: "REVOKED"', "MANUAL_CV_IMPORT", 'status: "SUSPENDED"', "createHash(", "passwordResetToken.deleteMany", "invitationTokenHash"]) {
     assert.ok(route.includes(fragment), "missing consent control: " + fragment);
   }
 });
@@ -31,12 +31,24 @@ test("Only authorized and analyzed CV intake records enter the provisional sourc
 
 test("local CV reprocessing preserves consent and defers all matching until authorization", () => {
   const route = read("app/api/owner/cv-intake/reprocess/route.ts");
-  assert.ok(route.includes("...previousMatching"));
+  assert.ok(route.includes("matching: { ...matching, suggestedMatches"));
   assert.ok(route.includes('consent.status !== "AUTHORIZED"'));
   assert.ok(route.indexOf('consent.status !== "AUTHORIZED"') < route.indexOf("extractTextFromCvBuffer("), "consent must be checked before document extraction");
+  assert.ok(route.includes('matching: { path: ["consent", "status"], equals: "AUTHORIZED" }'), "final analysis writes must be guarded against concurrent revocation");
+  assert.ok(route.includes('latestConsent.status !== "AUTHORIZED"'), "reprocessing must re-read consent after taking the intake row lock");
   assert.ok(route.includes("ingestAnalyzedCvIntakes(userId, 1, [record.id])"));
   assert.ok(!route.includes("prisma.job.findMany"));
   assert.ok(!route.includes("function scoreJob("));
+});
+
+test("sourcing ingestion serializes with revocation and cannot restore matches after consent is revoked", () => {
+  const ingest = read("lib/sourcing/ingest.ts");
+  assert.ok(ingest.includes('matching: { path: ["consent", "status"], equals: "AUTHORIZED" }'));
+  assert.ok(ingest.includes("const locked = await tx.cvIntake.updateMany"));
+  assert.ok(ingest.includes('consentStatus: "AUTHORIZED" }\n      : { id: candidate.id }'));
+  const consent = read("app/api/owner/cv-intake/[id]/consent/route.ts");
+  assert.ok(consent.includes("matchingScore: 0"));
+  assert.ok(consent.includes("matchedOffers: []"));
 });
 
 test("Legacy pending or revoked CV intake sourced candidates are excluded from matching and sourcing views", () => {
@@ -59,6 +71,7 @@ test("Candidate account creation and invitation require explicit Owner action af
   assert.ok(route.includes("tx.user.create"));
   assert.ok(route.includes("tx.candidateProfile.create"));
   assert.ok(route.includes("tx.candidateDocument.create"));
+  assert.ok(route.includes("invitationTokenHash: tokenHash"));
   assert.ok(route.includes("CV_INTAKE_LINKED_TO_CANDIDATE"));
   assert.ok(route.includes("CANDIDATE_INVITATION_SENT"));
   assert.ok(route.includes("invitationStatus: \"SENT\""));
@@ -82,6 +95,7 @@ test("CV consent metadata uses the existing JSON column and introduces no databa
   const schema = read("prisma/schema.prisma");
   const route = read("app/api/owner/cv-intake/[id]/consent/route.ts");
   assert.ok(!schema.includes('consentStatus     String          @default("PENDING")'));
-  assert.ok(route.includes("matching: { ...previousMatching") && route.includes("consent: { status, evidence, verifiedAt: verifiedAt.toISOString()"));
+  assert.ok(route.includes("consent: { status, evidence, verifiedAt: verifiedAt.toISOString()"));
+  assert.ok(route.includes("data: { matching: nextMatching as Prisma.InputJsonValue }"));
   assert.ok(!fs.existsSync("prisma/migrations/20261106010000_cv_intake_consent_gate/migration.sql"));
 });

@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { hashPassword } from "@/lib/password-crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { hashPassword, hashToken } from "@/lib/password-crypto";
 import { prisma } from "@/lib/prisma";
+import { ingestAnalyzedCvIntakes } from "@/lib/sourcing/ingest";
+import { resetPassword } from "@/app/reinitialisation-mot-de-passe/actions";
 
 const AI_ENV_KEYS = ["AI_PROVIDER", "OPENAI_API_KEY", "GEMINI_API_KEY"] as const;
 const PORT = 3187;
@@ -51,10 +53,14 @@ async function main() {
   const pdfBytes = await readFile("tests/fixtures/cv/synthetic-cv.pdf");
   const sha256 = createHash("sha256").update(pdfBytes).digest("hex");
   const originalAiEnv = Object.fromEntries(AI_ENV_KEYS.map((key) => [key, process.env[key]]));
+  const emailsToClean: string[] = [];
   let ownerId: string | null = null;
+  let adminId: string | null = null;
+  let candidateUserId: string | null = null;
   let child: ReturnType<typeof spawn> | null = null;
   let serverOutput = "";
   const jar = new Map<string, string>();
+  const adminJar = new Map<string, string>();
 
   // Force deterministic local CV analysis and guarantee no outbound AI calls.
   for (const key of AI_ENV_KEYS) delete process.env[key];
@@ -70,6 +76,18 @@ async function main() {
       select: { id: true, email: true, name: true },
     });
     ownerId = owner.id;
+    const adminEmail = `e2e.admin.http.${suffix}@example.test`;
+    emailsToClean.push(adminEmail);
+    const admin = await prisma.user.create({
+      data: {
+        name: "Synthetic HTTP E2E Admin",
+        email: adminEmail,
+        role: "ADMIN",
+        passwordHash: await hashPassword(PASSWORD),
+      },
+      select: { id: true },
+    });
+    adminId = admin.id;
 
     child = spawn(process.execPath, [
       "node_modules/next/dist/bin/next",
@@ -85,6 +103,7 @@ async function main() {
         AUTH_URL: BASE_URL,
         NEXTAUTH_URL: BASE_URL,
         MAINTENANCE_MODE: "false",
+        RESEND_API_KEY: "mock_key",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -131,10 +150,38 @@ async function main() {
     assert.equal(session?.user?.id, owner.id, "Real Auth.js session cookie must resolve the test Owner");
     assert.equal(session?.user?.role, "OWNER", "Auth.js must preserve the OWNER role in the signed session");
 
+    const adminCsrfResponse = await fetch(`${BASE_URL}/api/auth/csrf`);
+    setCookiesFromResponse(adminCsrfResponse, adminJar);
+    const adminCsrf = await adminCsrfResponse.json() as { csrfToken?: string };
+    assert.ok(adminCsrf.csrfToken);
+    const adminLoginResponse = await fetch(`${BASE_URL}/api/auth/callback/credentials`, {
+      method: "POST",
+      redirect: "manual",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": cookieHeader(adminJar),
+        "X-Auth-Return-Redirect": "1",
+      },
+      body: new URLSearchParams({
+        csrfToken: adminCsrf.csrfToken,
+        email: adminEmail,
+        password: PASSWORD,
+        callbackUrl: `${BASE_URL}/espace`,
+        json: "true",
+      }),
+    });
+    setCookiesFromResponse(adminLoginResponse, adminJar);
+    assert.ok([200, 302, 303].includes(adminLoginResponse.status));
+    const adminSessionResponse = await fetch(`${BASE_URL}/api/auth/session`, { headers: { Cookie: cookieHeader(adminJar) } });
+    const adminSession = await adminSessionResponse.json() as { user?: { id?: string; role?: string } } | null;
+    assert.equal(adminSession?.user?.id, admin.id);
+    assert.equal(adminSession?.user?.role, "ADMIN");
+
     // Upload a synthetic PDF through the real HTTP route, with the real signed session cookie.
     const formData = new FormData();
     formData.set("file", new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" }), "synthetic-cv.pdf");
     const consentEmail = `cv-consent-e2e.${suffix}@example.test`;
+    emailsToClean.push(consentEmail);
     formData.set("candidateName", "Synthetic CV Consent");
     formData.set("candidateEmail", consentEmail);
     const uploadResponse = await fetch(`${BASE_URL}/api/owner/cv-intake`, {
@@ -200,6 +247,13 @@ async function main() {
     const provisionalBeforeConsent = await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + persisted.id } } });
     assert.equal(provisionalBeforeConsent, null, "Pending-consent CV must not create a sourced candidate");
 
+    const nonOwnerConsentResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(adminJar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "AUTHORIZED", evidence: "E2E synthetic admin authorization attempt" }) });
+    assert.equal(nonOwnerConsentResponse.status, 403, "ADMIN must not authorize CV consent");
+    const missingEvidenceResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "AUTHORIZED", evidence: "   " }) });
+    assert.equal(missingEvidenceResponse.status, 400, "Consent authorization without evidence must be rejected");
+    const stillPendingAfterDeniedActions = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
+    assert.equal((((stillPendingAfterDeniedActions?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "PENDING");
+
     const consentResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "AUTHORIZED", evidence: "E2E synthetic consent evidence verified by Owner" }) });
     assert.equal(consentResponse.status, 200, `OWNER consent authorization failed: ${(await consentResponse.clone().text()).slice(0, 500)}`);
     const authorizedPendingIntake = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
@@ -230,14 +284,113 @@ async function main() {
     assert.equal(provisionalAfterConsent.consentStatus, "AUTHORIZED");
     assert.equal(provisionalAfterConsent.status, "DETECTED");
 
-    const revokeResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "REVOKED", evidence: "E2E synthetic consent revocation verified by Owner" }) });
+    const inviteAfterConsent = await fetch(`${BASE_URL}/api/owner/cv-intake/invite`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ intakeId: persisted.id }) });
+    assert.equal(inviteAfterConsent.status, 502, "Explicit invitation action should reach mail delivery after consent; CI has no mail provider configured");
+    const invitedUser = await prisma.user.findUnique({
+      where: { email: consentEmail },
+      select: { id: true, candidat: { select: { id: true, status: true } } },
+    });
+    candidateUserId = invitedUser?.id || null;
+    assert.ok(invitedUser?.candidat, "Candidate account/profile may be created only after the explicit Owner invitation action");
+    const derivedDocument = await prisma.candidateDocument.findFirst({
+      where: { candidateId: invitedUser.candidat.id, analysis: { path: ["sourceCvIntakeId"], equals: persisted.id } },
+      select: { id: true },
+    });
+    assert.ok(derivedDocument, "Explicit invitation action should create the derived candidate CV copy");
+
+    const pendingInvitationToken = randomBytes(32).toString("hex");
+    const pendingInvitationTokenHash = hashToken(pendingInvitationToken);
+    await prisma.passwordResetToken.create({
+      data: { email: consentEmail, tokenHash: pendingInvitationTokenHash, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+    });
+    const intakeBeforeTokenRevocation = await prisma.cvIntake.findUnique({ where: { id: persisted.id }, select: { matching: true } });
+    await prisma.cvIntake.update({
+      where: { id: persisted.id },
+      data: { matching: { ...(intakeBeforeTokenRevocation?.matching as Record<string, unknown>), invitationStatus: "SENT", invitationTokenHash: pendingInvitationTokenHash } },
+    });
+
+    await prisma.cvIntake.update({ where: { id: persisted.id }, data: { status: "NON_ANALYSE" } });
+    const [revokeResponse, raceReprocessResponse] = await Promise.all([
+      fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "REVOKED", evidence: "E2E synthetic consent revocation verified by Owner" }) }),
+      fetch(`${BASE_URL}/api/owner/cv-intake/reprocess`, {
+        method: "POST",
+        headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [persisted.id] }),
+      }),
+    ]);
     assert.equal(revokeResponse.status, 200, `OWNER consent revocation failed: ${(await revokeResponse.clone().text()).slice(0, 500)}`);
+    assert.equal(raceReprocessResponse.status, 200, "Concurrent local reprocessing should resolve safely against revocation");
     const revokedIntake = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
     const revokedCandidate = await prisma.sourcedCandidate.findUnique({ where: { id: provisionalAfterConsent.id } });
+    const revokedProfile = await prisma.candidateProfile.findUnique({ where: { id: invitedUser.candidat.id }, select: { status: true, preferences: true } });
     assert.equal((((revokedIntake?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "REVOKED");
     assert.equal(revokedCandidate?.consentStatus, "REVOKED");
     assert.equal(revokedCandidate?.status, "REJECTED", "Revoked CV must leave the active sourcing/matching pool");
-    assert.equal(await prisma.user.findUnique({ where: { email: consentEmail }, select: { id: true } }), null, "Consent review must not create an account until the explicit invitation action");
+    assert.equal(revokedCandidate?.matchingScore, 0);
+    assert.deepEqual((revokedCandidate?.matchingDetails as Record<string, unknown> | null)?.matchedOffers, []);
+    assert.equal(revokedProfile?.status, "SUSPENDED", "Profile created from the import must be suspended on revocation");
+    assert.equal(await prisma.candidateDocument.findFirst({ where: { candidateId: invitedUser.candidat.id, analysis: { path: ["sourceCvIntakeId"], equals: persisted.id } }, select: { id: true } }), null, "Revocation must remove the derived CV copy");
+    assert.equal(await prisma.passwordResetToken.findUnique({ where: { tokenHash: pendingInvitationTokenHash }, select: { id: true } }), null, "Revocation must invalidate the pending invitation token");
+    const resetFormData = new FormData();
+    resetFormData.set("token", pendingInvitationToken);
+    resetFormData.set("password", "Synthetic-Reset-2026!");
+    const rejectedPasswordReset = await resetPassword(resetFormData);
+    assert.equal(rejectedPasswordReset.ok, false, "A revoked invitation token must not activate candidate credentials");
+    const preservedOriginal = await prisma.cvIntake.findUnique({ where: { id: persisted.id }, select: { originalSha256: true, fileData: true } });
+    assert.equal(preservedOriginal?.originalSha256, sha256);
+    assert.deepEqual(Buffer.from(preservedOriginal!.fileData), pdfBytes, "Revocation must retain the immutable original CV");
+
+    const reprocessAfterRevocation = await fetch(`${BASE_URL}/api/owner/cv-intake/reprocess`, {
+      method: "POST",
+      headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [persisted.id] }),
+    });
+    const revokedRetryBody = await reprocessAfterRevocation.json() as { results: Array<{ status: string }> };
+    assert.equal(revokedRetryBody.results[0]?.status, "SKIPPED_CONSENT_PENDING", "Reanalysis must not run after revocation");
+    const inviteAfterRevocation = await fetch(`${BASE_URL}/api/owner/cv-intake/invite`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ intakeId: persisted.id }) });
+    assert.equal(inviteAfterRevocation.status, 409, "Revocation must block future invitations");
+    const stillSuspended = await prisma.candidateProfile.findUnique({ where: { id: invitedUser.candidat.id }, select: { status: true } });
+    assert.equal(stillSuspended?.status, "SUSPENDED", "Retry attempts must not reactivate the revoked candidate profile");
+
+    const raceEmail = `cv-consent-race.${suffix}@example.test`;
+    emailsToClean.push(raceEmail);
+    const raceIntake = await prisma.cvIntake.create({
+      data: {
+        name: "synthetic-consent-race.pdf",
+        originalName: "synthetic-consent-race.pdf",
+        mimeType: "application/pdf",
+        fileData: pdfBytes,
+        size: pdfBytes.length,
+        originalSha256: sha256,
+        senderUserId: owner.id,
+        senderRole: "OWNER",
+        senderEmail: owner.email,
+        candidateName: "Synthetic Consent Race",
+        candidateEmail: raceEmail,
+        docType: "CV",
+        folderPath: "CANDIDATS/A_CLASSER/CV",
+        analysis: { skills: ["TypeScript"], subCategoryCodes: [], primaryCategoryCode: null, sourceFactsOnly: true },
+        matching: { consent: { status: "AUTHORIZED", evidence: "E2E synthetic race setup", verifiedAt: new Date().toISOString(), verifiedByUserId: owner.id } },
+        analyzedAt: new Date(),
+        status: "ANALYSE_OK",
+      },
+    });
+    const [raceSyncResult, raceRevokeResponse] = await Promise.all([
+      ingestAnalyzedCvIntakes(owner.id, 1, [raceIntake.id]),
+      fetch(`${BASE_URL}/api/owner/cv-intake/${raceIntake.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "REVOKED", evidence: "E2E synthetic concurrent revocation evidence" }) }),
+    ]);
+    assert.equal(raceRevokeResponse.status, 200);
+    const raceSourcedCandidate = await prisma.sourcedCandidate.findUnique({
+      where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + raceIntake.id } },
+      select: { consentStatus: true, status: true, matchingScore: true, matchingDetails: true },
+    });
+    const raceIntakeAfter = await prisma.cvIntake.findUnique({ where: { id: raceIntake.id }, select: { matching: true } });
+    assert.equal((((raceIntakeAfter?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "REVOKED");
+    assert.ok(!raceSourcedCandidate || (raceSourcedCandidate.consentStatus === "REVOKED" && raceSourcedCandidate.status === "REJECTED"), "A concurrent ingestion must not leave a revoked CV in the active sourcing pool");
+    if (raceSourcedCandidate) {
+      assert.equal(raceSourcedCandidate.matchingScore, 0);
+      assert.deepEqual((raceSourcedCandidate.matchingDetails as Record<string, unknown> | null)?.matchedOffers, []);
+    }
 
     // Read-only check of the OWNER outflows API against the fully migrated CI schema.
     const outflowsResponse = await fetch(`${BASE_URL}/api/owner/outflows`, {
@@ -263,11 +416,20 @@ async function main() {
         immutableOriginalAndSha256: true,
         auditTrail: true,
         ownerOutflowsReadAgainstMigratedSchema: true,
-        noCandidateIdentityCreated: true,
+        noCandidateIdentityCreatedBeforeOwnerAction: true,
         consentRequiredBeforeSourcing: true,
         consentRevocationExcludesFromMatching: true,
+        concurrentRevocationAndReanalysisSafe: true,
+        nonOwnerConsentDenied: true,
+        missingEvidenceRejected: true,
+        invitationAfterExplicitOwnerAction: true,
+        revokedDerivedDocumentRemoved: true,
+        revokedProfileSuspended: true,
+        revokedProfileNotReactivated: true,
+        revokedInvitationTokenInvalidated: true,
         noAutomaticCandidateInvitation: true,
         noExternalAiProviderCalled: true,
+        concurrentIngestionAndRevocationSafe: true,
       },
     }, null, 2));
   } finally {
@@ -287,6 +449,16 @@ async function main() {
         await prisma.candidateDocument.deleteMany({ where: { candidateId: { in: candidateIds } } });
         await prisma.candidateProfile.deleteMany({ where: { id: { in: candidateIds } } });
       }
+      if (candidateUserId) {
+        const candidate = await prisma.user.findUnique({ where: { id: candidateUserId }, select: { candidat: { select: { id: true } } } });
+        if (candidate?.candidat) {
+          await prisma.candidateDocument.deleteMany({ where: { candidateId: candidate.candidat.id } });
+          await prisma.candidateProfile.deleteMany({ where: { id: candidate.candidat.id } });
+        }
+        await prisma.user.deleteMany({ where: { id: candidateUserId } });
+      }
+      if (emailsToClean.length) await prisma.passwordResetToken.deleteMany({ where: { email: { in: emailsToClean } } });
+      if (adminId) await prisma.user.deleteMany({ where: { id: adminId } });
       await prisma.user.deleteMany({ where: { id: ownerId } });
     }
     if (child && child.exitCode === null) {

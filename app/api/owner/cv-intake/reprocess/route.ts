@@ -82,15 +82,35 @@ export async function POST(request: Request) {
       const text = await extractTextFromCvBuffer(Buffer.from(record.fileData), record.mimeType, record.name);
       if (!text) {
         const reason = "Extraction locale impossible : document vide, scanné sans couche texte ou format non exploitable.";
-        await prisma.cvIntake.update({
-          where: { id: record.id },
-          data: {
-            status: "NON_ANALYSE",
-            analysis: { sourceFactsOnly: true, error: reason, retryMethod: "LOCAL_DETERMINISTIC" },
-            matching: { ...previousMatching, suggestedMatches: [], generatedAt: new Date().toISOString(), method: "LOCAL_DETERMINISTIC" },
-            analyzedAt: null,
-          },
+        const saved = await prisma.$transaction(async (tx) => {
+          const locked = await tx.cvIntake.updateMany({
+            where: { id: record.id, matching: { path: ["consent", "status"], equals: "AUTHORIZED" } },
+            data: { updatedAt: new Date() },
+          });
+          if (!locked.count) return false;
+          const latest = await tx.cvIntake.findUnique({ where: { id: record.id }, select: { matching: true } });
+          const matching = latest?.matching && typeof latest.matching === "object" && !Array.isArray(latest.matching)
+            ? latest.matching as Record<string, unknown>
+            : {};
+          const latestConsent = matching.consent && typeof matching.consent === "object" && !Array.isArray(matching.consent)
+            ? matching.consent as Record<string, unknown>
+            : {};
+          if (latestConsent.status !== "AUTHORIZED") return false;
+          await tx.cvIntake.update({
+            where: { id: record.id },
+            data: {
+              status: "NON_ANALYSE",
+              analysis: { sourceFactsOnly: true, error: reason, retryMethod: "LOCAL_DETERMINISTIC" },
+              matching: { ...matching, suggestedMatches: [], generatedAt: new Date().toISOString(), method: "LOCAL_DETERMINISTIC" },
+              analyzedAt: null,
+            },
+          });
+          return true;
         });
+        if (!saved) {
+          results.push({ id: record.id, status: "SKIPPED_CONSENT_PENDING", reason: "Consentement révoqué pendant l’analyse." });
+          continue;
+        }
         await prisma.auditLog.create({
           data: {
             actorUserId: userId,
@@ -107,15 +127,35 @@ export async function POST(request: Request) {
 
       const analysis = parseCvTextLocally(text, taxonomyItems);
       const suggestedMatches: Array<{ jobId: string; title: string; score: number }> = [];
-      await prisma.cvIntake.update({
-        where: { id: record.id },
-        data: {
-          status: "ANALYSE_OK",
-          analysis: { ...analysis, sourceFactsOnly: true, retryMethod: "LOCAL_DETERMINISTIC" },
-          matching: { ...previousMatching, suggestedMatches, generatedAt: new Date().toISOString(), method: "LOCAL_DETERMINISTIC" },
-          analyzedAt: new Date(),
-        },
+      const saved = await prisma.$transaction(async (tx) => {
+        const locked = await tx.cvIntake.updateMany({
+          where: { id: record.id, matching: { path: ["consent", "status"], equals: "AUTHORIZED" } },
+          data: { updatedAt: new Date() },
+        });
+        if (!locked.count) return false;
+        const latest = await tx.cvIntake.findUnique({ where: { id: record.id }, select: { matching: true } });
+        const matching = latest?.matching && typeof latest.matching === "object" && !Array.isArray(latest.matching)
+          ? latest.matching as Record<string, unknown>
+          : {};
+        const latestConsent = matching.consent && typeof matching.consent === "object" && !Array.isArray(matching.consent)
+          ? matching.consent as Record<string, unknown>
+          : {};
+        if (latestConsent.status !== "AUTHORIZED") return false;
+        await tx.cvIntake.update({
+          where: { id: record.id },
+          data: {
+            status: "ANALYSE_OK",
+            analysis: { ...analysis, sourceFactsOnly: true, retryMethod: "LOCAL_DETERMINISTIC" },
+            matching: { ...matching, suggestedMatches, generatedAt: new Date().toISOString(), method: "LOCAL_DETERMINISTIC" },
+            analyzedAt: new Date(),
+          },
+        });
+        return true;
       });
+      if (!saved) {
+        results.push({ id: record.id, status: "SKIPPED_CONSENT_PENDING", reason: "Consentement révoqué pendant l’analyse." });
+        continue;
+      }
       await ingestAnalyzedCvIntakes(userId, 1, [record.id]);
       await prisma.auditLog.create({
         data: {
