@@ -2,12 +2,9 @@ import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { analyzeCvDocument, analyzeCvDocumentLocally } from "@/lib/cv/analyzer";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
-import { buildCandidateFolder, buildCandidateFolderFromAnalysis, resolveCvTaxonomySelection } from "@/lib/cv/folders";
-import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
+import { buildCandidateFolder } from "@/lib/cv/folders";
 import { hasPermission } from "@/lib/auth/permissions";
-import { sanitizePostgresJson } from "@/lib/security/sanitize-postgres-json";
 
 const CV_INTAKE_ALLOWED_TYPES = new Set([
   ...Array.from(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg"]),
@@ -63,7 +60,6 @@ export async function POST(request: Request) {
   if (!(await hasPermission(userId, session?.user?.role || undefined, "CV_INTAKE"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
 
   try {
-    await ensureTaxonomySynced();
     const formData = await request.formData();
     const file = formData.get("file");
     if (!file || typeof file === "string") return NextResponse.json({ error: "Aucun CV fourni." }, { status: 400 });
@@ -77,68 +73,18 @@ export async function POST(request: Request) {
     const duplicate = await prisma.cvIntake.findFirst({ where: { originalSha256: sha256 }, select: { id: true, name: true, folderPath: true } });
     if (duplicate) return NextResponse.json({ error: "Ce CV original est déjà répertorié.", duplicateId: duplicate.id, name: duplicate.name, originalSha256: sha256, folderPath: duplicate.folderPath }, { status: 409 });
 
-    const taxonomy = await prisma.jobCategory.findMany({
-      where: { isActive: true },
-      orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
-      select: { id: true, code: true, name: true, parentId: true },
-    });
-    const taxonomyItems = taxonomy.map((item) => ({
-      code: item.code,
-      name: typeof item.name === "object" && item.name !== null && "fr" in item.name ? String((item.name as Record<string, unknown>).fr || item.code) : typeof item.name === "string" ? item.name : item.code,
-      parentCode: taxonomy.find((parent) => parent.id === item.parentId)?.code || null,
-    }));
-
-    let analysis: Awaited<ReturnType<typeof analyzeCvDocument>> = null;
-    let analysisError: string | null = null;
-    try {
-      analysis = await analyzeCvDocument({
-        fileName: safeFileName,
-        mimeType: file.type || "application/octet-stream",
-        buffer,
-        taxonomy: taxonomyItems,
-      });
-    } catch (error) {
-      // L'intégration du CV ne doit jamais échouer uniquement parce que
-      // l'analyse IA est momentanément indisponible ou rejette le format.
-      analysisError = error instanceof Error ? error.message : "Erreur d'analyse IA";
-      console.error("[owner cv analysis]", error);
-      // Provider failure must not leave a CV unprocessed when local text extraction works.
-      try {
-        analysis = await analyzeCvDocumentLocally({
-          fileName: safeFileName,
-          mimeType: file.type || "application/octet-stream",
-          buffer,
-          taxonomy: taxonomyItems,
-        });
-      } catch {
-        analysis = null;
-      }
-    }
-
-    // Extractors may return U+0000 from binary-heavy or malformed documents.
-    // Preserve the original fileData bytes, but sanitize all parsed fields before DB/JSON persistence.
-    analysis = sanitizePostgresJson(analysis);
-
-    // Matching is deliberately deferred until the OWNER has verified the CV usage authorization.
+    // Do not parse, classify or match a CV before the OWNER verifies the authorization.
     const suggestedMatches: Array<{ jobId: string; title: string; score: number }> = [];
-
-    const taxonomySelection = resolveCvTaxonomySelection(analysis, taxonomyItems);
-
-    const extractedEmail = analysis?.email || null;
-    const candidateEmail = (typeof formData.get("candidateEmail") === "string"
+    const candidateEmail = typeof formData.get("candidateEmail") === "string"
       ? String(formData.get("candidateEmail")).replace(/\u0000/g, "").trim().toLowerCase() || null
-      : null) || extractedEmail;
-    const candidateName = (typeof formData.get("candidateName") === "string"
+      : null;
+    const candidateName = typeof formData.get("candidateName") === "string"
       ? String(formData.get("candidateName")).replace(/\u0000/g, "").trim() || null
-      : null) || [analysis?.firstName, analysis?.lastName].filter(Boolean).join(" ").trim() || null;
-    // Import is deliberately provisional: no account, candidate profile, invitation or company sharing is created here.
-    // A direct candidate link must be performed separately after explicit Owner verification.
+      : null;
     const candidateInviteSent = false;
     const candidateId = null;
-    const year = new Date().getFullYear();
-    const suggestedFolder = analysis
-      ? buildCandidateFolderFromAnalysis(analysis, taxonomyItems, year, "CV")
-      : buildCandidateFolder({ year, documentKind: "CV" });
+    const suggestedFolder = buildCandidateFolder({ year: new Date().getFullYear(), documentKind: "CV" });
+
 
     const record = await prisma.cvIntake.create({
       data: {
@@ -156,9 +102,8 @@ export async function POST(request: Request) {
         candidateId,
         docType: "CV",
         folderPath: suggestedFolder,
-        analysis: analysis ? { ...analysis, sourceFactsOnly: true, suggestedMatches } : { sourceFactsOnly: true, suggestedMatches },
-        analyzedAt: analysis ? new Date() : null,
-        status: analysis ? "ANALYSE_OK" : "A_ANALYSER",
+        analyzedAt: null,
+        status: "A_ANALYSER",
         matching: { suggestedMatches, generatedAt: new Date().toISOString(), consent: { status: "PENDING", evidence: null, verifiedAt: null, verifiedByUserId: null } },
       },
       select: { id: true, name: true, folderPath: true, analyzedAt: true, createdAt: true },
@@ -179,8 +124,8 @@ export async function POST(request: Request) {
           invitationSent: false,
           originalSha256: sha256,
           folderPath: suggestedFolder,
-          analysisGenerated: Boolean(analysis),
-          analysisDeferred: Boolean(analysisError),
+          analysisGenerated: false,
+          analysisDeferred: true,
           suggestedMatchCount: suggestedMatches.length,
           originalImmutable: true,
         },
