@@ -18,7 +18,7 @@ test("matching dashboard loads ranked proposals automatically in both directions
 
 test("matching recalculation evaluates candidate-job pairs and audits the actual result", () => {
   const start = route.indexOf('if (parsed.data.action === "recalculate")');
-  const end = route.indexOf('if (parsed.data.action === "propose_anonymized")', start);
+  const end = route.indexOf('return NextResponse.json({ error: "Action non prise en charge."', start);
   assert.ok(start >= 0 && end > start, "recalculation action block must exist");
   const block = route.slice(start, end);
   assert.match(block, /matchCandidateToJob\(/);
