@@ -63,6 +63,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     documents: items,
     folders: [...new Set(items.map((item) => item.folderPath))].sort(),
+    canManageConsent: session?.user?.role === "OWNER",
   });
 }
 
