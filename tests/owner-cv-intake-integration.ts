@@ -222,7 +222,7 @@ async function main() {
     assert.equal(consentResponse.status, 200, `OWNER consent authorization failed: ${(await consentResponse.clone().text()).slice(0, 500)}`);
     const authorizedIntake = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
     assert.equal((((authorizedIntake?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "AUTHORIZED");
-    assert.ok(authorizedIntake?.consentVerifiedAt);
+    assert.ok((((authorizedIntake?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.verifiedAt));
     const provisionalAfterConsent = await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + persisted.id } } });
     assert.ok(provisionalAfterConsent, "Authorized CV must create one provisional sourced candidate");
     assert.equal(provisionalAfterConsent.consentStatus, "AUTHORIZED");
