@@ -50,7 +50,9 @@ test("Executive Search embeds live anonymous candidate-offer proposals and reuse
   assert.ok(cockpit.includes('if ((activeTab === "matching" || activeTab === "overview") && !matchingLoaded && !matchingLoading)'));
 
   assert.match(matchingRoute, /requireMatchingAccess/);
-  assert.match(matchingRoute, /"PRESENTATIONS_MANAGE"/);
+  assert.match(matchingRoute, /const canPresent = access\.role === "OWNER"/);
+  assert.match(matchingRoute, /if \(access\.role !== "OWNER"\)/);
+  assert.doesNotMatch(matchingRoute, /PRESENTATIONS_MANAGE/);
   assert.match(matchingRoute, /"CANDIDATE_MATCH_PRESENTED"/);
   assert.match(matchingRoute, /anonymousMessagingEnabled: true/);
   assert.match(matchingRoute, /identityProtected: true/);
