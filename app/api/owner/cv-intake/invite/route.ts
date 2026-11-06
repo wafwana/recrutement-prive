@@ -78,6 +78,21 @@ export async function POST(request: Request) {
         });
       }
       await tx.cvIntake.update({ where: { id: intake.id }, data: { candidateId: candidate.id } });
+      const provisional = await tx.sourcedCandidate.findUnique({
+        where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + intake.id } },
+        select: { id: true, matchingDetails: true },
+      });
+      if (provisional) {
+        const previousDetails = asRecord(provisional.matchingDetails);
+        await tx.sourcedCandidate.update({
+          where: { id: provisional.id },
+          data: {
+            status: "REJECTED",
+            matchingDetails: { ...previousDetails, promotedToCandidateId: candidate.id, promotedAt: new Date().toISOString(), promotionReason: "OWNER_INVITATION_FLOW" },
+            notes: "Dossier provisoire converti en profil candidat de la plateforme après validation Owner et préparation de l’accès.",
+          },
+        });
+      }
       await tx.auditLog.create({
         data: { actorUserId: userId, actorRole: "OWNER", action: "CV_INTAKE_LINKED_TO_CANDIDATE", targetType: "CV_INTAKE", targetId: intake.id, details: { candidateId: candidate.id, invitationRequested: !candidateUser.passwordHash, consentStatus: "AUTHORIZED" } },
       });
