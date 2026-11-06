@@ -25,9 +25,11 @@ test("navigation separates candidate, enterprise, consultant and ADMIN destinati
   for (const role of ["CANDIDAT", "ENTREPRISE", "CONSULTANT", "ADMIN"]) {
     assert.match(nav, new RegExp(`^  ${role}: \\{`, "m"), `missing role navigation: ${role}`);
   }
-  for (const labelKey of ["ws_candidate_title","ws_candidate_description","ws_candidate_profile_documents","ws_candidate_applications","ws_enterprise_title","ws_enterprise_description","ws_enterprise_offers","ws_enterprise_applications","ws_enterprise_presentations","ws_consultant_title","ws_consultant_description","ws_consultant_pipeline","ws_consultant_sourcing","ws_admin_title","ws_admin_description","ws_admin_dashboard","ws_admin_permissions","ws_admin_configuration","ws_admin_partners_sources","ws_messages","ws_overview"]) {
+  for (const labelKey of ["ws_candidate_title","ws_candidate_description","ws_candidate_profile_documents","ws_candidate_applications","ws_enterprise_title","ws_enterprise_description","ws_enterprise_offers","ws_enterprise_applications","ws_enterprise_presentations","ws_consultant_title","ws_consultant_description","ws_consultant_pipeline","ws_consultant_sourcing","ws_cv_intake_validation","ws_admin_title","ws_admin_description","ws_admin_dashboard","ws_admin_permissions","ws_admin_configuration","ws_admin_partners_sources","ws_messages","ws_overview"]) {
     assert.ok(nav.includes(labelKey), `missing navigation translation key: ${labelKey}`);
   }
+  const delegatedCvLinks = nav.match(/href: "\/espace\/cv-intake", labelKey: "ws_cv_intake_validation", permission: "CV_INTAKE"/g) || [];
+  assert.equal(delegatedCvLinks.length, 2, "ADMIN and CONSULTANT CV links must both require CV_INTAKE");
   assert.match(nav, /useI18n/);
   assert.match(nav, /t\(item\.labelKey\)/);
   assert.match(nav, /aria-current=\{active \? "page" : undefined\}/);
@@ -52,11 +54,16 @@ test("every hard-coded workspace destination resolves to a page and every in-pag
   }
 });
 
-test("ADMIN-only tools are permission-gated and do not expose OWNER navigation", () => {
+test("ADMIN-only tools and delegated CV navigation remain permission-gated", () => {
   const nav = read("components/workspace/RoleWorkspaceNavigation.tsx");
+  const layout = read("app/espace/layout.tsx");
   assert.match(nav, /permission: "PLATFORM_SETTINGS"/);
   assert.match(nav, /permission: "PARTNERS_MANAGE"/);
   assert.match(nav, /!item\.permission \|\| allowedAdminPermissions\.includes\(item\.permission\)/);
+  assert.match(layout, /const canManageCvIntake = \(role === "ADMIN" \|\| role === "CONSULTANT"\)/);
+  assert.match(layout, /hasPermission\(session\.user\.id, role, "CV_INTAKE"\)/);
+  assert.match(layout, /\.\.\.\(canManageCvIntake \? \["CV_INTAKE" as const\] : \[\]\)/);
+  assert.equal((read("lib/i18n/dictionaries.ts").match(/"ws_cv_intake_validation":/g) || []).length, 7);
 });
 
 test("enterprise navigation preserves the selected company when jumping between dashboard sections", () => {

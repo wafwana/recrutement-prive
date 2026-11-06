@@ -71,6 +71,8 @@ async function computeSha256(file: File): Promise<string | null> {
 export default function RealCvRegistryPage() {
   const [items, setItems] = useState<Cv[]>([]);
   const [canManageConsent, setCanManageConsent] = useState(false);
+  const [canInviteCandidates, setCanInviteCandidates] = useState(false);
+  const [canReprocess, setCanReprocess] = useState(false);
   const [consentEvidenceById, setConsentEvidenceById] = useState<Record<string, string>>({});
   const [consentBusyId, setConsentBusyId] = useState<string | null>(null);
   const [folders, setFolders] = useState<string[]>([]);
@@ -101,6 +103,8 @@ export default function RealCvRegistryPage() {
     setItems(data.documents || []);
     setFolders(data.folders || []);
     setCanManageConsent(data.canManageConsent === true);
+    setCanInviteCandidates(data.canInviteCandidates === true);
+    setCanReprocess(data.canReprocess === true);
   }
 
   useEffect(() => {
@@ -283,6 +287,10 @@ export default function RealCvRegistryPage() {
   }
 
   async function inviteCandidate(cv: Cv) {
+    if (!canInviteCandidates) {
+      setMessage("La création de compte et l’invitation sont réservées à l’OWNER.");
+      return;
+    }
     if (cv.consentStatus !== "AUTHORIZED") {
       setMessage("L’autorisation d’exploitation doit être validée avant toute invitation.");
       return;
@@ -336,6 +344,10 @@ export default function RealCvRegistryPage() {
   }
 
   async function retryLocalAnalysis(cv: Cv) {
+    if (!canReprocess) {
+      setMessage("La réanalyse des CV est réservée à l’OWNER.");
+      return;
+    }
     setRetryingId(cv.id);
     setMessage("");
     try {
@@ -366,6 +378,10 @@ export default function RealCvRegistryPage() {
   const visible = useMemo(() => (folder ? displayedItems.filter((item) => item.folderPath === folder) : displayedItems), [displayedItems, folder]);
 
   async function processSelected() {
+    if (!canReprocess) {
+      setMessage("La réanalyse des CV est réservée à l’OWNER.");
+      return;
+    }
     const ids = selectedIds.filter((id) => activeItems.some((item) => item.id === id));
     if (!ids.length) {
       setMessage("Aucun CV en attente n’est sélectionné.");
@@ -517,12 +533,16 @@ export default function RealCvRegistryPage() {
       </div>
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
-        <button disabled={processingAll || !activeItems.length} onClick={() => setSelectedIds(activeItems.map((item) => item.id))} className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-white/70 disabled:opacity-40">
-          Sélectionner les CV en attente ({activeItems.length})
-        </button>
-        <button disabled={processingAll || !selectedIds.length} onClick={processSelected} className="border border-[#c7a15a] px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-[#c7a15a] disabled:opacity-40">
-          {processingAll ? "Traitement…" : `Traiter les CV sélectionnés (${selectedIds.length})`}
-        </button>
+        {canReprocess ? (
+          <>
+            <button disabled={processingAll || !activeItems.length} onClick={() => setSelectedIds(activeItems.map((item) => item.id))} className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-white/70 disabled:opacity-40">
+              Sélectionner les CV en attente ({activeItems.length})
+            </button>
+            <button disabled={processingAll || !selectedIds.length} onClick={processSelected} className="border border-[#c7a15a] px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-[#c7a15a] disabled:opacity-40">
+              {processingAll ? "Traitement…" : `Traiter les CV sélectionnés (${selectedIds.length})`}
+            </button>
+          </>
+        ) : null}
         <button disabled={processingAll} onClick={() => setShowCompleted((value) => !value)} className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-white/70">
           {showCompleted ? "Masquer les CV finalisés" : "Afficher l’historique des CV finalisés"}
         </button>
@@ -571,7 +591,7 @@ export default function RealCvRegistryPage() {
                 <p className="mt-1 text-[10px] text-white/25">SHA-256 : {cv.originalSha256}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {cv.candidateEmail && cv.consentStatus === "AUTHORIZED" && !["SENT", "ACCOUNT_ALREADY_ACTIVE"].includes(cv.invitationStatus || "") ? (
+                {canInviteCandidates && cv.candidateEmail && cv.consentStatus === "AUTHORIZED" && !["SENT", "ACCOUNT_ALREADY_ACTIVE"].includes(cv.invitationStatus || "") ? (
                   <button
                     disabled={invitingId === cv.id}
                     onClick={() => inviteCandidate(cv)}
@@ -582,7 +602,7 @@ export default function RealCvRegistryPage() {
                 ) : null}
                 {cv.invitationStatus === "SENT" ? <span className="text-xs text-emerald-300">Invitation envoyée {cv.invitationSentAt ? "le " + new Date(cv.invitationSentAt).toLocaleString("fr-FR") : ""}</span> : null}
                 {cv.invitationStatus === "ACCOUNT_ALREADY_ACTIVE" ? <span className="text-xs text-white/45">Compte candidat déjà actif</span> : null}
-                {cv.status !== "ANALYSE_OK" || cv.analysis?.error ? (
+                {canReprocess && (cv.status !== "ANALYSE_OK" || cv.analysis?.error) ? (
                   <button disabled={retryingId === cv.id} onClick={() => retryLocalAnalysis(cv)} className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a] disabled:opacity-40">
                     {retryingId === cv.id ? "Analyse locale…" : "Relancer analyse locale"}
                   </button>

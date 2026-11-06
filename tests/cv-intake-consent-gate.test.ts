@@ -87,6 +87,14 @@ test("CV intake UI exposes consent controls only to users with CV_INTAKE permiss
   const page = read("app/espace/owner/cv-intake/page.tsx");
   assert.ok(api.includes('const canManageConsent = await hasPermission(userId, session?.user?.role || undefined, "CV_INTAKE")'));
   assert.ok(api.includes("canManageConsent,"));
+  assert.ok(api.includes('canInviteCandidates: session?.user?.role === "OWNER"'));
+  assert.ok(api.includes('canReprocess: session?.user?.role === "OWNER"'));
+  assert.ok(page.includes("setCanInviteCandidates(data.canInviteCandidates === true)"));
+  assert.ok(page.includes("setCanReprocess(data.canReprocess === true)"));
+  assert.ok(page.includes("{canInviteCandidates && cv.candidateEmail"));
+  assert.ok(page.includes("if (!canInviteCandidates)"));
+  assert.ok(page.includes("if (!canReprocess)"));
+  assert.ok(page.includes("{canReprocess && (cv.status !== \"ANALYSE_OK\" || cv.analysis?.error)"));
   assert.ok(page.includes("canManageConsent"));
   assert.ok(page.includes("Valider l’autorisation"));
   assert.ok(page.includes("Révoquer l’autorisation"));

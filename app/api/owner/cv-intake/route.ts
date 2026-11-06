@@ -50,6 +50,8 @@ export async function GET(request: Request) {
     }),
     folders: [...new Set(items.map((item) => item.folderPath))].sort(),
     canManageConsent,
+    canInviteCandidates: session?.user?.role === "OWNER",
+    canReprocess: session?.user?.role === "OWNER",
   });
 }
 
