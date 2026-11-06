@@ -25,7 +25,7 @@ test("matching recalculation evaluates candidate-job pairs and audits the actual
   assert.match(block, /for \(const candidate of candidates\)/);
   assert.match(block, /for \(const job of jobs\)/);
   assert.match(block, /evaluatedPairs/);
-  assert.match(block, /CANDIDATE_MATCHING_RECALCULATED/);
+  assert.match(block, /action: "CV_MATCHING_RECALCULATED"/);
   assert.match(block, /auditLog\.create/);
   assert.match(block, /success: false/);
   assert.match(block, /truncated/);
