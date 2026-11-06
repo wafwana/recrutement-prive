@@ -6,6 +6,7 @@ import { analyzeCvDocument, analyzeCvDocumentLocally, type CvAnalysis } from "@/
 import { buildCandidateFolderFromAnalysis, resolveCvTaxonomySelection } from "@/lib/cv/folders";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 import { selectBatchWindow } from "@/lib/sourcing/batch-window";
+import { ingestAnalyzedCvIntakes } from "@/lib/sourcing/ingest";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -16,6 +17,10 @@ export async function GET(request: Request) {
   const candidateWhere = {
     status: "ACTIVE" as const,
     documents: { some: { docType: "CV" as const } },
+    NOT: { AND: [
+      { preferences: { path: ["source"], equals: "MANUAL_CV_IMPORT" } },
+      { preferences: { path: ["consentStatus"], not: "AUTHORIZED" } },
+    ] },
   };
   const candidateSourceTotal = await prisma.candidateProfile.count({ where: candidateWhere });
   const candidateBatchKey = "cv-rematch:candidates";
@@ -52,9 +57,10 @@ export async function GET(request: Request) {
   const externalOffers = await prisma.externalJobOpportunity.findMany({ where: { status: { not: "REJECTED" } }, orderBy: { sourceCollectedAt: "desc" }, take: 500 });
 
   const intakeQueue = await prisma.cvIntake.findMany({
-    where: { status: "A_ANALYSER" },
+    where: { status: "A_ANALYSER", matching: { path: ["consent", "status"], equals: "AUTHORIZED" } },
     orderBy: { createdAt: "asc" },
     take: 10,
+    select: { id: true, originalName: true, mimeType: true, fileData: true, createdAt: true, candidateId: true, matching: true, senderUserId: true },
   });
 
   let intakeAnalyzed = 0;
@@ -72,10 +78,12 @@ export async function GET(request: Request) {
 
   let updated = 0;
   for (const intake of intakeQueue) {
-
+    const previousMatching = intake.matching && typeof intake.matching === "object" && !Array.isArray(intake.matching)
+      ? intake.matching as Record<string, unknown>
+      : {};
 
     try {
-      const analysis = await analyzeCvDocument({
+      const analysis = await analyzeCvDocumentLocally({
         fileName: intake.originalName,
         mimeType: intake.mimeType,
         buffer: Buffer.from(intake.fileData),
@@ -86,7 +94,8 @@ export async function GET(request: Request) {
           where: { id: intake.id },
           data: {
             status: "NON_ANALYSE",
-            analysis: { error: "Aucun fournisseur IA disponible ou rejeté par règles de confidentialité." },
+            analysis: { error: "Extraction locale impossible après autorisation Owner." },
+            matching: { ...previousMatching, suggestedMatches: [], generatedAt: new Date().toISOString() },
           },
         });
         continue;
@@ -155,12 +164,16 @@ export async function GET(request: Request) {
         where: { id: intake.id },
         data: {
           analysis: { ...analysis, sourceFactsOnly: true, suggestedMatches: candidateMatches },
-          matching: { suggestedMatches: candidateMatches, generatedAt: new Date().toISOString() },
+          matching: { ...previousMatching, suggestedMatches: candidateMatches, generatedAt: new Date().toISOString() },
           analyzedAt: new Date(),
           status: "ANALYSE_OK",
           folderPath: suggestedFolder,
         },
       });
+
+      if (!intake.candidateId) {
+        await ingestAnalyzedCvIntakes(intake.senderUserId, 1, [intake.id]);
+      }
 
       if (intake.candidateId) {
         await prisma.candidateProfile.update({
