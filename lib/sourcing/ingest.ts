@@ -420,6 +420,13 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20
     if (wasConsentRevoked || !Array.isArray(currentDetails.matchedOffers) || typeof currentDetails.rematchedAt !== "string") {
       const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(saved.id);
       matched += rematch.matches;
+      const refreshed = await prisma.sourcedCandidate.findUnique({ where: { id: saved.id }, select: { matchingDetails: true } });
+      const refreshedDetails = refreshed?.matchingDetails && typeof refreshed.matchingDetails === "object" && !Array.isArray(refreshed.matchingDetails) ? refreshed.matchingDetails as Record<string, unknown> : {};
+      const matchedOffers = Array.isArray(refreshedDetails.matchedOffers) ? refreshedDetails.matchedOffers.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item)) : [];
+      await prisma.cvIntake.update({
+        where: { id: intake.id },
+        data: { matching: { source: "AUTHORIZED_EXTERNAL_OFFERS", suggestedMatches: matchedOffers.slice(0, 20).map((item) => ({ jobId: typeof item.externalJobId === "string" ? item.externalJobId : "", title: typeof item.title === "string" ? item.title : "", score: typeof item.score === "number" ? item.score : 0 })), generatedAt: new Date().toISOString(), consentVerified: true } },
+      });
     }
   }
 
