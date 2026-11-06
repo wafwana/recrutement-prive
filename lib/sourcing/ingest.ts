@@ -347,13 +347,13 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
 
 export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20, intakeIds?: string[]) {
   const take = Math.min(20, Math.max(1, Math.trunc(maxItems)));
-  const intakeWhere = { status: "ANALYSE_OK", candidateId: null, consentStatus: "AUTHORIZED", ...(intakeIds?.length ? { id: { in: intakeIds } } : {}) };
+  const intakeWhere = { status: "ANALYSE_OK", candidateId: null, matching: { path: ["consent", "status"], equals: "AUTHORIZED" }, ...(intakeIds?.length ? { id: { in: intakeIds } } : {}) };
   const sourceTotal = await prisma.cvIntake.count({ where: intakeWhere });
   const intakes = await prisma.cvIntake.findMany({
     where: intakeWhere,
     orderBy: [{ analyzedAt: "desc" }, { createdAt: "desc" }],
     take,
-    select: { id: true, candidateName: true, analysis: true, analyzedAt: true, updatedAt: true, consentEvidence: true, consentVerifiedAt: true },
+    select: { id: true, candidateName: true, analysis: true, matching: true, analyzedAt: true, updatedAt: true },
   });
 
   const candidateIds: string[] = [];
@@ -376,6 +376,8 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20
       where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
       select: { id: true, status: true, consentStatus: true, matchingDetails: true },
     });
+    const intakeMatching = intake.matching && typeof intake.matching === "object" && !Array.isArray(intake.matching) ? intake.matching as Record<string, unknown> : {};
+    const intakeConsent = intakeMatching.consent && typeof intakeMatching.consent === "object" && !Array.isArray(intakeMatching.consent) ? intakeMatching.consent as Record<string, unknown> : {};
     const previousDetails = existing?.matchingDetails && typeof existing.matchingDetails === "object" && !Array.isArray(existing.matchingDetails) ? existing.matchingDetails as Record<string, unknown> : {};
     const wasConsentRevoked = typeof previousDetails.consentRevokedAt === "string";
     const finished = Boolean(existing && !wasConsentRevoked && shouldPreserveSourcedCandidateStatus(existing.status));
@@ -398,8 +400,8 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20
         cvAnalyzed: true,
         humanValidated: false,
         consentStatus: "AUTHORIZED",
-        consentVerifiedAt: intake.consentVerifiedAt?.toISOString() || null,
-        consentEvidence: intake.consentEvidence || null,
+        consentVerifiedAt: typeof intakeConsent.verifiedAt === "string" ? intakeConsent.verifiedAt : null,
+        consentEvidence: typeof intakeConsent.evidence === "string" ? intakeConsent.evidence : null,
         analyzedAt: intake.analyzedAt?.toISOString() || null,
       } as unknown as Prisma.InputJsonValue,
       notes: "CV importé en interne après vérification de l’autorisation par l’OWNER. Matching indicatif ; validation humaine obligatoire ; aucun contact automatique.",
@@ -425,7 +427,7 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20
       const matchedOffers = Array.isArray(refreshedDetails.matchedOffers) ? refreshedDetails.matchedOffers.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item)) : [];
       await prisma.cvIntake.update({
         where: { id: intake.id },
-        data: { matching: { source: "AUTHORIZED_EXTERNAL_OFFERS", suggestedMatches: matchedOffers.slice(0, 20).map((item) => ({ jobId: typeof item.externalJobId === "string" ? item.externalJobId : "", title: typeof item.title === "string" ? item.title : "", score: typeof item.score === "number" ? item.score : 0 })), generatedAt: new Date().toISOString(), consentVerified: true } },
+        data: { matching: { ...intakeMatching, consent: intakeConsent, source: "AUTHORIZED_EXTERNAL_OFFERS", suggestedMatches: matchedOffers.slice(0, 20).map((item) => ({ jobId: typeof item.externalJobId === "string" ? item.externalJobId : "", title: typeof item.title === "string" ? item.title : "", score: typeof item.score === "number" ? item.score : 0 })), generatedAt: new Date().toISOString(), consentVerified: true } },
       });
     }
   }
