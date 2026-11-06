@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ingestAnalyzedCvIntakes } from "@/lib/sourcing/ingest";
@@ -23,7 +24,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (status !== "AUTHORIZED" && status !== "REVOKED") return NextResponse.json({ error: "Statut d’autorisation invalide." }, { status: 400 });
   if (evidence.length < 10 || evidence.length > 500) return NextResponse.json({ error: "Indique une preuve ou une référence d’autorisation/révocation (10 à 500 caractères)." }, { status: 400 });
 
-  const intake = await prisma.cvIntake.findUnique({ where: { id }, select: { id: true, status: true, matching: true, candidateId: true } });
+  const intake = await prisma.cvIntake.findUnique({ where: { id }, select: { id: true, status: true, matching: true, candidateId: true, name: true, originalSha256: true } });
   if (!intake) return NextResponse.json({ error: "CV introuvable." }, { status: 404 });
 
   const verifiedAt = new Date();
@@ -53,18 +54,41 @@ export async function POST(request: Request, { params }: RouteParams) {
         },
       });
     }
-    if (status === "REVOKED" && intake.candidateId) {
+    if (intake.candidateId) {
       const profile = await tx.candidateProfile.findUnique({ where: { id: intake.candidateId }, select: { preferences: true, status: true } });
       const preferences = asRecord(profile?.preferences);
-      if (profile && preferences.sourceCvIntakeId === id) {
+      const profileComesFromThisIntake = preferences.sourceCvIntakeId === id || preferences.source === "MANUAL_CV_IMPORT";
+      if (profile && profileComesFromThisIntake && status === "REVOKED") {
         await tx.candidateProfile.update({
           where: { id: intake.candidateId },
-          data: { status: "SUSPENDED", preferences: { ...preferences, consentStatus: "REVOKED", consentRevokedAt: verifiedAt.toISOString() } },
+          data: { status: "SUSPENDED", preferences: { ...preferences, sourceCvIntakeId: id, consentStatus: "REVOKED", consentRevokedAt: verifiedAt.toISOString(), consentSuspendedAt: verifiedAt.toISOString() } },
         });
       }
-      await tx.candidateDocument.deleteMany({
-        where: { candidateId: intake.candidateId, docType: "CV", analysis: { path: ["sourceCvIntakeId"], equals: id } },
+      if (profile && profileComesFromThisIntake && status === "AUTHORIZED") {
+        const nextPreferences = { ...preferences, sourceCvIntakeId: id, consentStatus: "AUTHORIZED", consentVerifiedAt: verifiedAt.toISOString() };
+        delete nextPreferences.consentSuspendedAt;
+        await tx.candidateProfile.update({
+          where: { id: intake.candidateId },
+          data: { status: typeof preferences.consentSuspendedAt === "string" ? "ACTIVE" : profile.status, preferences: nextPreferences },
+        });
+      }
+      const candidateDocuments = await tx.candidateDocument.findMany({
+        where: { candidateId: intake.candidateId, docType: "CV", name: intake.name },
+        select: { id: true, fileData: true, analysis: true },
       });
+      for (const document of candidateDocuments) {
+        const fileHash = createHash("sha256").update(Buffer.from(document.fileData)).digest("hex");
+        if (fileHash !== intake.originalSha256) continue;
+        if (status === "REVOKED") {
+          await tx.candidateDocument.delete({ where: { id: document.id } });
+        } else {
+          const documentAnalysis = asRecord(document.analysis);
+          await tx.candidateDocument.update({
+            where: { id: document.id },
+            data: { analysis: { ...documentAnalysis, sourceCvIntakeId: id, consentStatus: "AUTHORIZED", consentVerifiedAt: verifiedAt.toISOString() } },
+          });
+        }
+      }
     }
     await tx.auditLog.create({
       data: {
