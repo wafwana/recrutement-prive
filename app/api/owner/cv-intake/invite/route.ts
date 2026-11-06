@@ -32,6 +32,8 @@ export async function POST(request: Request) {
     const intakeMatching = asRecord(intake.matching);
     const consent = asRecord(intakeMatching.consent);
     if (consent.status !== "AUTHORIZED") return NextResponse.json({ error: "L’autorisation d’exploitation doit être validée par l’OWNER avant toute invitation." }, { status: 409 });
+    if (intakeMatching.invitationStatus === "SENT") return NextResponse.json({ error: "Une invitation a déjà été envoyée pour ce CV." }, { status: 409 });
+    if (intakeMatching.invitationStatus === "ACCOUNT_ALREADY_ACTIVE") return NextResponse.json({ ok: true, linked: true, invitationSent: false, candidateId: intake.candidateId, message: "Le compte candidat est déjà actif." });
 
     const email = intake.candidateEmail?.trim().toLowerCase();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "Aucune adresse e-mail valide n’est associée à ce CV." }, { status: 400 });
