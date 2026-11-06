@@ -15,21 +15,6 @@ const CV_INTAKE_ALLOWED_TYPES = new Set([
   "text/markdown",
 ]);
 
-function scoreJob(analysis: Awaited<ReturnType<typeof analyzeCvDocument>>, job: { id: string; title: string; requiredSkills: unknown; requiredExperienceYears: number | null; jobCategoryId: string | null; subCategoryId: string | null }) {
-  if (!analysis) return 0;
-  const candidateSkills = new Set(analysis.skills.map((skill) => skill.toLowerCase()));
-  const required = Array.isArray(job.requiredSkills) ? job.requiredSkills.filter((v): v is string => typeof v === "string") : [];
-  const skillHits = required.filter((skill) => [...candidateSkills].some((candidate) => candidate.includes(skill.toLowerCase()) || skill.toLowerCase().includes(candidate))).length;
-  const skillScore = required.length ? Math.round((skillHits / required.length) * 60) : 0;
-  const experienceScore = job.requiredExperienceYears == null || analysis.experienceYears == null
-    ? 0
-    : analysis.experienceYears >= job.requiredExperienceYears ? 25 : Math.max(0, Math.round((analysis.experienceYears / Math.max(1, job.requiredExperienceYears)) * 25));
-  const titleScore = analysis.headline && job.title
-    ? analysis.headline.toLowerCase().split(/\W+/).filter(Boolean).some((word) => job.title.toLowerCase().includes(word)) ? 15 : 0
-    : 0;
-  return Math.min(100, skillScore + experienceScore + titleScore);
-}
-
 export async function GET(request: Request) {
   const session = getActiveSessionContext() || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
@@ -131,16 +116,8 @@ export async function POST(request: Request) {
     // Preserve the original fileData bytes, but sanitize all parsed fields before DB/JSON persistence.
     analysis = sanitizePostgresJson(analysis);
 
-    const jobs = await prisma.job.findMany({
-      where: { status: "OPEN" },
-      take: 500,
-      select: { id: true, title: true, requiredSkills: true, requiredExperienceYears: true, jobCategoryId: true, subCategoryId: true },
-    });
-    const suggestedMatches = jobs
-      .map((job) => ({ jobId: job.id, title: job.title, score: scoreJob(analysis, job), categoryId: job.jobCategoryId, subCategoryId: job.subCategoryId }))
-      .filter((item) => item.score >= 25)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 20);
+    // Matching is deliberately deferred until the OWNER has verified the CV usage authorization.
+    const suggestedMatches: Array<{ jobId: string; title: string; score: number }> = [];
 
     const taxonomySelection = resolveCvTaxonomySelection(analysis, taxonomyItems);
 
