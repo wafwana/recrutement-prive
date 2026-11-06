@@ -536,6 +536,12 @@ export default function CvMatchingPage() {
         ))}
       </div>
 
+      {overview?.truncated ? (
+        <p role="status" className="mt-4 border border-amber-400/30 bg-amber-400/5 p-4 text-sm leading-6 text-amber-100/90">
+          Le classement est partiel : pour préserver les performances, le calcul examine au maximum les 150 profils actifs et les 150 offres ouvertes les plus récemment mis à jour. Les autres éléments ne sont pas inclus dans ce résultat.
+        </p>
+      ) : null}
+
       {presentationMessage ? (
         <div aria-live="polite" className="mt-5 border border-[#F97316]/30 bg-[#F97316]/5 p-4 text-sm leading-6 text-white/80">
           {presentationMessage}
