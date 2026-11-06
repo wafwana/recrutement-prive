@@ -99,3 +99,13 @@ test("CV consent metadata uses the existing JSON column and introduces no databa
   assert.ok(route.includes("data: { matching: nextMatching as Prisma.InputJsonValue }"));
   assert.ok(!fs.existsSync("prisma/migrations/20261106010000_cv_intake_consent_gate/migration.sql"));
 });
+
+test("CV intake audit records the authenticated actor role instead of attributing every import to OWNER", () => {
+  const route = read("app/api/owner/cv-intake/route.ts");
+  assert.ok(route.includes("const userRole = typeof session?.user?.role === \"string\" ? session.user.role : \"\""));
+  assert.ok(route.includes("senderRole: userRole"));
+  assert.ok(route.includes("actorRole: userRole"));
+  assert.ok(route.includes("authorRole: userRole"));
+  assert.ok(!route.includes('senderRole: "OWNER"'));
+  assert.ok(!route.includes('actorRole: "OWNER"'));
+});
