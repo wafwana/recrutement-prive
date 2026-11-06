@@ -53,6 +53,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
   const lock = await prisma.externalJobOpportunity.updateMany({
     where: {
       id,
+      updatedAt: offer.updatedAt,
       OR: [
         { status: { in: ["QUALIFIED", "MATCHING"] } },
         { status: "INTEGRATING", updatedAt: { lt: staleLockBefore } },
@@ -61,6 +62,8 @@ export async function POST(_request: Request, { params }: RouteParams) {
     data: { status: "INTEGRATING" },
   });
   if (lock.count !== 1) return NextResponse.json({ error: "Cette offre est déjà en cours d’intégration. Réessaie après vérification." }, { status: 409 });
+  const lockedOffer = await prisma.externalJobOpportunity.findUnique({ where: { id }, select: { updatedAt: true } });
+  if (!lockedOffer) return NextResponse.json({ error: "Offre introuvable après verrouillage." }, { status: 404 });
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -137,7 +140,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ ok: true, alreadyIntegrated: false, ...result, message: "Brouillon interne créé. L’entreprise reste suspendue et l’offre n’est pas publiée." });
   } catch (error) {
     await prisma.externalJobOpportunity.updateMany({
-      where: { id, status: "INTEGRATING" },
+      where: { id, status: "INTEGRATING", updatedAt: lockedOffer.updatedAt },
       data: { status: offer.status },
     }).catch(() => null);
     if (error instanceof Error && error.message === "ALREADY_INTEGRATED") {
