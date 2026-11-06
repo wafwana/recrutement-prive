@@ -19,6 +19,7 @@ export async function GET(request: Request) {
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(session?.user?.role || "")) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   if (!(await hasPermission(userId, session?.user?.role || undefined, "CV_INTAKE"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
 
+  const canManageConsent = await hasPermission(userId, session?.user?.role || undefined, "CV_INTAKE");
   const q = new URL(request.url).searchParams.get("q")?.trim().toLowerCase();
   const items = await prisma.cvIntake.findMany({
     where: q ? {
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
       return { ...item, consentStatus: typeof consent.status === "string" ? consent.status : "PENDING", consentEvidence: typeof consent.evidence === "string" ? consent.evidence : null, consentVerifiedAt: typeof consent.verifiedAt === "string" ? consent.verifiedAt : null, invitationStatus: typeof matching.invitationStatus === "string" ? matching.invitationStatus : null, invitationSentAt: typeof matching.invitationSentAt === "string" ? matching.invitationSentAt : null };
     }),
     folders: [...new Set(items.map((item) => item.folderPath))].sort(),
-    canManageConsent: session?.user?.role === "OWNER",
+    canManageConsent,
   });
 }
 
