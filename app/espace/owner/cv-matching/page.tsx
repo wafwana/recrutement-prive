@@ -433,7 +433,7 @@ export default function CvMatchingPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Recalcul impossible.");
-      setMessage("Matching recalculé pour " + match.candidateAlias + " et " + match.jobTitle + "." + (data.truncated ? " Recalcul partiel : limite de {data.evaluationLimit} profils/offres par périmètre atteinte." : ""));
+      setMessage("Matching recalculé pour " + match.candidateAlias + " et " + match.jobTitle + "." + (data.truncated ? " Recalcul partiel : limite de " + data.evaluationLimit + " profils/offres par périmètre atteinte." : ""));
       await fetchOverview();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erreur de recalcul.");
