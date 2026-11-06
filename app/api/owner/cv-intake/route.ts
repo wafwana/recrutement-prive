@@ -56,7 +56,8 @@ export async function POST(request: Request) {
   const session = getActiveSessionContext() || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const userEmail = typeof session?.user?.email === "string" ? session.user.email : "";
-  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(session?.user?.role || "")) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  const userRole = typeof session?.user?.role === "string" ? session.user.role : "";
+  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(userRole)) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   if (!(await hasPermission(userId, session?.user?.role || undefined, "CV_INTAKE"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
 
   try {
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
         size: file.size,
         originalSha256: sha256,
         senderUserId: userId,
-        senderRole: "OWNER",
+        senderRole: userRole,
         senderEmail: userEmail,
         candidateName,
         candidateEmail,
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
     await prisma.auditLog.create({
       data: {
         actorUserId: userId,
-        actorRole: "OWNER",
+        actorRole: userRole,
         action: "CV_REAL_IMPORT",
         targetType: "CV_INTAKE",
         targetId: record.id,
@@ -132,7 +133,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true, document: record, originalImmutable: true, authorRole: "OWNER", candidateId, candidateInviteSent }, { status: 201 });
+    return NextResponse.json({ ok: true, document: record, originalImmutable: true, authorRole: userRole, candidateId, candidateInviteSent }, { status: 201 });
   } catch (error) {
     console.error("[owner cv intake]", error);
     return NextResponse.json({ error: "Erreur lors de l'intégration du CV." }, { status: 500 });
