@@ -56,6 +56,16 @@ export async function POST(request: Request) {
         data: { name: intake.candidateName || email.split("@")[0], email, role: "CANDIDAT" },
         select: { id: true, name: true, passwordHash: true, role: true, candidat: { select: { id: true } } },
       });
+      if (candidateUser.candidat) {
+        const currentProfile = await tx.candidateProfile.findUnique({ where: { id: candidateUser.candidat.id }, select: { preferences: true, status: true } });
+        const preferences = asRecord(currentProfile?.preferences);
+        if (preferences.sourceCvIntakeId === intake.id && currentProfile?.status === "INACTIVE") {
+          await tx.candidateProfile.update({
+            where: { id: candidateUser.candidat.id },
+            data: { status: "ACTIVE", preferences: { ...preferences, consentStatus: "AUTHORIZED", consentVerifiedAt: typeof consent.verifiedAt === "string" ? consent.verifiedAt : null } },
+          });
+        }
+      }
       const candidate = candidateUser.candidat || await tx.candidateProfile.create({
         data: {
           userId: candidateUser.id,
@@ -68,15 +78,15 @@ export async function POST(request: Request) {
           experienceYears: typeof analysis.experienceYears === "number" && Number.isFinite(analysis.experienceYears) ? Math.max(0, Math.min(60, Math.trunc(analysis.experienceYears))) : null,
           primaryCategoryId: primaryCategory?.id || null,
           subCategoryIds: subCategories.map((item) => item.id),
-          preferences: { source: "CV_INTAKE_OWNER_APPROVED", consentStatus: "AUTHORIZED", consentVerifiedAt: typeof consent.verifiedAt === "string" ? consent.verifiedAt : null, importedAt: new Date().toISOString() },
+          preferences: { source: "CV_INTAKE_OWNER_APPROVED", sourceCvIntakeId: intake.id, consentStatus: "AUTHORIZED", consentVerifiedAt: typeof consent.verifiedAt === "string" ? consent.verifiedAt : null, importedAt: new Date().toISOString() },
         },
         select: { id: true },
       });
 
-      const existingDocument = await tx.candidateDocument.findFirst({ where: { candidateId: candidate.id, name: intake.name, docType: "CV" }, select: { id: true } });
+      const existingDocument = await tx.candidateDocument.findFirst({ where: { candidateId: candidate.id, docType: "CV", analysis: { path: ["sourceCvIntakeId"], equals: intake.id } }, select: { id: true } });
       if (!existingDocument) {
         await tx.candidateDocument.create({
-          data: { candidateId: candidate.id, name: intake.name, fileData: intake.fileData, type: intake.mimeType, docType: "CV", folderPath: intake.folderPath, analysis: intake.analysis ?? undefined, analyzedAt: intake.analyzedAt, isPrimaryCv: true },
+          data: { candidateId: candidate.id, name: intake.name, fileData: intake.fileData, type: intake.mimeType, docType: "CV", folderPath: intake.folderPath, analysis: { ...analysis, sourceCvIntakeId: intake.id, consentStatus: "AUTHORIZED" }, analyzedAt: intake.analyzedAt, isPrimaryCv: true },
         });
       }
       await tx.cvIntake.update({ where: { id: intake.id }, data: { candidateId: candidate.id } });
