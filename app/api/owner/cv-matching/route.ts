@@ -1071,6 +1071,7 @@ export async function POST(request: Request) {
     const { candidateId, jobId } = parsed.data;
 
     try {
+      const evaluationLimit = candidateId || jobId ? 500 : 150;
       const [candidates, jobs, totalCandidates, totalJobs] = await Promise.all([
         prisma.candidateProfile.findMany({
           where: {
@@ -1078,7 +1079,7 @@ export async function POST(request: Request) {
             ...(candidateId ? { id: candidateId } : {}),
           },
           orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-          take: 500,
+          take: evaluationLimit,
           select: {
             id: true,
             headline: true,
@@ -1183,6 +1184,7 @@ export async function POST(request: Request) {
             jobCount: totalJobs,
             candidatesEvaluated: candidates.length,
             jobsEvaluated: jobs.length,
+            evaluationLimit,
             truncated: totalCandidates > candidates.length || totalJobs > jobs.length,
             evaluatedPairs,
             eligibleMatches,
@@ -1200,6 +1202,7 @@ export async function POST(request: Request) {
         jobCount: totalJobs,
         candidatesEvaluated: candidates.length,
         jobsEvaluated: jobs.length,
+        evaluationLimit,
         truncated: totalCandidates > candidates.length || totalJobs > jobs.length,
         evaluatedPairs,
         eligibleMatches,
