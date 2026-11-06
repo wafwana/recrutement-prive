@@ -30,6 +30,8 @@ test("external offer integration is idempotent and protected by an atomic lock",
   assert.ok(route.includes("previousJobId"));
   assert.ok(route.includes("updateMany"));
   assert.ok(route.includes("status: \"INTEGRATING\""));
+  assert.ok(route.includes("updatedAt: offer.updatedAt"));
+  assert.ok(route.includes("updatedAt: lockedOffer.updatedAt"));
   assert.ok(route.includes("alreadyIntegrated: true"));
   const pipeline = read("lib/jobs/offer-pipeline.ts");
   assert.ok(pipeline.includes("\"INTEGRATED_DRAFT\""));
