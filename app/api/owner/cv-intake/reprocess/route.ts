@@ -143,7 +143,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    ok: results.every((result) => result.status === "ANALYSE_OK" || result.status === "SKIPPED_ALREADY_ANALYZED"),
+    ok: results.every((result) => ["ANALYSE_OK", "SKIPPED_ALREADY_ANALYZED", "SKIPPED_CONSENT_PENDING"].includes(result.status)),
     method: "LOCAL_DETERMINISTIC",
     externalAiCalled: false,
     originalFilesModified: false,
