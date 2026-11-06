@@ -51,6 +51,8 @@ test("Candidate account creation and invitation require explicit Owner action af
   assert.ok(route.includes("tx.candidateDocument.create"));
   assert.ok(route.includes("CV_INTAKE_LINKED_TO_CANDIDATE"));
   assert.ok(route.includes("CANDIDATE_INVITATION_SENT"));
+  assert.ok(route.includes("invitationStatus: \"SENT\""));
+  assert.ok(route.includes("invitationStatus === \"SENT\""));
   assert.ok(route.includes("promotedToCandidateId"));
 });
 
@@ -63,6 +65,7 @@ test("CV intake UI exposes consent controls only to OWNER and gates invitations"
   assert.ok(page.includes("Révoquer l’autorisation"));
   assert.ok(page.includes('cv.consentStatus === "AUTHORIZED"'));
   assert.ok(page.includes("Aucun compte candidat ni invitation n’a été créé automatiquement."));
+  assert.ok(page.includes("invitationStatus === \"SENT\""));
 });
 
 test("CV consent metadata uses the existing JSON column and introduces no database migration", () => {
