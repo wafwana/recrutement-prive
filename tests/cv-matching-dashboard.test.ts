@@ -26,7 +26,9 @@ test("matching suggestions use anonymous labels rather than exposing names or em
 test("confidential presentation is explicitly requested, permission-gated, re-scored and audited", () => {
   assert.match(route, /connectMatchmakingSchema|presentationSchema/);
   assert.match(route, /action: z\.literal\("(connect_matchmaking|present)"\)/);
-  assert.match(route, /"PRESENTATIONS_MANAGE"/);
+  assert.match(route, /const canPresent = access\.role === "OWNER"/);
+  assert.match(route, /if \(access\.role !== "OWNER"\)/);
+  assert.doesNotMatch(route, /PRESENTATIONS_MANAGE/);
   assert.match(route, /match\.score < 25/);
   assert.match(route, /tx\.missionPresentation\.create/);
   assert.match(route, /anonymousMessagingEnabled: true/);
