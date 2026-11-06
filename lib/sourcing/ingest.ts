@@ -345,9 +345,9 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
   return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidateBatch.length, candidateSourceTotal, batchLimit: candidateBatchLimit, created, updated, internalCvIntakes: internalCvIntakeSync ? { sourceTotal: internalCvIntakeSync.sourceTotal, batchFetched: internalCvIntakeSync.batchFetched, synced: internalCvIntakeSync.synced, skipped: internalCvIntakeSync.skipped, matched: internalCvIntakeSync.matched } : { failed: true } };
 }
 
-export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20) {
+export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20, intakeIds?: string[]) {
   const take = Math.min(20, Math.max(1, Math.trunc(maxItems)));
-  const intakeWhere = { status: "ANALYSE_OK", candidateId: null, consentStatus: "AUTHORIZED" };
+  const intakeWhere = { status: "ANALYSE_OK", candidateId: null, consentStatus: "AUTHORIZED", ...(intakeIds?.length ? { id: { in: intakeIds } } : {}) };
   const sourceTotal = await prisma.cvIntake.count({ where: intakeWhere });
   const intakes = await prisma.cvIntake.findMany({
     where: intakeWhere,
