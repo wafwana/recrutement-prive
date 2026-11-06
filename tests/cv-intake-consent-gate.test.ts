@@ -81,6 +81,6 @@ test("CV consent metadata uses the existing JSON column and introduces no databa
   const schema = read("prisma/schema.prisma");
   const route = read("app/api/owner/cv-intake/[id]/consent/route.ts");
   assert.ok(!schema.includes('consentStatus     String          @default("PENDING")'));
-  assert.ok(route.includes("matching: { ...previousMatching, consent:"));
+  assert.ok(route.includes("matching: { ...previousMatching") && route.includes("consent: { status, evidence, verifiedAt: verifiedAt.toISOString()"));
   assert.ok(!fs.existsSync("prisma/migrations/20261106010000_cv_intake_consent_gate/migration.sql"));
 });
