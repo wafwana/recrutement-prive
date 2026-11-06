@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -69,7 +70,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         delete nextPreferences.consentSuspendedAt;
         await tx.candidateProfile.update({
           where: { id: intake.candidateId },
-          data: { status: typeof preferences.consentSuspendedAt === "string" ? "ACTIVE" : profile.status, preferences: nextPreferences },
+          data: { status: typeof preferences.consentSuspendedAt === "string" ? "ACTIVE" : profile.status, preferences: nextPreferences as Prisma.InputJsonValue },
         });
       }
       const candidateDocuments = await tx.candidateDocument.findMany({
@@ -77,6 +78,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         select: { id: true, fileData: true, analysis: true },
       });
       for (const document of candidateDocuments) {
+        if (!document.fileData) continue;
         const fileHash = createHash("sha256").update(Buffer.from(document.fileData)).digest("hex");
         if (fileHash !== intake.originalSha256) continue;
         if (status === "REVOKED") {
