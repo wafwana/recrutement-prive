@@ -54,6 +54,8 @@ jobs:
         run: npm run test:owner-compatibility
       - name: Validate Lot 1 factual-assistance guardrails
         run: node --import tsx --test tests/lot-1-no-invention-guardrails.test.ts
+      - name: Validate Pôle 1 CV intake, offer detail and bounded matching regressions
+        run: node --import tsx --test tests/pole-1-regressions.test.ts
       - name: Verify Gemini structured-output schema contract
         run: npm run test:gemini-schema-normalization
       - run: npx prisma generate
