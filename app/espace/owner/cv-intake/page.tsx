@@ -37,6 +37,8 @@ type Cv = {
   consentStatus: string;
   consentEvidence: string | null;
   consentVerifiedAt: string | null;
+  invitationStatus: string | null;
+  invitationSentAt: string | null;
   folderPath: string;
   analysis: Analysis | null;
   matching: { suggestedMatches?: Array<{ jobId: string; title: string; score: number }>; generatedAt?: string } | null;
@@ -567,7 +569,7 @@ export default function RealCvRegistryPage() {
                 <p className="mt-1 text-[10px] text-white/25">SHA-256 : {cv.originalSha256}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {cv.candidateEmail && cv.consentStatus === "AUTHORIZED" ? (
+                {cv.candidateEmail && cv.consentStatus === "AUTHORIZED" && !["SENT", "ACCOUNT_ALREADY_ACTIVE"].includes(cv.invitationStatus || "") ? (
                   <button
                     disabled={invitingId === cv.id}
                     onClick={() => inviteCandidate(cv)}
@@ -576,6 +578,8 @@ export default function RealCvRegistryPage() {
                     {invitingId === cv.id ? "Envoi…" : cv.candidateId ? "Inviter candidat" : "Créer accès et inviter"}
                   </button>
                 ) : null}
+                {cv.invitationStatus === "SENT" ? <span className="text-xs text-emerald-300">Invitation envoyée {cv.invitationSentAt ? "le " + new Date(cv.invitationSentAt).toLocaleString("fr-FR") : ""}</span> : null}
+                {cv.invitationStatus === "ACCOUNT_ALREADY_ACTIVE" ? <span className="text-xs text-white/45">Compte candidat déjà actif</span> : null}
                 {cv.status !== "ANALYSE_OK" || cv.analysis?.error ? (
                   <button disabled={retryingId === cv.id} onClick={() => retryLocalAnalysis(cv)} className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a] disabled:opacity-40">
                     {retryingId === cv.id ? "Analyse locale…" : "Relancer analyse locale"}
