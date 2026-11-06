@@ -4,6 +4,13 @@ import fs from "node:fs";
 
 const read = (path: string) => fs.readFileSync(path, "utf8");
 
+test("CV library applies the active search to both candidate documents and intake records", () => {
+  const route = read("app/api/documents/cv-library/route.ts");
+  assert.match(route, /const intakeDocs = await prisma\.cvIntake\.findMany\(\{\s*where: q/);
+  for (const field of ["name", "originalName", "candidateName", "candidateEmail", "folderPath"]) {
+    assert.match(route, new RegExp("\\{ " + field + ": \\{ contains: q, mode: \"insensitive\" \\} \\}"));
+  }
+});
 test("CV intake search covers file names, candidate identity and candidate email", () => {
   const route = read("app/api/owner/cv-intake/route.ts");
   for (const field of ["name", "originalName", "candidateName", "candidateEmail", "folderPath"]) {
