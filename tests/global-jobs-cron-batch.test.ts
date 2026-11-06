@@ -35,3 +35,12 @@ test("global-jobs cron uses a persistent source cursor and bounds feed processin
   assert.match(route, /writeBatchOffset\(sourceRotationKey, rotation\.nextOffset, rotation\.total\)/);
   assert.doesNotMatch(route, /for\s*\(\s*const source of sources\s*\)/);
 });
+
+test("manual global sourcing processes one rotated source and a bounded offer batch per request", () => {
+  const route = fs.readFileSync("app/api/sourcing/global-jobs/route.ts", "utf8");
+  assert.match(route, /readBatchOffset\\(cursorKey, sources\\.length\\)/);
+  assert.match(route, /selectNextSource\\(sources, sourceOffset\\)/);
+  assert.match(route, /ingestGlobalJobs\\(rotation\\.source, actor, \\{ maxItems: 2 \\}\\)/);
+  assert.match(route, /writeBatchOffset\\(cursorKey, rotation\\.nextOffset, rotation\\.total\\)/);
+  assert.doesNotMatch(route, /for\\s*\\(\\s*const source of sources\\s*\\)/);
+});
