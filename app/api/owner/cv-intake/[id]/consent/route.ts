@@ -65,7 +65,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         });
       }
       if (profile && profileComesFromThisIntake && status === "AUTHORIZED") {
-        const nextPreferences = { ...preferences, sourceCvIntakeId: id, consentStatus: "AUTHORIZED", consentVerifiedAt: verifiedAt.toISOString() };
+        const nextPreferences: Record<string, unknown> = { ...preferences, sourceCvIntakeId: id, consentStatus: "AUTHORIZED", consentVerifiedAt: verifiedAt.toISOString() };
         delete nextPreferences.consentSuspendedAt;
         await tx.candidateProfile.update({
           where: { id: intake.candidateId },
