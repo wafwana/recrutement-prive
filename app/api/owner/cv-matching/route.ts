@@ -314,13 +314,15 @@ export async function GET(request: Request) {
     });
     if (!job) return NextResponse.json({ error: "Offre introuvable." }, { status: 404 });
 
-    const candidates = await prisma.candidateProfile.findMany({
-      where: { status: "ACTIVE" },
-      include: {
-        primaryCategory: { select: { code: true } },
-      },
-      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-    });
+    const [candidates, totalActiveCandidates] = await Promise.all([
+      prisma.candidateProfile.findMany({
+        where: { status: "ACTIVE" },
+        include: { primaryCategory: { select: { code: true } } },
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        take: 500,
+      }),
+      prisma.candidateProfile.count({ where: { status: "ACTIVE" } }),
+    ]);
 
     const candidateIds = candidates.flatMap((candidate) =>
       Array.isArray(candidate.subCategoryIds)
@@ -399,6 +401,9 @@ export async function GET(request: Request) {
     return NextResponse.json({
       job: { id: job.id, title: job.title, location: job.location },
       matches,
+      candidateCount: totalActiveCandidates,
+      candidatesEvaluated: candidates.length,
+      truncated: totalActiveCandidates > candidates.length,
     });
   }
 
@@ -417,15 +422,19 @@ export async function GET(request: Request) {
       })).map((row) => row.code)
     : [];
 
-  const jobs = await prisma.job.findMany({
-    where: { status: "OPEN" },
-    include: {
-      jobCategory: { select: { code: true } },
-      subCategory: { select: { code: true } },
-      company: { select: { country: true } },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+  const [jobs, totalOpenJobs] = await Promise.all([
+    prisma.job.findMany({
+      where: { status: "OPEN" },
+      include: {
+        jobCategory: { select: { code: true } },
+        subCategory: { select: { code: true } },
+        company: { select: { country: true } },
+      },
+      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+      take: 500,
+    }),
+    prisma.job.count({ where: { status: "OPEN" } }),
+  ]);
 
   const matches = jobs
     .map((job) => {
@@ -493,6 +502,9 @@ export async function GET(request: Request) {
       subCategoryCodes,
     },
     matches,
+    offersEvaluated: jobs.length,
+    offerCount: totalOpenJobs,
+    truncated: totalOpenJobs > jobs.length,
   });
 }
 
