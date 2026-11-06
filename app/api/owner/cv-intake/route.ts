@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     documents: items.map((item) => {
       const matching = item.matching && typeof item.matching === "object" && !Array.isArray(item.matching) ? item.matching as Record<string, unknown> : {};
       const consent = matching.consent && typeof matching.consent === "object" && !Array.isArray(matching.consent) ? matching.consent as Record<string, unknown> : {};
-      return { ...item, consentStatus: typeof consent.status === "string" ? consent.status : "PENDING", consentEvidence: typeof consent.evidence === "string" ? consent.evidence : null, consentVerifiedAt: typeof consent.verifiedAt === "string" ? consent.verifiedAt : null };
+      return { ...item, consentStatus: typeof consent.status === "string" ? consent.status : "PENDING", consentEvidence: typeof consent.evidence === "string" ? consent.evidence : null, consentVerifiedAt: typeof consent.verifiedAt === "string" ? consent.verifiedAt : null, invitationStatus: typeof matching.invitationStatus === "string" ? matching.invitationStatus : null, invitationSentAt: typeof matching.invitationSentAt === "string" ? matching.invitationSentAt : null };
     }),
     folders: [...new Set(items.map((item) => item.folderPath))].sort(),
     canManageConsent: session?.user?.role === "OWNER",
