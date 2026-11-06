@@ -23,18 +23,17 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (status !== "AUTHORIZED" && status !== "REVOKED") return NextResponse.json({ error: "Statut d’autorisation invalide." }, { status: 400 });
   if (evidence.length < 10 || evidence.length > 500) return NextResponse.json({ error: "Indique une preuve ou une référence d’autorisation/révocation (10 à 500 caractères)." }, { status: 400 });
 
-  const intake = await prisma.cvIntake.findUnique({ where: { id }, select: { id: true, status: true, consentStatus: true } });
+  const intake = await prisma.cvIntake.findUnique({ where: { id }, select: { id: true, status: true, matching: true } });
   if (!intake) return NextResponse.json({ error: "CV introuvable." }, { status: 404 });
 
   const verifiedAt = new Date();
+  const previousMatching = asRecord(intake.matching);
+  const previousConsent = asRecord(previousMatching.consent);
   await prisma.$transaction(async (tx) => {
     await tx.cvIntake.update({
       where: { id },
       data: {
-        consentStatus: status,
-        consentEvidence: evidence,
-        consentVerifiedAt: verifiedAt,
-        consentVerifiedByUserId: userId,
+        matching: { ...previousMatching, consent: { status, evidence, verifiedAt: verifiedAt.toISOString(), verifiedByUserId: userId } },
       },
     });
     const externalId = "cv-intake:" + id;
@@ -61,7 +60,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         action: status === "AUTHORIZED" ? "CV_INTAKE_CONSENT_AUTHORIZED" : "CV_INTAKE_CONSENT_REVOKED",
         targetType: "CV_INTAKE",
         targetId: id,
-        details: { consentStatus: status, evidence, previousConsentStatus: intake.consentStatus, verifiedAt: verifiedAt.toISOString(), sourceStatus: intake.status },
+        details: { consentStatus: status, evidence, previousConsentStatus: typeof previousConsent.status === "string" ? previousConsent.status : "PENDING", verifiedAt: verifiedAt.toISOString(), sourceStatus: intake.status },
       },
     });
   });
