@@ -497,7 +497,7 @@ export default function RealCvRegistryPage() {
           <option value="">Tous les dossiers ({displayedItems.length})</option>
           {folders.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <button onClick={() => load().catch((e) => setMessage(e.message))} className="border border-white/15 px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-white/60">Actualiser</button>
+        <button onClick={() => load().catch((e) => setMessage(e.message))} className="border border-white/15 px-5 py-3 text-[10px] uppercase tracking-[0.16em] text-white/60">Rechercher</button>
       </div>
 
       <div className="mt-8 space-y-4">

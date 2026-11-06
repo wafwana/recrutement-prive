@@ -41,7 +41,12 @@ test("matching does not send outreach or open a meeting automatically", () => {
 });
 
 test("automatic proposals are bounded and show if a pair has already been presented", () => {
-  assert.match(route, /take: 150/);
+  // The overview is deliberately bounded until cursor-based global evaluation exists.
+  assert.equal((route.match(/take: 150/g) || []).length, 2);
+  assert.match(route, /candidateProfile\.count\(\{ where: \{ status: "ACTIVE" \} \}\)/);
+  assert.match(route, /job\.count\(\{ where: \{ status: "OPEN" \} \}\)/);
+  assert.match(route, /totalActiveCandidates > candidates\.length/);
+  assert.match(route, /totalOpenJobs > jobs\.length/);
   assert.match(route, /ranked\.slice\(0, 100\)/);
   assert.match(route, /candidateSuggestions/);
   assert.match(route, /offerSuggestions/);

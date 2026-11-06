@@ -70,7 +70,8 @@ async function requireMatchingAccess() {
   const role = typeof active?.user?.role === "string" ? active.user.role : undefined;
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role ?? "")) return null;
   if (!role || !(await hasPermission(userId, role, "CV_MATCHING"))) return null;
-  return { userId, role };
+  const canViewCandidateDocuments = role === "OWNER" || await hasPermission(userId, role, "DOCUMENTS_VIEW");
+  return { userId, role, canViewCandidateDocuments };
 }
 
 export async function GET(request: Request) {
@@ -87,10 +88,10 @@ export async function GET(request: Request) {
       access.role === "ADMIN" &&
       await hasPermission(access.userId, access.role, "PRESENTATIONS_MANAGE")
     );
-    const [candidates, jobs] = await Promise.all([
+    const [candidates, jobs, totalActiveCandidates, totalOpenJobs] = await Promise.all([
       prisma.candidateProfile.findMany({
         where: { status: "ACTIVE" },
-        orderBy: { updatedAt: "desc" },
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
         take: 150,
         select: {
           id: true,
@@ -103,11 +104,12 @@ export async function GET(request: Request) {
           country: true,
           subCategoryIds: true,
           primaryCategory: { select: { code: true } },
+          documents: { where: { docType: "CV" }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true, name: true } },
         },
       }),
       prisma.job.findMany({
         where: { status: "OPEN" },
-        orderBy: { updatedAt: "desc" },
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
         take: 150,
         select: {
           id: true,
@@ -122,15 +124,17 @@ export async function GET(request: Request) {
           subCategory: { select: { code: true } },
         },
       }),
+      prisma.candidateProfile.count({ where: { status: "ACTIVE" } }),
+      prisma.job.count({ where: { status: "OPEN" } }),
     ]);
 
     if (!candidates.length || !jobs.length) {
       return NextResponse.json({
         canPresent,
-        candidateCount: candidates.length,
-        jobCount: jobs.length,
+        candidateCount: totalActiveCandidates,
+        jobCount: totalOpenJobs,
         totalMatches: 0,
-        truncated: false,
+        truncated: totalActiveCandidates > candidates.length || totalOpenJobs > jobs.length,
         suggestions: [],
         candidateSuggestions: [],
         offerSuggestions: [],
@@ -165,6 +169,8 @@ export async function GET(request: Request) {
 
     const ranked: Array<{
       candidateId: string;
+      candidateCvDocumentId: string | null;
+      candidateCvDocumentName: string | null;
       candidateAlias: string;
       candidateHeadline: string | null;
       candidateLocation: string | null;
@@ -222,6 +228,8 @@ export async function GET(request: Request) {
         const presentation = application?.presentations[0];
         ranked.push({
           candidateId: candidate.id,
+          candidateCvDocumentId: access.canViewCandidateDocuments ? candidate.documents[0]?.id ?? null : null,
+          candidateCvDocumentName: access.canViewCandidateDocuments ? candidate.documents[0]?.name ?? null : null,
           candidateAlias: candidateAlias(candidate.id),
           candidateHeadline: candidate.headline,
           candidateLocation: candidate.location,
@@ -249,7 +257,7 @@ export async function GET(request: Request) {
       }
     }
 
-    ranked.sort((a, b) => b.score - a.score);
+    ranked.sort((a, b) => b.score - a.score || a.candidateId.localeCompare(b.candidateId) || a.jobId.localeCompare(b.jobId));
     const candidateSuggestionCounts = new Map<string, number>();
     const offerSuggestionCounts = new Map<string, number>();
     const candidateSuggestions: typeof ranked = [];
@@ -268,10 +276,10 @@ export async function GET(request: Request) {
     }
     return NextResponse.json({
       canPresent,
-      candidateCount: candidates.length,
-      jobCount: jobs.length,
+      candidateCount: totalActiveCandidates,
+      jobCount: totalOpenJobs,
       totalMatches: ranked.length,
-      truncated: ranked.length > 100,
+      truncated: totalActiveCandidates > candidates.length || totalOpenJobs > jobs.length || ranked.length > 100,
       suggestions: ranked.slice(0, 100),
       candidateSuggestions,
       offerSuggestions,
@@ -312,14 +320,18 @@ export async function GET(request: Request) {
     });
     if (!job) return NextResponse.json({ error: "Offre introuvable." }, { status: 404 });
 
-    const candidates = await prisma.candidateProfile.findMany({
-      where: { status: "ACTIVE" },
-      include: {
-        primaryCategory: { select: { code: true } },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 500,
-    });
+    const [candidates, totalActiveCandidates] = await Promise.all([
+      prisma.candidateProfile.findMany({
+        where: { status: "ACTIVE" },
+        include: {
+          primaryCategory: { select: { code: true } },
+          documents: { where: { docType: "CV" }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true, name: true } },
+        },
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        take: 500,
+      }),
+      prisma.candidateProfile.count({ where: { status: "ACTIVE" } }),
+    ]);
 
     const candidateIds = candidates.flatMap((candidate) =>
       Array.isArray(candidate.subCategoryIds)
@@ -363,6 +375,8 @@ export async function GET(request: Request) {
         );
         return {
           candidateId: candidate.id,
+          candidateCvDocumentId: access.canViewCandidateDocuments ? candidate.documents[0]?.id ?? null : null,
+          candidateCvDocumentName: access.canViewCandidateDocuments ? candidate.documents[0]?.name ?? null : null,
           candidateAlias: candidateAlias(candidate.id),
           headline: candidate.headline,
           location: candidate.location,
@@ -398,6 +412,9 @@ export async function GET(request: Request) {
     return NextResponse.json({
       job: { id: job.id, title: job.title, location: job.location },
       matches,
+      candidateCount: totalActiveCandidates,
+      candidatesEvaluated: candidates.length,
+      truncated: totalActiveCandidates > candidates.length,
     });
   }
 
@@ -405,7 +422,10 @@ export async function GET(request: Request) {
 
   const candidate = await prisma.candidateProfile.findUnique({
     where: { id: candidateId },
-    include: { primaryCategory: { select: { code: true } } },
+    include: {
+      primaryCategory: { select: { code: true } },
+      documents: { where: { docType: "CV" }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true, name: true } },
+    },
   });
   if (!candidate) return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
 
@@ -416,15 +436,19 @@ export async function GET(request: Request) {
       })).map((row) => row.code)
     : [];
 
-  const jobs = await prisma.job.findMany({
-    where: { status: "OPEN" },
-    include: {
-      jobCategory: { select: { code: true } },
-      subCategory: { select: { code: true } },
-      company: { select: { country: true } },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+  const [jobs, totalOpenJobs] = await Promise.all([
+    prisma.job.findMany({
+      where: { status: "OPEN" },
+      include: {
+        jobCategory: { select: { code: true } },
+        subCategory: { select: { code: true } },
+        company: { select: { country: true } },
+      },
+      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+      take: 500,
+    }),
+    prisma.job.count({ where: { status: "OPEN" } }),
+  ]);
 
   const matches = jobs
     .map((job) => {
@@ -490,8 +514,13 @@ export async function GET(request: Request) {
       experienceYears: candidate.experienceYears,
       primaryCategoryCode: candidate.primaryCategory?.code ?? null,
       subCategoryCodes,
+      cvDocumentId: access.canViewCandidateDocuments ? candidate.documents[0]?.id ?? null : null,
+      cvDocumentName: access.canViewCandidateDocuments ? candidate.documents[0]?.name ?? null : null,
     },
     matches,
+    offersEvaluated: jobs.length,
+    offerCount: totalOpenJobs,
+    truncated: totalOpenJobs > jobs.length,
   });
 }
 
@@ -1042,12 +1071,15 @@ export async function POST(request: Request) {
     const { candidateId, jobId } = parsed.data;
 
     try {
-      const [candidates, jobs] = await Promise.all([
+      const evaluationLimit = candidateId || jobId ? 500 : 150;
+      const [candidates, jobs, totalCandidates, totalJobs] = await Promise.all([
         prisma.candidateProfile.findMany({
           where: {
             status: "ACTIVE",
             ...(candidateId ? { id: candidateId } : {}),
           },
+          orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+          take: evaluationLimit,
           select: {
             id: true,
             headline: true,
@@ -1065,6 +1097,8 @@ export async function POST(request: Request) {
             status: "OPEN",
             ...(jobId ? { id: jobId } : {}),
           },
+          orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+          take: 500,
           select: {
             id: true,
             title: true,
@@ -1077,6 +1111,8 @@ export async function POST(request: Request) {
             subCategory: { select: { code: true } },
           },
         }),
+        prisma.candidateProfile.count({ where: { status: "ACTIVE", ...(candidateId ? { id: candidateId } : {}) } }),
+        prisma.job.count({ where: { status: "OPEN", ...(jobId ? { id: jobId } : {}) } }),
       ]);
 
       if (candidateId && candidates.length === 0) {
@@ -1144,8 +1180,12 @@ export async function POST(request: Request) {
           details: {
             candidateId: candidateId || null,
             jobId: jobId || null,
-            candidateCount: candidates.length,
-            jobCount: jobs.length,
+            candidateCount: totalCandidates,
+            jobCount: totalJobs,
+            candidatesEvaluated: candidates.length,
+            jobsEvaluated: jobs.length,
+            evaluationLimit,
+            truncated: totalCandidates > candidates.length || totalJobs > jobs.length,
             evaluatedPairs,
             eligibleMatches,
             highestScore,
@@ -1158,8 +1198,12 @@ export async function POST(request: Request) {
         success: true,
         message: "Recalcul du matching exécuté avec succès.",
         scope: jobId ? "JOB" : candidateId ? "CANDIDATE" : "GLOBAL",
-        candidateCount: candidates.length,
-        jobCount: jobs.length,
+        candidateCount: totalCandidates,
+        jobCount: totalJobs,
+        candidatesEvaluated: candidates.length,
+        jobsEvaluated: jobs.length,
+        evaluationLimit,
+        truncated: totalCandidates > candidates.length || totalJobs > jobs.length,
         evaluatedPairs,
         eligibleMatches,
         highestScore,

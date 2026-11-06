@@ -43,6 +43,17 @@ export async function GET(request: Request) {
   });
 
   const intakeDocs = await prisma.cvIntake.findMany({
+    where: q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { originalName: { contains: q, mode: "insensitive" } },
+            { candidateName: { contains: q, mode: "insensitive" } },
+            { candidateEmail: { contains: q, mode: "insensitive" } },
+            { folderPath: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : undefined,
     orderBy: { createdAt: "desc" },
     take: 5000,
     select: {

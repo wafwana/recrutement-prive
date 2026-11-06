@@ -47,6 +47,7 @@ export async function GET(request: Request) {
         { name: { contains: q, mode: "insensitive" } },
         { originalName: { contains: q, mode: "insensitive" } },
         { candidateName: { contains: q, mode: "insensitive" } },
+        { candidateEmail: { contains: q, mode: "insensitive" } },
         { folderPath: { contains: q, mode: "insensitive" } },
       ],
     } : undefined,

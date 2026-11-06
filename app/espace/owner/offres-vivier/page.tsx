@@ -169,6 +169,7 @@ export default async function OfferPoolPage({
             <article key={offer.id} className="grid grid-cols-1 gap-3 border-b border-white/10 px-5 py-5 last:border-b-0 md:grid-cols-[2fr_1.1fr_1fr_1fr_1fr] md:items-center">
               <div>
                 <p className="text-sm text-white/85">{offer.title}</p>
+                <Link href={"/espace/owner/offres-vivier/" + offer.id} className="mt-2 inline-block text-[10px] uppercase tracking-[0.12em] text-[#c7a15a] underline underline-offset-4">Consulter le détail complet</Link>
                 {offer.salary ? (
                   <p className="mt-1 text-sm font-medium text-[#F97316]">{offer.salary}</p>
                 ) : (

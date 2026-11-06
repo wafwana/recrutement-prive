@@ -32,6 +32,8 @@ type FocusedJobMatch = {
 
 type FocusedCandidateMatch = {
   candidateId: string;
+  candidateCvDocumentId?: string | null;
+  candidateCvDocumentName?: string | null;
   candidateAlias: string;
   headline: string | null;
   location: string | null;
@@ -51,6 +53,8 @@ type FocusedCandidateMatch = {
 
 type Suggestion = {
   candidateId: string;
+  candidateCvDocumentId?: string | null;
+  candidateCvDocumentName?: string | null;
   candidateAlias: string;
   candidateHeadline: string | null;
   candidateLocation: string | null;
@@ -149,6 +153,7 @@ function PairCard({
             </a>
           </div>
           <h4 className="mt-2 text-base leading-6 text-white">{match.jobTitle}</h4>
+          {match.candidateCvDocumentId ? <a href={"/api/candidats/documents/" + match.candidateCvDocumentId} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] uppercase tracking-wider text-[#c7a15a] underline">Consulter le CV · {match.candidateCvDocumentName || "Document CV"}</a> : null}
           {match.candidateHeadline ? <p className="mt-1 text-xs text-white/65">{match.candidateHeadline}</p> : null}
           <p className="mt-1 text-xs text-white/35">
             {[
@@ -389,7 +394,7 @@ export default function CvMatchingPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Matching impossible.");
       setCandidateMatches(data.matches || []);
-      setMessage((data.matches?.length || 0) + " opportunité(s) analysées pour " + candidateAlias(targetId) + ".");
+      setMessage((data.matches?.length || 0) + " opportunité(s) analysées pour " + candidateAlias(targetId) + "." + (data.truncated ? " Résultat partiel : les 500 offres les plus récemment mises à jour ont été examinées." : ""));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erreur de matching.");
       setCandidateMatches([]);
@@ -409,7 +414,7 @@ export default function CvMatchingPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Matching impossible.");
       setJobMatches(data.matches || []);
-      setMessage((data.matches?.length || 0) + " profil(s) analysés pour cette offre.");
+      setMessage((data.matches?.length || 0) + " profil(s) analysés pour cette offre." + (data.truncated ? " Résultat partiel : les 500 profils actifs les plus récemment mis à jour ont été examinés." : ""));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erreur de matching.");
       setJobMatches([]);
@@ -428,7 +433,7 @@ export default function CvMatchingPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Recalcul impossible.");
-      setMessage("Matching recalculé pour " + match.candidateAlias + " et " + match.jobTitle + ".");
+      setMessage("Matching recalculé pour " + match.candidateAlias + " et " + match.jobTitle + "." + (data.truncated ? " Recalcul partiel : limite de " + data.evaluationLimit + " profils/offres par périmètre atteinte." : ""));
       await fetchOverview();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erreur de recalcul.");
@@ -535,6 +540,12 @@ export default function CvMatchingPage() {
           </div>
         ))}
       </div>
+
+      {overview?.truncated ? (
+        <p role="status" className="mt-4 border border-amber-400/30 bg-amber-400/5 p-4 text-sm leading-6 text-amber-100/90">
+          Le classement est partiel : pour préserver les performances, le calcul examine au maximum les 150 profils actifs et les 150 offres ouvertes les plus récemment mis à jour. Les autres éléments ne sont pas inclus dans ce résultat.
+        </p>
+      ) : null}
 
       {presentationMessage ? (
         <div aria-live="polite" className="mt-5 border border-[#F97316]/30 bg-[#F97316]/5 p-4 text-sm leading-6 text-white/80">
@@ -744,6 +755,7 @@ export default function CvMatchingPage() {
                       #{index + 1} · {scoreLabel(match.score)}
                     </p>
                     <p className="mt-1 font-serif text-xl text-white">{match.candidateAlias}</p>
+                    {match.candidateCvDocumentId ? <a href={"/api/candidats/documents/" + match.candidateCvDocumentId} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] uppercase tracking-wider text-[#c7a15a] underline">Consulter le CV · {match.candidateCvDocumentName || "Document CV"}</a> : null}
                     <p className="mt-1 text-xs text-white/45">
                       {match.headline || "Profil candidat"} · {[match.location, match.country, match.experienceYears !== null ? match.experienceYears + " an(s) d’expérience" : null].filter(Boolean).join(" · ")}
                     </p>
