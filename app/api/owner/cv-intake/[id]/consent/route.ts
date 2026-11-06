@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     await tx.cvIntake.update({
       where: { id },
       data: {
-        matching: { ...previousMatching, consent: { status, evidence, verifiedAt: verifiedAt.toISOString(), verifiedByUserId: userId } },
+        matching: { ...previousMatching, ...(status === "AUTHORIZED" && previousConsent.status === "REVOKED" ? { invitationStatus: null, invitationSentAt: null } : {}), consent: { status, evidence, verifiedAt: verifiedAt.toISOString(), verifiedByUserId: userId } },
       },
     });
     const externalId = "cv-intake:" + id;
