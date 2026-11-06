@@ -53,7 +53,9 @@ test("focused matching is bounded and reports omitted records", () => {
   assert.ok(route.includes("truncated: totalOpenJobs > jobs.length"));
   const recalculate = route.slice(route.indexOf("if (parsed.data.action === \"recalculate\")"));
   assert.ok(recalculate.includes("matchCandidateToJob("));
-  assert.ok(recalculate.includes("take: 500"));
+  assert.ok(recalculate.includes("const evaluationLimit = candidateId || jobId ? 500 : 150;"));
+  assert.ok(recalculate.includes("take: evaluationLimit"));
+  assert.ok(recalculate.includes("evaluationLimit,"));
   assert.ok(recalculate.includes("evaluatedPairs"));
   assert.ok(recalculate.includes("truncated: totalCandidates > candidates.length || totalJobs > jobs.length"));
   assert.ok(route.includes("canViewCandidateDocuments"));
