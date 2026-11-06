@@ -17,9 +17,13 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
   const canManagePartners = role === "ADMIN" && session?.user?.id
     ? await hasPermission(session.user.id, role, "PARTNERS_MANAGE").catch(() => false)
     : false;
+  const canManageCvIntake = (role === "ADMIN" || role === "CONSULTANT") && session?.user?.id
+    ? await hasPermission(session.user.id, role, "CV_INTAKE").catch(() => false)
+    : false;
   const allowedAdminPermissions: WorkspaceNavigationPermission[] = [
     ...(canManagePlatformSettings ? ["PLATFORM_SETTINGS" as const] : []),
     ...(canManagePartners ? ["PARTNERS_MANAGE" as const] : []),
+    ...(canManageCvIntake ? ["CV_INTAKE" as const] : []),
   ];
   const workspaceRole =
     role === "CANDIDAT" || role === "ENTREPRISE" || role === "CONSULTANT" || role === "ADMIN"
