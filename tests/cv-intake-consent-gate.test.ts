@@ -6,7 +6,7 @@ const read = (path: string) => fs.readFileSync(path, "utf8");
 
 test("CV intake stores pending consent and never creates a user, candidate profile or invitation during import", () => {
   const route = read("app/api/owner/cv-intake/route.ts");
-  assert.ok(route.includes('consentStatus: "PENDING"'));
+  assert.ok(route.includes('consent: { status: "PENDING"'));
   assert.ok(!route.includes("prisma.user.create"));
   assert.ok(!route.includes("prisma.candidateProfile.create"));
   assert.ok(!route.includes("sendEmail"));
@@ -16,14 +16,14 @@ test("CV intake stores pending consent and never creates a user, candidate profi
 
 test("CV intake consent is OWNER-only, evidence-backed, audited and revocable", () => {
   const route = read("app/api/owner/cv-intake/[id]/consent/route.ts");
-  for (const fragment of ['role !== "OWNER"', "evidence.length < 10", "consentStatus: status", "consentVerifiedAt: verifiedAt", "consentVerifiedByUserId: userId", "tx.auditLog.create", "CV_INTAKE_CONSENT_AUTHORIZED", "CV_INTAKE_CONSENT_REVOKED", 'status: "REJECTED"', 'consentStatus: "REVOKED"']) {
+  for (const fragment of ['role !== "OWNER"', "evidence.length < 10", "matching: { ...previousMatching, consent:", "verifiedAt: verifiedAt.toISOString()", "verifiedByUserId: userId", "tx.auditLog.create", "CV_INTAKE_CONSENT_AUTHORIZED", "CV_INTAKE_CONSENT_REVOKED", 'status: "REJECTED"', 'consentStatus: "REVOKED"']) {
     assert.ok(route.includes(fragment), "missing consent control: " + fragment);
   }
 });
 
 test("Only authorized and analyzed CV intake records enter the provisional sourcing pool", () => {
   const ingest = read("lib/sourcing/ingest.ts");
-  assert.ok(ingest.includes('status: "ANALYSE_OK", candidateId: null, consentStatus: "AUTHORIZED"'));
+  assert.ok(ingest.includes('status: "ANALYSE_OK", candidateId: null, matching: { path: ["consent", "status"], equals: "AUTHORIZED" }'));
   assert.ok(ingest.includes('consentStatus: "AUTHORIZED"'));
   assert.ok(ingest.includes('candidate.source === "PLATFORM_CV_INTAKE" && candidate.consentStatus !== "AUTHORIZED"'));
   assert.ok(ingest.includes("consentVerified: true"));
@@ -45,7 +45,7 @@ test("Legacy pending or revoked CV intake sourced candidates are excluded from m
 test("Candidate account creation and invitation require explicit Owner action after consent", () => {
   const route = read("app/api/owner/cv-intake/invite/route.ts");
   assert.ok(route.includes('role !== "OWNER"'));
-  assert.ok(route.includes('intake.consentStatus !== "AUTHORIZED"'));
+  assert.ok(route.includes('consent.status !== "AUTHORIZED"'));
   assert.ok(route.includes("tx.user.create"));
   assert.ok(route.includes("tx.candidateProfile.create"));
   assert.ok(route.includes("tx.candidateDocument.create"));
@@ -65,10 +65,10 @@ test("CV intake UI exposes consent controls only to OWNER and gates invitations"
   assert.ok(page.includes("Aucun compte candidat ni invitation n’a été créé automatiquement."));
 });
 
-test("CV consent migration defaults all existing records to pending", () => {
+test("CV consent metadata uses the existing JSON column and introduces no database migration", () => {
   const schema = read("prisma/schema.prisma");
-  const migration = read("prisma/migrations/20261106010000_cv_intake_consent_gate/migration.sql");
-  assert.ok(schema.includes('consentStatus     String          @default("PENDING")'));
-  assert.ok(migration.includes("DEFAULT 'PENDING'"));
-  assert.ok(migration.includes("CvIntake_consentStatus_status_createdAt_idx"));
+  const route = read("app/api/owner/cv-intake/[id]/consent/route.ts");
+  assert.ok(!schema.includes('consentStatus     String          @default("PENDING")'));
+  assert.ok(route.includes("matching: { ...previousMatching, consent:"));
+  assert.ok(!fs.existsSync("prisma/migrations/20261106010000_cv_intake_consent_gate/migration.sql"));
 });
