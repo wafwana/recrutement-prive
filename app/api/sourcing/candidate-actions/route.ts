@@ -48,19 +48,25 @@ export async function POST(request: Request) {
   }
   const newStatus = statusByAction[action];
   // La lecture, la mise à jour du statut et l’AuditLog sont atomiques.
-  const updatedCandidate = await prisma.$transaction(async (tx) => {
-    const candidate = await tx.sourcedCandidate.findUnique({ where: { id: candidateId } });
-    if (!candidate) return null;
-    if (candidate.source === "PLATFORM_CV_INTAKE" && candidate.consentStatus !== "AUTHORIZED") throw new Error("CV_INTAKE_CONSENT_REQUIRED");
-    const updated = await tx.sourcedCandidate.update({
-      where: { id: candidateId },
-      data: { status: newStatus, notes: notes ? `${candidate.notes ? candidate.notes + " | " : ""}${notes}` : candidate.notes, updatedAt: new Date() },
+  let updatedCandidate: Awaited<ReturnType<typeof prisma.sourcedCandidate.update>> | null = null;
+  try {
+    updatedCandidate = await prisma.$transaction(async (tx) => {
+      const candidate = await tx.sourcedCandidate.findUnique({ where: { id: candidateId } });
+      if (!candidate) return null;
+      if (candidate.source === "PLATFORM_CV_INTAKE" && candidate.consentStatus !== "AUTHORIZED") throw new Error("CV_INTAKE_CONSENT_REQUIRED");
+      const updated = await tx.sourcedCandidate.update({
+        where: { id: candidateId },
+        data: { status: newStatus, notes: notes ? `${candidate.notes ? candidate.notes + " | " : ""}${notes}` : candidate.notes, updatedAt: new Date() },
+      });
+      await tx.auditLog.create({
+        data: { actorUserId: staff.userId, actorRole: staff.role, action: `SOURCED_CANDIDATE_${action}`, targetType: "SOURCED_CANDIDATE", targetId: candidateId, details: { previousStatus: candidate.status, newStatus, notes } },
+      });
+      return updated;
     });
-    await tx.auditLog.create({
-      data: { actorUserId: staff.userId, actorRole: staff.role, action: `SOURCED_CANDIDATE_${action}`, targetType: "SOURCED_CANDIDATE", targetId: candidateId, details: { previousStatus: candidate.status, newStatus, notes } },
-    });
-    return updated;
-  });
+  } catch (error) {
+    if (error instanceof Error && error.message === "CV_INTAKE_CONSENT_REQUIRED") return NextResponse.json({ error: "Autorisation d’exploitation non validée. Action de sourcing refusée." }, { status: 409 });
+    throw error;
+  }
   if (!updatedCandidate) return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
   return NextResponse.json({ ok: true, candidate: updatedCandidate });
 }
