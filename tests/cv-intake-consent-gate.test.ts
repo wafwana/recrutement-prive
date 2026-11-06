@@ -31,8 +31,9 @@ test("Only authorized and analyzed CV intake records enter the provisional sourc
 
 test("local CV reprocessing preserves consent and defers all matching until authorization", () => {
   const route = read("app/api/owner/cv-intake/reprocess/route.ts");
-  assert.ok(route.includes("...previousMatching"))
-  assert.ok(route.includes("consent.status === \"AUTHORIZED\""));
+  assert.ok(route.includes("...previousMatching"));
+  assert.ok(route.includes('consent.status !== "AUTHORIZED"'));
+  assert.ok(route.indexOf('consent.status !== "AUTHORIZED"') < route.indexOf("extractTextFromCvBuffer("), "consent must be checked before document extraction");
   assert.ok(route.includes("ingestAnalyzedCvIntakes(userId, 1, [record.id])"));
   assert.ok(!route.includes("prisma.job.findMany"));
   assert.ok(!route.includes("function scoreJob("));
