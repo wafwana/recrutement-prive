@@ -59,7 +59,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       if (profile && preferences.sourceCvIntakeId === id) {
         await tx.candidateProfile.update({
           where: { id: intake.candidateId },
-          data: { status: "INACTIVE", preferences: { ...preferences, consentStatus: "REVOKED", consentRevokedAt: verifiedAt.toISOString() } },
+          data: { status: "SUSPENDED", preferences: { ...preferences, consentStatus: "REVOKED", consentRevokedAt: verifiedAt.toISOString() } },
         });
       }
       await tx.candidateDocument.deleteMany({
