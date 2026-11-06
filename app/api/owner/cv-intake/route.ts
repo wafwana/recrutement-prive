@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { analyzeCvDocument, analyzeCvDocumentLocally } from "@/lib/cv/analyzer";
@@ -7,9 +7,6 @@ import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { buildCandidateFolder, buildCandidateFolderFromAnalysis, resolveCvTaxonomySelection } from "@/lib/cv/folders";
 import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
 import { hasPermission } from "@/lib/auth/permissions";
-import { hashToken } from "@/lib/password-crypto";
-import { sendEmail } from "@/lib/email/service";
-import { getAppBaseUrl } from "@/lib/url";
 import { sanitizePostgresJson } from "@/lib/security/sanitize-postgres-json";
 
 const CV_INTAKE_ALLOWED_TYPES = new Set([
@@ -58,6 +55,7 @@ export async function GET(request: Request) {
       originalSha256: true, senderUserId: true, senderRole: true, senderEmail: true,
       candidateName: true, candidateEmail: true, docType: true, folderPath: true,
       analysis: true, matching: true, analyzedAt: true, status: true, candidateId: true,
+      consentStatus: true, consentEvidence: true, consentVerifiedAt: true, consentVerifiedByUserId: true,
       createdAt: true, updatedAt: true,
       candidate: { select: { id: true, preferences: true, user: { select: { name: true, email: true } } } },
     },
@@ -152,108 +150,15 @@ export async function POST(request: Request) {
     const candidateName = (typeof formData.get("candidateName") === "string"
       ? String(formData.get("candidateName")).replace(/\u0000/g, "").trim() || null
       : null) || [analysis?.firstName, analysis?.lastName].filter(Boolean).join(" ").trim() || null;
-    const bulkImport = formData.get("bulkImport") === "true";
+    // Import is deliberately provisional: no account, candidate profile, invitation or company sharing is created here.
+    // A direct candidate link must be performed separately after explicit Owner verification.
     const requestedCandidateId = typeof formData.get("candidateId") === "string" ? String(formData.get("candidateId")).trim() || null : null;
-    let candidate = bulkImport ? null : requestedCandidateId
-      ? await prisma.candidateProfile.findUnique({ where: { id: requestedCandidateId }, select: { id: true, preferences: true } })
-      : candidateEmail
-        ? await prisma.candidateProfile.findFirst({ where: { user: { email: { equals: candidateEmail, mode: "insensitive" } } }, select: { id: true, preferences: true } })
-        : null;
-
-    if (!bulkImport && requestedCandidateId && !candidate) {
-      return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
+    if (requestedCandidateId) {
+      const candidateExists = await prisma.candidateProfile.findUnique({ where: { id: requestedCandidateId }, select: { id: true } });
+      if (!candidateExists) return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
     }
-
-    let candidateInviteSent = false;
-    if (!bulkImport && !candidate && candidateEmail && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(candidateEmail)) {
-      let user = await prisma.user.findUnique({
-        where: { email: candidateEmail },
-        select: { id: true, name: true, passwordHash: true, role: true, candidat: { select: { id: true, preferences: true } } },
-      });
-
-      if (!user) {
-        user = await prisma.user.create({
-          data: { name: candidateName, email: candidateEmail, role: "CANDIDAT" },
-          select: { id: true, name: true, passwordHash: true, role: true, candidat: { select: { id: true, preferences: true } } },
-        });
-      }
-
-      if (user.role !== "CANDIDAT") {
-        // Never attach a manual CV to an existing non-candidate identity.
-        // Keep the CV intake record unlinked so the Owner can resolve it explicitly.
-        console.warn("[owner cv intake] existing non-candidate identity; leaving CV unlinked", {
-          candidateEmail,
-          existingRole: user.role,
-        });
-      } else if (user.candidat) {
-        candidate = user.candidat;
-      } else {
-        const primaryCategory = taxonomySelection.primaryCategoryCode
-          ? taxonomy.find((item) => item.code === taxonomySelection.primaryCategoryCode && item.parentId === null)
-          : null;
-        const subCategories = taxonomy.filter((item) => taxonomySelection.subCategoryCodes.includes(item.code));
-        candidate = await prisma.candidateProfile.create({
-          data: {
-            userId: user.id,
-            headline: analysis?.headline || null,
-            bio: analysis?.improvedSummary || analysis?.summary || null,
-            location: analysis?.location || null,
-            country: analysis?.country || null,
-            phone: analysis?.phone || null,
-            skills: analysis ? { explicit: analysis.explicitSkills, normalized: analysis.skills } : undefined,
-            experienceYears: analysis?.experienceYears ?? null,
-            primaryCategoryId: primaryCategory?.id || null,
-            subCategoryIds: subCategories.map((item) => item.id),
-            preferences: {
-              source: "MANUAL_CV_IMPORT",
-              consentStatus: user.passwordHash ? "ALREADY_REGISTERED" : "PENDING",
-              importedAt: new Date().toISOString(),
-              extractedContact: {
-                email: candidateEmail,
-                phone: analysis?.phone || null,
-                address: analysis?.address || null,
-                location: analysis?.location || null,
-                country: analysis?.country || null,
-              },
-              education: analysis?.education || [],
-              certifications: analysis?.certifications || [],
-              languages: analysis?.languages || [],
-              alternativeCategoryCodes: analysis?.alternativeCategoryCodes || [],
-              suggestedPositioning: analysis?.suggestedPositioning || [],
-              careerLevel: analysis?.careerLevel || "NON_SPECIFIE",
-              careerLevelEvidence: analysis?.careerLevelEvidence || null,
-            },
-          },
-          select: { id: true, preferences: true },
-        });
-      }
-
-      if (!user.passwordHash && user.role === "CANDIDAT") {
-        const rawToken = randomBytes(32).toString("hex");
-        const tokenHash = hashToken(rawToken);
-        await prisma.passwordResetToken.create({
-          data: { email: candidateEmail, tokenHash, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
-        });
-        const inviteUrl = `${getAppBaseUrl()}/reinitialisation-mot-de-passe?token=${rawToken}`;
-        const safeName = (candidateName || candidateEmail.split("@")[0]).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-        const delivery = await sendEmail({
-          to: candidateEmail,
-          subject: "[Recrutement Privé] Votre profil professionnel a été identifié",
-          html: `<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:24px;color:#111827">
-            <h2 style="color:#0b1b2b">Recrutement Privé</h2>
-            <p>Bonjour ${safeName},</p>
-            <p>Votre profil professionnel a été identifié et analysé à partir des informations présentes dans votre CV.</p>
-            <p>Vous pouvez accepter la reprise de ce profil sur Recrutement Privé et créer votre accès en utilisant le lien sécurisé ci-dessous.</p>
-            <p><a href="${inviteUrl}" style="display:inline-block;background:#0b1b2b;color:#fff;padding:12px 18px;text-decoration:none">Valider mon profil et créer mon accès</a></p>
-            <p>Le lien est valable 7 jours. Si vous n'êtes pas concerné, vous pouvez ignorer ce message.</p>
-            <p style="font-size:12px;color:#6b7280">Recrutement Privé — contact@recrutement-prive.com</p>
-          </div>`,
-        });
-        if (delivery.ok) candidateInviteSent = true;
-        else await prisma.passwordResetToken.delete({ where: { tokenHash } }).catch(() => undefined);
-      }
-    }
-
+    const candidateInviteSent = false;
+    const candidateId = null;
     const year = new Date().getFullYear();
     const suggestedFolder = analysis
       ? buildCandidateFolderFromAnalysis(analysis, taxonomyItems, year, "CV")
@@ -272,39 +177,17 @@ export async function POST(request: Request) {
         senderEmail: userEmail,
         candidateName,
         candidateEmail,
-        candidateId: candidate?.id || null,
+        candidateId,
         docType: "CV",
         folderPath: suggestedFolder,
         analysis: analysis ? { ...analysis, sourceFactsOnly: true, suggestedMatches } : { sourceFactsOnly: true, suggestedMatches },
         matching: { suggestedMatches, generatedAt: new Date().toISOString() },
         analyzedAt: analysis ? new Date() : null,
         status: analysis ? "ANALYSE_OK" : "A_ANALYSER",
+        consentStatus: "PENDING",
       },
       select: { id: true, name: true, folderPath: true, analyzedAt: true, createdAt: true },
     });
-
-    if (candidate?.id) {
-      const existingCandidateDocument = await prisma.candidateDocument.findFirst({
-        where: { candidateId: candidate.id, name: safeFileName, docType: "CV" },
-        select: { id: true },
-      });
-
-      if (!existingCandidateDocument) {
-        await prisma.candidateDocument.create({
-          data: {
-            candidateId: candidate.id,
-            name: safeFileName,
-            fileData: buffer,
-            type: file.type || "application/octet-stream",
-            docType: "CV",
-            folderPath: suggestedFolder,
-            analysis: analysis ? { ...analysis, sourceFactsOnly: true, suggestedMatches } : { sourceFactsOnly: true, suggestedMatches },
-            analyzedAt: analysis ? new Date() : null,
-            isPrimaryCv: true,
-          },
-        });
-      }
-    }
 
     await prisma.auditLog.create({
       data: {
@@ -316,7 +199,9 @@ export async function POST(request: Request) {
         details: {
           originalName: safeFileName,
           candidateInviteSent,
-          candidateProfileLinked: Boolean(candidate?.id),
+          candidateProfileLinked: false,
+          consentStatus: "PENDING",
+          invitationSent: false,
           originalSha256: sha256,
           folderPath: suggestedFolder,
           analysisGenerated: Boolean(analysis),
@@ -327,7 +212,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true, document: record, originalImmutable: true, authorRole: "OWNER", candidateId: candidate?.id || null, candidateInviteSent }, { status: 201 });
+    return NextResponse.json({ ok: true, document: record, originalImmutable: true, authorRole: "OWNER", candidateId, candidateInviteSent }, { status: 201 });
   } catch (error) {
     console.error("[owner cv intake]", error);
     return NextResponse.json({ error: "Erreur lors de l'intégration du CV." }, { status: 500 });
