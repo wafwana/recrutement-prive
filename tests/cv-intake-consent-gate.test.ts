@@ -14,9 +14,12 @@ test("CV intake stores pending consent and never creates a user, candidate profi
   assert.ok(!route.includes("prisma.job.findMany"));
 });
 
-test("CV intake consent is OWNER-only, evidence-backed, audited and revocable", () => {
+test("CV intake consent is restricted to OWNER/ADMIN/CONSULTANT with CV_INTAKE permission, evidence-backed, audited and revocable", () => {
   const route = read("app/api/owner/cv-intake/[id]/consent/route.ts");
-  for (const fragment of ['role !== "OWNER"', "evidence.length < 10", "previousConsent.status === \"REVOKED\"", "verifiedAt: verifiedAt.toISOString()", "verifiedByUserId: userId", "tx.auditLog.create", "CV_INTAKE_CONSENT_AUTHORIZED", "CV_INTAKE_CONSENT_REVOKED", 'status: "REJECTED"', 'consentStatus: "REVOKED"', "MANUAL_CV_IMPORT", 'status: "SUSPENDED"', "createHash(", "passwordResetToken.deleteMany", "invitationTokenHash"]) {
+  assert.ok(route.includes('["OWNER", "ADMIN", "CONSULTANT"].includes(role)'));
+  assert.ok(route.includes('hasPermission(userId, role, "CV_INTAKE")'));
+  assert.ok(route.includes("actorRole: role"));
+  for (const fragment of ["evidence.length < 10", "previousConsent.status === \"REVOKED\"", "verifiedAt: verifiedAt.toISOString()", "verifiedByUserId: userId", "tx.auditLog.create", "CV_INTAKE_CONSENT_AUTHORIZED", "CV_INTAKE_CONSENT_REVOKED", 'status: "REJECTED"', 'consentStatus: "REVOKED"', "MANUAL_CV_IMPORT", 'status: "SUSPENDED"', "createHash(", "passwordResetToken.deleteMany", "invitationTokenHash"]) {
     assert.ok(route.includes(fragment), "missing consent control: " + fragment);
   }
 });
@@ -79,10 +82,11 @@ test("Candidate account creation and invitation require explicit Owner action af
   assert.ok(route.includes("promotedToCandidateId"));
 });
 
-test("CV intake UI exposes consent controls only to OWNER and gates invitations", () => {
+test("CV intake UI exposes consent controls only to users with CV_INTAKE permission and gates invitations", () => {
   const api = read("app/api/owner/cv-intake/route.ts");
   const page = read("app/espace/owner/cv-intake/page.tsx");
-  assert.ok(api.includes('canManageConsent: session?.user?.role === "OWNER"'));
+  assert.ok(api.includes('const canManageConsent = await hasPermission(userId, session?.user?.role || undefined, "CV_INTAKE")'));
+  assert.ok(api.includes("canManageConsent,"));
   assert.ok(page.includes("canManageConsent"));
   assert.ok(page.includes("Valider l’autorisation"));
   assert.ok(page.includes("Révoquer l’autorisation"));
