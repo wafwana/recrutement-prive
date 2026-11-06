@@ -32,6 +32,8 @@ type FocusedJobMatch = {
 
 type FocusedCandidateMatch = {
   candidateId: string;
+  candidateCvDocumentId?: string | null;
+  candidateCvDocumentName?: string | null;
   candidateAlias: string;
   headline: string | null;
   location: string | null;
@@ -51,6 +53,8 @@ type FocusedCandidateMatch = {
 
 type Suggestion = {
   candidateId: string;
+  candidateCvDocumentId?: string | null;
+  candidateCvDocumentName?: string | null;
   candidateAlias: string;
   candidateHeadline: string | null;
   candidateLocation: string | null;
@@ -149,6 +153,7 @@ function PairCard({
             </a>
           </div>
           <h4 className="mt-2 text-base leading-6 text-white">{match.jobTitle}</h4>
+          {match.candidateCvDocumentId ? <a href={"/api/candidats/documents/" + match.candidateCvDocumentId} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] uppercase tracking-wider text-[#c7a15a] underline">Consulter le CV · {match.candidateCvDocumentName || "Document CV"}</a> : null}
           {match.candidateHeadline ? <p className="mt-1 text-xs text-white/65">{match.candidateHeadline}</p> : null}
           <p className="mt-1 text-xs text-white/35">
             {[
@@ -750,6 +755,7 @@ export default function CvMatchingPage() {
                       #{index + 1} · {scoreLabel(match.score)}
                     </p>
                     <p className="mt-1 font-serif text-xl text-white">{match.candidateAlias}</p>
+                    {match.candidateCvDocumentId ? <a href={"/api/candidats/documents/" + match.candidateCvDocumentId} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[10px] uppercase tracking-wider text-[#c7a15a] underline">Consulter le CV · {match.candidateCvDocumentName || "Document CV"}</a> : null}
                     <p className="mt-1 text-xs text-white/45">
                       {match.headline || "Profil candidat"} · {[match.location, match.country, match.experienceYears !== null ? match.experienceYears + " an(s) d’expérience" : null].filter(Boolean).join(" · ")}
                     </p>
