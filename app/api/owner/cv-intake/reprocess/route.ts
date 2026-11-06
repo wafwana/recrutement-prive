@@ -3,34 +3,7 @@ import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { extractTextFromCvBuffer, parseCvTextLocally } from "@/lib/cv/analyzer";
 import { hasPermission } from "@/lib/auth/permissions";
-
-function scoreJob(
-  analysis: ReturnType<typeof parseCvTextLocally>,
-  job: { id: string; title: string; requiredSkills: unknown; requiredExperienceYears: number | null },
-) {
-  const candidateSkills = new Set(analysis.skills.map((skill) => skill.toLowerCase()));
-  const required = Array.isArray(job.requiredSkills)
-    ? job.requiredSkills.filter((value): value is string => typeof value === "string")
-    : [];
-  const skillHits = required.filter((skill) =>
-    [...candidateSkills].some((candidate) =>
-      candidate.includes(skill.toLowerCase()) || skill.toLowerCase().includes(candidate),
-    ),
-  ).length;
-  const skillScore = required.length ? Math.round((skillHits / required.length) * 60) : 0;
-  const experienceScore =
-    job.requiredExperienceYears == null || analysis.experienceYears == null
-      ? 0
-      : analysis.experienceYears >= job.requiredExperienceYears
-        ? 25
-        : Math.max(0, Math.round((analysis.experienceYears / Math.max(1, job.requiredExperienceYears)) * 25));
-  const titleScore =
-    analysis.headline && job.title &&
-    analysis.headline.toLowerCase().split(/\W+/).filter(Boolean).some((word) => job.title.toLowerCase().includes(word))
-      ? 15
-      : 0;
-  return Math.min(100, skillScore + experienceScore + titleScore);
-}
+import { ingestAnalyzedCvIntakes } from "@/lib/sourcing/ingest";
 
 /**
  * Retry failed CV intake records using local deterministic parsing only.
@@ -80,12 +53,6 @@ export async function POST(request: Request) {
       : item.code,
     parentCode: taxonomy.find((parent) => parent.id === item.parentId)?.code || null,
   }));
-  const jobs = await prisma.job.findMany({
-    where: { status: "OPEN" },
-    take: 500,
-    select: { id: true, title: true, requiredSkills: true, requiredExperienceYears: true },
-  });
-
   const results: Array<{ id: string; status: string; reason?: string }> = [];
   for (const record of records) {
     const previousAnalysis = record.analysis && typeof record.analysis === "object"
@@ -109,7 +76,7 @@ export async function POST(request: Request) {
           data: {
             status: "NON_ANALYSE",
             analysis: { sourceFactsOnly: true, error: reason, retryMethod: "LOCAL_DETERMINISTIC" },
-            matching: { suggestedMatches: [], generatedAt: new Date().toISOString() },
+            matching: { ...previousMatching, suggestedMatches: [], generatedAt: new Date().toISOString(), method: "LOCAL_DETERMINISTIC" },
             analyzedAt: null,
           },
         });
@@ -128,26 +95,22 @@ export async function POST(request: Request) {
       }
 
       const analysis = parseCvTextLocally(text, taxonomyItems);
-      const suggestedMatches = jobs
-        .map((job) => ({
-          jobId: job.id,
-          title: job.title,
-          score: scoreJob(analysis, job),
-          categoryId: taxonomy.find((item) => item.code === analysis.primaryCategoryCode)?.id || null,
-          subCategoryId: taxonomy.find((item) => item.code === analysis.subCategoryCodes[0])?.id || null,
-        }))
-        .filter((match) => match.score >= 25)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 20);
+      const suggestedMatches: Array<{ jobId: string; title: string; score: number }> = [];
       await prisma.cvIntake.update({
         where: { id: record.id },
         data: {
           status: "ANALYSE_OK",
-          analysis: { ...analysis, sourceFactsOnly: true, suggestedMatches, retryMethod: "LOCAL_DETERMINISTIC" },
-          matching: { suggestedMatches, generatedAt: new Date().toISOString(), method: "LOCAL_DETERMINISTIC" },
+          analysis: { ...analysis, sourceFactsOnly: true, retryMethod: "LOCAL_DETERMINISTIC" },
+          matching: { ...previousMatching, suggestedMatches, generatedAt: new Date().toISOString(), method: "LOCAL_DETERMINISTIC" },
           analyzedAt: new Date(),
         },
       });
+      const consent = previousMatching.consent && typeof previousMatching.consent === "object" && !Array.isArray(previousMatching.consent)
+        ? previousMatching.consent as Record<string, unknown>
+        : {};
+      if (consent.status === "AUTHORIZED") {
+        await ingestAnalyzedCvIntakes(userId, 1, [record.id]);
+      }
       await prisma.auditLog.create({
         data: {
           actorUserId: userId,
@@ -160,7 +123,8 @@ export async function POST(request: Request) {
             originalSha256: record.originalSha256,
             method: "LOCAL_DETERMINISTIC",
             externalAiCalled: false,
-            suggestedMatchCount: suggestedMatches.length,
+            suggestedMatchCount: 0,
+            consentStatus: typeof consent.status === "string" ? consent.status : "PENDING",
             originalImmutable: true,
           },
         },
