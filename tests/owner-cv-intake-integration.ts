@@ -155,13 +155,11 @@ async function main() {
     assert.ok(persisted, "Uploaded CV must persist in the database");
     assert.equal(persisted.originalSha256, sha256);
     assert.deepEqual(Buffer.from(persisted.fileData), pdfBytes, "Stored original must match the uploaded bytes");
-    assert.equal(persisted.status, "ANALYSE_OK", "Synthetic PDF must complete deterministic local analysis");
-    assert.ok(persisted.analyzedAt);
-    assert.ok(persisted.analysis && typeof persisted.analysis === "object");
+    assert.equal(persisted.status, "A_ANALYSER", "CV must remain pending until OWNER consent");
+    assert.equal(persisted.analyzedAt, null, "Import must not analyze before consent");
+    assert.equal(persisted.analysis, null, "Import must not persist extracted candidate data before consent");
     assert.ok(persisted.matching && typeof persisted.matching === "object");
-    const analysis = persisted.analysis as Record<string, unknown>;
-    assert.equal(analysis.sourceFactsOnly, true);
-    assert.ok(Array.isArray(analysis.skills));
+    assert.equal(((persisted.matching as Record<string, unknown>).consent as Record<string, unknown>).status, "PENDING");
 
     const listResponse = await fetch(
       `${BASE_URL}/api/owner/cv-intake?q=${encodeURIComponent("synthetic-cv.pdf")}`,
@@ -171,8 +169,8 @@ async function main() {
     const listBody = await listResponse.json() as { documents: Array<{ id: string; status: string; analysis: unknown; matching: unknown }>; folders: string[] };
     const visible = listBody.documents.find((item) => item.id === uploadBody.document?.id);
     assert.ok(visible, "Uploaded CV must be visible in the authenticated list");
-    assert.equal(visible.status, "ANALYSE_OK");
-    assert.ok(visible.analysis);
+    assert.equal(visible.status, "A_ANALYSER");
+    assert.equal(visible.analysis, null);
     assert.ok(visible.matching);
     assert.ok(listBody.folders.includes(persisted.folderPath));
 
@@ -181,17 +179,34 @@ async function main() {
       select: { details: true },
     });
     assert.ok(audit, "CV import must produce an audit entry");
-    assert.equal((audit.details as Record<string, unknown>).analysisGenerated, true);
+    assert.equal((audit.details as Record<string, unknown>).analysisGenerated, false);
 
-    // Simulate one of the legacy failed records and verify OWNER can reprocess it locally.
-    await prisma.cvIntake.update({
-      where: { id: persisted.id },
-      data: {
-        status: "NON_ANALYSE",
-        analysis: { sourceFactsOnly: true, error: "synthetic legacy provider failure" },
-        analyzedAt: null,
-      },
+    // A manual retry before consent must skip extraction altogether.
+    const pendingRetryResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/reprocess`, {
+      method: "POST",
+      headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [persisted.id] }),
     });
+    assert.equal(pendingRetryResponse.status, 200);
+    const pendingRetryBody = await pendingRetryResponse.json() as { ok: boolean; results: Array<{ id: string; status: string }> };
+    assert.equal(pendingRetryBody.ok, true);
+    assert.equal(pendingRetryBody.results[0]?.status, "SKIPPED_CONSENT_PENDING");
+    const stillPending = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
+    assert.equal(stillPending?.status, "A_ANALYSER");
+    assert.equal(stillPending?.analysis, null, "Pending consent retry must not extract or store CV data");
+
+    const inviteBeforeConsent = await fetch(`${BASE_URL}/api/owner/cv-intake/invite`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ intakeId: persisted.id }) });
+    assert.equal(inviteBeforeConsent.status, 409, "Candidate invitation must be blocked before consent authorization");
+    const provisionalBeforeConsent = await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + persisted.id } } });
+    assert.equal(provisionalBeforeConsent, null, "Pending-consent CV must not create a sourced candidate");
+
+    const consentResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "AUTHORIZED", evidence: "E2E synthetic consent evidence verified by Owner" }) });
+    assert.equal(consentResponse.status, 200, `OWNER consent authorization failed: ${(await consentResponse.clone().text()).slice(0, 500)}`);
+    const authorizedPendingIntake = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
+    assert.equal((((authorizedPendingIntake?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "AUTHORIZED");
+    assert.equal(await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + persisted.id } } }), null, "Authorization alone must not create a candidate projection before analysis");
+
+    // Analysis and matching are now permitted; keep the operation local and preserve original bytes.
     const retryResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/reprocess`, {
       method: "POST",
       headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" },
@@ -204,27 +219,14 @@ async function main() {
     assert.equal(retryBody.originalFilesModified, false);
     assert.equal(retryBody.results[0]?.status, "ANALYSE_OK");
     const retried = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
-    assert.ok(retried?.analyzedAt, "Successful reprocessing must set analyzedAt");
+    assert.ok(retried?.analyzedAt, "Successful authorized reprocessing must set analyzedAt");
     assert.equal(retried?.originalSha256, sha256, "Reprocessing must preserve the original file hash");
     assert.equal(retried?.status, "ANALYSE_OK");
+    const authorizedAnalysis = retried?.analysis as Record<string, unknown>;
+    assert.equal(authorizedAnalysis.sourceFactsOnly, true);
 
-    // A CV with no verified consent must not be added to the sourcing/matching pool.
-    assert.equal(((retried?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status, "PENDING");
-    const provisionalBeforeConsent = await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + persisted.id } } });
-    assert.equal(provisionalBeforeConsent, null, "Pending-consent CV must not create a sourced candidate");
-    const inviteBeforeConsent = await fetch(`${BASE_URL}/api/owner/cv-intake/invite`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ intakeId: persisted.id }) });
-    assert.equal(inviteBeforeConsent.status, 409, "Candidate invitation must be blocked before consent authorization");
-
-    const previousAnalysis = (retried?.analysis || {}) as Record<string, unknown>;
-    const safeAnalysis = { ...previousAnalysis, skills: Array.isArray(previousAnalysis.skills) ? previousAnalysis.skills : ["TypeScript"], subCategoryCodes: Array.isArray(previousAnalysis.subCategoryCodes) ? previousAnalysis.subCategoryCodes : [], primaryCategoryCode: previousAnalysis.primaryCategoryCode ?? null };
-    await prisma.cvIntake.update({ where: { id: persisted.id }, data: { analysis: safeAnalysis } });
-    const consentResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "AUTHORIZED", evidence: "E2E synthetic consent evidence verified by Owner" }) });
-    assert.equal(consentResponse.status, 200, `OWNER consent authorization failed: ${(await consentResponse.clone().text()).slice(0, 500)}`);
-    const authorizedIntake = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
-    assert.equal((((authorizedIntake?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "AUTHORIZED");
-    assert.ok((((authorizedIntake?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.verifiedAt));
     const provisionalAfterConsent = await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + persisted.id } } });
-    assert.ok(provisionalAfterConsent, "Authorized CV must create one provisional sourced candidate");
+    assert.ok(provisionalAfterConsent, "Authorized and analyzed CV must create one provisional sourced candidate");
     assert.equal(provisionalAfterConsent.consentStatus, "AUTHORIZED");
     assert.equal(provisionalAfterConsent.status, "DETECTED");
 
