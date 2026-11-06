@@ -374,6 +374,7 @@ export default function RealCvRegistryPage() {
     setProcessingAll(true);
     setMessage("");
     let processed = 0;
+    let skippedConsent = 0;
     let failed = 0;
     try {
       for (let offset = 0; offset < ids.length; offset += 20) {
@@ -391,11 +392,12 @@ export default function RealCvRegistryPage() {
         }
         for (const result of data.results || []) {
           if (result.status === "ANALYSE_OK" || result.status === "SKIPPED_ALREADY_ANALYZED") processed += 1;
+          else if (result.status === "SKIPPED_CONSENT_PENDING") skippedConsent += 1;
           else failed += 1;
         }
       }
       setSelectedIds([]);
-      setMessage(`Traitement terminé : ${processed} CV traité(s) ou déjà à jour, ${failed} échec(s). Les originaux sont conservés.`);
+      setMessage(`Traitement terminé : ${processed} CV traité(s) ou déjà à jour, ${skippedConsent} en attente d’autorisation OWNER (non analysé(s)), ${failed} échec(s). Les originaux sont conservés.`);
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Le traitement collectif a échoué.");
