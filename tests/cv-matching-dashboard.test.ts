@@ -16,6 +16,20 @@ test("matching dashboard loads ranked proposals automatically in both directions
   assert.match(page, /Mise en relation|Proposer anonymisé|Proposer complètement/);
 });
 
+test("matching recalculation evaluates candidate-job pairs and audits the actual result", () => {
+  const start = route.indexOf('if (parsed.data.action === "recalculate")');
+  const end = route.indexOf('return NextResponse.json({ error: "Action non prise en charge."', start);
+  assert.ok(start >= 0 && end > start, "recalculation action block must exist");
+  const block = route.slice(start, end);
+  assert.match(block, /matchCandidateToJob\(/);
+  assert.match(block, /for \(const candidate of candidates\)/);
+  assert.match(block, /for \(const job of jobs\)/);
+  assert.match(block, /evaluatedPairs/);
+  assert.match(block, /action: "CV_MATCHING_RECALCULATED"/);
+  assert.match(block, /auditLog\.create/);
+  assert.match(block, /success: false/);
+  assert.match(block, /truncated/);
+});
 test("matching suggestions use anonymous labels rather than exposing names or email addresses", () => {
   assert.match(route, /candidateAlias\(candidate\.id\)/);
   assert.match(route, /companyAlias\(job\.companyId\)/);
@@ -26,7 +40,9 @@ test("matching suggestions use anonymous labels rather than exposing names or em
 test("confidential presentation is explicitly requested, permission-gated, re-scored and audited", () => {
   assert.match(route, /connectMatchmakingSchema|presentationSchema/);
   assert.match(route, /action: z\.literal\("(connect_matchmaking|present)"\)/);
-  assert.match(route, /"PRESENTATIONS_MANAGE"/);
+  assert.match(route, /const canPresent = access\.role === "OWNER"/);
+  assert.match(route, /if \(access\.role !== "OWNER"\)/);
+  assert.doesNotMatch(route, /PRESENTATIONS_MANAGE/);
   assert.match(route, /match\.score < 25/);
   assert.match(route, /tx\.missionPresentation\.create/);
   assert.match(route, /anonymousMessagingEnabled: true/);
