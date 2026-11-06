@@ -183,6 +183,10 @@ model CvIntake {
   analyzedAt        DateTime?
   status            String          @default("A_ANALYSER")
   candidateId       String?
+  consentStatus     String          @default("PENDING")
+  consentEvidence   String?
+  consentVerifiedAt DateTime?
+  consentVerifiedByUserId String?
   candidate         CandidateProfile? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
@@ -190,6 +194,7 @@ model CvIntake {
   @@index([folderPath])
   @@index([candidateId])
   @@index([status, createdAt])
+  @@index([consentStatus, status, createdAt])
   @@index([originalSha256])
 }
 
