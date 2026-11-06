@@ -70,7 +70,8 @@ async function requireMatchingAccess() {
   const role = typeof active?.user?.role === "string" ? active.user.role : undefined;
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role ?? "")) return null;
   if (!role || !(await hasPermission(userId, role, "CV_MATCHING"))) return null;
-  return { userId, role };
+  const canViewCandidateDocuments = role === "OWNER" || await hasPermission(userId, role, "DOCUMENTS_VIEW");
+  return { userId, role, canViewCandidateDocuments };
 }
 
 export async function GET(request: Request) {
@@ -103,6 +104,7 @@ export async function GET(request: Request) {
           country: true,
           subCategoryIds: true,
           primaryCategory: { select: { code: true } },
+          documents: { where: { docType: "CV" }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true, name: true } },
         },
       }),
       prisma.job.findMany({
@@ -167,6 +169,8 @@ export async function GET(request: Request) {
 
     const ranked: Array<{
       candidateId: string;
+      candidateCvDocumentId: string | null;
+      candidateCvDocumentName: string | null;
       candidateAlias: string;
       candidateHeadline: string | null;
       candidateLocation: string | null;
@@ -224,6 +228,8 @@ export async function GET(request: Request) {
         const presentation = application?.presentations[0];
         ranked.push({
           candidateId: candidate.id,
+          candidateCvDocumentId: access.canViewCandidateDocuments ? candidate.documents[0]?.id ?? null : null,
+          candidateCvDocumentName: access.canViewCandidateDocuments ? candidate.documents[0]?.name ?? null : null,
           candidateAlias: candidateAlias(candidate.id),
           candidateHeadline: candidate.headline,
           candidateLocation: candidate.location,
@@ -317,7 +323,10 @@ export async function GET(request: Request) {
     const [candidates, totalActiveCandidates] = await Promise.all([
       prisma.candidateProfile.findMany({
         where: { status: "ACTIVE" },
-        include: { primaryCategory: { select: { code: true } } },
+        include: {
+          primaryCategory: { select: { code: true } },
+          documents: { where: { docType: "CV" }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true, name: true } },
+        },
         orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
         take: 500,
       }),
@@ -366,6 +375,8 @@ export async function GET(request: Request) {
         );
         return {
           candidateId: candidate.id,
+          candidateCvDocumentId: access.canViewCandidateDocuments ? candidate.documents[0]?.id ?? null : null,
+          candidateCvDocumentName: access.canViewCandidateDocuments ? candidate.documents[0]?.name ?? null : null,
           candidateAlias: candidateAlias(candidate.id),
           headline: candidate.headline,
           location: candidate.location,
@@ -411,7 +422,10 @@ export async function GET(request: Request) {
 
   const candidate = await prisma.candidateProfile.findUnique({
     where: { id: candidateId },
-    include: { primaryCategory: { select: { code: true } } },
+    include: {
+      primaryCategory: { select: { code: true } },
+      documents: { where: { docType: "CV" }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true, name: true } },
+    },
   });
   if (!candidate) return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
 
@@ -500,6 +514,8 @@ export async function GET(request: Request) {
       experienceYears: candidate.experienceYears,
       primaryCategoryCode: candidate.primaryCategory?.code ?? null,
       subCategoryCodes,
+      cvDocumentId: access.canViewCandidateDocuments ? candidate.documents[0]?.id ?? null : null,
+      cvDocumentName: access.canViewCandidateDocuments ? candidate.documents[0]?.name ?? null : null,
     },
     matches,
     offersEvaluated: jobs.length,
