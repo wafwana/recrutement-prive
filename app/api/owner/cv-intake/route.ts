@@ -152,11 +152,6 @@ export async function POST(request: Request) {
       : null) || [analysis?.firstName, analysis?.lastName].filter(Boolean).join(" ").trim() || null;
     // Import is deliberately provisional: no account, candidate profile, invitation or company sharing is created here.
     // A direct candidate link must be performed separately after explicit Owner verification.
-    const requestedCandidateId = typeof formData.get("candidateId") === "string" ? String(formData.get("candidateId")).trim() || null : null;
-    if (requestedCandidateId) {
-      const candidateExists = await prisma.candidateProfile.findUnique({ where: { id: requestedCandidateId }, select: { id: true } });
-      if (!candidateExists) return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
-    }
     const candidateInviteSent = false;
     const candidateId = null;
     const year = new Date().getFullYear();
