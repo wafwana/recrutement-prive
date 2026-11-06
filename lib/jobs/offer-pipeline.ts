@@ -38,7 +38,7 @@ export async function qualifyAndMatchExternalOffer(
   // Idempotency check: if offer is already processed and force is not true, skip
   if (
     !options?.force &&
-    ["QUALIFIED", "MATCHING", "INTEGRATED_DRAFT", "CONTACTED", "FILLED", "ARCHIVED", "REJECTED"].includes(offer.status)
+    ["QUALIFIED", "MATCHING", "CONTACTED", "FILLED", "ARCHIVED", "REJECTED"].includes(offer.status)
   ) {
     const existingRaw = offer.rawData && typeof offer.rawData === "object" && !Array.isArray(offer.rawData)
       ? (offer.rawData as Record<string, unknown>)
@@ -253,7 +253,7 @@ export async function qualifyAndMatchExternalOffer(
       take: 250,
     }),
     prisma.sourcedCandidate.findMany({
-      where: { status: { not: "REJECTED" } },
+      where: { status: { not: "REJECTED" }, OR: [{ source: { not: "PLATFORM_CV_INTAKE" } }, { consentStatus: "AUTHORIZED" }] },
       take: 250,
     }),
   ]);
