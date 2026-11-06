@@ -26,10 +26,12 @@ export async function POST(request: Request) {
 
     const intake = await prisma.cvIntake.findUnique({
       where: { id: intakeId },
-      select: { id: true, candidateId: true, candidateEmail: true, candidateName: true, consentStatus: true, consentVerifiedAt: true, analysis: true, fileData: true, mimeType: true, name: true, folderPath: true, analyzedAt: true },
+      select: { id: true, candidateId: true, candidateEmail: true, candidateName: true, matching: true, analysis: true, fileData: true, mimeType: true, name: true, folderPath: true, analyzedAt: true },
     });
     if (!intake) return NextResponse.json({ error: "CV introuvable." }, { status: 404 });
-    if (intake.consentStatus !== "AUTHORIZED") return NextResponse.json({ error: "L’autorisation d’exploitation doit être validée par l’OWNER avant toute invitation." }, { status: 409 });
+    const intakeMatching = asRecord(intake.matching);
+    const consent = asRecord(intakeMatching.consent);
+    if (consent.status !== "AUTHORIZED") return NextResponse.json({ error: "L’autorisation d’exploitation doit être validée par l’OWNER avant toute invitation." }, { status: 409 });
 
     const email = intake.candidateEmail?.trim().toLowerCase();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "Aucune adresse e-mail valide n’est associée à ce CV." }, { status: 400 });
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
           experienceYears: typeof analysis.experienceYears === "number" && Number.isFinite(analysis.experienceYears) ? Math.max(0, Math.min(60, Math.trunc(analysis.experienceYears))) : null,
           primaryCategoryId: primaryCategory?.id || null,
           subCategoryIds: subCategories.map((item) => item.id),
-          preferences: { source: "CV_INTAKE_OWNER_APPROVED", consentStatus: "AUTHORIZED", consentVerifiedAt: intake.consentVerifiedAt?.toISOString() || null, importedAt: new Date().toISOString() },
+          preferences: { source: "CV_INTAKE_OWNER_APPROVED", consentStatus: "AUTHORIZED", consentVerifiedAt: typeof consent.verifiedAt === "string" ? consent.verifiedAt : null, importedAt: new Date().toISOString() },
         },
         select: { id: true },
       });
