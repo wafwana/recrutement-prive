@@ -40,13 +40,16 @@ export async function GET(request: Request) {
       originalSha256: true, senderUserId: true, senderRole: true, senderEmail: true,
       candidateName: true, candidateEmail: true, docType: true, folderPath: true,
       analysis: true, matching: true, analyzedAt: true, status: true, candidateId: true,
-      consentStatus: true, consentEvidence: true, consentVerifiedAt: true, consentVerifiedByUserId: true,
       createdAt: true, updatedAt: true,
       candidate: { select: { id: true, preferences: true, user: { select: { name: true, email: true } } } },
     },
   });
   return NextResponse.json({
-    documents: items,
+    documents: items.map((item) => {
+      const matching = item.matching && typeof item.matching === "object" && !Array.isArray(item.matching) ? item.matching as Record<string, unknown> : {};
+      const consent = matching.consent && typeof matching.consent === "object" && !Array.isArray(matching.consent) ? matching.consent as Record<string, unknown> : {};
+      return { ...item, consentStatus: typeof consent.status === "string" ? consent.status : "PENDING", consentEvidence: typeof consent.evidence === "string" ? consent.evidence : null, consentVerifiedAt: typeof consent.verifiedAt === "string" ? consent.verifiedAt : null };
+    }),
     folders: [...new Set(items.map((item) => item.folderPath))].sort(),
     canManageConsent: session?.user?.role === "OWNER",
   });
@@ -157,7 +160,7 @@ export async function POST(request: Request) {
         matching: { suggestedMatches, generatedAt: new Date().toISOString() },
         analyzedAt: analysis ? new Date() : null,
         status: analysis ? "ANALYSE_OK" : "A_ANALYSER",
-        consentStatus: "PENDING",
+        matching: { suggestedMatches, generatedAt: new Date().toISOString(), consent: { status: "PENDING", evidence: null, verifiedAt: null, verifiedByUserId: null } },
       },
       select: { id: true, name: true, folderPath: true, analyzedAt: true, createdAt: true },
     });
