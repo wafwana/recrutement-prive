@@ -61,6 +61,17 @@ export async function POST(request: Request) {
     const previousMatching = record.matching && typeof record.matching === "object"
       ? record.matching as Record<string, unknown>
       : {};
+    const consent = previousMatching.consent && typeof previousMatching.consent === "object" && !Array.isArray(previousMatching.consent)
+      ? previousMatching.consent as Record<string, unknown>
+      : {};
+    if (consent.status !== "AUTHORIZED") {
+      results.push({
+        id: record.id,
+        status: "SKIPPED_CONSENT_PENDING",
+        reason: "Analyse bloquée : autorisation d’exploitation non validée par l’OWNER.",
+      });
+      continue;
+    }
     const hasMatchingResult = typeof previousMatching.generatedAt === "string" && previousMatching.generatedAt.length > 0;
     if (record.status === "ANALYSE_OK" && !previousAnalysis.error && hasMatchingResult) {
       results.push({ id: record.id, status: "SKIPPED_ALREADY_ANALYZED" });
@@ -105,12 +116,7 @@ export async function POST(request: Request) {
           analyzedAt: new Date(),
         },
       });
-      const consent = previousMatching.consent && typeof previousMatching.consent === "object" && !Array.isArray(previousMatching.consent)
-        ? previousMatching.consent as Record<string, unknown>
-        : {};
-      if (consent.status === "AUTHORIZED") {
-        await ingestAnalyzedCvIntakes(userId, 1, [record.id]);
-      }
+      await ingestAnalyzedCvIntakes(userId, 1, [record.id]);
       await prisma.auditLog.create({
         data: {
           actorUserId: userId,
