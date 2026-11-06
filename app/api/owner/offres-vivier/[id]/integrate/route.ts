@@ -70,7 +70,11 @@ export async function POST(_request: Request, { params }: RouteParams) {
       const currentIntegration = asRecord(currentRaw.integration);
       if (typeof currentIntegration.jobId === "string") throw new Error("ALREADY_INTEGRATED");
 
-      const company = await tx.company.create({
+      const existingCompany = await tx.company.findFirst({
+        where: { name: companyName, country: offer.country || null, sourceType: "EXTERNAL_OFFER", status: "SUSPENDED" },
+        select: { id: true },
+      });
+      const company = existingCompany || await tx.company.create({
         data: {
           name: companyName,
           country: offer.country || null,
