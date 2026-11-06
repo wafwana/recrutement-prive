@@ -1,37 +1,16 @@
 import { NextResponse } from "next/server";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { analyzeCvDocument, analyzeCvDocumentLocally } from "@/lib/cv/analyzer";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
-import { buildCandidateFolder, buildCandidateFolderFromAnalysis, resolveCvTaxonomySelection } from "@/lib/cv/folders";
-import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
+import { buildCandidateFolder } from "@/lib/cv/folders";
 import { hasPermission } from "@/lib/auth/permissions";
-import { hashToken } from "@/lib/password-crypto";
-import { sendEmail } from "@/lib/email/service";
-import { getAppBaseUrl } from "@/lib/url";
-import { sanitizePostgresJson } from "@/lib/security/sanitize-postgres-json";
 
 const CV_INTAKE_ALLOWED_TYPES = new Set([
   ...Array.from(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg"]),
   "text/plain",
   "text/markdown",
 ]);
-
-function scoreJob(analysis: Awaited<ReturnType<typeof analyzeCvDocument>>, job: { id: string; title: string; requiredSkills: unknown; requiredExperienceYears: number | null; jobCategoryId: string | null; subCategoryId: string | null }) {
-  if (!analysis) return 0;
-  const candidateSkills = new Set(analysis.skills.map((skill) => skill.toLowerCase()));
-  const required = Array.isArray(job.requiredSkills) ? job.requiredSkills.filter((v): v is string => typeof v === "string") : [];
-  const skillHits = required.filter((skill) => [...candidateSkills].some((candidate) => candidate.includes(skill.toLowerCase()) || skill.toLowerCase().includes(candidate))).length;
-  const skillScore = required.length ? Math.round((skillHits / required.length) * 60) : 0;
-  const experienceScore = job.requiredExperienceYears == null || analysis.experienceYears == null
-    ? 0
-    : analysis.experienceYears >= job.requiredExperienceYears ? 25 : Math.max(0, Math.round((analysis.experienceYears / Math.max(1, job.requiredExperienceYears)) * 25));
-  const titleScore = analysis.headline && job.title
-    ? analysis.headline.toLowerCase().split(/\W+/).filter(Boolean).some((word) => job.title.toLowerCase().includes(word)) ? 15 : 0
-    : 0;
-  return Math.min(100, skillScore + experienceScore + titleScore);
-}
 
 export async function GET(request: Request) {
   const session = getActiveSessionContext() || (await auth());
@@ -40,6 +19,7 @@ export async function GET(request: Request) {
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(session?.user?.role || "")) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   if (!(await hasPermission(userId, session?.user?.role || undefined, "CV_INTAKE"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
 
+  const canManageConsent = await hasPermission(userId, session?.user?.role || undefined, "CV_INTAKE");
   const q = new URL(request.url).searchParams.get("q")?.trim().toLowerCase();
   const items = await prisma.cvIntake.findMany({
     where: q ? {
@@ -63,8 +43,15 @@ export async function GET(request: Request) {
     },
   });
   return NextResponse.json({
-    documents: items,
+    documents: items.map((item) => {
+      const matching = item.matching && typeof item.matching === "object" && !Array.isArray(item.matching) ? item.matching as Record<string, unknown> : {};
+      const consent = matching.consent && typeof matching.consent === "object" && !Array.isArray(matching.consent) ? matching.consent as Record<string, unknown> : {};
+      return { ...item, consentStatus: typeof consent.status === "string" ? consent.status : "PENDING", consentEvidence: typeof consent.evidence === "string" ? consent.evidence : null, consentVerifiedAt: typeof consent.verifiedAt === "string" ? consent.verifiedAt : null, invitationStatus: typeof matching.invitationStatus === "string" ? matching.invitationStatus : null, invitationSentAt: typeof matching.invitationSentAt === "string" ? matching.invitationSentAt : null };
+    }),
     folders: [...new Set(items.map((item) => item.folderPath))].sort(),
+    canManageConsent,
+    canInviteCandidates: session?.user?.role === "OWNER",
+    canReprocess: session?.user?.role === "OWNER",
   });
 }
 
@@ -72,11 +59,11 @@ export async function POST(request: Request) {
   const session = getActiveSessionContext() || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const userEmail = typeof session?.user?.email === "string" ? session.user.email : "";
-  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(session?.user?.role || "")) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  const userRole = typeof session?.user?.role === "string" ? session.user.role : "";
+  if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(userRole)) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   if (!(await hasPermission(userId, session?.user?.role || undefined, "CV_INTAKE"))) return NextResponse.json({ error: "Permission d’import CV non accordée par l’Owner." }, { status: 403 });
 
   try {
-    await ensureTaxonomySynced();
     const formData = await request.formData();
     const file = formData.get("file");
     if (!file || typeof file === "string") return NextResponse.json({ error: "Aucun CV fourni." }, { status: 400 });
@@ -90,174 +77,18 @@ export async function POST(request: Request) {
     const duplicate = await prisma.cvIntake.findFirst({ where: { originalSha256: sha256 }, select: { id: true, name: true, folderPath: true } });
     if (duplicate) return NextResponse.json({ error: "Ce CV original est déjà répertorié.", duplicateId: duplicate.id, name: duplicate.name, originalSha256: sha256, folderPath: duplicate.folderPath }, { status: 409 });
 
-    const taxonomy = await prisma.jobCategory.findMany({
-      where: { isActive: true },
-      orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
-      select: { id: true, code: true, name: true, parentId: true },
-    });
-    const taxonomyItems = taxonomy.map((item) => ({
-      code: item.code,
-      name: typeof item.name === "object" && item.name !== null && "fr" in item.name ? String((item.name as Record<string, unknown>).fr || item.code) : typeof item.name === "string" ? item.name : item.code,
-      parentCode: taxonomy.find((parent) => parent.id === item.parentId)?.code || null,
-    }));
-
-    let analysis: Awaited<ReturnType<typeof analyzeCvDocument>> = null;
-    let analysisError: string | null = null;
-    try {
-      analysis = await analyzeCvDocument({
-        fileName: safeFileName,
-        mimeType: file.type || "application/octet-stream",
-        buffer,
-        taxonomy: taxonomyItems,
-      });
-    } catch (error) {
-      // L'intégration du CV ne doit jamais échouer uniquement parce que
-      // l'analyse IA est momentanément indisponible ou rejette le format.
-      analysisError = error instanceof Error ? error.message : "Erreur d'analyse IA";
-      console.error("[owner cv analysis]", error);
-      // Provider failure must not leave a CV unprocessed when local text extraction works.
-      try {
-        analysis = await analyzeCvDocumentLocally({
-          fileName: safeFileName,
-          mimeType: file.type || "application/octet-stream",
-          buffer,
-          taxonomy: taxonomyItems,
-        });
-      } catch {
-        analysis = null;
-      }
-    }
-
-    // Extractors may return U+0000 from binary-heavy or malformed documents.
-    // Preserve the original fileData bytes, but sanitize all parsed fields before DB/JSON persistence.
-    analysis = sanitizePostgresJson(analysis);
-
-    const jobs = await prisma.job.findMany({
-      where: { status: "OPEN" },
-      take: 500,
-      select: { id: true, title: true, requiredSkills: true, requiredExperienceYears: true, jobCategoryId: true, subCategoryId: true },
-    });
-    const suggestedMatches = jobs
-      .map((job) => ({ jobId: job.id, title: job.title, score: scoreJob(analysis, job), categoryId: job.jobCategoryId, subCategoryId: job.subCategoryId }))
-      .filter((item) => item.score >= 25)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 20);
-
-    const taxonomySelection = resolveCvTaxonomySelection(analysis, taxonomyItems);
-
-    const extractedEmail = analysis?.email || null;
-    const candidateEmail = (typeof formData.get("candidateEmail") === "string"
+    // Do not parse, classify or match a CV before the OWNER verifies the authorization.
+    const suggestedMatches: Array<{ jobId: string; title: string; score: number }> = [];
+    const candidateEmail = typeof formData.get("candidateEmail") === "string"
       ? String(formData.get("candidateEmail")).replace(/\u0000/g, "").trim().toLowerCase() || null
-      : null) || extractedEmail;
-    const candidateName = (typeof formData.get("candidateName") === "string"
+      : null;
+    const candidateName = typeof formData.get("candidateName") === "string"
       ? String(formData.get("candidateName")).replace(/\u0000/g, "").trim() || null
-      : null) || [analysis?.firstName, analysis?.lastName].filter(Boolean).join(" ").trim() || null;
-    const bulkImport = formData.get("bulkImport") === "true";
-    const requestedCandidateId = typeof formData.get("candidateId") === "string" ? String(formData.get("candidateId")).trim() || null : null;
-    let candidate = bulkImport ? null : requestedCandidateId
-      ? await prisma.candidateProfile.findUnique({ where: { id: requestedCandidateId }, select: { id: true, preferences: true } })
-      : candidateEmail
-        ? await prisma.candidateProfile.findFirst({ where: { user: { email: { equals: candidateEmail, mode: "insensitive" } } }, select: { id: true, preferences: true } })
-        : null;
+      : null;
+    const candidateInviteSent = false;
+    const candidateId = null;
+    const suggestedFolder = buildCandidateFolder({ year: new Date().getFullYear(), documentKind: "CV" });
 
-    if (!bulkImport && requestedCandidateId && !candidate) {
-      return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
-    }
-
-    let candidateInviteSent = false;
-    if (!bulkImport && !candidate && candidateEmail && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(candidateEmail)) {
-      let user = await prisma.user.findUnique({
-        where: { email: candidateEmail },
-        select: { id: true, name: true, passwordHash: true, role: true, candidat: { select: { id: true, preferences: true } } },
-      });
-
-      if (!user) {
-        user = await prisma.user.create({
-          data: { name: candidateName, email: candidateEmail, role: "CANDIDAT" },
-          select: { id: true, name: true, passwordHash: true, role: true, candidat: { select: { id: true, preferences: true } } },
-        });
-      }
-
-      if (user.role !== "CANDIDAT") {
-        // Never attach a manual CV to an existing non-candidate identity.
-        // Keep the CV intake record unlinked so the Owner can resolve it explicitly.
-        console.warn("[owner cv intake] existing non-candidate identity; leaving CV unlinked", {
-          candidateEmail,
-          existingRole: user.role,
-        });
-      } else if (user.candidat) {
-        candidate = user.candidat;
-      } else {
-        const primaryCategory = taxonomySelection.primaryCategoryCode
-          ? taxonomy.find((item) => item.code === taxonomySelection.primaryCategoryCode && item.parentId === null)
-          : null;
-        const subCategories = taxonomy.filter((item) => taxonomySelection.subCategoryCodes.includes(item.code));
-        candidate = await prisma.candidateProfile.create({
-          data: {
-            userId: user.id,
-            headline: analysis?.headline || null,
-            bio: analysis?.improvedSummary || analysis?.summary || null,
-            location: analysis?.location || null,
-            country: analysis?.country || null,
-            phone: analysis?.phone || null,
-            skills: analysis ? { explicit: analysis.explicitSkills, normalized: analysis.skills } : undefined,
-            experienceYears: analysis?.experienceYears ?? null,
-            primaryCategoryId: primaryCategory?.id || null,
-            subCategoryIds: subCategories.map((item) => item.id),
-            preferences: {
-              source: "MANUAL_CV_IMPORT",
-              consentStatus: user.passwordHash ? "ALREADY_REGISTERED" : "PENDING",
-              importedAt: new Date().toISOString(),
-              extractedContact: {
-                email: candidateEmail,
-                phone: analysis?.phone || null,
-                address: analysis?.address || null,
-                location: analysis?.location || null,
-                country: analysis?.country || null,
-              },
-              education: analysis?.education || [],
-              certifications: analysis?.certifications || [],
-              languages: analysis?.languages || [],
-              alternativeCategoryCodes: analysis?.alternativeCategoryCodes || [],
-              suggestedPositioning: analysis?.suggestedPositioning || [],
-              careerLevel: analysis?.careerLevel || "NON_SPECIFIE",
-              careerLevelEvidence: analysis?.careerLevelEvidence || null,
-            },
-          },
-          select: { id: true, preferences: true },
-        });
-      }
-
-      if (!user.passwordHash && user.role === "CANDIDAT") {
-        const rawToken = randomBytes(32).toString("hex");
-        const tokenHash = hashToken(rawToken);
-        await prisma.passwordResetToken.create({
-          data: { email: candidateEmail, tokenHash, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
-        });
-        const inviteUrl = `${getAppBaseUrl()}/reinitialisation-mot-de-passe?token=${rawToken}`;
-        const safeName = (candidateName || candidateEmail.split("@")[0]).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-        const delivery = await sendEmail({
-          to: candidateEmail,
-          subject: "[Recrutement Privé] Votre profil professionnel a été identifié",
-          html: `<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;padding:24px;color:#111827">
-            <h2 style="color:#0b1b2b">Recrutement Privé</h2>
-            <p>Bonjour ${safeName},</p>
-            <p>Votre profil professionnel a été identifié et analysé à partir des informations présentes dans votre CV.</p>
-            <p>Vous pouvez accepter la reprise de ce profil sur Recrutement Privé et créer votre accès en utilisant le lien sécurisé ci-dessous.</p>
-            <p><a href="${inviteUrl}" style="display:inline-block;background:#0b1b2b;color:#fff;padding:12px 18px;text-decoration:none">Valider mon profil et créer mon accès</a></p>
-            <p>Le lien est valable 7 jours. Si vous n'êtes pas concerné, vous pouvez ignorer ce message.</p>
-            <p style="font-size:12px;color:#6b7280">Recrutement Privé — contact@recrutement-prive.com</p>
-          </div>`,
-        });
-        if (delivery.ok) candidateInviteSent = true;
-        else await prisma.passwordResetToken.delete({ where: { tokenHash } }).catch(() => undefined);
-      }
-    }
-
-    const year = new Date().getFullYear();
-    const suggestedFolder = analysis
-      ? buildCandidateFolderFromAnalysis(analysis, taxonomyItems, year, "CV")
-      : buildCandidateFolder({ year, documentKind: "CV" });
 
     const record = await prisma.cvIntake.create({
       data: {
@@ -268,66 +99,44 @@ export async function POST(request: Request) {
         size: file.size,
         originalSha256: sha256,
         senderUserId: userId,
-        senderRole: "OWNER",
+        senderRole: userRole,
         senderEmail: userEmail,
         candidateName,
         candidateEmail,
-        candidateId: candidate?.id || null,
+        candidateId,
         docType: "CV",
         folderPath: suggestedFolder,
-        analysis: analysis ? { ...analysis, sourceFactsOnly: true, suggestedMatches } : { sourceFactsOnly: true, suggestedMatches },
-        matching: { suggestedMatches, generatedAt: new Date().toISOString() },
-        analyzedAt: analysis ? new Date() : null,
-        status: analysis ? "ANALYSE_OK" : "A_ANALYSER",
+        analyzedAt: null,
+        status: "A_ANALYSER",
+        matching: { suggestedMatches, generatedAt: new Date().toISOString(), consent: { status: "PENDING", evidence: null, verifiedAt: null, verifiedByUserId: null } },
       },
       select: { id: true, name: true, folderPath: true, analyzedAt: true, createdAt: true },
     });
 
-    if (candidate?.id) {
-      const existingCandidateDocument = await prisma.candidateDocument.findFirst({
-        where: { candidateId: candidate.id, name: safeFileName, docType: "CV" },
-        select: { id: true },
-      });
-
-      if (!existingCandidateDocument) {
-        await prisma.candidateDocument.create({
-          data: {
-            candidateId: candidate.id,
-            name: safeFileName,
-            fileData: buffer,
-            type: file.type || "application/octet-stream",
-            docType: "CV",
-            folderPath: suggestedFolder,
-            analysis: analysis ? { ...analysis, sourceFactsOnly: true, suggestedMatches } : { sourceFactsOnly: true, suggestedMatches },
-            analyzedAt: analysis ? new Date() : null,
-            isPrimaryCv: true,
-          },
-        });
-      }
-    }
-
     await prisma.auditLog.create({
       data: {
         actorUserId: userId,
-        actorRole: "OWNER",
+        actorRole: userRole,
         action: "CV_REAL_IMPORT",
         targetType: "CV_INTAKE",
         targetId: record.id,
         details: {
           originalName: safeFileName,
           candidateInviteSent,
-          candidateProfileLinked: Boolean(candidate?.id),
+          candidateProfileLinked: false,
+          consentStatus: "PENDING",
+          invitationSent: false,
           originalSha256: sha256,
           folderPath: suggestedFolder,
-          analysisGenerated: Boolean(analysis),
-          analysisDeferred: Boolean(analysisError),
+          analysisGenerated: false,
+          analysisDeferred: true,
           suggestedMatchCount: suggestedMatches.length,
           originalImmutable: true,
         },
       },
     });
 
-    return NextResponse.json({ ok: true, document: record, originalImmutable: true, authorRole: "OWNER", candidateId: candidate?.id || null, candidateInviteSent }, { status: 201 });
+    return NextResponse.json({ ok: true, document: record, originalImmutable: true, authorRole: userRole, candidateId, candidateInviteSent }, { status: 201 });
   } catch (error) {
     console.error("[owner cv intake]", error);
     return NextResponse.json({ error: "Erreur lors de l'intégration du CV." }, { status: 500 });

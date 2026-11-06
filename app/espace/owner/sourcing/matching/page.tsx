@@ -8,7 +8,7 @@ export default async function SourcingMatchingPage() {
   if (!session?.user?.id || !["OWNER", "ADMIN", "CONSULTANT"].includes(session.user.role || "")) redirect("/connexion");
   const fallback = session.user.role === "ADMIN" ? "/espace/admin" : session.user.role === "CONSULTANT" ? "/espace/consultant" : "/espace";
   if (!(await hasPermission(session.user.id, session.user.role, "SOURCING"))) redirect(fallback);
-  const candidates = await prisma.sourcedCandidate.findMany({ where: { matchingScore: { not: null } }, orderBy: [{ matchingScore: "desc" }], take: 100, select: { id: true, name: true, headline: true, location: true, skills: true, matchingScore: true, source: true } });
+  const candidates = await prisma.sourcedCandidate.findMany({ where: { matchingScore: { not: null }, status: { not: "REJECTED" }, OR: [{ source: { not: "PLATFORM_CV_INTAKE" } }, { consentStatus: "AUTHORIZED" }] }, orderBy: [{ matchingScore: "desc" }], take: 100, select: { id: true, name: true, headline: true, location: true, skills: true, matchingScore: true, source: true } });
   const average = candidates.length ? Math.round(candidates.reduce((sum, c) => sum + (c.matchingScore || 0), 0) / candidates.length) : null;
   return <section className="mx-auto w-[min(1280px,calc(100%-40px))] py-12 md:py-20">
     <p className="text-[10px] uppercase tracking-[0.35em] text-[#F97316]">04 · Matching</p>

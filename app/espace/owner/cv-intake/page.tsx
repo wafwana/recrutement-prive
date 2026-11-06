@@ -33,6 +33,12 @@ type Cv = {
   senderRole: string;
   candidateName: string | null;
   candidateEmail: string | null;
+  candidateId: string | null;
+  consentStatus: string;
+  consentEvidence: string | null;
+  consentVerifiedAt: string | null;
+  invitationStatus: string | null;
+  invitationSentAt: string | null;
   folderPath: string;
   analysis: Analysis | null;
   matching: { suggestedMatches?: Array<{ jobId: string; title: string; score: number }>; generatedAt?: string } | null;
@@ -64,6 +70,11 @@ async function computeSha256(file: File): Promise<string | null> {
 
 export default function RealCvRegistryPage() {
   const [items, setItems] = useState<Cv[]>([]);
+  const [canManageConsent, setCanManageConsent] = useState(false);
+  const [canInviteCandidates, setCanInviteCandidates] = useState(false);
+  const [canReprocess, setCanReprocess] = useState(false);
+  const [consentEvidenceById, setConsentEvidenceById] = useState<Record<string, string>>({});
+  const [consentBusyId, setConsentBusyId] = useState<string | null>(null);
   const [folders, setFolders] = useState<string[]>([]);
   const [folder, setFolder] = useState("");
   const [search, setSearch] = useState("");
@@ -91,6 +102,9 @@ export default function RealCvRegistryPage() {
     if (!res.ok) throw new Error(data.error || "Accès refusé.");
     setItems(data.documents || []);
     setFolders(data.folders || []);
+    setCanManageConsent(data.canManageConsent === true);
+    setCanInviteCandidates(data.canInviteCandidates === true);
+    setCanReprocess(data.canReprocess === true);
   }
 
   useEffect(() => {
@@ -109,11 +123,7 @@ export default function RealCvRegistryPage() {
       const res = await fetch("/api/owner/cv-intake", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Import impossible.");
-      setMessage(
-        data.candidateInviteSent
-          ? `CV intégré. Invitation envoyée à ${data.document.candidateEmail || candidateEmail.trim()} ; le lien expire dans 7 jours.`
-          : `CV intégré : ${data.document.name}. Aucune invitation n’a été confirmée lors de cet import. Vérifie l’adresse e-mail et utilise l’action d’invitation sur la fiche ci-dessous si le profil est lié.`
-      );
+      setMessage(`CV conservé : ${data.document.name}. Autorisation d’exploitation en attente de vérification par un utilisateur habilité. Aucun compte candidat ni invitation n’a été créé automatiquement.`);
       setFile(null);
       setCandidateName("");
       setCandidateEmail("");
@@ -277,6 +287,14 @@ export default function RealCvRegistryPage() {
   }
 
   async function inviteCandidate(cv: Cv) {
+    if (!canInviteCandidates) {
+      setMessage("La création de compte et l’invitation sont réservées à l’OWNER.");
+      return;
+    }
+    if (cv.consentStatus !== "AUTHORIZED") {
+      setMessage("L’autorisation d’exploitation doit être validée avant toute invitation.");
+      return;
+    }
     if (!cv.candidateEmail?.trim()) {
       setMessage("Aucune adresse e-mail n’est associée à ce CV. Renseigne ou corrige l’adresse avant d’inviter le candidat.");
       return;
@@ -300,7 +318,36 @@ export default function RealCvRegistryPage() {
     }
   }
 
+  async function updateConsent(cv: Cv, status: "AUTHORIZED" | "REVOKED") {
+    const evidence = (consentEvidenceById[cv.id] || "").trim();
+    if (evidence.length < 10) {
+      setMessage("Indique une référence vérifiable de l’autorisation ou de la révocation (10 caractères minimum).");
+      return;
+    }
+    setConsentBusyId(cv.id);
+    setMessage("");
+    try {
+      const response = await fetch("/api/owner/cv-intake/" + encodeURIComponent(cv.id) + "/consent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, evidence }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Mise à jour de l’autorisation impossible.");
+      setMessage(data.message || "Autorisation mise à jour.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Mise à jour de l’autorisation impossible.");
+    } finally {
+      setConsentBusyId(null);
+    }
+  }
+
   async function retryLocalAnalysis(cv: Cv) {
+    if (!canReprocess) {
+      setMessage("La réanalyse des CV est réservée à l’OWNER.");
+      return;
+    }
     setRetryingId(cv.id);
     setMessage("");
     try {
@@ -331,6 +378,10 @@ export default function RealCvRegistryPage() {
   const visible = useMemo(() => (folder ? displayedItems.filter((item) => item.folderPath === folder) : displayedItems), [displayedItems, folder]);
 
   async function processSelected() {
+    if (!canReprocess) {
+      setMessage("La réanalyse des CV est réservée à l’OWNER.");
+      return;
+    }
     const ids = selectedIds.filter((id) => activeItems.some((item) => item.id === id));
     if (!ids.length) {
       setMessage("Aucun CV en attente n’est sélectionné.");
@@ -339,6 +390,7 @@ export default function RealCvRegistryPage() {
     setProcessingAll(true);
     setMessage("");
     let processed = 0;
+    let skippedConsent = 0;
     let failed = 0;
     try {
       for (let offset = 0; offset < ids.length; offset += 20) {
@@ -356,11 +408,12 @@ export default function RealCvRegistryPage() {
         }
         for (const result of data.results || []) {
           if (result.status === "ANALYSE_OK" || result.status === "SKIPPED_ALREADY_ANALYZED") processed += 1;
+          else if (result.status === "SKIPPED_CONSENT_PENDING") skippedConsent += 1;
           else failed += 1;
         }
       }
       setSelectedIds([]);
-      setMessage(`Traitement terminé : ${processed} CV traité(s) ou déjà à jour, ${failed} échec(s). Les originaux sont conservés.`);
+      setMessage(`Traitement terminé : ${processed} CV traité(s) ou déjà à jour, ${skippedConsent} en attente d’autorisation OWNER (non analysé(s)), ${failed} échec(s). Les originaux sont conservés.`);
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Le traitement collectif a échoué.");
@@ -480,12 +533,16 @@ export default function RealCvRegistryPage() {
       </div>
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
-        <button disabled={processingAll || !activeItems.length} onClick={() => setSelectedIds(activeItems.map((item) => item.id))} className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-white/70 disabled:opacity-40">
-          Sélectionner les CV en attente ({activeItems.length})
-        </button>
-        <button disabled={processingAll || !selectedIds.length} onClick={processSelected} className="border border-[#c7a15a] px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-[#c7a15a] disabled:opacity-40">
-          {processingAll ? "Traitement…" : `Traiter les CV sélectionnés (${selectedIds.length})`}
-        </button>
+        {canReprocess ? (
+          <>
+            <button disabled={processingAll || !activeItems.length} onClick={() => setSelectedIds(activeItems.map((item) => item.id))} className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-white/70 disabled:opacity-40">
+              Sélectionner les CV en attente ({activeItems.length})
+            </button>
+            <button disabled={processingAll || !selectedIds.length} onClick={processSelected} className="border border-[#c7a15a] px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-[#c7a15a] disabled:opacity-40">
+              {processingAll ? "Traitement…" : `Traiter les CV sélectionnés (${selectedIds.length})`}
+            </button>
+          </>
+        ) : null}
         <button disabled={processingAll} onClick={() => setShowCompleted((value) => !value)} className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-white/70">
           {showCompleted ? "Masquer les CV finalisés" : "Afficher l’historique des CV finalisés"}
         </button>
@@ -525,6 +582,7 @@ export default function RealCvRegistryPage() {
                   <h2 className="text-base font-medium text-white">{cv.name}</h2>
                   <span className="bg-emerald-500/10 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-emerald-300">Original verrouillé</span>
                   <span className="bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.12em] text-white/50">{cv.status}</span>
+                  <span className={"px-2 py-1 text-[9px] uppercase tracking-[0.12em] " + (cv.consentStatus === "AUTHORIZED" ? "bg-emerald-500/10 text-emerald-300" : cv.consentStatus === "REVOKED" ? "bg-rose-500/10 text-rose-300" : "bg-amber-500/10 text-amber-300")}>Autorisation : {cv.consentStatus || "PENDING"}</span>
                 </div>
                 <p className="mt-2 text-xs font-mono text-[#c7a15a]">{cv.folderPath}</p>
                 <p className="mt-2 text-xs text-white/35">
@@ -533,16 +591,18 @@ export default function RealCvRegistryPage() {
                 <p className="mt-1 text-[10px] text-white/25">SHA-256 : {cv.originalSha256}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {cv.candidateEmail ? (
+                {canInviteCandidates && cv.candidateEmail && cv.consentStatus === "AUTHORIZED" && !["SENT", "ACCOUNT_ALREADY_ACTIVE"].includes(cv.invitationStatus || "") ? (
                   <button
                     disabled={invitingId === cv.id}
                     onClick={() => inviteCandidate(cv)}
                     className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a] disabled:opacity-40"
                   >
-                    {invitingId === cv.id ? "Envoi…" : "Inviter candidat"}
+                    {invitingId === cv.id ? "Envoi…" : cv.candidateId ? "Inviter candidat" : "Créer accès et inviter"}
                   </button>
                 ) : null}
-                {cv.status !== "ANALYSE_OK" || cv.analysis?.error ? (
+                {cv.invitationStatus === "SENT" ? <span className="text-xs text-emerald-300">Invitation envoyée {cv.invitationSentAt ? "le " + new Date(cv.invitationSentAt).toLocaleString("fr-FR") : ""}</span> : null}
+                {cv.invitationStatus === "ACCOUNT_ALREADY_ACTIVE" ? <span className="text-xs text-white/45">Compte candidat déjà actif</span> : null}
+                {canReprocess && (cv.status !== "ANALYSE_OK" || cv.analysis?.error) ? (
                   <button disabled={retryingId === cv.id} onClick={() => retryLocalAnalysis(cv)} className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a] disabled:opacity-40">
                     {retryingId === cv.id ? "Analyse locale…" : "Relancer analyse locale"}
                   </button>
@@ -552,6 +612,31 @@ export default function RealCvRegistryPage() {
                 </a>
               </div>
             </div>
+
+            {canManageConsent ? (
+              <div className="mt-5 border border-white/10 bg-[#0b0f14] p-4">
+                <p className="text-[10px] uppercase tracking-[0.16em] text-white/45">Preuve d’autorisation / révocation</p>
+                <input
+                  value={consentEvidenceById[cv.id] ?? cv.consentEvidence ?? ""}
+                  onChange={(event) => setConsentEvidenceById((current) => ({ ...current, [cv.id]: event.target.value }))}
+                  placeholder="Référence : consentement écrit, formulaire, mandat…"
+                  maxLength={500}
+                  className="mt-3 w-full border border-white/10 bg-[#111] px-3 py-2 text-xs text-white outline-none"
+                />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {cv.consentStatus !== "AUTHORIZED" ? (
+                    <button disabled={consentBusyId === cv.id} onClick={() => updateConsent(cv, "AUTHORIZED")} className="border border-emerald-500/50 px-3 py-2 text-[9px] uppercase tracking-[0.12em] text-emerald-300 disabled:opacity-40">
+                      {consentBusyId === cv.id ? "Enregistrement…" : "Valider l’autorisation"}
+                    </button>
+                  ) : (
+                    <button disabled={consentBusyId === cv.id} onClick={() => updateConsent(cv, "REVOKED")} className="border border-rose-500/50 px-3 py-2 text-[9px] uppercase tracking-[0.12em] text-rose-300 disabled:opacity-40">
+                      {consentBusyId === cv.id ? "Enregistrement…" : "Révoquer l’autorisation"}
+                    </button>
+                  )}
+                </div>
+                {cv.consentVerifiedAt ? <p className="mt-2 text-[10px] text-white/30">Dernière vérification : {new Date(cv.consentVerifiedAt).toLocaleString("fr-FR")}</p> : null}
+              </div>
+            ) : null}
 
             {cv.analysis ? (
               <div className="mt-6 grid gap-5 lg:grid-cols-2">

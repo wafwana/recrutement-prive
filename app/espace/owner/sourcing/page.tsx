@@ -38,6 +38,7 @@ export default async function OwnerSourcingPage() {
       },
     }),
     prisma.sourcedCandidate.findMany({
+      where: { status: { not: "REJECTED" }, OR: [{ source: { not: "PLATFORM_CV_INTAKE" } }, { consentStatus: "AUTHORIZED" }] },
       orderBy: { createdAt: "desc" },
       take: 100,
       select: {

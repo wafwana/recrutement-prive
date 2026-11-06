@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { hashPassword } from "@/lib/password-crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { hashPassword, hashToken } from "@/lib/password-crypto";
 import { prisma } from "@/lib/prisma";
+import { ingestAnalyzedCvIntakes } from "@/lib/sourcing/ingest";
+import { resetPassword } from "@/app/reinitialisation-mot-de-passe/actions";
 
 const AI_ENV_KEYS = ["AI_PROVIDER", "OPENAI_API_KEY", "GEMINI_API_KEY"] as const;
 const PORT = 3187;
@@ -51,10 +53,16 @@ async function main() {
   const pdfBytes = await readFile("tests/fixtures/cv/synthetic-cv.pdf");
   const sha256 = createHash("sha256").update(pdfBytes).digest("hex");
   const originalAiEnv = Object.fromEntries(AI_ENV_KEYS.map((key) => [key, process.env[key]]));
+  const emailsToClean: string[] = [];
   let ownerId: string | null = null;
+  let adminId: string | null = null;
+  let consultantId: string | null = null;
+  let candidateUserId: string | null = null;
   let child: ReturnType<typeof spawn> | null = null;
   let serverOutput = "";
   const jar = new Map<string, string>();
+  const adminJar = new Map<string, string>();
+  const consultantJar = new Map<string, string>();
 
   // Force deterministic local CV analysis and guarantee no outbound AI calls.
   for (const key of AI_ENV_KEYS) delete process.env[key];
@@ -70,6 +78,30 @@ async function main() {
       select: { id: true, email: true, name: true },
     });
     ownerId = owner.id;
+    const adminEmail = `e2e.admin.http.${suffix}@example.test`;
+    emailsToClean.push(adminEmail);
+    const admin = await prisma.user.create({
+      data: {
+        name: "Synthetic HTTP E2E Admin",
+        email: adminEmail,
+        role: "ADMIN",
+        passwordHash: await hashPassword(PASSWORD),
+      },
+      select: { id: true },
+    });
+    adminId = admin.id;
+    const consultantEmail = `e2e.consultant.http.${suffix}@example.test`;
+    emailsToClean.push(consultantEmail);
+    const consultant = await prisma.user.create({
+      data: {
+        name: "Synthetic HTTP E2E Consultant",
+        email: consultantEmail,
+        role: "CONSULTANT",
+        passwordHash: await hashPassword(PASSWORD),
+      },
+      select: { id: true },
+    });
+    consultantId = consultant.id;
 
     child = spawn(process.execPath, [
       "node_modules/next/dist/bin/next",
@@ -85,6 +117,7 @@ async function main() {
         AUTH_URL: BASE_URL,
         NEXTAUTH_URL: BASE_URL,
         MAINTENANCE_MODE: "false",
+        RESEND_API_KEY: "mock_key",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -131,9 +164,66 @@ async function main() {
     assert.equal(session?.user?.id, owner.id, "Real Auth.js session cookie must resolve the test Owner");
     assert.equal(session?.user?.role, "OWNER", "Auth.js must preserve the OWNER role in the signed session");
 
+    const adminCsrfResponse = await fetch(`${BASE_URL}/api/auth/csrf`);
+    setCookiesFromResponse(adminCsrfResponse, adminJar);
+    const adminCsrf = await adminCsrfResponse.json() as { csrfToken?: string };
+    assert.ok(adminCsrf.csrfToken);
+    const adminLoginResponse = await fetch(`${BASE_URL}/api/auth/callback/credentials`, {
+      method: "POST",
+      redirect: "manual",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": cookieHeader(adminJar),
+        "X-Auth-Return-Redirect": "1",
+      },
+      body: new URLSearchParams({
+        csrfToken: adminCsrf.csrfToken,
+        email: adminEmail,
+        password: PASSWORD,
+        callbackUrl: `${BASE_URL}/espace`,
+        json: "true",
+      }),
+    });
+    setCookiesFromResponse(adminLoginResponse, adminJar);
+    assert.ok([200, 302, 303].includes(adminLoginResponse.status));
+    const adminSessionResponse = await fetch(`${BASE_URL}/api/auth/session`, { headers: { Cookie: cookieHeader(adminJar) } });
+    const adminSession = await adminSessionResponse.json() as { user?: { id?: string; role?: string } } | null;
+    assert.equal(adminSession?.user?.id, admin.id);
+    assert.equal(adminSession?.user?.role, "ADMIN");
+    const consultantCsrfResponse = await fetch(`${BASE_URL}/api/auth/csrf`);
+    setCookiesFromResponse(consultantCsrfResponse, consultantJar);
+    const consultantCsrf = await consultantCsrfResponse.json() as { csrfToken?: string };
+    assert.ok(consultantCsrf.csrfToken);
+    const consultantLoginResponse = await fetch(`${BASE_URL}/api/auth/callback/credentials`, {
+      method: "POST",
+      redirect: "manual",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": cookieHeader(consultantJar),
+        "X-Auth-Return-Redirect": "1",
+      },
+      body: new URLSearchParams({
+        csrfToken: consultantCsrf.csrfToken,
+        email: consultantEmail,
+        password: PASSWORD,
+        callbackUrl: `${BASE_URL}/espace`,
+        json: "true",
+      }),
+    });
+    setCookiesFromResponse(consultantLoginResponse, consultantJar);
+    assert.ok([200, 302, 303].includes(consultantLoginResponse.status));
+    const consultantSessionResponse = await fetch(`${BASE_URL}/api/auth/session`, { headers: { Cookie: cookieHeader(consultantJar) } });
+    const consultantSession = await consultantSessionResponse.json() as { user?: { id?: string; role?: string } } | null;
+    assert.equal(consultantSession?.user?.id, consultant.id);
+    assert.equal(consultantSession?.user?.role, "CONSULTANT");
+
     // Upload a synthetic PDF through the real HTTP route, with the real signed session cookie.
     const formData = new FormData();
     formData.set("file", new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" }), "synthetic-cv.pdf");
+    const consentEmail = `cv-consent-e2e.${suffix}@example.test`;
+    emailsToClean.push(consentEmail);
+    formData.set("candidateName", "Synthetic CV Consent");
+    formData.set("candidateEmail", consentEmail);
     const uploadResponse = await fetch(`${BASE_URL}/api/owner/cv-intake`, {
       method: "POST",
       headers: { Cookie: cookieHeader(jar) },
@@ -146,18 +236,17 @@ async function main() {
     assert.ok(uploadBody.document?.id);
     assert.equal(uploadBody.document?.name, "synthetic-cv.pdf");
     assert.equal(uploadBody.candidateId ?? null, null, "Synthetic CV must not create or attach a candidate identity");
+    assert.equal(await prisma.user.findUnique({ where: { email: consentEmail }, select: { id: true } }), null, "Import must not create a candidate account before consent");
 
     const persisted = await prisma.cvIntake.findUnique({ where: { id: uploadBody.document.id } });
     assert.ok(persisted, "Uploaded CV must persist in the database");
     assert.equal(persisted.originalSha256, sha256);
     assert.deepEqual(Buffer.from(persisted.fileData), pdfBytes, "Stored original must match the uploaded bytes");
-    assert.equal(persisted.status, "ANALYSE_OK", "Synthetic PDF must complete deterministic local analysis");
-    assert.ok(persisted.analyzedAt);
-    assert.ok(persisted.analysis && typeof persisted.analysis === "object");
+    assert.equal(persisted.status, "A_ANALYSER", "CV must remain pending until OWNER consent");
+    assert.equal(persisted.analyzedAt, null, "Import must not analyze before consent");
+    assert.equal(persisted.analysis, null, "Import must not persist extracted candidate data before consent");
     assert.ok(persisted.matching && typeof persisted.matching === "object");
-    const analysis = persisted.analysis as Record<string, unknown>;
-    assert.equal(analysis.sourceFactsOnly, true);
-    assert.ok(Array.isArray(analysis.skills));
+    assert.equal(((persisted.matching as Record<string, unknown>).consent as Record<string, unknown>).status, "PENDING");
 
     const listResponse = await fetch(
       `${BASE_URL}/api/owner/cv-intake?q=${encodeURIComponent("synthetic-cv.pdf")}`,
@@ -167,8 +256,8 @@ async function main() {
     const listBody = await listResponse.json() as { documents: Array<{ id: string; status: string; analysis: unknown; matching: unknown }>; folders: string[] };
     const visible = listBody.documents.find((item) => item.id === uploadBody.document?.id);
     assert.ok(visible, "Uploaded CV must be visible in the authenticated list");
-    assert.equal(visible.status, "ANALYSE_OK");
-    assert.ok(visible.analysis);
+    assert.equal(visible.status, "A_ANALYSER");
+    assert.equal(visible.analysis, null);
     assert.ok(visible.matching);
     assert.ok(listBody.folders.includes(persisted.folderPath));
 
@@ -177,17 +266,64 @@ async function main() {
       select: { details: true },
     });
     assert.ok(audit, "CV import must produce an audit entry");
-    assert.equal((audit.details as Record<string, unknown>).analysisGenerated, true);
+    assert.equal((audit.details as Record<string, unknown>).analysisGenerated, false);
 
-    // Simulate one of the legacy failed records and verify OWNER can reprocess it locally.
-    await prisma.cvIntake.update({
-      where: { id: persisted.id },
-      data: {
-        status: "NON_ANALYSE",
-        analysis: { sourceFactsOnly: true, error: "synthetic legacy provider failure" },
-        analyzedAt: null,
-      },
+    // A manual retry before consent must skip extraction altogether.
+    const pendingRetryResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/reprocess`, {
+      method: "POST",
+      headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [persisted.id] }),
     });
+    assert.equal(pendingRetryResponse.status, 200);
+    const pendingRetryBody = await pendingRetryResponse.json() as { ok: boolean; results: Array<{ id: string; status: string }> };
+    assert.equal(pendingRetryBody.ok, true);
+    assert.equal(pendingRetryBody.results[0]?.status, "SKIPPED_CONSENT_PENDING");
+    const stillPending = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
+    assert.equal(stillPending?.status, "A_ANALYSER");
+    assert.equal(stillPending?.analysis, null, "Pending consent retry must not extract or store CV data");
+
+    const inviteBeforeConsent = await fetch(`${BASE_URL}/api/owner/cv-intake/invite`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ intakeId: persisted.id }) });
+    assert.equal(inviteBeforeConsent.status, 409, "Candidate invitation must be blocked before consent authorization");
+    const provisionalBeforeConsent = await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + persisted.id } } });
+    assert.equal(provisionalBeforeConsent, null, "Pending-consent CV must not create a sourced candidate");
+
+    const nonOwnerConsentResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(adminJar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "AUTHORIZED", evidence: "E2E synthetic admin authorization attempt" }) });
+    assert.equal(nonOwnerConsentResponse.status, 403, "ADMIN without CV_INTAKE permission must not authorize CV consent");
+    const missingEvidenceResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "AUTHORIZED", evidence: "   " }) });
+    assert.equal(missingEvidenceResponse.status, 400, "Consent authorization without evidence must be rejected");
+    const stillPendingAfterDeniedActions = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
+    assert.equal((((stillPendingAfterDeniedActions?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "PENDING");
+
+    for (const userId of [admin.id, consultant.id]) {
+      const permissionResponse = await fetch(`${BASE_URL}/api/owner/permissions`, {
+        method: "PUT",
+        headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, permissions: ["CV_INTAKE"], reason: "E2E CV consent delegation" }),
+      });
+      assert.equal(permissionResponse.status, 200, `OWNER must be able to grant CV_INTAKE to ${userId}`);
+    }
+    for (const delegatedJar of [adminJar, consultantJar]) {
+      const delegatedListResponse = await fetch(`${BASE_URL}/api/owner/cv-intake`, { headers: { Cookie: cookieHeader(delegatedJar) } });
+      assert.equal(delegatedListResponse.status, 200);
+      const delegatedList = await delegatedListResponse.json() as { canManageConsent: boolean; canInviteCandidates: boolean; canReprocess: boolean };
+      assert.equal(delegatedList.canManageConsent, true);
+      assert.equal(delegatedList.canInviteCandidates, false, "Delegated CV_INTAKE permission must not grant candidate invitations");
+      assert.equal(delegatedList.canReprocess, false, "Delegated CV_INTAKE permission must not grant OWNER-only CV reprocessing");
+    }
+
+    const consentResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(adminJar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "AUTHORIZED", evidence: "E2E synthetic consent evidence verified by delegated ADMIN" }) });
+    assert.equal(consentResponse.status, 200, `Authorized ADMIN consent failed: ${(await consentResponse.clone().text()).slice(0, 500)}`);
+    const authorizationAudit = await prisma.auditLog.findFirst({
+      where: { action: "CV_INTAKE_CONSENT_AUTHORIZED", targetType: "CV_INTAKE", targetId: persisted.id },
+      select: { actorUserId: true, actorRole: true },
+    });
+    assert.equal(authorizationAudit?.actorUserId, admin.id);
+    assert.equal(authorizationAudit?.actorRole, "ADMIN", "Delegated authorization must record the actual actor role");
+    const authorizedPendingIntake = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
+    assert.equal((((authorizedPendingIntake?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "AUTHORIZED");
+    assert.equal(await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + persisted.id } } }), null, "Authorization alone must not create a candidate projection before analysis");
+
+    // Analysis and matching are now permitted; keep the operation local and preserve original bytes.
     const retryResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/reprocess`, {
       method: "POST",
       headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" },
@@ -200,9 +336,132 @@ async function main() {
     assert.equal(retryBody.originalFilesModified, false);
     assert.equal(retryBody.results[0]?.status, "ANALYSE_OK");
     const retried = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
-    assert.ok(retried?.analyzedAt, "Successful reprocessing must set analyzedAt");
+    assert.ok(retried?.analyzedAt, "Successful authorized reprocessing must set analyzedAt");
     assert.equal(retried?.originalSha256, sha256, "Reprocessing must preserve the original file hash");
     assert.equal(retried?.status, "ANALYSE_OK");
+    const authorizedAnalysis = retried?.analysis as Record<string, unknown>;
+    assert.equal(authorizedAnalysis.sourceFactsOnly, true);
+
+    const provisionalAfterConsent = await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + persisted.id } } });
+    assert.ok(provisionalAfterConsent, "Authorized and analyzed CV must create one provisional sourced candidate");
+    assert.equal(provisionalAfterConsent.consentStatus, "AUTHORIZED");
+    assert.equal(provisionalAfterConsent.status, "DETECTED");
+
+    const delegatedInvite = await fetch(`${BASE_URL}/api/owner/cv-intake/invite`, { method: "POST", headers: { Cookie: cookieHeader(adminJar), "Content-Type": "application/json" }, body: JSON.stringify({ intakeId: persisted.id }) });
+    assert.equal(delegatedInvite.status, 403, "CV_INTAKE permission must not grant the OWNER-only invitation action");
+    const inviteAfterConsent = await fetch(`${BASE_URL}/api/owner/cv-intake/invite`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ intakeId: persisted.id }) });
+    assert.equal(inviteAfterConsent.status, 502, "Explicit invitation action should reach mail delivery after consent; CI has no mail provider configured");
+    const invitedUser = await prisma.user.findUnique({
+      where: { email: consentEmail },
+      select: { id: true, candidat: { select: { id: true, status: true } } },
+    });
+    candidateUserId = invitedUser?.id || null;
+    assert.ok(invitedUser?.candidat, "Candidate account/profile may be created only after the explicit Owner invitation action");
+    const derivedDocument = await prisma.candidateDocument.findFirst({
+      where: { candidateId: invitedUser.candidat.id, analysis: { path: ["sourceCvIntakeId"], equals: persisted.id } },
+      select: { id: true },
+    });
+    assert.ok(derivedDocument, "Explicit invitation action should create the derived candidate CV copy");
+
+    const pendingInvitationToken = randomBytes(32).toString("hex");
+    const pendingInvitationTokenHash = hashToken(pendingInvitationToken);
+    await prisma.passwordResetToken.create({
+      data: { email: consentEmail, tokenHash: pendingInvitationTokenHash, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+    });
+    const intakeBeforeTokenRevocation = await prisma.cvIntake.findUnique({ where: { id: persisted.id }, select: { matching: true } });
+    await prisma.cvIntake.update({
+      where: { id: persisted.id },
+      data: { matching: { ...(intakeBeforeTokenRevocation?.matching as Record<string, unknown>), invitationStatus: "SENT", invitationTokenHash: pendingInvitationTokenHash } },
+    });
+
+    await prisma.cvIntake.update({ where: { id: persisted.id }, data: { status: "NON_ANALYSE" } });
+    const [revokeResponse, raceReprocessResponse] = await Promise.all([
+      fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(consultantJar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "REVOKED", evidence: "E2E synthetic consent revocation verified by delegated Consultant" }) }),
+      fetch(`${BASE_URL}/api/owner/cv-intake/reprocess`, {
+        method: "POST",
+        headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [persisted.id] }),
+      }),
+    ]);
+    assert.equal(revokeResponse.status, 200, `Authorized CONSULTANT consent revocation failed: ${(await revokeResponse.clone().text()).slice(0, 500)}`);
+    assert.equal(raceReprocessResponse.status, 200, "Concurrent local reprocessing should resolve safely against revocation");
+    const revokedIntake = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
+    const revokedCandidate = await prisma.sourcedCandidate.findUnique({ where: { id: provisionalAfterConsent.id } });
+    const revokedProfile = await prisma.candidateProfile.findUnique({ where: { id: invitedUser.candidat.id }, select: { status: true, preferences: true } });
+    assert.equal((((revokedIntake?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "REVOKED");
+    assert.equal(revokedCandidate?.consentStatus, "REVOKED");
+    assert.equal(revokedCandidate?.status, "REJECTED", "Revoked CV must leave the active sourcing/matching pool");
+    assert.equal(revokedCandidate?.matchingScore, 0);
+    assert.deepEqual((revokedCandidate?.matchingDetails as Record<string, unknown> | null)?.matchedOffers, []);
+    assert.equal(revokedProfile?.status, "SUSPENDED", "Profile created from the import must be suspended on revocation");
+    const revocationAudit = await prisma.auditLog.findFirst({
+      where: { action: "CV_INTAKE_CONSENT_REVOKED", targetType: "CV_INTAKE", targetId: persisted.id },
+      select: { actorUserId: true, actorRole: true },
+    });
+    assert.equal(revocationAudit?.actorUserId, consultant.id);
+    assert.equal(revocationAudit?.actorRole, "CONSULTANT", "Delegated revocation must record the actual actor role");
+    assert.equal(await prisma.candidateDocument.findFirst({ where: { candidateId: invitedUser.candidat.id, analysis: { path: ["sourceCvIntakeId"], equals: persisted.id } }, select: { id: true } }), null, "Revocation must remove the derived CV copy");
+    assert.equal(await prisma.passwordResetToken.findUnique({ where: { tokenHash: pendingInvitationTokenHash }, select: { id: true } }), null, "Revocation must invalidate the pending invitation token");
+    const resetFormData = new FormData();
+    resetFormData.set("token", pendingInvitationToken);
+    resetFormData.set("password", "Synthetic-Reset-2026!");
+    const rejectedPasswordReset = await resetPassword(resetFormData);
+    assert.equal(rejectedPasswordReset.ok, false, "A revoked invitation token must not activate candidate credentials");
+    const preservedOriginal = await prisma.cvIntake.findUnique({ where: { id: persisted.id }, select: { originalSha256: true, fileData: true } });
+    assert.equal(preservedOriginal?.originalSha256, sha256);
+    assert.deepEqual(Buffer.from(preservedOriginal!.fileData), pdfBytes, "Revocation must retain the immutable original CV");
+
+    const reprocessAfterRevocation = await fetch(`${BASE_URL}/api/owner/cv-intake/reprocess`, {
+      method: "POST",
+      headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [persisted.id] }),
+    });
+    const revokedRetryBody = await reprocessAfterRevocation.json() as { results: Array<{ status: string }> };
+    assert.equal(revokedRetryBody.results[0]?.status, "SKIPPED_CONSENT_PENDING", "Reanalysis must not run after revocation");
+    const inviteAfterRevocation = await fetch(`${BASE_URL}/api/owner/cv-intake/invite`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ intakeId: persisted.id }) });
+    assert.equal(inviteAfterRevocation.status, 409, "Revocation must block future invitations");
+    const stillSuspended = await prisma.candidateProfile.findUnique({ where: { id: invitedUser.candidat.id }, select: { status: true } });
+    assert.equal(stillSuspended?.status, "SUSPENDED", "Retry attempts must not reactivate the revoked candidate profile");
+
+    const raceEmail = `cv-consent-race.${suffix}@example.test`;
+    emailsToClean.push(raceEmail);
+    const raceIntake = await prisma.cvIntake.create({
+      data: {
+        name: "synthetic-consent-race.pdf",
+        originalName: "synthetic-consent-race.pdf",
+        mimeType: "application/pdf",
+        fileData: pdfBytes,
+        size: pdfBytes.length,
+        originalSha256: sha256,
+        senderUserId: owner.id,
+        senderRole: "OWNER",
+        senderEmail: owner.email,
+        candidateName: "Synthetic Consent Race",
+        candidateEmail: raceEmail,
+        docType: "CV",
+        folderPath: "CANDIDATS/A_CLASSER/CV",
+        analysis: { skills: ["TypeScript"], subCategoryCodes: [], primaryCategoryCode: null, sourceFactsOnly: true },
+        matching: { consent: { status: "AUTHORIZED", evidence: "E2E synthetic race setup", verifiedAt: new Date().toISOString(), verifiedByUserId: owner.id } },
+        analyzedAt: new Date(),
+        status: "ANALYSE_OK",
+      },
+    });
+    const [raceSyncResult, raceRevokeResponse] = await Promise.all([
+      ingestAnalyzedCvIntakes(owner.id, 1, [raceIntake.id]),
+      fetch(`${BASE_URL}/api/owner/cv-intake/${raceIntake.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "REVOKED", evidence: "E2E synthetic concurrent revocation evidence" }) }),
+    ]);
+    assert.equal(raceRevokeResponse.status, 200);
+    const raceSourcedCandidate = await prisma.sourcedCandidate.findUnique({
+      where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + raceIntake.id } },
+      select: { consentStatus: true, status: true, matchingScore: true, matchingDetails: true },
+    });
+    const raceIntakeAfter = await prisma.cvIntake.findUnique({ where: { id: raceIntake.id }, select: { matching: true } });
+    assert.equal((((raceIntakeAfter?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "REVOKED");
+    assert.ok(!raceSourcedCandidate || (raceSourcedCandidate.consentStatus === "REVOKED" && raceSourcedCandidate.status === "REJECTED"), "A concurrent ingestion must not leave a revoked CV in the active sourcing pool");
+    if (raceSourcedCandidate) {
+      assert.equal(raceSourcedCandidate.matchingScore, 0);
+      assert.deepEqual((raceSourcedCandidate.matchingDetails as Record<string, unknown> | null)?.matchedOffers, []);
+    }
 
     // Read-only check of the OWNER outflows API against the fully migrated CI schema.
     const outflowsResponse = await fetch(`${BASE_URL}/api/owner/outflows`, {
@@ -228,8 +487,23 @@ async function main() {
         immutableOriginalAndSha256: true,
         auditTrail: true,
         ownerOutflowsReadAgainstMigratedSchema: true,
-        noCandidateIdentityCreated: true,
+        noCandidateIdentityCreatedBeforeOwnerAction: true,
+        consentRequiredBeforeSourcing: true,
+        consentRevocationExcludesFromMatching: true,
+        concurrentRevocationAndReanalysisSafe: true,
+        staffWithoutCvIntakePermissionDenied: true,
+        adminConsentAuthorizationAndAudit: true,
+        consultantConsentRevocationAndAudit: true,
+        delegatedInvitationDenied: true,
+        missingEvidenceRejected: true,
+        invitationAfterExplicitOwnerAction: true,
+        revokedDerivedDocumentRemoved: true,
+        revokedProfileSuspended: true,
+        revokedProfileNotReactivated: true,
+        revokedInvitationTokenInvalidated: true,
+        noAutomaticCandidateInvitation: true,
         noExternalAiProviderCalled: true,
+        concurrentIngestionAndRevocationSafe: true,
       },
     }, null, 2));
   } finally {
@@ -239,14 +513,29 @@ async function main() {
         select: { id: true, candidateId: true },
       }).catch(() => []);
       const ids = [...new Set(records.map((record) => record.id))];
+      await prisma.sourcedCandidate.deleteMany({ where: { source: "PLATFORM_CV_INTAKE", externalId: { in: ids.map((id) => "cv-intake:" + id) } } }).catch(() => undefined);
       if (ids.length) {
-        await prisma.auditLog.deleteMany({ where: { action: "CV_REAL_IMPORT", targetId: { in: ids } } });
+        await prisma.auditLog.deleteMany({ where: { targetType: "CV_INTAKE", targetId: { in: ids } } });
         await prisma.cvIntake.deleteMany({ where: { id: { in: ids } } });
       }
       const candidateIds = records.map((record) => record.candidateId).filter((id): id is string => Boolean(id));
       if (candidateIds.length) {
         await prisma.candidateDocument.deleteMany({ where: { candidateId: { in: candidateIds } } });
         await prisma.candidateProfile.deleteMany({ where: { id: { in: candidateIds } } });
+      }
+      if (candidateUserId) {
+        const candidate = await prisma.user.findUnique({ where: { id: candidateUserId }, select: { candidat: { select: { id: true } } } });
+        if (candidate?.candidat) {
+          await prisma.candidateDocument.deleteMany({ where: { candidateId: candidate.candidat.id } });
+          await prisma.candidateProfile.deleteMany({ where: { id: candidate.candidat.id } });
+        }
+        await prisma.user.deleteMany({ where: { id: candidateUserId } });
+      }
+      if (emailsToClean.length) await prisma.passwordResetToken.deleteMany({ where: { email: { in: emailsToClean } } });
+      for (const staffId of [adminId, consultantId].filter((id): id is string => Boolean(id))) {
+        await prisma.systemSetting.deleteMany({ where: { key: `permissions:${staffId}` } });
+        await prisma.auditLog.deleteMany({ where: { action: "UPDATE_STAFF_PERMISSIONS", targetType: "USER", targetId: staffId } });
+        await prisma.user.deleteMany({ where: { id: staffId } });
       }
       await prisma.user.deleteMany({ where: { id: ownerId } });
     }

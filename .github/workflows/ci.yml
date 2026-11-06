@@ -96,6 +96,8 @@ jobs:
       - run: npm run test:secure-contact-payments
       - name: Validate public contact form input and abuse guard
         run: node --import tsx --test tests/public-contact-validation.test.ts
+      - name: Validate CV consent authorization and revocation gate
+        run: node --import tsx --test tests/cv-intake-consent-gate.test.ts
       - name: Validate secure external offer to internal draft integration
         run: node --import tsx --test tests/external-offer-integration.test.ts
       - name: Validate OWNER manual sourcing, candidate history, accessibility and audit contract

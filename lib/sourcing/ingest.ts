@@ -137,11 +137,12 @@ async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string
   const candidate = await prisma.sourcedCandidate.findUnique({
     where: { id: candidateId },
     select: {
-      id: true, status: true, source: true, skills: true, experienceYears: true,
+      id: true, status: true, source: true, consentStatus: true, skills: true, experienceYears: true,
       headline: true, location: true, matchingDetails: true,
     },
   });
-  if (!candidate || !shouldRematchSourcedCandidate(candidate.status)) {
+  if (!candidate || !shouldRematchSourcedCandidate(candidate.status) ||
+      (candidate.source === "PLATFORM_CV_INTAKE" && candidate.consentStatus !== "AUTHORIZED")) {
     return { candidateId, evaluated: 0, matches: 0, bestScore: 0 };
   }
 
@@ -194,8 +195,10 @@ async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string
       ? candidate.matchingDetails as Record<string, unknown>
       : {};
 
-  await prisma.sourcedCandidate.update({
-    where: { id: candidate.id },
+  const updated = await prisma.sourcedCandidate.updateMany({
+    where: candidate.source === "PLATFORM_CV_INTAKE"
+      ? { id: candidate.id, consentStatus: "AUTHORIZED" }
+      : { id: candidate.id },
     data: {
       matchingScore: matches[0]?.score ?? 0,
       matchingDetails: {
@@ -212,8 +215,8 @@ async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string
   return {
     candidateId: candidate.id,
     evaluated: offers.length,
-    matches: matches.length,
-    bestScore: matches[0]?.score ?? 0,
+    matches: updated.count ? matches.length : 0,
+    bestScore: updated.count ? matches[0]?.score ?? 0 : 0,
   };
 }
 
@@ -344,15 +347,15 @@ export async function refreshProactiveCandidatePool(actorUserId: string) {
   return { mode: "PROACTIVE_TALENT_POOL", demandSignals: topDemand.length, candidatesEvaluated: candidateBatch.length, candidateSourceTotal, batchLimit: candidateBatchLimit, created, updated, internalCvIntakes: internalCvIntakeSync ? { sourceTotal: internalCvIntakeSync.sourceTotal, batchFetched: internalCvIntakeSync.batchFetched, synced: internalCvIntakeSync.synced, skipped: internalCvIntakeSync.skipped, matched: internalCvIntakeSync.matched } : { failed: true } };
 }
 
-export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20) {
+export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20, intakeIds?: string[]) {
   const take = Math.min(20, Math.max(1, Math.trunc(maxItems)));
-  const intakeWhere = { status: "ANALYSE_OK", candidateId: null };
+  const intakeWhere = { status: "ANALYSE_OK", candidateId: null, matching: { path: ["consent", "status"], equals: "AUTHORIZED" }, ...(intakeIds?.length ? { id: { in: intakeIds } } : {}) };
   const sourceTotal = await prisma.cvIntake.count({ where: intakeWhere });
   const intakes = await prisma.cvIntake.findMany({
     where: intakeWhere,
     orderBy: [{ analyzedAt: "desc" }, { createdAt: "desc" }],
     take,
-    select: { id: true, candidateName: true, analysis: true, analyzedAt: true, updatedAt: true },
+    select: { id: true, candidateName: true, analysis: true, matching: true, analyzedAt: true, updatedAt: true },
   });
 
   const candidateIds: string[] = [];
@@ -361,58 +364,111 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20
   let matched = 0;
 
   for (const intake of intakes) {
-    const analysis = intake.analysis && typeof intake.analysis === "object" && !Array.isArray(intake.analysis)
-      ? intake.analysis as Record<string, unknown>
-      : null;
-    if (!analysis || !Array.isArray(analysis.skills) || !Array.isArray(analysis.subCategoryCodes) ||
-        !Object.prototype.hasOwnProperty.call(analysis, "primaryCategoryCode")) {
+    const externalId = `cv-intake:${intake.id}`;
+    const syncedIntake = await prisma.$transaction(async (tx) => {
+      const locked = await tx.cvIntake.updateMany({
+        where: {
+          id: intake.id,
+          status: "ANALYSE_OK",
+          candidateId: null,
+          matching: { path: ["consent", "status"], equals: "AUTHORIZED" },
+        },
+        data: { updatedAt: new Date() },
+      });
+      if (!locked.count) return null;
+
+      const currentIntake = await tx.cvIntake.findUnique({
+        where: { id: intake.id },
+        select: { id: true, candidateName: true, analysis: true, matching: true, analyzedAt: true, updatedAt: true },
+      });
+      if (!currentIntake) return null;
+      const analysis = currentIntake.analysis && typeof currentIntake.analysis === "object" && !Array.isArray(currentIntake.analysis)
+        ? currentIntake.analysis as Record<string, unknown>
+        : null;
+      if (!analysis || !Array.isArray(analysis.skills) || !Array.isArray(analysis.subCategoryCodes) ||
+          !Object.prototype.hasOwnProperty.call(analysis, "primaryCategoryCode")) {
+        return { invalidAnalysis: true as const };
+      }
+
+      const existing = await tx.sourcedCandidate.findUnique({
+        where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
+        select: { id: true, status: true, consentStatus: true, matchingDetails: true },
+      });
+      const intakeMatching = currentIntake.matching && typeof currentIntake.matching === "object" && !Array.isArray(currentIntake.matching) ? currentIntake.matching as Record<string, unknown> : {};
+      const intakeConsent = intakeMatching.consent && typeof intakeMatching.consent === "object" && !Array.isArray(intakeMatching.consent) ? intakeMatching.consent as Record<string, unknown> : {};
+      const previousDetails = existing?.matchingDetails && typeof existing.matchingDetails === "object" && !Array.isArray(existing.matchingDetails) ? existing.matchingDetails as Record<string, unknown> : {};
+      const wasConsentRevoked = typeof previousDetails.consentRevokedAt === "string";
+      const finished = Boolean(existing && !wasConsentRevoked && shouldPreserveSourcedCandidateStatus(existing.status));
+      const skills = analysis.skills.filter((value): value is string => typeof value === "string");
+      const locationParts = [analysis.location, analysis.country].filter((value): value is string => typeof value === "string" && Boolean(value.trim()));
+      const data = {
+        source: "PLATFORM_CV_INTAKE",
+        consentStatus: "AUTHORIZED",
+        sourceProfileUrl: null,
+        sourceCollectedAt: currentIntake.analyzedAt || currentIntake.updatedAt,
+        name: currentIntake.candidateName || null,
+        headline: typeof analysis.headline === "string" ? analysis.headline : null,
+        location: locationParts.join(", ") || null,
+        skills: skills as unknown as Prisma.InputJsonValue,
+        experienceYears: typeof analysis.experienceYears === "number" && Number.isFinite(analysis.experienceYears)
+          ? Math.max(0, Math.min(60, Math.trunc(analysis.experienceYears)))
+          : null,
+        matchingDetails: {
+          mode: "ANALYZED_CV_INTAKE",
+          cvAnalyzed: true,
+          humanValidated: false,
+          consentStatus: "AUTHORIZED",
+          consentVerifiedAt: typeof intakeConsent.verifiedAt === "string" ? intakeConsent.verifiedAt : null,
+          consentEvidence: typeof intakeConsent.evidence === "string" ? intakeConsent.evidence : null,
+          analyzedAt: currentIntake.analyzedAt?.toISOString() || null,
+        } as unknown as Prisma.InputJsonValue,
+        notes: "CV importé en interne après vérification de l’autorisation par l’OWNER. Matching indicatif ; validation humaine obligatoire ; aucun contact automatique.",
+        createdByUserId: actorUserId,
+      };
+
+      const saved = await tx.sourcedCandidate.upsert({
+        where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
+        create: { ...data, externalId, status: "DETECTED" },
+        update: { ...data, status: finished ? existing!.status : "DETECTED", updatedAt: new Date() },
+        select: { id: true },
+      });
+      return { saved, existing, currentIntake, intakeMatching, intakeConsent, wasConsentRevoked };
+    });
+    if (!syncedIntake) {
+      skipped++;
+      continue;
+    }
+    if ("invalidAnalysis" in syncedIntake) {
       skipped++;
       continue;
     }
 
-    const externalId = `cv-intake:${intake.id}`;
-    const existing = await prisma.sourcedCandidate.findUnique({
-      where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
-      select: { id: true, status: true, matchingDetails: true },
-    });
-    const finished = Boolean(existing && shouldPreserveSourcedCandidateStatus(existing.status));
-    const skills = analysis.skills.filter((value): value is string => typeof value === "string");
-    const locationParts = [analysis.location, analysis.country].filter((value): value is string => typeof value === "string" && Boolean(value.trim()));
-    const data = {
-      source: "PLATFORM_CV_INTAKE",
-      sourceProfileUrl: null,
-      sourceCollectedAt: intake.analyzedAt || intake.updatedAt,
-      name: intake.candidateName || null,
-      headline: typeof analysis.headline === "string" ? analysis.headline : null,
-      location: locationParts.join(", ") || null,
-      skills: skills as unknown as Prisma.InputJsonValue,
-      experienceYears: typeof analysis.experienceYears === "number" && Number.isFinite(analysis.experienceYears)
-        ? Math.max(0, Math.min(60, Math.trunc(analysis.experienceYears)))
-        : null,
-      matchingDetails: {
-        mode: "ANALYZED_CV_INTAKE",
-        cvAnalyzed: true,
-        humanValidated: false,
-        analyzedAt: intake.analyzedAt?.toISOString() || null,
-      } as unknown as Prisma.InputJsonValue,
-      notes: "CV importé en interne et analysé localement. Consentement en attente ; validation humaine obligatoire ; aucun contact automatique.",
-      createdByUserId: actorUserId,
-    };
-
-    const saved = await prisma.sourcedCandidate.upsert({
-      where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId } },
-      create: { ...data, externalId, status: "DETECTED" },
-      update: { ...data, status: finished ? existing!.status : "DETECTED", updatedAt: new Date() },
-      select: { id: true },
-    });
-    candidateIds.push(saved.id);
-    if (!existing) createdCandidateIds.push(saved.id);
-    const previousDetails = existing?.matchingDetails && typeof existing.matchingDetails === "object" && !Array.isArray(existing.matchingDetails)
-      ? existing.matchingDetails as Record<string, unknown>
+    candidateIds.push(syncedIntake.saved.id);
+    if (!syncedIntake.existing) createdCandidateIds.push(syncedIntake.saved.id);
+    const currentDetails = syncedIntake.existing?.matchingDetails && typeof syncedIntake.existing.matchingDetails === "object" && !Array.isArray(syncedIntake.existing.matchingDetails)
+      ? syncedIntake.existing.matchingDetails as Record<string, unknown>
       : {};
-    if (!Array.isArray(previousDetails.matchedOffers) || typeof previousDetails.rematchedAt !== "string") {
-      const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(saved.id);
+    if (syncedIntake.wasConsentRevoked || !Array.isArray(currentDetails.matchedOffers) || typeof currentDetails.rematchedAt !== "string") {
+      const rematch = await rematchSourcedCandidateAgainstQualifiedOffers(syncedIntake.saved.id);
       matched += rematch.matches;
+      const refreshed = await prisma.sourcedCandidate.findUnique({ where: { id: syncedIntake.saved.id }, select: { matchingDetails: true } });
+      const refreshedDetails = refreshed?.matchingDetails && typeof refreshed.matchingDetails === "object" && !Array.isArray(refreshed.matchingDetails) ? refreshed.matchingDetails as Record<string, unknown> : {};
+      const matchedOffers = Array.isArray(refreshedDetails.matchedOffers) ? refreshedDetails.matchedOffers.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item)) : [];
+      await prisma.$transaction(async (tx) => {
+        const locked = await tx.cvIntake.updateMany({
+          where: { id: intake.id, matching: { path: ["consent", "status"], equals: "AUTHORIZED" } },
+          data: { updatedAt: new Date() },
+        });
+        if (!locked.count) return;
+        const latestIntake = await tx.cvIntake.findUnique({ where: { id: intake.id }, select: { matching: true } });
+        const latestMatching = latestIntake?.matching && typeof latestIntake.matching === "object" && !Array.isArray(latestIntake.matching) ? latestIntake.matching as Record<string, unknown> : {};
+        const latestConsent = latestMatching.consent && typeof latestMatching.consent === "object" && !Array.isArray(latestMatching.consent) ? latestMatching.consent as Record<string, unknown> : {};
+        if (latestConsent.status !== "AUTHORIZED") return;
+        await tx.cvIntake.update({
+          where: { id: intake.id },
+          data: { matching: ({ ...latestMatching, source: "AUTHORIZED_EXTERNAL_OFFERS", suggestedMatches: matchedOffers.slice(0, 20).map((item) => ({ jobId: typeof item.externalJobId === "string" ? item.externalJobId : "", title: typeof item.title === "string" ? item.title : "", score: typeof item.score === "number" ? item.score : 0 })), generatedAt: new Date().toISOString(), consentVerified: true } as Prisma.InputJsonValue) },
+        });
+      });
     }
   }
 

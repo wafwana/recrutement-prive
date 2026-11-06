@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
 
 type WorkspaceRole = "CANDIDAT" | "ENTREPRISE" | "CONSULTANT" | "ADMIN";
-export type WorkspaceNavigationPermission = "PLATFORM_SETTINGS" | "PARTNERS_MANAGE";
+export type WorkspaceNavigationPermission = "PLATFORM_SETTINGS" | "PARTNERS_MANAGE" | "CV_INTAKE";
 type NavItem = { href: string; labelKey: string; permission?: WorkspaceNavigationPermission };
 type WorkspaceDefinition = { titleKey: string; descriptionKey: string; links: NavItem[] };
 
@@ -37,6 +37,7 @@ const workspaces: Record<WorkspaceRole, WorkspaceDefinition> = {
       { href: "/espace/consultant", labelKey: "ws_overview" },
       { href: "/espace/consultant/candidatures", labelKey: "ws_consultant_pipeline" },
       { href: "/espace/consultant/sourcing", labelKey: "ws_consultant_sourcing" },
+      { href: "/espace/cv-intake", labelKey: "ws_cv_intake_validation", permission: "CV_INTAKE" },
       { href: "/espace/messages", labelKey: "ws_messages" },
     ],
   },
@@ -48,6 +49,7 @@ const workspaces: Record<WorkspaceRole, WorkspaceDefinition> = {
       { href: "/espace/admin/autorisations", labelKey: "ws_admin_permissions" },
       { href: "/espace/admin/configuration", labelKey: "ws_admin_configuration", permission: "PLATFORM_SETTINGS" },
       { href: "/espace/admin/partenaires", labelKey: "ws_admin_partners_sources", permission: "PARTNERS_MANAGE" },
+      { href: "/espace/cv-intake", labelKey: "ws_cv_intake_validation", permission: "CV_INTAKE" },
       { href: "/espace/messages", labelKey: "ws_messages" },
     ],
   },

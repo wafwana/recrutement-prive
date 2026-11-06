@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
-import { analyzeCvDocument, analyzeCvDocumentLocally, type CvAnalysis } from "@/lib/cv/analyzer";
+import { analyzeCvDocumentLocally, type CvAnalysis } from "@/lib/cv/analyzer";
 import { buildCandidateFolderFromAnalysis, resolveCvTaxonomySelection } from "@/lib/cv/folders";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 import { selectBatchWindow } from "@/lib/sourcing/batch-window";
+import { ingestAnalyzedCvIntakes } from "@/lib/sourcing/ingest";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -16,6 +17,10 @@ export async function GET(request: Request) {
   const candidateWhere = {
     status: "ACTIVE" as const,
     documents: { some: { docType: "CV" as const } },
+    NOT: { AND: [
+      { preferences: { path: ["source"], equals: "MANUAL_CV_IMPORT" } },
+      { preferences: { path: ["consentStatus"], not: "AUTHORIZED" } },
+    ] },
   };
   const candidateSourceTotal = await prisma.candidateProfile.count({ where: candidateWhere });
   const candidateBatchKey = "cv-rematch:candidates";
@@ -52,9 +57,10 @@ export async function GET(request: Request) {
   const externalOffers = await prisma.externalJobOpportunity.findMany({ where: { status: { not: "REJECTED" } }, orderBy: { sourceCollectedAt: "desc" }, take: 500 });
 
   const intakeQueue = await prisma.cvIntake.findMany({
-    where: { status: "A_ANALYSER" },
+    where: { status: "A_ANALYSER", matching: { path: ["consent", "status"], equals: "AUTHORIZED" } },
     orderBy: { createdAt: "asc" },
     take: 10,
+    select: { id: true, originalName: true, mimeType: true, fileData: true, createdAt: true, candidateId: true, matching: true, senderUserId: true },
   });
 
   let intakeAnalyzed = 0;
@@ -72,10 +78,12 @@ export async function GET(request: Request) {
 
   let updated = 0;
   for (const intake of intakeQueue) {
-
+    const previousMatching = intake.matching && typeof intake.matching === "object" && !Array.isArray(intake.matching)
+      ? intake.matching as Record<string, unknown>
+      : {};
 
     try {
-      const analysis = await analyzeCvDocument({
+      const analysis = await analyzeCvDocumentLocally({
         fileName: intake.originalName,
         mimeType: intake.mimeType,
         buffer: Buffer.from(intake.fileData),
@@ -86,7 +94,8 @@ export async function GET(request: Request) {
           where: { id: intake.id },
           data: {
             status: "NON_ANALYSE",
-            analysis: { error: "Aucun fournisseur IA disponible ou rejeté par règles de confidentialité." },
+            analysis: { error: "Extraction locale impossible après autorisation Owner." },
+            matching: { ...previousMatching, suggestedMatches: [], generatedAt: new Date().toISOString() },
           },
         });
         continue;
@@ -120,28 +129,7 @@ export async function GET(request: Request) {
           );
           return { jobId: job.id, title: job.title, score: result.score, matchedSkills: result.matchedSkills, missingSkills: result.missingSkills, categoryMatchLevel: result.categoryMatchLevel };
         }),
-        ...externalOffers.map((offer) => {
-          const result = matchCandidateToJob(
-            {
-              skills: analysis.skills,
-              experienceYears: analysis.experienceYears,
-              headline: analysis.headline,
-              bio: analysis.improvedSummary || analysis.summary,
-              primaryCategoryCode: analysis.primaryCategoryCode,
-              subCategoryCodes: analysis.subCategoryCodes,
-            },
-            {
-              requiredSkills: offer.skills,
-              requiredExperienceYears: offer.experienceYears,
-              title: offer.title,
-              description: offer.description,
-              location: [offer.city, offer.country].filter(Boolean).join(", ") || null,
-              categoryCode: offer.categoryCode,
-              subCategoryCode: offer.subCategoryCode,
-            },
-          );
-          return { externalJobId: offer.id, title: offer.title, score: result.score, matchedSkills: result.matchedSkills, missingSkills: result.missingSkills, categoryMatchLevel: result.categoryMatchLevel, source: offer.source };
-        }),
+
       ].filter((item) => item.score >= 25).sort((a, b) => b.score - a.score).slice(0, 20);
 
       const suggestedFolder = buildCandidateFolderFromAnalysis(
@@ -155,12 +143,16 @@ export async function GET(request: Request) {
         where: { id: intake.id },
         data: {
           analysis: { ...analysis, sourceFactsOnly: true, suggestedMatches: candidateMatches },
-          matching: { suggestedMatches: candidateMatches, generatedAt: new Date().toISOString() },
+          matching: { ...previousMatching, suggestedMatches: candidateMatches, generatedAt: new Date().toISOString() },
           analyzedAt: new Date(),
           status: "ANALYSE_OK",
           folderPath: suggestedFolder,
         },
       });
+
+      if (!intake.candidateId) {
+        await ingestAnalyzedCvIntakes(intake.senderUserId, 1, [intake.id]);
+      }
 
       if (intake.candidateId) {
         await prisma.candidateProfile.update({
@@ -212,7 +204,7 @@ export async function GET(request: Request) {
   // folder. Cursor over the stable ANALYSE_OK set so unresolved records cannot
   // starve later records; only generic folders are changed, preserving manual
   // folder assignments and the original file bytes.
-  const reclassificationWhere = { status: "ANALYSE_OK" };
+  const reclassificationWhere = { status: "ANALYSE_OK", matching: { path: ["consent", "status"], equals: "AUTHORIZED" } };
   const reclassificationTotal = await prisma.cvIntake.count({ where: reclassificationWhere });
   const reclassificationKey = "cv-intake:folder-reclassification";
   const reclassificationOffset = await readBatchOffset(reclassificationKey, reclassificationTotal);
