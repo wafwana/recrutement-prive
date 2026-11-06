@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/auth/permissions";
 import { ingestAnalyzedCvIntakes } from "@/lib/sourcing/ingest";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -14,7 +15,8 @@ export async function POST(request: Request, { params }: RouteParams) {
   const session = getActiveSessionContext() || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : null;
   const role = typeof session?.user?.role === "string" ? session.user.role : null;
-  if (!userId || role !== "OWNER") return NextResponse.json({ error: "Seul l’OWNER peut valider ou révoquer l’autorisation d’exploitation d’un CV." }, { status: 403 });
+  if (!userId || !role || !["OWNER", "ADMIN", "CONSULTANT"].includes(role)) return NextResponse.json({ error: "Accès réservé à l’OWNER, aux ADMIN et aux CONSULTANTS autorisés." }, { status: 403 });
+  if (!(await hasPermission(userId, role, "CV_INTAKE"))) return NextResponse.json({ error: "La permission CV_INTAKE doit être accordée par l’OWNER." }, { status: 403 });
 
   const { id } = await params;
   let body: unknown;
@@ -66,7 +68,7 @@ export async function POST(request: Request, { params }: RouteParams) {
           status: "REJECTED",
           matchingScore: 0,
           matchingDetails: { ...previous, matchedOffers: [], consentRevokedAt: verifiedAt.toISOString(), consentRevocationEvidence: evidence },
-          notes: "Autorisation d’exploitation révoquée par l’OWNER. Exclu du matching et du vivier actif.",
+          notes: "Autorisation d’exploitation révoquée par un utilisateur habilité. Exclu du matching et du vivier actif.",
         },
       });
     }
@@ -110,7 +112,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     await tx.auditLog.create({
       data: {
         actorUserId: userId,
-        actorRole: "OWNER",
+        actorRole: role,
         action: status === "AUTHORIZED" ? "CV_INTAKE_CONSENT_AUTHORIZED" : "CV_INTAKE_CONSENT_REVOKED",
         targetType: "CV_INTAKE",
         targetId: id,
