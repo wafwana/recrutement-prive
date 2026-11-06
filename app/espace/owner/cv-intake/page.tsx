@@ -119,7 +119,7 @@ export default function RealCvRegistryPage() {
       const res = await fetch("/api/owner/cv-intake", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Import impossible.");
-      setMessage(`CV conservé : ${data.document.name}. Autorisation d’exploitation en attente de vérification par l’OWNER. Aucun compte candidat ni invitation n’a été créé automatiquement.`);
+      setMessage(`CV conservé : ${data.document.name}. Autorisation d’exploitation en attente de vérification par un utilisateur habilité. Aucun compte candidat ni invitation n’a été créé automatiquement.`);
       setFile(null);
       setCandidateName("");
       setCandidateEmail("");
@@ -284,7 +284,7 @@ export default function RealCvRegistryPage() {
 
   async function inviteCandidate(cv: Cv) {
     if (cv.consentStatus !== "AUTHORIZED") {
-      setMessage("L’autorisation d’exploitation doit être validée par l’OWNER avant toute invitation.");
+      setMessage("L’autorisation d’exploitation doit être validée avant toute invitation.");
       return;
     }
     if (!cv.candidateEmail?.trim()) {
