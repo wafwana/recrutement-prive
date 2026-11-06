@@ -29,6 +29,15 @@ test("Only authorized and analyzed CV intake records enter the provisional sourc
   assert.ok(ingest.includes("consentVerified: true"));
 });
 
+test("local CV reprocessing preserves consent and defers all matching until authorization", () => {
+  const route = read("app/api/owner/cv-intake/reprocess/route.ts");
+  assert.ok(route.includes("...previousMatching"))
+  assert.ok(route.includes("consent.status === \"AUTHORIZED\""));
+  assert.ok(route.includes("ingestAnalyzedCvIntakes(userId, 1, [record.id])"));
+  assert.ok(!route.includes("prisma.job.findMany"));
+  assert.ok(!route.includes("function scoreJob("));
+});
+
 test("Legacy pending or revoked CV intake sourced candidates are excluded from matching and sourcing views", () => {
   const pipeline = read("lib/jobs/offer-pipeline.ts");
   assert.ok(pipeline.includes('source: { not: "PLATFORM_CV_INTAKE" }'));
