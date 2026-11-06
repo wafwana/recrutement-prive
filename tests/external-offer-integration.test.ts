@@ -33,8 +33,11 @@ test("external offer integration is idempotent and protected by an atomic lock",
   assert.ok(route.includes("updatedAt: offer.updatedAt"));
   assert.ok(route.includes("updatedAt: lockedOffer.updatedAt"));
   assert.ok(route.includes("alreadyIntegrated: true"));
-  const pipeline = read("lib/jobs/offer-pipeline.ts");
-  assert.ok(pipeline.includes("\"INTEGRATED_DRAFT\""));
+  const page = read("app/espace/owner/offres-vivier/page.tsx");
+  const api = read("app/api/owner/offres-vivier/route.ts");
+  assert.ok(page.includes("INTEGRATED_DRAFT"));
+  assert.ok(page.includes("Brouillons internes"));
+  assert.ok(!api.includes("INTEGRATED_DRAFT"));
 });
 
 test("only the Owner sees the integration action and the detail page displays internal matches", () => {
