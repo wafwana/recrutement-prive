@@ -1071,12 +1071,14 @@ export async function POST(request: Request) {
     const { candidateId, jobId } = parsed.data;
 
     try {
-      const [candidates, jobs] = await Promise.all([
+      const [candidates, jobs, totalCandidates, totalJobs] = await Promise.all([
         prisma.candidateProfile.findMany({
           where: {
             status: "ACTIVE",
             ...(candidateId ? { id: candidateId } : {}),
           },
+          orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+          take: 500,
           select: {
             id: true,
             headline: true,
@@ -1094,6 +1096,8 @@ export async function POST(request: Request) {
             status: "OPEN",
             ...(jobId ? { id: jobId } : {}),
           },
+          orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+          take: 500,
           select: {
             id: true,
             title: true,
@@ -1106,6 +1110,8 @@ export async function POST(request: Request) {
             subCategory: { select: { code: true } },
           },
         }),
+        prisma.candidateProfile.count({ where: { status: "ACTIVE", ...(candidateId ? { id: candidateId } : {}) } }),
+        prisma.job.count({ where: { status: "OPEN", ...(jobId ? { id: jobId } : {}) } }),
       ]);
 
       if (candidateId && candidates.length === 0) {
@@ -1173,8 +1179,11 @@ export async function POST(request: Request) {
           details: {
             candidateId: candidateId || null,
             jobId: jobId || null,
-            candidateCount: candidates.length,
-            jobCount: jobs.length,
+            candidateCount: totalCandidates,
+            jobCount: totalJobs,
+            candidatesEvaluated: candidates.length,
+            jobsEvaluated: jobs.length,
+            truncated: totalCandidates > candidates.length || totalJobs > jobs.length,
             evaluatedPairs,
             eligibleMatches,
             highestScore,
@@ -1187,8 +1196,11 @@ export async function POST(request: Request) {
         success: true,
         message: "Recalcul du matching exécuté avec succès.",
         scope: jobId ? "JOB" : candidateId ? "CANDIDATE" : "GLOBAL",
-        candidateCount: candidates.length,
-        jobCount: jobs.length,
+        candidateCount: totalCandidates,
+        jobCount: totalJobs,
+        candidatesEvaluated: candidates.length,
+        jobsEvaluated: jobs.length,
+        truncated: totalCandidates > candidates.length || totalJobs > jobs.length,
         evaluatedPairs,
         eligibleMatches,
         highestScore,
