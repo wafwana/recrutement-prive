@@ -253,7 +253,7 @@ export async function qualifyAndMatchExternalOffer(
       take: 250,
     }),
     prisma.sourcedCandidate.findMany({
-      where: { status: { not: "REJECTED" } },
+      where: { status: { not: "REJECTED" }, OR: [{ source: { not: "PLATFORM_CV_INTAKE" } }, { consentStatus: "AUTHORIZED" }] },
       take: 250,
     }),
   ]);
