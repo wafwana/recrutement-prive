@@ -209,7 +209,7 @@ async function main() {
     assert.equal(retried?.status, "ANALYSE_OK");
 
     // A CV with no verified consent must not be added to the sourcing/matching pool.
-    assert.equal(retried?.consentStatus, "PENDING");
+    assert.equal(((retried?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status, "PENDING");
     const provisionalBeforeConsent = await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + persisted.id } } });
     assert.equal(provisionalBeforeConsent, null, "Pending-consent CV must not create a sourced candidate");
     const inviteBeforeConsent = await fetch(`${BASE_URL}/api/owner/cv-intake/invite`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ intakeId: persisted.id }) });
@@ -221,7 +221,7 @@ async function main() {
     const consentResponse = await fetch(`${BASE_URL}/api/owner/cv-intake/${persisted.id}/consent`, { method: "POST", headers: { Cookie: cookieHeader(jar), "Content-Type": "application/json" }, body: JSON.stringify({ status: "AUTHORIZED", evidence: "E2E synthetic consent evidence verified by Owner" }) });
     assert.equal(consentResponse.status, 200, `OWNER consent authorization failed: ${(await consentResponse.clone().text()).slice(0, 500)}`);
     const authorizedIntake = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
-    assert.equal(authorizedIntake?.consentStatus, "AUTHORIZED");
+    assert.equal((((authorizedIntake?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "AUTHORIZED");
     assert.ok(authorizedIntake?.consentVerifiedAt);
     const provisionalAfterConsent = await prisma.sourcedCandidate.findUnique({ where: { source_externalId: { source: "PLATFORM_CV_INTAKE", externalId: "cv-intake:" + persisted.id } } });
     assert.ok(provisionalAfterConsent, "Authorized CV must create one provisional sourced candidate");
@@ -232,7 +232,7 @@ async function main() {
     assert.equal(revokeResponse.status, 200, `OWNER consent revocation failed: ${(await revokeResponse.clone().text()).slice(0, 500)}`);
     const revokedIntake = await prisma.cvIntake.findUnique({ where: { id: persisted.id } });
     const revokedCandidate = await prisma.sourcedCandidate.findUnique({ where: { id: provisionalAfterConsent.id } });
-    assert.equal(revokedIntake?.consentStatus, "REVOKED");
+    assert.equal((((revokedIntake?.matching as Record<string, unknown> | null)?.consent as Record<string, unknown> | undefined)?.status), "REVOKED");
     assert.equal(revokedCandidate?.consentStatus, "REVOKED");
     assert.equal(revokedCandidate?.status, "REJECTED", "Revoked CV must leave the active sourcing/matching pool");
     assert.equal(await prisma.user.findUnique({ where: { email: consentEmail }, select: { id: true } }), null, "Consent review must not create an account until the explicit invitation action");
