@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       if (candidateUser.candidat) {
         const currentProfile = await tx.candidateProfile.findUnique({ where: { id: candidateUser.candidat.id }, select: { preferences: true, status: true } });
         const preferences = asRecord(currentProfile?.preferences);
-        if (preferences.sourceCvIntakeId === intake.id && currentProfile?.status === "INACTIVE") {
+        if (preferences.sourceCvIntakeId === intake.id && currentProfile?.status === "SUSPENDED") {
           await tx.candidateProfile.update({
             where: { id: candidateUser.candidat.id },
             data: { status: "ACTIVE", preferences: { ...preferences, consentStatus: "AUTHORIZED", consentVerifiedAt: typeof consent.verifiedAt === "string" ? consent.verifiedAt : null } },
