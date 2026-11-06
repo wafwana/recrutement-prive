@@ -16,6 +16,20 @@ test("matching dashboard loads ranked proposals automatically in both directions
   assert.match(page, /Mise en relation|Proposer anonymisé|Proposer complètement/);
 });
 
+test("matching recalculation evaluates candidate-job pairs and audits the actual result", () => {
+  const start = route.indexOf('if (parsed.data.action === "recalculate")');
+  const end = route.indexOf('if (parsed.data.action === "propose_anonymized")', start);
+  assert.ok(start >= 0 && end > start, "recalculation action block must exist");
+  const block = route.slice(start, end);
+  assert.match(block, /matchCandidateToJob\(/);
+  assert.match(block, /for \(const candidate of candidates\)/);
+  assert.match(block, /for \(const job of jobs\)/);
+  assert.match(block, /evaluatedPairs/);
+  assert.match(block, /CANDIDATE_MATCHING_RECALCULATED/);
+  assert.match(block, /auditLog\.create/);
+  assert.match(block, /success: false/);
+  assert.match(block, /truncated/);
+});
 test("matching suggestions use anonymous labels rather than exposing names or email addresses", () => {
   assert.match(route, /candidateAlias\(candidate\.id\)/);
   assert.match(route, /companyAlias\(job\.companyId\)/);
