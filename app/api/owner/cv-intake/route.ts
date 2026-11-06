@@ -157,7 +157,6 @@ export async function POST(request: Request) {
         docType: "CV",
         folderPath: suggestedFolder,
         analysis: analysis ? { ...analysis, sourceFactsOnly: true, suggestedMatches } : { sourceFactsOnly: true, suggestedMatches },
-        matching: { suggestedMatches, generatedAt: new Date().toISOString() },
         analyzedAt: analysis ? new Date() : null,
         status: analysis ? "ANALYSE_OK" : "A_ANALYSER",
         matching: { suggestedMatches, generatedAt: new Date().toISOString(), consent: { status: "PENDING", evidence: null, verifiedAt: null, verifiedByUserId: null } },
