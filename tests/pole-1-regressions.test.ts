@@ -44,4 +44,8 @@ test("focused matching is bounded and reports omitted records", () => {
   assert.match(route, /totalOpenJobs > jobs\\.length/);
   assert.match(route, /truncated: totalActiveCandidates > candidates\\.length/);
   assert.match(route, /truncated: totalOpenJobs > jobs\\.length/);
+  assert.match(route, /canViewCandidateDocuments/);
+  assert.match(route, /documents: \\{ where: \\{ docType: "CV" \}/);
+  const page = read("app/espace/owner/cv-matching/page.tsx");
+  assert.match(page, /api\\/candidats\\/documents\\/);
 });
