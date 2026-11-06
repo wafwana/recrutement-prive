@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import BackButton from "@/components/navigation/BackButton";
+import IntegrateExternalOfferButton from "@/components/owner/IntegrateExternalOfferButton";
 
 function formatDate(value: Date | null) {
   if (!value) return "Non renseignée";
@@ -53,6 +54,7 @@ export default async function OwnerOfferDetailPage({
       closingAt: true,
       description: true,
       translations: true,
+      rawData: true,
       status: true,
       createdAt: true,
       updatedAt: true,
@@ -61,6 +63,8 @@ export default async function OwnerOfferDetailPage({
   if (!offer) notFound();
 
   const skills = readStringList(offer.skills);
+  const integration = offer.rawData && typeof offer.rawData === "object" && !Array.isArray(offer.rawData) && (offer.rawData as Record<string, unknown>).integration && typeof (offer.rawData as Record<string, unknown>).integration === "object" ? (offer.rawData as Record<string, unknown>).integration as Record<string, unknown> : {};
+  const integratedJobId = typeof integration.jobId === "string" ? integration.jobId : null;
   const translationRoot = offer.translations && typeof offer.translations === "object" && !Array.isArray(offer.translations) ? offer.translations as Record<string, unknown> : {};
   const frenchRaw = translationRoot.fr && typeof translationRoot.fr === "object" && !Array.isArray(translationRoot.fr) ? translationRoot.fr as Record<string, unknown> : null;
   const frenchTitle = typeof frenchRaw?.titleFr === "string" ? frenchRaw.titleFr.trim() : "";
@@ -92,6 +96,17 @@ export default async function OwnerOfferDetailPage({
           <p className="mt-5 text-xs text-white/35">Aucune URL source n’est enregistrée pour cette offre.</p>
         )}
       </header>
+
+      {role === "OWNER" && !integratedJobId && ["QUALIFIED", "MATCHING"].includes(offer.status) ? (
+        <IntegrateExternalOfferButton offerId={offer.id} />
+      ) : null}
+      {integratedJobId ? (
+        <div className="mt-6 border border-emerald-500/30 bg-emerald-500/5 p-5">
+          <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">Brouillon interne créé</p>
+          <p className="mt-2 text-sm text-white/70">Job RP : <span className="font-mono text-xs">{integratedJobId}</span></p>
+          <p className="mt-1 text-xs text-white/45">L’entreprise source reste suspendue et le poste reste en DRAFT tant qu’une validation séparée n’a pas été réalisée.</p>
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <div className="border border-white/10 p-5">
