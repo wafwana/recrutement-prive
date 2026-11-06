@@ -389,7 +389,7 @@ export default function CvMatchingPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Matching impossible.");
       setCandidateMatches(data.matches || []);
-      setMessage((data.matches?.length || 0) + " opportunité(s) analysées pour " + candidateAlias(targetId) + ".");
+      setMessage((data.matches?.length || 0) + " opportunité(s) analysées pour " + candidateAlias(targetId) + "." + (data.truncated ? " Résultat partiel : les 500 offres les plus récemment mises à jour ont été examinées." : ""));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erreur de matching.");
       setCandidateMatches([]);
@@ -409,7 +409,7 @@ export default function CvMatchingPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Matching impossible.");
       setJobMatches(data.matches || []);
-      setMessage((data.matches?.length || 0) + " profil(s) analysés pour cette offre.");
+      setMessage((data.matches?.length || 0) + " profil(s) analysés pour cette offre." + (data.truncated ? " Résultat partiel : les 500 profils actifs les plus récemment mis à jour ont été examinés." : ""));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erreur de matching.");
       setJobMatches([]);
