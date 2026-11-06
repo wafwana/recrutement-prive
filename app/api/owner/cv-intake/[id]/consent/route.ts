@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (status !== "AUTHORIZED" && status !== "REVOKED") return NextResponse.json({ error: "Statut d’autorisation invalide." }, { status: 400 });
   if (evidence.length < 10 || evidence.length > 500) return NextResponse.json({ error: "Indique une preuve ou une référence d’autorisation/révocation (10 à 500 caractères)." }, { status: 400 });
 
-  const intake = await prisma.cvIntake.findUnique({ where: { id }, select: { id: true, status: true, matching: true } });
+  const intake = await prisma.cvIntake.findUnique({ where: { id }, select: { id: true, status: true, matching: true, candidateId: true } });
   if (!intake) return NextResponse.json({ error: "CV introuvable." }, { status: 404 });
 
   const verifiedAt = new Date();
@@ -51,6 +51,19 @@ export async function POST(request: Request, { params }: RouteParams) {
           matchingDetails: { ...previous, consentRevokedAt: verifiedAt.toISOString(), consentRevocationEvidence: evidence },
           notes: "Autorisation d’exploitation révoquée par l’OWNER. Exclu du matching et du vivier actif.",
         },
+      });
+    }
+    if (status === "REVOKED" && intake.candidateId) {
+      const profile = await tx.candidateProfile.findUnique({ where: { id: intake.candidateId }, select: { preferences: true, status: true } });
+      const preferences = asRecord(profile?.preferences);
+      if (profile && preferences.sourceCvIntakeId === id) {
+        await tx.candidateProfile.update({
+          where: { id: intake.candidateId },
+          data: { status: "INACTIVE", preferences: { ...preferences, consentStatus: "REVOKED", consentRevokedAt: verifiedAt.toISOString() } },
+        });
+      }
+      await tx.candidateDocument.deleteMany({
+        where: { candidateId: intake.candidateId, docType: "CV", analysis: { path: ["sourceCvIntakeId"], equals: id } },
       });
     }
     await tx.auditLog.create({
