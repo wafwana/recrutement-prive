@@ -427,7 +427,7 @@ export async function ingestAnalyzedCvIntakes(actorUserId: string, maxItems = 20
       const matchedOffers = Array.isArray(refreshedDetails.matchedOffers) ? refreshedDetails.matchedOffers.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item)) : [];
       await prisma.cvIntake.update({
         where: { id: intake.id },
-        data: { matching: { ...intakeMatching, consent: intakeConsent, source: "AUTHORIZED_EXTERNAL_OFFERS", suggestedMatches: matchedOffers.slice(0, 20).map((item) => ({ jobId: typeof item.externalJobId === "string" ? item.externalJobId : "", title: typeof item.title === "string" ? item.title : "", score: typeof item.score === "number" ? item.score : 0 })), generatedAt: new Date().toISOString(), consentVerified: true } },
+        data: { matching: ({ ...intakeMatching, consent: intakeConsent as Prisma.InputJsonValue, source: "AUTHORIZED_EXTERNAL_OFFERS", suggestedMatches: matchedOffers.slice(0, 20).map((item) => ({ jobId: typeof item.externalJobId === "string" ? item.externalJobId : "", title: typeof item.title === "string" ? item.title : "", score: typeof item.score === "number" ? item.score : 0 })), generatedAt: new Date().toISOString(), consentVerified: true } as Prisma.InputJsonValue) },
       });
     }
   }
