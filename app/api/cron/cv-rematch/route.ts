@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
-import { analyzeCvDocument, analyzeCvDocumentLocally, type CvAnalysis } from "@/lib/cv/analyzer";
+import { analyzeCvDocumentLocally, type CvAnalysis } from "@/lib/cv/analyzer";
 import { buildCandidateFolderFromAnalysis, resolveCvTaxonomySelection } from "@/lib/cv/folders";
 import { readBatchOffset, writeBatchOffset } from "@/lib/sourcing/batch-state";
 import { selectBatchWindow } from "@/lib/sourcing/batch-window";
@@ -129,28 +129,7 @@ export async function GET(request: Request) {
           );
           return { jobId: job.id, title: job.title, score: result.score, matchedSkills: result.matchedSkills, missingSkills: result.missingSkills, categoryMatchLevel: result.categoryMatchLevel };
         }),
-        ...externalOffers.map((offer) => {
-          const result = matchCandidateToJob(
-            {
-              skills: analysis.skills,
-              experienceYears: analysis.experienceYears,
-              headline: analysis.headline,
-              bio: analysis.improvedSummary || analysis.summary,
-              primaryCategoryCode: analysis.primaryCategoryCode,
-              subCategoryCodes: analysis.subCategoryCodes,
-            },
-            {
-              requiredSkills: offer.skills,
-              requiredExperienceYears: offer.experienceYears,
-              title: offer.title,
-              description: offer.description,
-              location: [offer.city, offer.country].filter(Boolean).join(", ") || null,
-              categoryCode: offer.categoryCode,
-              subCategoryCode: offer.subCategoryCode,
-            },
-          );
-          return { externalJobId: offer.id, title: offer.title, score: result.score, matchedSkills: result.matchedSkills, missingSkills: result.missingSkills, categoryMatchLevel: result.categoryMatchLevel, source: offer.source };
-        }),
+
       ].filter((item) => item.score >= 25).sort((a, b) => b.score - a.score).slice(0, 20);
 
       const suggestedFolder = buildCandidateFolderFromAnalysis(
@@ -225,7 +204,7 @@ export async function GET(request: Request) {
   // folder. Cursor over the stable ANALYSE_OK set so unresolved records cannot
   // starve later records; only generic folders are changed, preserving manual
   // folder assignments and the original file bytes.
-  const reclassificationWhere = { status: "ANALYSE_OK" };
+  const reclassificationWhere = { status: "ANALYSE_OK", matching: { path: ["consent", "status"], equals: "AUTHORIZED" } };
   const reclassificationTotal = await prisma.cvIntake.count({ where: reclassificationWhere });
   const reclassificationKey = "cv-intake:folder-reclassification";
   const reclassificationOffset = await readBatchOffset(reclassificationKey, reclassificationTotal);
