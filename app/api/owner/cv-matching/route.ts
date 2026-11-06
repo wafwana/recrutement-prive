@@ -84,10 +84,7 @@ export async function GET(request: Request) {
   const mode = searchParams.get("mode")?.trim();
 
   if (mode === "overview") {
-    const canPresent = access.role === "OWNER" || (
-      access.role === "ADMIN" &&
-      await hasPermission(access.userId, access.role, "PRESENTATIONS_MANAGE")
-    );
+    const canPresent = access.role === "OWNER";
     const [candidates, jobs, totalActiveCandidates, totalOpenJobs] = await Promise.all([
       prisma.candidateProfile.findMany({
         where: { status: "ACTIVE" },
@@ -542,6 +539,9 @@ export async function POST(request: Request) {
   }
 
   if (parsed.data.action === "propose_anonymized") {
+    if (access.role !== "OWNER") {
+      return NextResponse.json({ error: "La préparation et la présentation anonymisée d’un candidat sont réservées à l’OWNER." }, { status: 403 });
+    }
     const { candidateId, jobId } = parsed.data;
     const [candidate, job] = await Promise.all([
       prisma.candidateProfile.findFirst({
@@ -700,11 +700,8 @@ export async function POST(request: Request) {
   }
 
   if (parsed.data.action === "propose_full") {
-    const canManagePresentations = access.role === "OWNER" || (
-      access.role === "ADMIN" && await hasPermission(access.userId, access.role, "PRESENTATIONS_MANAGE")
-    );
-    if (!canManagePresentations) {
-      return NextResponse.json({ error: "La préparation d'une proposition complète est réservée à l’OWNER ou à un ADMIN autorisé." }, { status: 403 });
+    if (access.role !== "OWNER") {
+      return NextResponse.json({ error: "La préparation d'une proposition complète est réservée à l’OWNER." }, { status: 403 });
     }
 
     const { candidateId, jobId } = parsed.data;
@@ -859,12 +856,8 @@ export async function POST(request: Request) {
   }
 
   if (parsed.data.action === "connect_matchmaking" || parsed.data.action === "present") {
-    const canPresent = access.role === "OWNER" || (
-      access.role === "ADMIN" &&
-      await hasPermission(access.userId, access.role, "PRESENTATIONS_MANAGE")
-    );
-    if (!canPresent) {
-      return NextResponse.json({ error: "La mise en relation est réservée à l’OWNER ou à un ADMIN explicitement habilité." }, { status: 403 });
+    if (access.role !== "OWNER") {
+      return NextResponse.json({ error: "La mise en relation et la présentation d’un candidat sont réservées à l’OWNER." }, { status: 403 });
     }
 
     const { candidateId, jobId } = parsed.data;
