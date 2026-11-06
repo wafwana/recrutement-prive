@@ -51,6 +51,7 @@ export async function POST(request: Request) {
   const updatedCandidate = await prisma.$transaction(async (tx) => {
     const candidate = await tx.sourcedCandidate.findUnique({ where: { id: candidateId } });
     if (!candidate) return null;
+    if (candidate.source === "PLATFORM_CV_INTAKE" && candidate.consentStatus !== "AUTHORIZED") throw new Error("CV_INTAKE_CONSENT_REQUIRED");
     const updated = await tx.sourcedCandidate.update({
       where: { id: candidateId },
       data: { status: newStatus, notes: notes ? `${candidate.notes ? candidate.notes + " | " : ""}${notes}` : candidate.notes, updatedAt: new Date() },
