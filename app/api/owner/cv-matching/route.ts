@@ -87,10 +87,11 @@ export async function GET(request: Request) {
       access.role === "ADMIN" &&
       await hasPermission(access.userId, access.role, "PRESENTATIONS_MANAGE")
     );
-    const [candidates, jobs] = await Promise.all([
+    const [candidates, jobs, totalActiveCandidates, totalOpenJobs] = await Promise.all([
       prisma.candidateProfile.findMany({
         where: { status: "ACTIVE" },
         orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        take: 150,
         select: {
           id: true,
           userId: true,
@@ -107,6 +108,7 @@ export async function GET(request: Request) {
       prisma.job.findMany({
         where: { status: "OPEN" },
         orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        take: 150,
         select: {
           id: true,
           title: true,
@@ -120,15 +122,17 @@ export async function GET(request: Request) {
           subCategory: { select: { code: true } },
         },
       }),
+      prisma.candidateProfile.count({ where: { status: "ACTIVE" } }),
+      prisma.job.count({ where: { status: "OPEN" } }),
     ]);
 
     if (!candidates.length || !jobs.length) {
       return NextResponse.json({
         canPresent,
-        candidateCount: candidates.length,
-        jobCount: jobs.length,
+        candidateCount: totalActiveCandidates,
+        jobCount: totalOpenJobs,
         totalMatches: 0,
-        truncated: false,
+        truncated: totalActiveCandidates > candidates.length || totalOpenJobs > jobs.length,
         suggestions: [],
         candidateSuggestions: [],
         offerSuggestions: [],
@@ -247,7 +251,7 @@ export async function GET(request: Request) {
       }
     }
 
-    ranked.sort((a, b) => b.score - a.score);
+    ranked.sort((a, b) => b.score - a.score || a.candidateId.localeCompare(b.candidateId) || a.jobId.localeCompare(b.jobId));
     const candidateSuggestionCounts = new Map<string, number>();
     const offerSuggestionCounts = new Map<string, number>();
     const candidateSuggestions: typeof ranked = [];
@@ -266,10 +270,10 @@ export async function GET(request: Request) {
     }
     return NextResponse.json({
       canPresent,
-      candidateCount: candidates.length,
-      jobCount: jobs.length,
+      candidateCount: totalActiveCandidates,
+      jobCount: totalOpenJobs,
       totalMatches: ranked.length,
-      truncated: ranked.length > 100,
+      truncated: totalActiveCandidates > candidates.length || totalOpenJobs > jobs.length || ranked.length > 100,
       suggestions: ranked.slice(0, 100),
       candidateSuggestions,
       offerSuggestions,
