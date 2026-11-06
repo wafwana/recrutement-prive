@@ -16,7 +16,7 @@ test("CV intake stores pending consent and never creates a user, candidate profi
 
 test("CV intake consent is OWNER-only, evidence-backed, audited and revocable", () => {
   const route = read("app/api/owner/cv-intake/[id]/consent/route.ts");
-  for (const fragment of ['role !== "OWNER"', "evidence.length < 10", "matching: { ...previousMatching", "previousConsent.status === \"REVOKED\"", "verifiedAt: verifiedAt.toISOString()", "verifiedByUserId: userId", "tx.auditLog.create", "CV_INTAKE_CONSENT_AUTHORIZED", "CV_INTAKE_CONSENT_REVOKED", 'status: "REJECTED"', 'consentStatus: "REVOKED"', "MANUAL_CV_IMPORT", 'status: "SUSPENDED"', "createHash(']) {
+  for (const fragment of ['role !== "OWNER"', "evidence.length < 10", "matching: { ...previousMatching", "previousConsent.status === \"REVOKED\"", "verifiedAt: verifiedAt.toISOString()", "verifiedByUserId: userId", "tx.auditLog.create", "CV_INTAKE_CONSENT_AUTHORIZED", "CV_INTAKE_CONSENT_REVOKED", 'status: "REJECTED"', 'consentStatus: "REVOKED"', "MANUAL_CV_IMPORT", 'status: "SUSPENDED"', "createHash("]) {
     assert.ok(route.includes(fragment), "missing consent control: " + fragment);
   }
 });
