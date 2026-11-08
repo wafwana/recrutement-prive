@@ -765,7 +765,7 @@ export async function POST(request: Request) {
       Number.isFinite(Date.parse(consentVerifiedAt))
     );
 
-    if (!hasExplicitPositiveConsent) {
+    if (!consentIntake || !hasExplicitPositiveConsent) {
       return NextResponse.json({
         error: "Consentement non confirmé : aucune preuve d'autorisation explicite, valide et toujours active n'est rattachée à ce profil. Validez d'abord le consentement dans le dossier CV Intake.",
       }, { status: 403 });
@@ -803,7 +803,34 @@ export async function POST(request: Request) {
       }
     );
 
-    await prisma.$transaction(async (tx) => {
+    const proposalPrepared = await prisma.$transaction(async (tx) => {
+      // Re-check and lock the exact intake consent in the same transaction as
+      // proposal creation so a concurrent revocation cannot race this action.
+      const consentLock = await tx.cvIntake.updateMany({
+        where: {
+          id: consentIntake.id,
+          candidateId: candidate.id,
+          matching: { path: ["consent", "status"], equals: "AUTHORIZED" },
+        },
+        data: { updatedAt: new Date() },
+      });
+      if (!consentLock.count) return false;
+      const currentConsentIntake = await tx.cvIntake.findUnique({
+        where: { id: consentIntake.id },
+        select: { matching: true },
+      });
+      const currentConsent = asRecord(asRecord(currentConsentIntake?.matching).consent);
+      const currentEvidence = typeof currentConsent.evidence === "string" ? currentConsent.evidence.trim() : "";
+      const currentVerifiedAt = typeof currentConsent.verifiedAt === "string" ? currentConsent.verifiedAt : null;
+      const currentVerifiedByUserId = typeof currentConsent.verifiedByUserId === "string" ? currentConsent.verifiedByUserId : null;
+      if (
+        currentConsent.status !== "AUTHORIZED" ||
+        currentEvidence.length < 10 ||
+        !currentVerifiedByUserId ||
+        !currentVerifiedAt ||
+        !Number.isFinite(Date.parse(currentVerifiedAt))
+      ) return false;
+
       const existingApp = await tx.application.findFirst({
         where: { candidateId: candidate.id, jobId: job.id },
         select: { id: true, status: true },
@@ -860,13 +887,20 @@ export async function POST(request: Request) {
             score: match.score,
             cvCount: candidate.documents.length,
             applicationId: appId,
-            consentIntakeId: consentIntake?.id,
-            consentVerifiedAt,
-            consentVerifiedByUserId,
+            consentIntakeId: consentIntake.id,
+            consentVerifiedAt: currentVerifiedAt,
+            consentVerifiedByUserId: currentVerifiedByUserId,
           },
         },
       });
+      return true;
     });
+
+    if (!proposalPrepared) {
+      return NextResponse.json({
+        error: "Consentement révoqué ou modifié pendant la préparation. Aucune proposition complète n'a été créée.",
+      }, { status: 409 });
+    }
 
     return NextResponse.json({
       success: true,
