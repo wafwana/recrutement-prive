@@ -57,6 +57,12 @@ function stringIds(value: unknown) {
     : [];
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
 async function requireMatchingAccess() {
   let active = getActiveSessionContext();
   if (!active) {
@@ -732,14 +738,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Consentement non confirmé : le candidat est inactif ou exclu du partage de données." }, { status: 403 });
     }
 
-    // Fail closed: generic preference booleans are not a verifiable, auditable
-    // consent record linked to the candidate's explicit consent workflow.
-    // Keep full proposals blocked until such a persisted proof exists.
-    const hasExplicitPositiveConsent = false;
+    // Resolve the consent proof created by the existing CV Intake workflow.
+    // A profile-level flag alone is not sufficient: it must point to the exact
+    // intake record, still be AUTHORIZED, and carry its evidence and audit metadata.
+    const candidatePreferences = asRecord(candidate.preferences);
+    const consentIntakeId = typeof candidatePreferences.sourceCvIntakeId === "string"
+      ? candidatePreferences.sourceCvIntakeId
+      : null;
+    const consentIntake = consentIntakeId
+      ? await prisma.cvIntake.findFirst({
+          where: { id: consentIntakeId, candidateId: candidate.id },
+          select: { id: true, matching: true },
+        })
+      : null;
+    const consent = asRecord(asRecord(consentIntake?.matching).consent);
+    const consentVerifiedAt = typeof consent.verifiedAt === "string" ? consent.verifiedAt : null;
+    const hasExplicitPositiveConsent = Boolean(
+      consentIntake &&
+      candidatePreferences.consentStatus === "AUTHORIZED" &&
+      consent.status === "AUTHORIZED" &&
+      typeof consent.evidence === "string" &&
+      consent.evidence.trim().length >= 10 &&
+      typeof consent.verifiedByUserId === "string" &&
+      consent.verifiedByUserId.length > 0 &&
+      consentVerifiedAt &&
+      Number.isFinite(Date.parse(consentVerifiedAt))
+    );
 
     if (!hasExplicitPositiveConsent) {
       return NextResponse.json({
-        error: "Consentement non confirmé : le candidat n'a pas enregistré d'accord positif explicite pour la communication de ses données personnelles.",
+        error: "Consentement non confirmé : aucune preuve d'autorisation explicite, valide et toujours active n'est rattachée à ce profil. Validez d'abord le consentement dans le dossier CV Intake.",
       }, { status: 403 });
     }
 
@@ -832,6 +860,9 @@ export async function POST(request: Request) {
             score: match.score,
             cvCount: candidate.documents.length,
             applicationId: appId,
+            consentIntakeId: consentIntake?.id,
+            consentVerifiedAt,
+            consentVerifiedByUserId: consent.verifiedByUserId,
           },
         },
       });
