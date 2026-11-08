@@ -753,14 +753,14 @@ export async function POST(request: Request) {
       : null;
     const consent = asRecord(asRecord(consentIntake?.matching).consent);
     const consentVerifiedAt = typeof consent.verifiedAt === "string" ? consent.verifiedAt : null;
+    const consentVerifiedByUserId = typeof consent.verifiedByUserId === "string" ? consent.verifiedByUserId : null;
     const hasExplicitPositiveConsent = Boolean(
       consentIntake &&
       candidatePreferences.consentStatus === "AUTHORIZED" &&
       consent.status === "AUTHORIZED" &&
       typeof consent.evidence === "string" &&
       consent.evidence.trim().length >= 10 &&
-      typeof consent.verifiedByUserId === "string" &&
-      consent.verifiedByUserId.length > 0 &&
+      consentVerifiedByUserId &&
       consentVerifiedAt &&
       Number.isFinite(Date.parse(consentVerifiedAt))
     );
@@ -862,7 +862,7 @@ export async function POST(request: Request) {
             applicationId: appId,
             consentIntakeId: consentIntake?.id,
             consentVerifiedAt,
-            consentVerifiedByUserId: consent.verifiedByUserId,
+            consentVerifiedByUserId,
           },
         },
       });
