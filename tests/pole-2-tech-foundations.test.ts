@@ -24,7 +24,8 @@ test("Pole 2 Prisma schema isolation and completeness", () => {
   assert.match(sql, /CREATE TABLE IF NOT EXISTS "TechProject"/);
   assert.equal((sql.match(/ON DELETE RESTRICT ON UPDATE CASCADE/g) || []).length, 2);
   assert.doesNotMatch(sql, /ON DELETE CASCADE/);
-  assert.equal((schema.match(/onDelete: Restrict/g) || []).length, 2);
+  assert.match(schema, /techProspect\s+TechProspect\s+@relation\(fields:\s*\[techProspectId\],\s*references:\s*\[id\],\s*onDelete:\s*Restrict\)/);
+  assert.equal((schema.match(/TechProspect\s+@relation\(fields:\s*\[techProspectId\],\s*references:\s*\[id\],\s*onDelete:\s*Restrict\)/g) || []).length, 2);
 });
 
 test("Pole 2 atomic permission TECH_SOLUTIONS_MANAGE configuration and RBAC", async () => {
