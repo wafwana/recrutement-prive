@@ -13,7 +13,7 @@ export default async function CompanyTechPage({ searchParams }: { searchParams: 
   catch { redirect("/espace/entreprise"); }
 
   const allProspects = await prisma.techProspect.findMany({
-    where: { leadSource: { in: ["POLE_1_COMPANY", "POLE_1_COMPANY_CLIENT"] } },
+    where: { leadSource: "POLE_1_COMPANY_CLIENT" },
     orderBy: { createdAt: "desc" },
     take: 500,
     select: { id: true, projectNeed: true, notes: true, status: true, createdAt: true, detectionSignals: true },
