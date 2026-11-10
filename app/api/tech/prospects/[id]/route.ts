@@ -24,6 +24,7 @@ export async function PATCH(request: Request, context: Ctx) {
   if ("status" in body) {
     if (typeof body.status !== "string" || !["NOUVEAU","A_QUALIFIER","QUALIFIE","CONTACTE","CDC_RECU","CHIFFRAGE","PROPOSITION","SIGNE","ABANDONNE"].includes(body.status)) return NextResponse.json({ error: "Étape inconnue." }, { status: 400 });
     data.status = body.status;
+    if (body.status === "CONTACTE" && before) data.lastContactedAt = new Date();
   }
   const before = await prisma.techProspect.findUnique({ where: { id } });
   if (!before) return NextResponse.json({ error: "Prospect introuvable." }, { status: 404 });

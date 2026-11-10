@@ -16,7 +16,10 @@ export async function POST(request:Request){
  if(!allowed.has(file.type))return NextResponse.json({error:"Formats acceptés : PDF, DOCX, TXT et Markdown."},{status:415});
  const prospect=await prisma.techProspect.findUnique({where:{id:prospectId},select:{id:true}});
  if(!prospect)return NextResponse.json({error:"Prospect introuvable."},{status:404});
- const bytes=Buffer.from(await file.arrayBuffer());let extractedText:string|null=null;
+ const bytes=Buffer.from(await file.arrayBuffer());
+ if(file.type==="application/pdf"&&!bytes.subarray(0,5).equals(Buffer.from("%PDF-")))return NextResponse.json({error:"Signature PDF invalide."},{status:415});
+ if(file.type==="application/vnd.openxmlformats-officedocument.wordprocessingml.document"&&!(bytes[0]===0x50&&bytes[1]===0x4b))return NextResponse.json({error:"Signature DOCX invalide."},{status:415});
+ let extractedText:string|null=null;
  try{
   if(file.type==="text/plain"||file.type==="text/markdown")extractedText=bytes.toString("utf8").slice(0,500000);
   else if(file.type==="application/pdf"){const parser=new PDFParse({data:bytes});try{const parsed=await parser.getText();extractedText=parsed.text.slice(0,500000);}finally{await parser.destroy();}}

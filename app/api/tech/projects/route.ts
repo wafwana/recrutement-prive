@@ -16,6 +16,8 @@ export async function POST(request:Request){
  const project=await prisma.$transaction(async tx=>{
   const p=await tx.techProject.create({data:{name:proposal.title,description:proposal.solution,techProspectId:proposal.techProspectId,proposalId:proposal.id,projectManagerUserId:actor.userId,currency:proposal.currency}});
   await tx.techProjectEvent.create({data:{eventType:"PROJECT_CREATED",note:p.reference,actorUserId:actor.userId,actorRole:actor.role,techProjectId:p.id}});
+  await tx.techProspect.update({where:{id:proposal.techProspectId},data:{status:"SIGNE"}});
+  await tx.techProspectEvent.create({data:{eventType:"STATUS_CHANGED",fromValue:"PROPOSITION",toValue:"SIGNE",note:"Projet créé depuis une proposition approuvée",actorUserId:actor.userId,actorRole:actor.role,techProspectId:proposal.techProspectId}});
   await tx.auditLog.create({data:{actorUserId:actor.userId,actorRole:actor.role,action:"TECH_PROJECT_CREATED",targetType:"TECH_PROJECT",targetId:p.id,details:{proposalId:proposal.id,reference:p.reference}}});
   return p;
  });
