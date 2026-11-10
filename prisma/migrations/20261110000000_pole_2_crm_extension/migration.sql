@@ -18,6 +18,7 @@ ALTER TABLE "TechProject" ADD COLUMN IF NOT EXISTS "budgetPlanned" DOUBLE PRECIS
 ALTER TABLE "TechProject" ADD COLUMN IF NOT EXISTS "budgetPlannedCertainty" TEXT NOT NULL DEFAULT 'INCONNU';
 ALTER TABLE "TechProject" ADD COLUMN IF NOT EXISTS "budgetActual" DOUBLE PRECISION;
 UPDATE "TechProject" SET "reference" = 'TECH-' || upper(substr(md5("id"), 1, 10)) WHERE "reference" IS NULL;
+ALTER TABLE "TechProject" ALTER COLUMN "reference" SET NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS "TechProject_reference_key" ON "TechProject"("reference");
 CREATE INDEX IF NOT EXISTS "TechProspect_nextActionAt_idx" ON "TechProspect"("nextActionAt");
 
