@@ -40,7 +40,7 @@ export default async function TechWorkspacePage() {
           <div className="border border-white/10 bg-white/[0.02] p-6 space-y-3">
             <h2 className="font-serif text-lg text-white">Cahiers des charges & Analyse</h2>
             <p className="text-xs text-white/50 leading-relaxed">
-              Consultez les besoins déposés par les entreprises cibles et évaluez la couverture fonctionnelle avec le référentiel Recrutement Privé.
+              Centralisez les besoins exprimés par les entreprises clientes et évaluez le périmètre fonctionnel de leur future solution numérique.
             </p>
             <div className="pt-2">
               <span className="inline-block border border-white/10 px-3 py-1 text-[10px] uppercase tracking-wider text-white/40">
@@ -56,7 +56,7 @@ export default async function TechWorkspacePage() {
             </p>
             <div className="pt-2">
               <span className="inline-block border border-white/10 px-3 py-1 text-[10px] uppercase tracking-wider text-white/40">
-                Activé en Brique 4
+                Suivi des propositions et projets
               </span>
             </div>
           </div>
