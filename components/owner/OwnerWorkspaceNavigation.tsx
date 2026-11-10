@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "@/lib/i18n/context";
+import TechOwnerNavigation from "@/components/owner/TechOwnerNavigation";
 
 type NavItem = { href: string; labelKey: string };
 type NavGroup = { titleKey: string; links: NavItem[] };
@@ -97,6 +98,7 @@ function NavLink({ item, pathname, t }: { item: NavItem; pathname: string; t: (k
 export default function OwnerWorkspaceNavigation() {
   const { t } = useI18n();
   const pathname = usePathname() || "/espace/owner";
+  if (pathname.startsWith("/espace/owner/solutions-tech") || pathname.startsWith("/espace/tech")) return <TechOwnerNavigation />;
   const isDeepOwnerRoute = navGroups.some((group) => group.links.some((link) => isActive(pathname, link.href)));
 
   return (
