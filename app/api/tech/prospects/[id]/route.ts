@@ -14,6 +14,8 @@ export async function PATCH(request: Request, context: Ctx) {
   const { id } = await context.params;
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return NextResponse.json({ error: "Données invalides." }, { status: 400 });
+  const before = await prisma.techProspect.findUnique({ where: { id } });
+  if (!before) return NextResponse.json({ error: "Prospect introuvable." }, { status: 404 });
   const allowed = ["companyName","sector","country","region","city","contactName","contactEmail","contactRole","leadSource","projectNeed","projectSize","projectMaturity","urgency","nextAction","nextActionAt","priority","estimatedBudget","notes"] as const;
   const data: Record<string, unknown> = {};
   for (const key of allowed) if (key in body) data[key] = body[key] === "" ? null : body[key];
@@ -26,14 +28,12 @@ export async function PATCH(request: Request, context: Ctx) {
     data.status = body.status;
     if (body.status === "CONTACTE" && before) data.lastContactedAt = new Date();
   }
-  const before = await prisma.techProspect.findUnique({ where: { id } });
-  if (!before) return NextResponse.json({ error: "Prospect introuvable." }, { status: 404 });
   const after = await prisma.$transaction(async tx => {
     const updated = await tx.techProspect.update({ where: { id }, data });
     const changed = Object.keys(data);
     for (const field of changed) {
-      const oldValue = (before as Record<string, unknown>)[field];
-      const newValue = (updated as Record<string, unknown>)[field];
+      const oldValue = (before as unknown as Record<string, unknown>)[field];
+      const newValue = (updated as unknown as Record<string, unknown>)[field];
       if (String(oldValue ?? "") !== String(newValue ?? "")) await tx.techProspectEvent.create({ data: { eventType: field === "status" ? "STATUS_CHANGED" : "FIELD_UPDATED", fromValue: oldValue instanceof Date ? oldValue.toISOString() : String(oldValue ?? ""), toValue: newValue instanceof Date ? newValue.toISOString() : String(newValue ?? ""), note: field, actorUserId: actor.userId, actorRole: actor.role, techProspectId: id } });
     }
     await tx.auditLog.create({ data: { actorUserId: actor.userId, actorRole: actor.role, action: "TECH_PROSPECT_UPDATED", targetType: "TECH_PROSPECT", targetId: id, details: { fields: changed } } });
