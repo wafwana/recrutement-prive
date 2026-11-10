@@ -28,3 +28,16 @@ testCase("Pôle 2 CRM routes audit business mutations", () => {
     "app/api/tech/requirements/route.ts",
   ]) assert.ok(fs.readFileSync(path, "utf8").includes("auditLog.create"));
 });
+
+testCase("Pôle 2 company bridge imports only safe Pôle 1 identity data under OWNER control", () => {
+  const route = fs.readFileSync("app/api/tech/prospects/import-pole1/route.ts", "utf8");
+  assert.ok(route.includes("if (!actor.isOwner)"));
+  assert.ok(route.includes('status: "ACTIVE"'));
+  assert.ok(route.includes("siren: true"));
+  assert.ok(route.includes("siret: true"));
+  assert.ok(route.includes("sourceCompanyId: company.id"));
+  assert.ok(route.includes('contactPermission: "NOT_GRANTED"'));
+  assert.ok(route.includes("Aucun contact externe"));
+  assert.ok(!route.includes("application.findMany"));
+  assert.ok(!route.includes("job.findMany"));
+});
