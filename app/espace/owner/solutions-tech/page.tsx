@@ -118,6 +118,12 @@ export default async function OwnerSolutionsTechPage() {
             >
               Cockpit Global
             </Link>
+            <Link
+              href="/espace/owner/solutions-tech/crm"
+              className="border border-[#c7a15a]/60 bg-[#c7a15a]/10 px-3.5 py-2 text-[10px] uppercase tracking-[0.16em] text-[#c7a15a] hover:bg-[#c7a15a]/20"
+            >
+              Ouvrir le CRM Pôle 2
+            </Link>
           </div>
         </div>
 

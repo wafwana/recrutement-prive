@@ -1062,6 +1062,7 @@ model TechProspect {
   siren               String?
   siret               String?
   country             String?
+  region              String?
   city                String?
   sector              String?
   companySize         String?
@@ -1071,6 +1072,14 @@ model TechProspect {
   contactRole         String?
   decisionMakers      Json?
   detectionSignals    Json?
+  leadSource          String?
+  projectNeed         String?
+  projectSize         String?
+  projectMaturity     String?
+  urgency             String?
+  nextAction          String?
+  nextActionAt        DateTime?
+  lastContactedAt     DateTime?
   status              String               @default("NOUVEAU") // NOUVEAU, A_QUALIFIER, QUALIFIE, CONTACTE, CDC_RECU, CHIFFRAGE, PROPOSITION, SIGNE, ABANDONNE
   priority            String               @default("MOYENNE") // BASSE, MOYENNE, HAUTE, URGENTE
   estimatedBudget     Float?
@@ -1078,6 +1087,8 @@ model TechProspect {
   assignedToUserId    String?
   createdByUserId     String?
   requirements        TechRequirementDoc[]
+  events              TechProspectEvent[]
+  proposals           TechProposal[]
   projects            TechProject[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -1085,6 +1096,7 @@ model TechProspect {
   @@index([status, createdAt])
   @@index([sector, country])
   @@index([assignedToUserId])
+  @@index([nextActionAt])
 }
 
 model TechRequirementDoc {
@@ -1093,7 +1105,11 @@ model TechRequirementDoc {
   description         String?
   documentUrl         String?
   fileName            String?
+  mimeType            String?
   fileSize            Int?
+  fileSha256          String?
+  fileData             Bytes?
+  extractedText       String?
   status              String       @default("DEPOSE") // DEPOSE, ANALYSE_EN_COURS, ANALYSE_TERMINEE, VALIDE, REJETE
   featuresAnalysis    Json?
   estimatedQuote      Json?
@@ -1109,8 +1125,12 @@ model TechRequirementDoc {
 
 model TechProject {
   id                       String       @id @default(cuid())
+  reference                String       @unique @default(cuid())
   name                     String
   description              String?
+  budgetPlanned            Float?
+  budgetPlannedCertainty   String       @default("INCONNU")
+  budgetActual             Float?
   status                   String       @default("CADRAGE") // CADRAGE, DEVELOPPEMENT, RECETTE, LIVRE, MAINTENANCE, CLOTURE
   setupPrice               Float?
   monthlySubscriptionPrice Float?
@@ -1122,10 +1142,104 @@ model TechProject {
   projectManagerUserId     String?
   techProspectId           String
   techProspect             TechProspect @relation(fields: [techProspectId], references: [id], onDelete: Restrict)
+  proposalId               String?      @unique
+  proposal                 TechProposal? @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  events                   TechProjectEvent[]
+  milestones               TechProjectMilestone[]
+  tasks                    TechProjectTask[]
   createdAt                DateTime     @default(now())
   updatedAt                DateTime     @updatedAt
 
   @@index([techProspectId])
   @@index([status])
   @@index([projectManagerUserId])
+}
+
+
+model TechProspectEvent {
+  id             String      @id @default(cuid())
+  eventType      String
+  fromValue      String?
+  toValue        String?
+  note           String?
+  actorUserId    String
+  actorRole      String
+  techProspectId String
+  techProspect   TechProspect @relation(fields: [techProspectId], references: [id], onDelete: Restrict)
+  createdAt      DateTime    @default(now())
+  @@index([techProspectId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model TechProposal {
+  id               String       @id @default(cuid())
+  reference        String       @unique @default(cuid())
+  title            String
+  problem          String?
+  solution         String?
+  deliverables     Json?
+  milestones       Json?
+  assumptions      Json?
+  conditions       String?
+  maintenance      String?
+  options          Json?
+  estimate         Json?
+  currency         String       @default("EUR")
+  status           String       @default("DRAFT")
+  approvedAt       DateTime?
+  approvedByUserId String?
+  decisionNote     String?
+  techProspectId   String
+  techProspect     TechProspect @relation(fields: [techProspectId], references: [id], onDelete: Restrict)
+  project          TechProject?
+  createdByUserId  String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  @@index([techProspectId, status])
+  @@index([createdAt])
+}
+
+model TechProjectEvent {
+  id            String     @id @default(cuid())
+  eventType     String
+  fromValue     String?
+  toValue       String?
+  note          String?
+  actorUserId   String
+  actorRole     String
+  techProjectId String
+  techProject   TechProject @relation(fields: [techProjectId], references: [id], onDelete: Restrict)
+  createdAt     DateTime   @default(now())
+  @@index([techProjectId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model TechProjectMilestone {
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  dueAt         DateTime?
+  completedAt   DateTime?
+  status        String     @default("A_FAIRE")
+  techProjectId String
+  techProject   TechProject @relation(fields: [techProjectId], references: [id], onDelete: Restrict)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  @@index([techProjectId, dueAt])
+}
+
+model TechProjectTask {
+  id             String     @id @default(cuid())
+  title          String
+  description    String?
+  assigneeUserId String?
+  dueAt          DateTime?
+  completedAt    DateTime?
+  status         String     @default("A_FAIRE")
+  techProjectId  String
+  techProject    TechProject @relation(fields: [techProjectId], references: [id], onDelete: Restrict)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  @@index([techProjectId, status])
+  @@index([assigneeUserId])
 }
