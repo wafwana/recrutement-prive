@@ -12,16 +12,14 @@ export default async function CompanyTechPage({ searchParams }: { searchParams: 
   try { access = await requireCompanyAccess(companyId); }
   catch { redirect("/espace/entreprise"); }
 
-  const allProspects = await prisma.techProspect.findMany({
-    where: { leadSource: "POLE_1_COMPANY_CLIENT" },
+  const ownProspects = await prisma.techProspect.findMany({
+    where: {
+      leadSource: "POLE_1_COMPANY_CLIENT",
+      detectionSignals: { path: ["sourceCompanyId"], equals: access.companyId },
+    },
     orderBy: { createdAt: "desc" },
     take: 500,
-    select: { id: true, projectNeed: true, notes: true, status: true, createdAt: true, detectionSignals: true },
-  });
-  const ownProspects = allProspects.filter((item) => {
-    const signals = item.detectionSignals && typeof item.detectionSignals === "object" && !Array.isArray(item.detectionSignals)
-      ? item.detectionSignals as Record<string, unknown> : {};
-    return signals.sourceCompanyId === access.companyId;
+    select: { id: true, projectNeed: true, notes: true, status: true, createdAt: true },
   });
   const prospectIds = ownProspects.map((item) => item.id);
   const projectRows = prospectIds.length ? await prisma.techProject.findMany({
