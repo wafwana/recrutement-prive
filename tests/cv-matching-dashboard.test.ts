@@ -71,3 +71,16 @@ test("automatic proposals are bounded and show if a pair has already been presen
   assert.match(route, /presentationExists/);
   assert.match(page, /match\.presentationExists/);
 });
+
+test("full candidate proposals require the linked, active CV Intake consent proof", () => {
+  assert.match(route, /candidatePreferences\.sourceCvIntakeId/);
+  assert.match(route, /where: \{ id: consentIntakeId, candidateId: candidate\.id \}/);
+  assert.match(route, /candidatePreferences\.consentStatus === "AUTHORIZED"/);
+  assert.match(route, /consent\.status === "AUTHORIZED"/);
+  assert.match(route, /consent\.evidence/);
+  assert.match(route, /consentVerifiedByUserId/);
+  assert.match(route, /consentVerifiedAt/);
+  assert.match(route, /tx\.cvIntake\.updateMany/);
+  assert.match(route, /consentIntakeId: consentIntake\.id/);
+  assert.doesNotMatch(route, /const hasExplicitPositiveConsent = false/);
+});
