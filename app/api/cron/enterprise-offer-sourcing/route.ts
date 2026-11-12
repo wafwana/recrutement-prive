@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { recordTechnicalIncident } from "@/lib/monitoring/incident-history";
 import { configuredSources, fetchGlobalJobs } from "@/lib/sourcing/global";
 import { analyzeExternalOffer } from "@/lib/sourcing/offer-analyzer";
 import { matchCandidateToJob } from "@/lib/matching/candidate-job";
@@ -341,6 +342,7 @@ export async function GET(request: Request) {
         await writeBatchOffset(batchKey, offset + scannedInBatch, items.length);
       }
     } catch (error) {
+      await recordTechnicalIncident({ module: "SOURCING", event: "ENTERPRISE_OFFER_SOURCE_FAILED", severity: "HIGH", route: "/api/cron/enterprise-offer-sourcing", summary: "Une source d’offres entreprise n’a pas pu être traitée." });
       errors.push({
         companyId: company.companyId,
         sourceUrl,

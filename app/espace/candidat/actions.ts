@@ -2,6 +2,7 @@
 
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { recordTechnicalIncident } from "@/lib/monitoring/incident-history";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
@@ -216,7 +217,8 @@ export async function uploadCandidateDocument(formData: FormData) {
         taxonomy,
       });
     } catch (error) {
-      console.error("[uploadCandidateDocument] CV analysis failed", error);
+      console.error("[uploadCandidateDocument] CV analysis failed", error instanceof Error ? error.name : "UnknownError");
+      await recordTechnicalIncident({ module: "CV", event: "CV_ANALYSIS_FAILED", severity: "MEDIUM", route: "/espace/candidat", summary: "L’analyse automatique du CV a échoué après sauvegarde du fichier." });
     }
 
     if (analysis) {
