@@ -20,10 +20,9 @@ testCase("Pôle 2 client requests are tied to the actual company membership", ()
   assert.ok(!route.includes("outreach"));
 });
 
-testCase("Pôle 2 client workspace only returns its own requests and linked projects", () => {
+testCase("Pôle 2 client workspace filters company records in the database query", () => {
   const page = fs.readFileSync("app/espace/entreprise/solutions-tech/page.tsx", "utf8");
-  assert.ok(page.includes('where: { leadSource: "POLE_1_COMPANY_CLIENT" }'));
-  assert.ok(page.includes("signals.sourceCompanyId === access.companyId"));
+  assert.ok(page.includes('leadSource: "POLE_1_COMPANY_CLIENT"'));
+  assert.ok(page.includes('path: ["sourceCompanyId"], equals: access.companyId'));
   assert.ok(page.includes("techProspectId: { in: prospectIds }"));
-  assert.ok(!page.includes("findMany({\n    orderBy: { createdAt: \"desc\""));
 });
