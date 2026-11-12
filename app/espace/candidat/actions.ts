@@ -192,6 +192,28 @@ export async function uploadCandidateDocument(formData: FormData) {
     select: { id: true },
   });
 
+  // Keep uploader provenance in the existing audit trail without making
+  // a secondary audit-write failure undo the already-persisted document.
+  try {
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: session.user.id,
+        actorRole: "CANDIDAT",
+        action: "CANDIDATE_DOCUMENT_UPLOAD",
+        targetType: "CANDIDATE_DOCUMENT",
+        targetId: persistedDocument.id,
+        details: {
+          candidateId: profile.id,
+          fileName: name.slice(0, 180),
+          docType,
+          provenance: "CANDIDATE_SELF_UPLOAD",
+        },
+      },
+    });
+  } catch (auditError) {
+    console.warn("[uploadCandidateDocument] unable to record upload provenance", auditError instanceof Error ? auditError.name : "UnknownError");
+  }
+
   try {
     if (isCv) {
     const taxonomyRows = await prisma.jobCategory.findMany({
