@@ -2,6 +2,14 @@
 
 Ces règles s'appliquent à tout agent, contributeur ou automatisation qui intervient dans ce dépôt. Elles complètent les instructions existantes ; en cas de conflit, préserver la sécurité, les données de production et la gouvernance OWNER prévaut.
 
+## 0. Identification canonique des ressources multi-outils
+
+- Avant tout appel GitHub, Vercel, Neon ou autre intégration, lire `docs/operations/REGISTRE-RESSOURCES-CANONIQUES.md` et utiliser les identifiants exacts du fournisseur ainsi que le bon compte/équipe/espace.
+- Ne jamais déduire un identifiant Vercel, Neon ou GitHub d'un simple nom affiché. Les noms et alias sont des aides de recherche ; les IDs propres à chaque fournisseur restent la référence.
+- Face à une erreur « introuvable », vérifier le scope, le type d'ID, les permissions et les alias avant toute conclusion. Une 404 ne signifie pas à elle seule un quota dépassé ni une ressource supprimée.
+- Ne jamais inventer, deviner, renommer ou recréer une ressource pour contourner un problème de résolution. Si une valeur manque, la marquer « À CONFIRMER » et effectuer une vérification ciblée, sans action destructive ni déploiement de test.
+- Toute valeur vérifiée ou modification d'identifiant doit être consignée dans le registre, sans jamais y placer de secret.
+
 ## 1. Préserver le socle existant
 
 - Recrutement Privé est une plateforme déjà largement développée. Toute demande nouvelle doit être traitée comme une évolution incrémentale, sauf preuve technique qu'une refonte ciblée est indispensable.
