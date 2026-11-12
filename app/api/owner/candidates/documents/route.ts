@@ -9,7 +9,8 @@ const DOC_TYPES = new Set(["CV", "DIPLOME", "CERTIFICAT", "IDENTITE", "AUTRE"]);
 
 export async function POST(request: Request) {
   const session = getActiveSessionContext() || await auth();
-  if (!session?.user?.id || session.user.role !== "OWNER") {
+  const actorUserId = session?.user?.id;
+  if (!actorUserId || session?.user?.role !== "OWNER") {
     return NextResponse.json({ error: "Cette action est réservée à l’OWNER." }, { status: 403 });
   }
 
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
       });
       await tx.auditLog.create({
         data: {
-          actorUserId: session.user.id,
+          actorUserId,
           actorRole: "OWNER",
           action: "OWNER_CANDIDATE_DOCUMENT_UPLOAD",
           targetType: "CANDIDATE_DOCUMENT",
