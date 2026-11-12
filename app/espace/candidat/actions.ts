@@ -192,7 +192,8 @@ export async function uploadCandidateDocument(formData: FormData) {
     select: { id: true },
   });
 
-  if (isCv) {
+  try {
+    if (isCv) {
     const taxonomyRows = await prisma.jobCategory.findMany({
       where: { isActive: true },
       select: { code: true, name: true, parent: { select: { code: true } } },
@@ -330,23 +331,33 @@ export async function uploadCandidateDocument(formData: FormData) {
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    if (isCv && isPrimaryCv) {
-      await tx.candidateDocument.updateMany({
-        where: { candidateId: profile.id, docType: "CV", isPrimaryCv: true },
-        data: { isPrimaryCv: false },
+    await prisma.$transaction(async (tx) => {
+      if (isCv && isPrimaryCv) {
+        await tx.candidateDocument.updateMany({
+          where: { candidateId: profile.id, docType: "CV", isPrimaryCv: true },
+          data: { isPrimaryCv: false },
+        });
+      }
+      await tx.candidateDocument.update({
+        where: { id: persistedDocument.id },
+        data: {
+          folderPath,
+          analysis: storedAnalysis ? JSON.parse(JSON.stringify(storedAnalysis)) : undefined,
+          analyzedAt,
+          isPrimaryCv,
+        },
       });
-    }
-    await tx.candidateDocument.update({
-      where: { id: persistedDocument.id },
-      data: {
-        folderPath,
-        analysis: storedAnalysis ? JSON.parse(JSON.stringify(storedAnalysis)) : undefined,
-        analyzedAt,
-        isPrimaryCv,
-      },
     });
-  });
+  } catch (error) {
+    console.error("[uploadCandidateDocument] secondary CV processing failed", error instanceof Error ? error.name : "UnknownError");
+    await recordTechnicalIncident({
+      module: "CV",
+      event: "CV_POST_UPLOAD_PROCESSING_FAILED",
+      severity: "MEDIUM",
+      route: "/espace/candidat",
+      summary: "Le CV a été sauvegardé, mais un traitement secondaire a échoué.",
+    });
+  }
 
   try { revalidatePath("/espace/candidat"); } catch { /* test context */ }
 }
