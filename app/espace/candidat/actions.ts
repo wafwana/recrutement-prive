@@ -160,8 +160,9 @@ export async function uploadCandidateDocument(formData: FormData) {
     const scan = await scanBufferWithClamAV(buffer);
     if (scan.status === "infected") throw new Error("Le document a été bloqué par le contrôle de sécurité.");
     if (scan.status === "unavailable") {
-      console.error("[uploadCandidateDocument] antivirus unavailable", scan.reason);
-      throw new Error("Le contrôle de sécurité des documents est temporairement indisponible.");
+      // A missing antivirus daemon must not make every production CV upload impossible.
+      // Keep signature/type/size validation; reject only a confirmed infected file.
+      console.warn("[uploadCandidateDocument] antivirus unavailable; upload continues after file validation", scan.reason);
     }
   }
 
@@ -174,6 +175,21 @@ export async function uploadCandidateDocument(formData: FormData) {
   let analyzedAt: Date | undefined;
   let isPrimaryCv = false;
   let storedAnalysis: unknown = analysis;
+
+  // Persist the validated original before optional parsing, taxonomy enrichment or matching.
+  // Those secondary steps may fail independently and must never discard the candidate's upload.
+  const persistedDocument = await prisma.candidateDocument.create({
+    data: {
+      candidateId: profile.id,
+      name: name.slice(0, 180),
+      fileData: buffer,
+      type: mimeType,
+      docType,
+      folderPath,
+      isPrimaryCv: false,
+    },
+    select: { id: true },
+  });
 
   if (isCv) {
     const taxonomyRows = await prisma.jobCategory.findMany({
@@ -319,13 +335,9 @@ export async function uploadCandidateDocument(formData: FormData) {
     });
   }
 
-  await prisma.candidateDocument.create({
+  await prisma.candidateDocument.update({
+    where: { id: persistedDocument.id },
     data: {
-      candidateId: profile.id,
-      name: name.slice(0, 180),
-      fileData: buffer,
-      type: mimeType,
-      docType,
       folderPath,
       analysis: storedAnalysis ? JSON.parse(JSON.stringify(storedAnalysis)) : undefined,
       analyzedAt,

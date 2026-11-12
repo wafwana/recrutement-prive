@@ -71,6 +71,24 @@ export default async function OwnerCandidatesPage() {
                 <div><p className="text-[10px] uppercase tracking-[0.14em] text-white/35">Catégorie</p><p className="mt-2 text-sm text-white/70">{profile?.primaryCategory?.name && typeof profile.primaryCategory.name === "object" && !Array.isArray(profile.primaryCategory.name) && "fr" in profile.primaryCategory.name ? String((profile.primaryCategory.name as Record<string, unknown>).fr ?? "—") : typeof profile?.primaryCategory?.name === "string" ? profile.primaryCategory.name : "—"}</p></div>
               </div>
 
+              {profile?.id ? (
+                <form action="/api/owner/candidates/documents" method="post" encType="multipart/form-data" className="mt-6 grid gap-3 border border-[#c7a15a]/25 bg-black/20 p-4 sm:grid-cols-[1fr_180px_auto] sm:items-end">
+                  <input type="hidden" name="candidateId" value={profile.id} />
+                  <label className="block text-xs text-white/60">Ajouter un document dans l’espace de ce candidat
+                    <input required type="file" name="file" accept=".pdf,.doc,.docx,.jpg,.jpeg" className="mt-2 block w-full text-xs text-white/70 file:mr-3 file:border-0 file:bg-[#c7a15a] file:px-3 file:py-2 file:text-black" />
+                  </label>
+                  <label className="block text-xs text-white/60">Type de document
+                    <select name="docType" defaultValue="AUTRE" className="mt-2 w-full border border-white/15 bg-[#111] px-3 py-2 text-sm text-white">
+                      <option value="CV">CV</option><option value="DIPLOME">Diplôme</option><option value="CERTIFICAT">Certificat</option><option value="IDENTITE">Identité</option><option value="AUTRE">Autre document</option>
+                    </select>
+                  </label>
+                  <button type="submit" className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a] hover:bg-[#c7a15a] hover:text-black">Ajouter au dossier</button>
+                  <p className="text-[11px] text-white/40 sm:col-span-3">Dépôt effectué par l’OWNER : le fichier sera directement visible dans les documents du candidat.</p>
+                </form>
+              ) : (
+                <p className="mt-6 border border-white/10 p-4 text-xs text-white/40">Ce compte n’a pas encore de fiche candidat. Le dépôt direct sera disponible dès la création de son profil.</p>
+              )}
+
               <div className="mt-6 border-t border-white/10 pt-5">
                 <p className="text-[10px] uppercase tracking-[0.18em] text-white/35">CV / documents rattachés</p>
                 {profile?.documents.length ? (
