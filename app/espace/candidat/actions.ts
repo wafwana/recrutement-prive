@@ -328,21 +328,22 @@ export async function uploadCandidateDocument(formData: FormData) {
     }
   }
 
-  if (isCv) {
-    await prisma.candidateDocument.updateMany({
-      where: { candidateId: profile.id, docType: "CV", isPrimaryCv: true },
-      data: { isPrimaryCv: false },
+  await prisma.$transaction(async (tx) => {
+    if (isCv && isPrimaryCv) {
+      await tx.candidateDocument.updateMany({
+        where: { candidateId: profile.id, docType: "CV", isPrimaryCv: true },
+        data: { isPrimaryCv: false },
+      });
+    }
+    await tx.candidateDocument.update({
+      where: { id: persistedDocument.id },
+      data: {
+        folderPath,
+        analysis: storedAnalysis ? JSON.parse(JSON.stringify(storedAnalysis)) : undefined,
+        analyzedAt,
+        isPrimaryCv,
+      },
     });
-  }
-
-  await prisma.candidateDocument.update({
-    where: { id: persistedDocument.id },
-    data: {
-      folderPath,
-      analysis: storedAnalysis ? JSON.parse(JSON.stringify(storedAnalysis)) : undefined,
-      analyzedAt,
-      isPrimaryCv,
-    },
   });
 
   try { revalidatePath("/espace/candidat"); } catch { /* test context */ }
