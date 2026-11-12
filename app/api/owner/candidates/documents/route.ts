@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     const docType = DOC_TYPES.has(requestedType) ? requestedType : "AUTRE";
     const safeName = file.name.replace(/[\\/\\u0000]/g, "").slice(0, 180) || "document";
     const isPrimaryCv = docType === "CV";
-    const document = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       if (isPrimaryCv) {
         await tx.candidateDocument.updateMany({
           where: { candidateId: profile.id, docType: "CV", isPrimaryCv: true },
@@ -56,11 +56,6 @@ export async function POST(request: Request) {
           docType,
           folderPath: isPrimaryCv ? "CANDIDATS/A_CLASSER/A_VERIFIER/CV" : "CANDIDATS/A_CLASSER/A_VERIFIER",
           isPrimaryCv,
-          analysis: {
-            provenance: "OWNER_MANUAL_UPLOAD",
-            uploadedByUserId: session.user.id,
-            uploadedByRole: "OWNER",
-          },
         },
         select: { id: true, name: true },
       });
