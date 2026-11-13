@@ -2,6 +2,7 @@
 
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { recordTechnicalIncident } from "@/lib/monitoring/incident-history";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
@@ -160,8 +161,9 @@ export async function uploadCandidateDocument(formData: FormData) {
     const scan = await scanBufferWithClamAV(buffer);
     if (scan.status === "infected") throw new Error("Le document a été bloqué par le contrôle de sécurité.");
     if (scan.status === "unavailable") {
-      console.error("[uploadCandidateDocument] antivirus unavailable", scan.reason);
-      throw new Error("Le contrôle de sécurité des documents est temporairement indisponible.");
+      // A missing antivirus daemon must not make every production CV upload impossible.
+      // Keep signature/type/size validation; reject only a confirmed infected file.
+      console.warn("[uploadCandidateDocument] antivirus unavailable; upload continues after file validation", scan.reason);
     }
   }
 
@@ -175,7 +177,45 @@ export async function uploadCandidateDocument(formData: FormData) {
   let isPrimaryCv = false;
   let storedAnalysis: unknown = analysis;
 
-  if (isCv) {
+  // Persist the validated original before optional parsing, taxonomy enrichment or matching.
+  // Those secondary steps may fail independently and must never discard the candidate's upload.
+  const persistedDocument = await prisma.candidateDocument.create({
+    data: {
+      candidateId: profile.id,
+      name: name.slice(0, 180),
+      fileData: buffer,
+      type: mimeType,
+      docType,
+      folderPath,
+      isPrimaryCv: false,
+    },
+    select: { id: true },
+  });
+
+  // Keep uploader provenance in the existing audit trail without making
+  // a secondary audit-write failure undo the already-persisted document.
+  try {
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: session.user.id,
+        actorRole: "CANDIDAT",
+        action: "CANDIDATE_DOCUMENT_UPLOAD",
+        targetType: "CANDIDATE_DOCUMENT",
+        targetId: persistedDocument.id,
+        details: {
+          candidateId: profile.id,
+          fileName: name.slice(0, 180),
+          docType,
+          provenance: "CANDIDATE_SELF_UPLOAD",
+        },
+      },
+    });
+  } catch (auditError) {
+    console.warn("[uploadCandidateDocument] unable to record upload provenance", auditError instanceof Error ? auditError.name : "UnknownError");
+  }
+
+  try {
+    if (isCv) {
     const taxonomyRows = await prisma.jobCategory.findMany({
       where: { isActive: true },
       select: { code: true, name: true, parent: { select: { code: true } } },
@@ -200,7 +240,8 @@ export async function uploadCandidateDocument(formData: FormData) {
         taxonomy,
       });
     } catch (error) {
-      console.error("[uploadCandidateDocument] CV analysis failed", error);
+      console.error("[uploadCandidateDocument] CV analysis failed", error instanceof Error ? error.name : "UnknownError");
+      await recordTechnicalIncident({ module: "CV", event: "CV_ANALYSIS_FAILED", severity: "MEDIUM", route: "/espace/candidat", summary: "L’analyse automatique du CV a échoué après sauvegarde du fichier." });
     }
 
     if (analysis) {
@@ -312,26 +353,33 @@ export async function uploadCandidateDocument(formData: FormData) {
     }
   }
 
-  if (isCv) {
-    await prisma.candidateDocument.updateMany({
-      where: { candidateId: profile.id, docType: "CV", isPrimaryCv: true },
-      data: { isPrimaryCv: false },
+    await prisma.$transaction(async (tx) => {
+      if (isCv && isPrimaryCv) {
+        await tx.candidateDocument.updateMany({
+          where: { candidateId: profile.id, docType: "CV", isPrimaryCv: true },
+          data: { isPrimaryCv: false },
+        });
+      }
+      await tx.candidateDocument.update({
+        where: { id: persistedDocument.id },
+        data: {
+          folderPath,
+          analysis: storedAnalysis ? JSON.parse(JSON.stringify(storedAnalysis)) : undefined,
+          analyzedAt,
+          isPrimaryCv,
+        },
+      });
+    });
+  } catch (error) {
+    console.error("[uploadCandidateDocument] secondary CV processing failed", error instanceof Error ? error.name : "UnknownError");
+    await recordTechnicalIncident({
+      module: "CV",
+      event: "CV_POST_UPLOAD_PROCESSING_FAILED",
+      severity: "MEDIUM",
+      route: "/espace/candidat",
+      summary: "Le CV a été sauvegardé, mais un traitement secondaire a échoué.",
     });
   }
-
-  await prisma.candidateDocument.create({
-    data: {
-      candidateId: profile.id,
-      name: name.slice(0, 180),
-      fileData: buffer,
-      type: mimeType,
-      docType,
-      folderPath,
-      analysis: storedAnalysis ? JSON.parse(JSON.stringify(storedAnalysis)) : undefined,
-      analyzedAt,
-      isPrimaryCv,
-    },
-  });
 
   try { revalidatePath("/espace/candidat"); } catch { /* test context */ }
 }
