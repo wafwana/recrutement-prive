@@ -24,5 +24,5 @@ testCase("Pôle 2 client workspace filters company records in the database query
   const page = fs.readFileSync("app/espace/entreprise/solutions-tech/page.tsx", "utf8");
   assert.ok(page.includes('leadSource: "POLE_1_COMPANY_CLIENT"'));
   assert.ok(page.includes('path: ["sourceCompanyId"], equals: access.companyId'));
-  assert.ok(page.includes("techProjectId: { in: prospectIds }"));
+  assert.ok(page.includes("techProspectId: { in: prospectIds }"));
 });
