@@ -121,6 +121,8 @@ jobs:
       - run: npm run test:workspace-navigation-locales
       - name: Validate Help Center and mailing templates
         run: node --import tsx --test tests/help-center-mailings-search.test.ts
+      - name: Validate Pôle 2 project delivery work-item permissions
+        run: node --import tsx --test tests/pole-2-project-delivery-work-items.test.ts
       - run: npm run typecheck
       - run: npm run build
       - name: End-to-end Auth.js login, CV intake and OWNER outflows over HTTP
