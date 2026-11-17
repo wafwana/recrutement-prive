@@ -52,7 +52,8 @@ export async function POST(request: Request) {
       try {
         results.push(await ingestGlobalJobs(sourceUrl, actor.userId, {
           maxItems: 5,
-          filterTerms: [...terms, ...(country ? [country] : [])],
+          filterTerms: terms,
+          filterCountry: country || undefined,
         }));
       } catch (error) {
         results.push({ sourceUrl, error: error instanceof Error ? error.message : "Erreur de collecte" });
