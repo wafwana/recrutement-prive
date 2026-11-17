@@ -22,10 +22,19 @@ export async function markExpiredGlobalJobs() {
   return updated.count;
 }
 
-export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, options?: { maxItems?: number }) {
-  const items = await fetchGlobalJobs(sourceUrl);
+export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, options?: { maxItems?: number; filterTerms?: string[] }) {
+  const fetchedItems = await fetchGlobalJobs(sourceUrl);
+  const terms = (options?.filterTerms ?? []).map((term) => term.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().trim()).filter(Boolean);
+  const items = terms.length
+    ? fetchedItems.filter((item) => {
+        const haystack = [item.title, item.description, item.companyName, item.categoryCode, item.subCategoryCode, item.country, item.city, ...(item.skills ?? [])]
+          .filter(Boolean).join(" ").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+        return terms.some((term) => haystack.includes(term));
+      })
+    : fetchedItems;
   const maxItems = Math.min(20, Math.max(1, options?.maxItems ?? 20));
-  const batchKey = `sourcing:global-jobs-batch:${encodeURIComponent(sourceUrl)}`;
+  const criteriaKey = terms.length ? `:${encodeURIComponent(terms.slice().sort().join("|"))}` : "";
+  const batchKey = `sourcing:global-jobs-batch:${encodeURIComponent(sourceUrl)}${criteriaKey}`;
   const offset = await readBatchOffset(batchKey, items.length);
   const batch = items.length > maxItems
     ? Array.from({ length: maxItems }, (_, index) => items[(offset + index) % items.length])
@@ -126,7 +135,7 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, o
       actorRole: "SYSTEM",
       action: "GLOBAL_JOB_SOURCING",
       targetType: "EXTERNAL_JOB_SOURCE",
-      details: { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired },
+      details: { sourceUrl, fetched: batch.length, sourceTotal: items.length, fetchedBeforeFilter: fetchedItems.length, filterTerms: terms, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired },
     },
   });
 
