@@ -59,13 +59,26 @@ export async function POST(request: Request) {
         results.push({ sourceUrl, error: error instanceof Error ? error.message : "Erreur de collecte" });
       }
     }
+    const normalizedTerms = terms.map((term) => term.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase());
+    const recentOffers = await prisma.externalJobOpportunity.findMany({
+      where: { sourceCollectedAt: { gte: startedAt }, source: { in: sources } },
+      orderBy: { sourceCollectedAt: "desc" },
+      take: 100,
+      select: { id: true, title: true, description: true, country: true, city: true, skills: true, categoryCode: true, subCategoryCode: true, companyName: true, source: true, sourceUrl: true, status: true },
+    });
+    const matchedOffers = recentOffers.filter((offer) => {
+      const haystack = [offer.title, offer.description, offer.country, offer.city, offer.companyName, offer.categoryCode, offer.subCategoryCode, ...(Array.isArray(offer.skills) ? offer.skills.filter((item): item is string => typeof item === "string") : [])]
+        .filter(Boolean).join(" ").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+      return normalizedTerms.some((term) => haystack.includes(term)) && (!country || haystack.includes(country.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase()));
+    });
     const fetched = results.reduce((sum, item) => sum + (typeof item.fetched === "number" ? item.fetched : 0), 0);
     const failures = results.filter((item) => typeof item.error === "string").length;
     await prisma.offerSourcingSearch.update({
       where: { id: folder.id },
       data: {
         status: failures === results.length ? "FAILED" : "COMPLETED",
-        sourceSummary: { startedAt: startedAt.toISOString(), completedAt: new Date().toISOString(), sources: results, fetched, failures, terms, country: country || null },
+        resultIds: matchedOffers.map((offer) => offer.id),
+        sourceSummary: { startedAt: startedAt.toISOString(), completedAt: new Date().toISOString(), sources: results, fetched, matched: matchedOffers.length, failures, terms, country: country || null },
         lastError: failures === results.length ? "Toutes les sources configurées ont échoué." : null,
       },
     });
@@ -79,7 +92,7 @@ export async function POST(request: Request) {
         details: { criteriaCount: criteria.length, sourceCount: sources.length, fetched, failures },
       },
     });
-    return NextResponse.json({ search: { id: folder.id, status: failures === results.length ? "FAILED" : "COMPLETED", fetched, failures } });
+    return NextResponse.json({ search: { id: folder.id, status: failures === results.length ? "FAILED" : "COMPLETED", fetched, matched: matchedOffers.length, failures } });
   } catch (error) {
     await prisma.offerSourcingSearch.update({
       where: { id: folder.id },
