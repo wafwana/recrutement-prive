@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { auth, getActiveSessionContext } from "@/auth";
 import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
   const folder = await prisma.offerSourcingSearch.create({
     data: {
       title: `Offres · ${criteria.length} critère(s) · ${new Date().toLocaleDateString("fr-FR")}`,
-      criteria: criteria as unknown as object,
+      criteria: criteria as unknown as Prisma.InputJsonValue,
       country: country || null,
       status: "RUNNING",
       createdByUserId: actor.userId,
