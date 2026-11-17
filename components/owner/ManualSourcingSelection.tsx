@@ -145,7 +145,7 @@ export default function ManualSourcingSelection({ sectors }: Props) {
       </div>
 
       {message && <p role="status" className="mt-4 border border-white/10 bg-white/[0.03] p-3 text-xs text-white/75">{message}</p>}
-      {completed.length > 0 && <div className="mt-3 space-y-2">{completed.map((item) => <p key={item.id} className="text-xs text-white/55"><Link className="text-[#F97316] underline" href={`/espace/owner/recherche-proactive?id=${item.id}`}>{item.title}</Link> · {item.status}</p>)}</div>}
+      {completed.length > 0 && <div className="mt-3 space-y-2">{completed.map((item) => <p key={item.id} className="text-xs text-white/55"><Link className="text-[#F97316] underline" href={item.title === "Recherche d’offres" ? `/espace/owner/sourcing-manuel?id=${item.id}` : `/espace/owner/recherche-proactive?id=${item.id}`}>{item.title}</Link> · {item.status}</p>)}</div>}
       <p className="mt-4 text-[10px] leading-5 text-white/30">La recherche d’offres utilise les flux HTTPS configurés, filtre les annonces selon les critères sélectionnés et conserve un dossier permanent distinct. Aucun candidat ni employeur n’est contacté automatiquement. Aucun candidat n’est contacté automatiquement.</p>
     </section>
   );
