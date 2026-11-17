@@ -27,6 +27,33 @@ export default function ManualSourcingSelection({ sectors }: Props) {
     });
   }
 
+  async function launchOffers() {
+    if (!selectedItems.length || running) return;
+    setRunning(true);
+    setMessage("");
+    setCompleted([]);
+    try {
+      const response = await fetch("/api/sourcing/manual-offers", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          criteria: selectedItems.map(({ sectorCode, professionCode, professionName, profileTitle }) => ({
+            sectorCode, professionCode, professionName, profileTitle,
+          })),
+          country: country.trim() || undefined,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.search?.id) throw new Error(data.error || "Recherche d'offres refusée");
+      setCompleted([{ title: "Recherche d'offres", id: data.search.id, status: data.search.status }]);
+      setMessage(`Recherche d'offres enregistrée : ${data.search.fetched ?? 0} offre(s) collectée(s), ${data.search.failures ?? 0} source(s) en échec.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "La recherche d'offres a échoué.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
   async function launchCandidates() {
     if (!selectedItems.length || running) return;
     setRunning(true);
@@ -81,6 +108,7 @@ export default function ManualSourcingSelection({ sectors }: Props) {
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => setSelected({})} disabled={!selectedItems.length || running} className="border border-white/15 px-3 py-2 text-[9px] uppercase tracking-[0.12em] text-white/55 disabled:opacity-40">Tout décocher</button>
           <button type="button" onClick={launchCandidates} disabled={!selectedItems.length || running} className="border border-[#F97316] bg-[#F97316]/10 px-4 py-2 text-[9px] uppercase tracking-[0.12em] text-[#F97316] disabled:opacity-40">{running ? "Recherches en cours…" : "Recherche candidat"}</button>
+          <button type="button" onClick={launchOffers} disabled={!selectedItems.length || running} className="border border-white/25 px-4 py-2 text-[9px] uppercase tracking-[0.12em] text-white/75 disabled:opacity-40">{running ? "Collecte en cours…" : "Recherche offre"}</button>
         </div>
       </div>
 
@@ -118,7 +146,7 @@ export default function ManualSourcingSelection({ sectors }: Props) {
 
       {message && <p role="status" className="mt-4 border border-white/10 bg-white/[0.03] p-3 text-xs text-white/75">{message}</p>}
       {completed.length > 0 && <div className="mt-3 space-y-2">{completed.map((item) => <p key={item.id} className="text-xs text-white/55"><Link className="text-[#F97316] underline" href={`/espace/owner/recherche-proactive?id=${item.id}`}>{item.title}</Link> · {item.status}</p>)}</div>}
-      <p className="mt-4 text-[10px] leading-5 text-white/30">La recherche d’offres sera raccordée au même panneau après vérification de son flux de collecte et de son stockage ; elle n’est pas simulée ici. Aucun candidat n’est contacté automatiquement.</p>
+      <p className="mt-4 text-[10px] leading-5 text-white/30">La recherche d’offres utilise les flux HTTPS configurés, filtre les annonces selon les critères sélectionnés et conserve un dossier permanent distinct. Aucun candidat ni employeur n’est contacté automatiquement. Aucun candidat n’est contacté automatiquement.</p>
     </section>
   );
 }
