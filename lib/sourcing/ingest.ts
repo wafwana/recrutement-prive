@@ -22,14 +22,15 @@ export async function markExpiredGlobalJobs() {
   return updated.count;
 }
 
-export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, options?: { maxItems?: number; filterTerms?: string[] }) {
+export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, options?: { maxItems?: number; filterTerms?: string[]; filterCountry?: string }) {
   const fetchedItems = await fetchGlobalJobs(sourceUrl);
   const terms = (options?.filterTerms ?? []).map((term) => term.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().trim()).filter(Boolean);
-  const items = terms.length
+  const countryTerm = options?.filterCountry?.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().trim();
+  const items = terms.length || countryTerm
     ? fetchedItems.filter((item) => {
         const haystack = [item.title, item.description, item.companyName, item.categoryCode, item.subCategoryCode, item.country, item.city, ...(item.skills ?? [])]
           .filter(Boolean).join(" ").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
-        return terms.some((term) => haystack.includes(term));
+        return (!terms.length || terms.some((term) => haystack.includes(term))) && (!countryTerm || haystack.includes(countryTerm));
       })
     : fetchedItems;
   const maxItems = Math.min(20, Math.max(1, options?.maxItems ?? 20));
