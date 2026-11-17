@@ -105,6 +105,7 @@ model User {
   videoSessionsCreated VideoSession[] @relation("VideoSessionCreatedBy")
   sourcedCandidates SourcedCandidate[]
   proactiveSearches ProactiveSearch[]
+  offerSourcingSearches OfferSourcingSearch[]
   outreachContacts OutreachContact[] @relation("CandidateOutreach")
   receivedTransfers InternalTransfer[] @relation("TransferredToCollaborator")
   grantedTransfers InternalTransfer[] @relation("TransferredByOwner")
@@ -361,6 +362,24 @@ model EnterpriseSourcedOffer {
   @@unique([companyId, externalJobId])
   @@index([companyId, status])
   @@index([selectedCountry])
+}
+
+
+model OfferSourcingSearch {
+  id String @id @default(cuid())
+  title String
+  criteria Json
+  country String?
+  status String @default("PENDING")
+  sourceSummary Json?
+  resultIds Json?
+  lastError String?
+  createdByUserId String
+  createdBy User @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([createdByUserId, createdAt])
+  @@index([status, createdAt])
 }
 
 model ExternalJobOpportunity {
