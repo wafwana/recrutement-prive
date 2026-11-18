@@ -15,7 +15,7 @@ export default function ManualSourcingSelection({ sectors }: Props) {
   const [country, setCountry] = useState("");
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState("");
-  const [completed, setCompleted] = useState<Array<{ title: string; id: string; status: string }>>([]);
+  const [completed, setCompleted] = useState<Array<{ title: string; id: string; status: string; kind: "candidate" | "offer" }>>([]);
 
   const selectedItems = useMemo(() => Object.values(selected), [selected]);
   function toggle(item: Selection, checked: boolean) {
@@ -45,7 +45,7 @@ export default function ManualSourcingSelection({ sectors }: Props) {
       });
       const data = await response.json();
       if (!response.ok || !data.search?.id) throw new Error(data.error || "Recherche d'offres refusée");
-      setCompleted([{ title: "Recherche d'offres", id: data.search.id, status: data.search.status }]);
+      setCompleted([{ title: "Recherche d'offres", id: data.search.id, status: data.search.status, kind: "offer" }]);
       setMessage(`Recherche d'offres enregistrée : ${data.search.fetched ?? 0} offre(s) collectée(s), ${data.search.failures ?? 0} source(s) en échec.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "La recherche d'offres a échoué.");
@@ -77,7 +77,7 @@ export default function ManualSourcingSelection({ sectors }: Props) {
           });
           const data = await response.json();
           if (!response.ok || !data.search?.id) throw new Error(data.error || "Recherche refusée");
-          done.push({ title: item.profileTitle || item.professionName, id: data.search.id, status: data.search.status });
+          done.push({ title: item.profileTitle || item.professionName, id: data.search.id, status: data.search.status, kind: "candidate" });
           setCompleted([...done]);
         } catch {
           failures += 1;
@@ -145,8 +145,8 @@ export default function ManualSourcingSelection({ sectors }: Props) {
       </div>
 
       {message && <p role="status" className="mt-4 border border-white/10 bg-white/[0.03] p-3 text-xs text-white/75">{message}</p>}
-      {completed.length > 0 && <div className="mt-3 space-y-2">{completed.map((item) => <p key={item.id} className="text-xs text-white/55"><Link className="text-[#F97316] underline" href={item.title === "Recherche d’offres" ? `/espace/owner/sourcing-manuel?id=${item.id}` : `/espace/owner/recherche-proactive?id=${item.id}`}>{item.title}</Link> · {item.status}</p>)}</div>}
-      <p className="mt-4 text-[10px] leading-5 text-white/30">La recherche d’offres utilise les flux HTTPS configurés, filtre les annonces selon les critères sélectionnés et conserve un dossier permanent distinct. Aucun candidat ni employeur n’est contacté automatiquement. Aucun candidat n’est contacté automatiquement.</p>
+      {completed.length > 0 && <div className="mt-3 space-y-2">{completed.map((item) => <p key={item.id} className="text-xs text-white/55"><Link className="text-[#F97316] underline" href={item.kind === "offer" ? `/espace/owner/sourcing-manuel?id=${item.id}` : `/espace/owner/recherche-proactive?id=${item.id}`}>{item.title}</Link> · {item.status}</p>)}</div>}
+      <p className="mt-4 text-[10px] leading-5 text-white/30">La recherche d’offres utilise les flux HTTPS configurés, filtre les annonces selon les critères sélectionnés et conserve un dossier permanent distinct. Aucun candidat ni employeur n’est contacté automatiquement.</p>
     </section>
   );
 }
