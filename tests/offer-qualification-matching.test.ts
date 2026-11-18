@@ -51,7 +51,7 @@ describe("Chain Qualification & Matching Behavioral Tests", () => {
     const pageSource = await import("node:fs").then((fs) =>
       fs.readFileSync("./app/espace/owner/offres-vivier/page.tsx", "utf-8")
     );
-    assert.ok(pageSource.includes('status: { in: ["DETECTED", "A_QUALIFIER", "QUALIFYING"] }'));
+    assert.ok(pageSource.includes('status: { in: ["DETECTED", "A_QUALIFIER", "QUALIFYING", "INTEGRATING"] }'));
     assert.ok(pageSource.includes('status: "QUALIFIED"'));
     assert.ok(pageSource.includes('status: "MATCHING"'));
     assert.ok(pageSource.includes("Vivier strictement interne"));
@@ -91,4 +91,16 @@ describe("Chain Qualification & Matching Behavioral Tests", () => {
     assert.ok(pipelineSource.includes("attemptCount"));
     assert.ok(pipelineSource.includes("progressMade"));
   });
+  test("offer pipeline cards navigate to real offer-pool status filters", async () => {
+    const pageSource = await import("node:fs").then((fs) =>
+      fs.readFileSync("./app/espace/owner/offres-vivier/page.tsx", "utf-8")
+    );
+    for (const status of ["DETECTED", "A_QUALIFIER", "MATCHING", "QUALIFIED"]) {
+      assert.ok(pageSource.includes(status), "missing pipeline status: " + status);
+    }
+    assert.ok(pageSource.includes("href={`/espace/owner/offres-vivier?status=${status}`}"));
+    assert.ok(pageSource.includes("Afficher les offres"));
+    assert.ok(pageSource.includes("aria-current={statusFilter === status ? \"page\" : undefined}"));
+  });
+
 });
