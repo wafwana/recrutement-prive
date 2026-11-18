@@ -8,14 +8,16 @@ import { ingestGlobalJobs } from "@/lib/sourcing/ingest";
 
 type Criterion = { sectorCode: string; professionCode: string; professionName: string; profileTitle?: string };
 
-async function requireSourcingActor() {
+type SourcingRole = "OWNER" | "ADMIN" | "CONSULTANT";
+
+async function requireSourcingActor(): Promise<{ userId: string; role: SourcingRole } | null> {
   const active = getActiveSessionContext();
   const session = active || (await auth());
   const userId = typeof session?.user?.id === "string" ? session.user.id : undefined;
   const role = typeof session?.user?.role === "string" ? session.user.role : undefined;
   if (!userId || !["OWNER", "ADMIN", "CONSULTANT"].includes(role ?? "")) return null;
   if (!(await hasPermission(userId, role, "SOURCING")) || !(await hasPermission(userId, role, "METIERS_DOSSIERS"))) return null;
-  return { userId, role };
+  return { userId, role: role as SourcingRole };
 }
 
 export async function POST(request: Request) {
@@ -79,7 +81,7 @@ export async function POST(request: Request) {
       data: {
         status: failures === results.length ? "FAILED" : "COMPLETED",
         resultIds: matchedOffers.map((offer) => offer.id),
-        sourceSummary: { startedAt: startedAt.toISOString(), completedAt: new Date().toISOString(), sources: results, fetched, matched: matchedOffers.length, failures, terms, country: country || null },
+        sourceSummary: { startedAt: startedAt.toISOString(), completedAt: new Date().toISOString(), sources: results, fetched, matched: matchedOffers.length, failures, terms, country: country || null } as Prisma.InputJsonValue,
         lastError: failures === results.length ? "Toutes les sources configurées ont échoué." : null,
       },
     });
