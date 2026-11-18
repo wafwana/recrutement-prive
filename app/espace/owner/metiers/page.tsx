@@ -10,6 +10,7 @@ import { ensureTaxonomySynced } from "@/lib/taxonomy/sync";
 import { getStrongProfilesForProfession } from "@/lib/taxonomy/strong-profiles";
 import BackButton from "@/components/navigation/BackButton";
 import ProactiveSearchButton from "@/components/owner/ProactiveSearchButton";
+import ManualSourcingSelection from "@/components/owner/ManualSourcingSelection";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -236,6 +237,20 @@ export default async function OwnerMetiersPage({ searchParams }: { searchParams:
           </div>
         </div>
       </form>
+
+      {canRunSourcing && (
+        <ManualSourcingSelection
+          sectors={RP_TAXONOMY.map((sector) => ({
+            code: sector.code,
+            name: sector.name.fr,
+            professions: sector.subcategories.map((profession) => ({
+              code: profession.code,
+              name: profession.name.fr,
+              profiles: getStrongProfilesForProfession(sector.code, profession.code),
+            })),
+          }))}
+        />
+      )}
 
       {selected ? (
         <section className="mt-8 border border-[#c7a15a]/40 bg-[#111] p-6 md:p-7">

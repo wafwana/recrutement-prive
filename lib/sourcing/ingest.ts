@@ -22,15 +22,27 @@ export async function markExpiredGlobalJobs() {
   return updated.count;
 }
 
-export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, options?: { maxItems?: number }) {
-  const items = await fetchGlobalJobs(sourceUrl);
+export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, options?: { maxItems?: number; filterTerms?: string[]; filterCountry?: string }) {
+  const fetchedItems = await fetchGlobalJobs(sourceUrl);
+  const terms = (options?.filterTerms ?? []).map((term) => term.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()).filter(Boolean);
+  const countryTerm = options?.filterCountry?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const items = terms.length || countryTerm
+    ? fetchedItems.filter((item) => {
+        const haystack = [item.title, item.description, item.companyName, item.categoryCode, item.subCategoryCode, item.country, item.city, ...(item.skills ?? [])]
+          .filter(Boolean).join(" ").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        return (!terms.length || terms.some((term) => haystack.includes(term))) && (!countryTerm || haystack.includes(countryTerm));
+      })
+    : fetchedItems;
   const maxItems = Math.min(20, Math.max(1, options?.maxItems ?? 20));
-  const batchKey = `sourcing:global-jobs-batch:${encodeURIComponent(sourceUrl)}`;
+  const criteriaParts = [...terms.slice().sort(), ...(countryTerm ? [`country=${countryTerm}`] : [])];
+  const criteriaKey = criteriaParts.length ? `:${encodeURIComponent(criteriaParts.join("|"))}` : "";
+  const batchKey = `sourcing:global-jobs-batch:${encodeURIComponent(sourceUrl)}${criteriaKey}`;
   const offset = await readBatchOffset(batchKey, items.length);
   const batch = items.length > maxItems
     ? Array.from({ length: maxItems }, (_, index) => items[(offset + index) % items.length])
     : items;
   let created = 0, updated = 0, qualified = 0, matched = 0, expired = 0;
+  const offerIds: string[] = [];
   const now = new Date();
 
   for (const item of batch) {
@@ -101,6 +113,7 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, o
       select: { id: true, status: true },
     });
 
+    offerIds.push(saved.id);
     if (existing) updated++; else created++;
 
     if (!isExpired && (!existing || ["DETECTED", "A_QUALIFIER"].includes(existing.status))) {
@@ -126,11 +139,11 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, o
       actorRole: "SYSTEM",
       action: "GLOBAL_JOB_SOURCING",
       targetType: "EXTERNAL_JOB_SOURCE",
-      details: { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired },
+      details: { sourceUrl, fetched: batch.length, sourceTotal: items.length, fetchedBeforeFilter: fetchedItems.length, filterTerms: terms, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired },
     },
   });
 
-  return { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired };
+  return { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired, offerIds };
 }
 
 async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string) {
