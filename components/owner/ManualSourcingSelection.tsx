@@ -59,7 +59,7 @@ export default function ManualSourcingSelection({ sectors }: Props) {
     setRunning(true);
     setMessage("");
     setCompleted([]);
-    const done: Array<{ title: string; id: string; status: string }> = [];
+    const done: Array<{ title: string; id: string; status: string; kind: "candidate" }> = [];
     let failures = 0;
     try {
       for (const item of selectedItems) {
