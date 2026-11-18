@@ -34,7 +34,8 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, o
       })
     : fetchedItems;
   const maxItems = Math.min(20, Math.max(1, options?.maxItems ?? 20));
-  const criteriaKey = terms.length ? `:${encodeURIComponent(terms.slice().sort().join("|"))}` : "";
+  const criteriaParts = [...terms.slice().sort(), ...(countryTerm ? [`country=${countryTerm}`] : [])];
+  const criteriaKey = criteriaParts.length ? `:${encodeURIComponent(criteriaParts.join("|"))}` : "";
   const batchKey = `sourcing:global-jobs-batch:${encodeURIComponent(sourceUrl)}${criteriaKey}`;
   const offset = await readBatchOffset(batchKey, items.length);
   const batch = items.length > maxItems
