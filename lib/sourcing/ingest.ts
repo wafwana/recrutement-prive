@@ -42,6 +42,7 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, o
     ? Array.from({ length: maxItems }, (_, index) => items[(offset + index) % items.length])
     : items;
   let created = 0, updated = 0, qualified = 0, matched = 0, expired = 0;
+  const offerIds: string[] = [];
   const now = new Date();
 
   for (const item of batch) {
@@ -112,6 +113,7 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, o
       select: { id: true, status: true },
     });
 
+    offerIds.push(saved.id);
     if (existing) updated++; else created++;
 
     if (!isExpired && (!existing || ["DETECTED", "A_QUALIFIER"].includes(existing.status))) {
@@ -141,7 +143,7 @@ export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, o
     },
   });
 
-  return { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired };
+  return { sourceUrl, fetched: batch.length, sourceTotal: items.length, batchLimit: maxItems, created, updated, qualified, matched, expired, sweptExpired, offerIds };
 }
 
 async function rematchSourcedCandidateAgainstQualifiedOffers(candidateId: string) {
