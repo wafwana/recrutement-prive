@@ -15,6 +15,7 @@ async function submitRawOffer(formData: FormData) { "use server"; await processO
 const statusLabels: Record<string, string> = {
   DETECTED: "Nouvelle",
   A_QUALIFIER: "À qualifier",
+  QUALIFYING: "Qualification en cours",
   QUALIFIED: "Qualifiée",
   MATCHING: "Matchings traités",
   CONTACTED: "Contactée",
@@ -105,15 +106,21 @@ export default async function OfferPoolPage({
         <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Pipeline des offres</p>
         <div className="mt-5 grid gap-3 md:grid-cols-4">
           {[
-            ["SOURCE","Origine directe de l'offre","text-[#c7a15a]"],
-            ["QUALIFICATION","Analyse / traduction / classement","text-white/70"],
-            ["MATCHING","Rapprochement avec les candidats","text-[#F97316]"],
-            ["VIVIER","Offres prêtes pour le travail RP","text-[#c7a15a]"],
-          ].map(([title,desc,color]) => (
-            <div key={title} className="border border-white/10 bg-[#111] p-4">
+            ["SOURCE","Offres détectées · provenance conservée","text-[#c7a15a]","DETECTED"],
+            ["QUALIFICATION","Offres en attente de qualification","text-white/70","A_QUALIFIER"],
+            ["MATCHING","Offres dont le rapprochement a été traité","text-[#F97316]","MATCHING"],
+            ["VIVIER","Offres qualifiées prêtes pour le travail RP","text-[#c7a15a]","QUALIFIED"],
+          ].map(([title,desc,color,status]) => (
+            <Link
+              key={title}
+              href={`/espace/owner/offres-vivier?status=${status}`}
+              aria-current={statusFilter === status ? "page" : undefined}
+              className={`block border bg-[#111] p-4 transition hover:border-[#c7a15a]/60 hover:bg-[#151515] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7a15a] ${statusFilter === status ? "border-[#c7a15a]/70" : "border-white/10"}`}
+            >
               <p className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${color}`}>{title}</p>
               <p className="mt-2 text-xs leading-5 text-white/45">{desc}</p>
-            </div>
+              <p className="mt-3 text-[9px] uppercase tracking-[0.16em] text-white/30">Afficher les offres →</p>
+            </Link>
           ))}
         </div>
         <p className="mt-5 text-xs leading-6 text-white/35">La source affichée sur chaque offre indique l'origine réelle. Le statut MATCHING ne signifie pas « offre sourcée » : il indique qu'un rapprochement offre ↔ candidat a été traité.</p>
