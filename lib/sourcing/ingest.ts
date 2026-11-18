@@ -24,12 +24,12 @@ export async function markExpiredGlobalJobs() {
 
 export async function ingestGlobalJobs(sourceUrl: string, actorUserId: string, options?: { maxItems?: number; filterTerms?: string[]; filterCountry?: string }) {
   const fetchedItems = await fetchGlobalJobs(sourceUrl);
-  const terms = (options?.filterTerms ?? []).map((term) => term.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().trim()).filter(Boolean);
-  const countryTerm = options?.filterCountry?.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().trim();
+  const terms = (options?.filterTerms ?? []).map((term) => term.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()).filter(Boolean);
+  const countryTerm = options?.filterCountry?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const items = terms.length || countryTerm
     ? fetchedItems.filter((item) => {
         const haystack = [item.title, item.description, item.companyName, item.categoryCode, item.subCategoryCode, item.country, item.city, ...(item.skills ?? [])]
-          .filter(Boolean).join(" ").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+          .filter(Boolean).join(" ").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         return (!terms.length || terms.some((term) => haystack.includes(term))) && (!countryTerm || haystack.includes(countryTerm));
       })
     : fetchedItems;
