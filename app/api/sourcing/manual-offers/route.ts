@@ -62,18 +62,15 @@ export async function POST(request: Request) {
         results.push({ sourceUrl, error: error instanceof Error ? error.message : "Erreur de collecte" });
       }
     }
-    const normalizedTerms = terms.map((term) => term.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
-    const recentOffers = await prisma.externalJobOpportunity.findMany({
-      where: { sourceCollectedAt: { gte: startedAt }, source: { in: sources } },
+    const offerIds = Array.from(new Set(results.flatMap((item) =>
+      Array.isArray(item.offerIds) ? item.offerIds.filter((id): id is string => typeof id === "string") : []
+    )));
+    const matchedOffers = offerIds.length ? await prisma.externalJobOpportunity.findMany({
+      where: { id: { in: offerIds }, source: { in: sources } },
       orderBy: { sourceCollectedAt: "desc" },
       take: 100,
       select: { id: true, title: true, description: true, country: true, city: true, skills: true, categoryCode: true, subCategoryCode: true, companyName: true, source: true, sourceUrl: true, status: true },
-    });
-    const matchedOffers = recentOffers.filter((offer) => {
-      const haystack = [offer.title, offer.description, offer.country, offer.city, offer.companyName, offer.categoryCode, offer.subCategoryCode, ...(Array.isArray(offer.skills) ? offer.skills.filter((item): item is string => typeof item === "string") : [])]
-        .filter(Boolean).join(" ").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-      return normalizedTerms.some((term) => haystack.includes(term)) && (!country || haystack.includes(country.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()));
-    });
+    }) : [];
     const fetched = results.reduce((sum, item) => sum + (typeof item.fetched === "number" ? item.fetched : 0), 0);
     const failures = results.filter((item) => typeof item.error === "string").length;
     await prisma.offerSourcingSearch.update({
