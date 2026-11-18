@@ -119,3 +119,40 @@ L'objectif de chaque évolution est :
 > AMÉLIORER LA PLATEFORME SANS PERDRE CE QUI A DÉJÀ ÉTÉ CONSTRUIT ET VALIDÉ.
 
 Toute nouvelle fonctionnalité doit s'intégrer à l'existant de manière cohérente, sécurisée, réversible lorsque nécessaire et sans régression.
+
+
+## 10. Règle commune de sécurité et de permissions — toutes les plateformes
+
+Cette règle s'applique à l'ensemble des plateformes et projets de l'OWNER, notamment Recrutement Privé, Studio Event 59, Diagnostique Téléradiologie Afrique, leurs pôles, modules et évolutions futures. Elle doit être reprise dans le dossier de règles de chaque dépôt indépendant.
+
+### 10.1 Socle de sécurité commun
+
+- Réutiliser en priorité les mécanismes de sécurité déjà en place et validés dans chaque plateforme.
+- Centraliser et maintenir cohérents l'authentification, les rôles, les permissions, l'isolation des données et la journalisation.
+- Une nouvelle fonctionnalité doit s'intégrer au socle existant ; elle ne doit pas créer un système parallèle ni des règles contradictoires.
+- Ne pas ajouter de contrôles redondants lorsqu'une protection existante couvre déjà le besoin.
+- Vérifier les risques propres à chaque évolution et appliquer des contrôles proportionnés.
+- La simplification des contrôles ne doit jamais affaiblir les permissions, la confidentialité ou la protection des données.
+
+### 10.2 Permissions indispensables
+
+- Les permissions sont une protection fondamentale et obligatoire de chaque plateforme.
+- Chaque rôle ne peut accéder qu'aux fonctionnalités, actions et données explicitement autorisées.
+- Les permissions sont vérifiées côté serveur ; masquer un bouton ou une page dans l'interface ne suffit pas.
+- Aucun utilisateur ne peut s'attribuer ou augmenter lui-même ses permissions.
+- Les nouveaux modules réutilisent le système de permissions de leur plateforme et déclarent uniquement les permissions nouvelles réellement nécessaires.
+- Les permissions doivent rester cohérentes entre les interfaces, les API et les opérations sur les données.
+
+### 10.3 Gouvernance OWNER / ADMIN
+
+- L'OWNER est l'autorité suprême de chaque plateforme et conserve tous les droits ADMIN.
+- Seul l'OWNER peut créer, désigner, remplacer, suspendre ou révoquer un ADMIN.
+- Un ADMIN ne peut pas modifier son propre rôle, créer ou désigner un OWNER, ni modifier ou révoquer l'OWNER.
+- Les règles de gouvernance OWNER / ADMIN existantes restent applicables ; cette règle commune ne les remplace pas et ne les affaiblit pas.
+- Les actions sensibles sont journalisées et, selon leur nature, notifiées, soumises à approbation ou rendues réversibles.
+
+### 10.4 Principe d'évolution
+
+Toute évolution doit préserver le socle de sécurité et les permissions existantes, sans multiplier les barrières spécifiques à chaque fonctionnalité. En cas de besoin nouveau, étendre de façon cohérente le système commun plutôt que créer une sécurité isolée.
+
+**Principe directeur : permissions solides et centralisées, sécurité réutilisée, contrôles proportionnés, aucune régression.**
