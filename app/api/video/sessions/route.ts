@@ -50,9 +50,6 @@ async function eligibleVideoMeeting(presentationId: string) {
   const acceptances = security.contractAcceptances && typeof security.contractAcceptances === "object" && !Array.isArray(security.contractAcceptances)
     ? security.contractAcceptances as Record<string, unknown>
     : {};
-  if (!acceptances[meeting.presentationId] && !acceptances[meeting.candidateId]) {
-    // Acceptances are keyed by user ID; resolve the presentation participants below.
-  }
   const presentation = await prisma.missionPresentation.findUnique({
     where: { id: presentationId },
     select: { candidateUserId: true, companyUserId: true },
