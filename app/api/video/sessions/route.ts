@@ -33,6 +33,35 @@ function iceServers() {
   return [{ urls, username, credential }];
 }
 
+async function eligibleVideoMeeting(presentationId: string) {
+  const meeting = await prisma.contactMeeting.findFirst({
+    where: {
+      presentationId,
+      channel: "VIDEO",
+      status: { in: ["CONFIRMED", "ACTIVE"] },
+      paymentStatus: "PAID",
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!meeting) return null;
+  const security = meeting.securityDetails && typeof meeting.securityDetails === "object" && !Array.isArray(meeting.securityDetails)
+    ? meeting.securityDetails as Record<string, unknown>
+    : {};
+  const acceptances = security.contractAcceptances && typeof security.contractAcceptances === "object" && !Array.isArray(security.contractAcceptances)
+    ? security.contractAcceptances as Record<string, unknown>
+    : {};
+  if (!acceptances[meeting.presentationId] && !acceptances[meeting.candidateId]) {
+    // Acceptances are keyed by user ID; resolve the presentation participants below.
+  }
+  const presentation = await prisma.missionPresentation.findUnique({
+    where: { id: presentationId },
+    select: { candidateUserId: true, companyUserId: true },
+  });
+  if (!presentation?.candidateUserId || !presentation.companyUserId) return null;
+  if (!acceptances[presentation.candidateUserId] || !acceptances[presentation.companyUserId]) return null;
+  return meeting;
+}
+
 async function participantForPresentation(presentationId: string, userId: string) {
   return prisma.missionPresentation.findFirst({
     where: {
@@ -61,6 +90,7 @@ async function getSession(sessionId: string, userId: string) {
   const p = session.presentation;
   if (p.candidateUserId !== userId && p.companyUserId !== userId) return null;
   if (!p.anonymousMessagingEnabled || ["IDENTITE_DEBLOQUEE", "MISSION_TERMINEE"].includes(p.state)) return null;
+  if (!await eligibleVideoMeeting(p.id)) return null;
   if (session.expiresAt <= new Date() && session.status !== "ENDED") {
     await prisma.videoSession.update({ where: { id: session.id }, data: { status: "EXPIRED", endedAt: new Date() } });
     return null;
@@ -171,6 +201,10 @@ export async function PUT(request: Request) {
   const presentation = await participantForPresentation(parsed.data.presentationId, sessionUser.user.id);
   if (!presentation || !presentation.candidateUserId || !presentation.companyUserId) {
     return NextResponse.json({ error: "Présentation non éligible à la vidéo sécurisée." }, { status: 403 });
+  }
+  const eligibleMeeting = await eligibleVideoMeeting(presentation.id);
+  if (!eligibleMeeting) {
+    return NextResponse.json({ error: "La visioconférence nécessite un contact vidéo autorisé, réglé et accepté par les deux participants." }, { status: 403 });
   }
 
   const existing = await prisma.videoSession.findFirst({
