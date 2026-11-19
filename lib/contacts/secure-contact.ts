@@ -35,14 +35,20 @@ export async function startContactMeeting(meetingId: string, actorUserId: string
   const acceptances = security.contractAcceptances && typeof security.contractAcceptances === "object" && !Array.isArray(security.contractAcceptances)
     ? security.contractAcceptances as Record<string, unknown>
     : {};
-  if (!acceptances[meeting.presentation.candidateUserId || ""]) throw new Error("Le candidat doit accepter les conditions contractuelles avant le démarrage du contact.");
-  if (meeting.candidateConsentAt === null || meeting.companyConsentAt === null) {
-    // The meeting may start without recording. Recording is a separate, two-party consented feature.
-    return prisma.contactMeeting.update({ where: { id: meetingId }, data: { status: "ACTIVE", startedAt: meeting.startedAt ?? new Date() } });
+  if (!meeting.presentation.candidateUserId || !acceptances[meeting.presentation.candidateUserId]) {
+    throw new Error("Le candidat doit accepter les conditions contractuelles avant le démarrage du contact.");
   }
+  if (!meeting.presentation.companyUserId || !acceptances[meeting.presentation.companyUserId]) {
+    throw new Error("L'entreprise doit accepter les conditions contractuelles avant le démarrage du contact.");
+  }
+  const recordingConsented = Boolean(meeting.candidateConsentAt && meeting.companyConsentAt);
   return prisma.contactMeeting.update({
     where: { id: meetingId },
-    data: { status: "ACTIVE", startedAt: meeting.startedAt ?? new Date(), recordingStartedAt: new Date() },
+    data: {
+      status: "ACTIVE",
+      startedAt: meeting.startedAt ?? new Date(),
+      ...(recordingConsented && !meeting.recordingStartedAt ? { recordingStartedAt: new Date() } : {}),
+    },
   });
 }
 
