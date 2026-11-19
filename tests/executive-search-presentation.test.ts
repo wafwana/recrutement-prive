@@ -24,7 +24,9 @@ test("secure contact request is company-initiated and remains payment-gated", ()
 
 test("recording only starts with two-party consent", () => {
   const service = fs.readFileSync(path.join(root, "lib/contacts/secure-contact.ts"), "utf8");
-  assert.match(service, /acceptances\[meeting\.presentation\.candidateUserId\]/);\n  assert.match(service, /acceptances\[meeting\.presentation\.companyUserId\]/);\n  assert.match(service, /Boolean\(meeting\.candidateConsentAt && meeting\.companyConsentAt\)/);
+  assert.match(service, /acceptances\[meeting\.presentation\.candidateUserId\]/);
+  assert.match(service, /acceptances\[meeting\.presentation\.companyUserId\]/);
+  assert.match(service, /Boolean\(meeting\.candidateConsentAt && meeting\.companyConsentAt\)/);
   assert.match(service, /recordingStartedAt: new Date\(\)/);
 });
 
@@ -47,7 +49,7 @@ test("Executive Search embeds live anonymous candidate-offer proposals and reuse
   assert.match(cockpit, /Les prochaines étapes du cabinet/);
   assert.match(cockpit, /Trouver de nouvelles mises en relation/);
   assert.match(cockpit, /Examiner de nouveaux matchings/);
-  assert.ok(cockpit.includes('if ((activeTab === "matching" || activeTab === "overview") && !matchingLoaded && !matchingLoading)'));
+  assert.ok(cockpit.includes('if ((activeTab === "matching" || activeTab === "overview") && !matchingLoaded && !matchingLoading'));
 
   assert.match(matchingRoute, /requireMatchingAccess/);
   assert.match(matchingRoute, /const canPresent = access\.role === "OWNER"/);
