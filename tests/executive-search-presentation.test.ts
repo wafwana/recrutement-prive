@@ -24,7 +24,7 @@ test("secure contact request is company-initiated and remains payment-gated", ()
 
 test("recording only starts with two-party consent", () => {
   const service = fs.readFileSync(path.join(root, "lib/contacts/secure-contact.ts"), "utf8");
-  assert.match(service, /candidateConsentAt === null \|\| meeting\.companyConsentAt === null/);
+  assert.match(service, /acceptances\[meeting\.presentation\.candidateUserId\]/);\n  assert.match(service, /acceptances\[meeting\.presentation\.companyUserId\]/);\n  assert.match(service, /Boolean\(meeting\.candidateConsentAt && meeting\.companyConsentAt\)/);
   assert.match(service, /recordingStartedAt: new Date\(\)/);
 });
 
