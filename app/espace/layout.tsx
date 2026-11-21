@@ -19,9 +19,10 @@ const ADMIN_NAV_PERMISSIONS = [
 export default async function EspaceLayout({ children }: { children: ReactNode }) {
   const session = await auth();
   const role = session?.user?.role;
-  const adminPermissions = role === "ADMIN" && session?.user?.id
+  const adminUserId = role === "ADMIN" ? session?.user?.id : undefined;
+  const adminPermissions = adminUserId
     ? (await Promise.all(ADMIN_NAV_PERMISSIONS.map((permission) =>
-        hasPermission(session.user.id, role, permission).catch(() => false),
+        hasPermission(adminUserId, "ADMIN", permission).catch(() => false),
       ))).flatMap((allowed, index) => allowed ? [ADMIN_NAV_PERMISSIONS[index]] : [])
     : [];
 
