@@ -26,7 +26,7 @@ const groups: Group[] = [
   { title: "Entreprises & documents", items: [
     { href: "/espace/owner#entreprises", label: "Gestion des entreprises", permission: "COMPANIES_MANAGE" },
     { href: "/espace/owner/entreprises/nouvelle", label: "Ajouter une entreprise", permission: "COMPANIES_MANAGE" },
-    { href: "/espace/documents", label: "Dépôt de documents", permission: "DOCUMENTS_VIEW" },
+    { href: "/espace/documents", label: "Dépôt de documents", permission: "DOCUMENTS_DEPOSIT" },
     { href: "/espace/owner/sourcing/offres", label: "Sourcing offres entreprise", permission: "ENTERPRISE_OFFER_SOURCING" },
     { href: "/espace/owner/partenaires", label: "Partenaires & Sources", permission: "PARTNERS_MANAGE" },
   ]},
