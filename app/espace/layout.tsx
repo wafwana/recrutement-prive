@@ -4,13 +4,27 @@ import { auth } from "@/auth";
 import { CollaboratorActivityTracker } from "@/components/activity/CollaboratorActivityTracker";
 import ContextBackButton from "@/components/navigation/ContextBackButton";
 import OwnerWorkspaceNavigation from "@/components/owner/OwnerWorkspaceNavigation";
+import AdminWorkspaceNavigation from "@/components/admin/AdminWorkspaceNavigation";
 import RoleWorkspaceNavigation, { type WorkspaceNavigationPermission } from "@/components/workspace/RoleWorkspaceNavigation";
 import { hasPermission } from "@/lib/auth/permissions";
 import ReturnToSiteLink from "@/components/navigation/ReturnToSiteLink";
 
+const ADMIN_NAV_PERMISSIONS = [
+  "CANDIDATES_VIEW", "CANDIDATES_MANAGE", "CV_INTAKE", "CV_LIBRARY", "CV_MATCHING",
+  "METIERS_DOSSIERS", "SOURCING", "OFFRES_VIVIER", "JOBS_MANAGE", "PRESENTATIONS_MANAGE",
+  "COMPANIES_MANAGE", "DOCUMENTS_DEPOSIT", "ENTERPRISE_OFFER_SOURCING", "PARTNERS_MANAGE",
+  "TECH_SOLUTIONS_MANAGE", "SECURE_CONTACTS_AUTHORIZE", "MESSAGING_CLIENTS_ENTERPRISE",
+] as const;
+
 export default async function EspaceLayout({ children }: { children: ReactNode }) {
   const session = await auth();
   const role = session?.user?.role;
+  const adminPermissions = role === "ADMIN" && session?.user?.id
+    ? (await Promise.all(ADMIN_NAV_PERMISSIONS.map((permission) =>
+        hasPermission(session.user.id, role, permission).catch(() => false),
+      ))).flatMap((allowed, index) => allowed ? [ADMIN_NAV_PERMISSIONS[index]] : [])
+    : [];
+
   const canManagePlatformSettings = role === "ADMIN" && session?.user?.id
     ? await hasPermission(session.user.id, role, "PLATFORM_SETTINGS").catch(() => false)
     : false;
@@ -26,7 +40,7 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
     ...(canManageCvIntake ? ["CV_INTAKE" as const] : []),
   ];
   const workspaceRole =
-    role === "CANDIDAT" || role === "ENTREPRISE" || role === "CONSULTANT" || role === "ADMIN"
+    role === "CANDIDAT" || role === "ENTREPRISE" || role === "CONSULTANT"
       ? role
       : null;
 
@@ -44,6 +58,7 @@ export default async function EspaceLayout({ children }: { children: ReactNode }
       </header>
       <CollaboratorActivityTracker />
       {role === "OWNER" ? <OwnerWorkspaceNavigation /> : null}
+      {role === "ADMIN" ? <AdminWorkspaceNavigation permissions={adminPermissions} /> : null}
       {workspaceRole ? <RoleWorkspaceNavigation role={workspaceRole} allowedAdminPermissions={allowedAdminPermissions} /> : null}
       <ContextBackButton />
       {children}
