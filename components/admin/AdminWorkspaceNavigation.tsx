@@ -9,7 +9,8 @@ type Group = { title: string; items: Item[] };
 
 const groups: Group[] = [
   { title: "Candidats & CV", items: [
-    { href: "/espace/owner/candidats", label: "Voir / gérer les candidats", permission: "CANDIDATES_VIEW" },
+    { href: "/espace/owner/candidats", label: "Voir les candidats", permission: "CANDIDATES_VIEW" },
+    { href: "/espace/owner/candidats", label: "Gérer les candidats", permission: "CANDIDATES_MANAGE" },
     { href: "/espace/owner/cv-intake", label: "Intégrer les CV réels", permission: "CV_INTAKE" },
     { href: "/espace/documents/cv-library", label: "Bibliothèque CV", permission: "CV_LIBRARY" },
     { href: "/espace/owner/cv-matching", label: "CV & Matching transversal", permission: "CV_MATCHING" },
@@ -25,7 +26,7 @@ const groups: Group[] = [
   { title: "Entreprises & documents", items: [
     { href: "/espace/owner#entreprises", label: "Gestion des entreprises", permission: "COMPANIES_MANAGE" },
     { href: "/espace/owner/entreprises/nouvelle", label: "Ajouter une entreprise", permission: "COMPANIES_MANAGE" },
-    { href: "/espace/documents", label: "Dépôt de documents", permission: "DOCUMENTS_DEPOSIT" },
+    { href: "/espace/documents", label: "Dépôt de documents", permission: "DOCUMENTS_VIEW" },
     { href: "/espace/owner/sourcing/offres", label: "Sourcing offres entreprise", permission: "ENTERPRISE_OFFER_SOURCING" },
     { href: "/espace/owner/partenaires", label: "Partenaires & Sources", permission: "PARTNERS_MANAGE" },
   ]},
