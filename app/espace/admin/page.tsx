@@ -49,7 +49,7 @@ export default async function AdminPage() {
   // Fetch only data authorized by active permissions
   const [users, companies, jobs, applications] = await Promise.all([
     canViewCandidates || isOwner
-      ? prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, email: true, role: true, createdAt: true } })
+      ? prisma.user.findMany({ where: isOwner ? undefined : { role: "CANDIDAT" }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, name: true, email: true, role: true, createdAt: true } })
       : Promise.resolve([]),
     canManageCompanies || isOwner
       ? prisma.company.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { _count: { select: { members: true, jobs: true } } } })
@@ -144,8 +144,8 @@ export default async function AdminPage() {
       <div id="admin-kpis" className="mt-12 grid gap-px bg-white/10 md:grid-cols-4">
         {(canViewCandidates || isOwner) && (
           <Link href="#candidats" className="bg-[#111] p-7 transition hover:bg-[#171717]">
-            <span className="text-[10px] uppercase tracking-[0.22em] text-white/40">Utilisateurs / Candidates</span>
-            <p className="mt-6 font-serif text-4xl text-[#c7a15a]">{users.length}</p><span className="mt-3 block text-[10px] uppercase tracking-[0.14em] text-white/30">Voir les utilisateurs →</span>
+            <span className="text-[10px] uppercase tracking-[0.22em] text-white/40">{isOwner ? "Utilisateurs / Candidates" : "Candidats"}</span>
+            <p className="mt-6 font-serif text-4xl text-[#c7a15a]">{users.length}</p><span className="mt-3 block text-[10px] uppercase tracking-[0.14em] text-white/30">{isOwner ? "Voir les utilisateurs" : "Voir les candidats"} →</span>
           </Link>
         )}
         {(canManageCompanies || isOwner) && (
@@ -190,7 +190,7 @@ export default async function AdminPage() {
 
         {(canViewCandidates || isOwner) && (
           <section id="candidats" className="border border-white/10 p-8">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">Utilisateurs</p>
+            <p className="text-[10px] uppercase tracking-[0.25em] text-[#c7a15a]">{isOwner ? "Utilisateurs" : "Candidats"}</p>
             <div className="mt-6 space-y-3">
               {users.slice(0, 12).map((user) => (
                 <div key={user.id} className="border border-white/10 p-4">

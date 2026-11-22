@@ -23,3 +23,10 @@ test("Owner cockpit count matches active CANDIDAT accounts and links the dedicat
   assert.match(page, /prisma\.user\.count\(\{ where: \{ role: "CANDIDAT", status: "ACTIVE" \} \}\)/);
   assert.match(page, /\["Candidats", candidates, "\/espace\/owner\/candidats", "Voir les candidats"\]/);
 });
+
+
+test("ADMIN candidate permission scopes the dashboard query to candidate accounts without changing OWNER", () => {
+  const page = read("app/espace/admin/page.tsx");
+  assert.match(page, /canViewCandidates \|\| isOwner\s*\?\s*prisma\.user\.findMany\(\{\s*where: isOwner \? undefined : \{ role: "CANDIDAT" \}/);
+  assert.match(page, /isOwner \? "Utilisateurs" : "Candidats"/);
+});
