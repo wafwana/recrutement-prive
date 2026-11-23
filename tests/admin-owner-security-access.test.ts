@@ -5,6 +5,7 @@ import { hasPermission } from "../lib/auth/permissions";
 import { GET as getPermissions } from "../app/api/owner/permissions/route";
 import { GET as getOutflows } from "../app/api/owner/outflows/route";
 import { POST as postExclusions } from "../app/api/owner/exclusions/route";
+import { POST as postCandidateDocument } from "../app/api/owner/candidates/documents/route";
 import { POST as postGlobalJobs } from "../app/api/sourcing/global-jobs/route";
 import { POST as postCandidateActions } from "../app/api/sourcing/candidate-actions/route";
 
@@ -66,6 +67,22 @@ test("Route Guard Security: POST /api/owner/exclusions route handler strictly re
   assert.equal(adminRes.status, 403);
   const adminData = await adminRes.json();
   assert.equal(adminData.error, "Accès strictement réservé à l'Owner.");
+});
+
+test("Candidate document uploads require explicit ADMIN permissions and preserve OWNER access", async () => {
+  const request = () => new Request("http://localhost:3000/api/owner/candidates/documents", {
+    method: "POST",
+    body: new FormData(),
+  });
+
+  const adminRes = await runWithTestSession(unconfiguredAdminSession, () => postCandidateDocument(request()));
+  assert.equal(adminRes.status, 403);
+
+  const consultantRes = await runWithTestSession(consultantSession, () => postCandidateDocument(request()));
+  assert.equal(consultantRes.status, 403);
+
+  const ownerRes = await runWithTestSession(ownerSession, () => postCandidateDocument(request()));
+  assert.equal(ownerRes.status, 400, "OWNER must pass the access gate and receive request validation");
 });
 
 test("Route Guard Security: POST /api/sourcing/global-jobs rejects unconfigured ADMIN without SOURCING permission", async () => {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { auth, getActiveSessionContext } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/auth/permissions";
 import { validateUploadedDocument } from "@/lib/security/file-validation";
 import { scanBufferWithClamAV } from "@/lib/security/file-scan";
 
@@ -10,8 +11,15 @@ const DOC_TYPES = new Set(["CV", "DIPLOME", "CERTIFICAT", "IDENTITE", "AUTRE"]);
 export async function POST(request: Request) {
   const session = getActiveSessionContext() || await auth();
   const actorUserId = session?.user?.id;
-  if (!actorUserId || session?.user?.role !== "OWNER") {
-    return NextResponse.json({ error: "Cette action est réservée à l’OWNER." }, { status: 403 });
+  const actorRole = session?.user?.role;
+  if (!actorUserId || !actorRole || !["OWNER", "ADMIN"].includes(actorRole)) {
+    return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
+  }
+  if (
+    !(await hasPermission(actorUserId, actorRole, "CANDIDATES_MANAGE")) ||
+    !(await hasPermission(actorUserId, actorRole, "DOCUMENTS_DEPOSIT"))
+  ) {
+    return NextResponse.json({ error: "Permissions de gestion des candidats et de dépôt de documents requises." }, { status: 403 });
   }
 
   try {
@@ -63,8 +71,8 @@ export async function POST(request: Request) {
       await tx.auditLog.create({
         data: {
           actorUserId,
-          actorRole: "OWNER",
-          action: "OWNER_CANDIDATE_DOCUMENT_UPLOAD",
+          actorRole,
+          action: actorRole === "OWNER" ? "OWNER_CANDIDATE_DOCUMENT_UPLOAD" : "ADMIN_CANDIDATE_DOCUMENT_UPLOAD",
           targetType: "CANDIDATE_DOCUMENT",
           targetId: created.id,
           details: { candidateId: profile.id, fileName: safeName, docType, provenance: "OWNER_MANUAL_UPLOAD" },
