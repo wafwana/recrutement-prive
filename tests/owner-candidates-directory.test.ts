@@ -21,6 +21,14 @@ test("Candidate directory is server-protected and lists only active candidate ac
   assert.match(page, /\/api\/candidats\/documents\/\$\{doc\.id\}/);
 });
 
+test("Candidate document uploads require view, manage and deposit permissions and audit the actor role", () => {
+  const route = read("app/api/owner/candidates/documents/route.ts");
+  for (const permission of ["CANDIDATES_VIEW", "CANDIDATES_MANAGE", "DOCUMENTS_DEPOSIT"]) {
+    assert.match(route, new RegExp(`hasPermission\\(actorUserId, actorRole, "${permission}"\\)`));
+  }
+  assert.match(route, /actorRole === "OWNER" \? "OWNER_CANDIDATE_DOCUMENT_UPLOAD" : "ADMIN_CANDIDATE_DOCUMENT_UPLOAD"/);
+});
+
 test("Owner cockpit count matches active CANDIDAT accounts and links the dedicated directory", () => {
   const page = read("app/espace/owner/page.tsx");
   assert.match(page, /prisma\.user\.count\(\{ where: \{ role: "CANDIDAT", status: "ACTIVE" \} \}\)/);

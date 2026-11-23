@@ -16,10 +16,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
   }
   if (
+    !(await hasPermission(actorUserId, actorRole, "CANDIDATES_VIEW")) ||
     !(await hasPermission(actorUserId, actorRole, "CANDIDATES_MANAGE")) ||
     !(await hasPermission(actorUserId, actorRole, "DOCUMENTS_DEPOSIT"))
   ) {
-    return NextResponse.json({ error: "Permissions de gestion des candidats et de dépôt de documents requises." }, { status: 403 });
+    return NextResponse.json({ error: "Permissions de consultation/gestion des candidats et de dépôt de documents requises." }, { status: 403 });
   }
 
   try {
