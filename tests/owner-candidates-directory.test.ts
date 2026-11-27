@@ -27,6 +27,7 @@ test("Candidate document uploads require view, manage and deposit permissions an
     assert.match(route, new RegExp(`hasPermission\\(actorUserId, actorRole, "${permission}"\\)`));
   }
   assert.match(route, /actorRole === "OWNER" \? "OWNER_CANDIDATE_DOCUMENT_UPLOAD" : "ADMIN_CANDIDATE_DOCUMENT_UPLOAD"/);
+  assert.match(route, /provenance: actorRole === "OWNER" \? "OWNER_MANUAL_UPLOAD" : "ADMIN_MANUAL_UPLOAD"/);
 });
 
 test("Owner cockpit count matches active CANDIDAT accounts and links the dedicated directory", () => {

@@ -76,7 +76,12 @@ export async function POST(request: Request) {
           action: actorRole === "OWNER" ? "OWNER_CANDIDATE_DOCUMENT_UPLOAD" : "ADMIN_CANDIDATE_DOCUMENT_UPLOAD",
           targetType: "CANDIDATE_DOCUMENT",
           targetId: created.id,
-          details: { candidateId: profile.id, fileName: safeName, docType, provenance: "OWNER_MANUAL_UPLOAD" },
+          details: {
+            candidateId: profile.id,
+            fileName: safeName,
+            docType,
+            provenance: actorRole === "OWNER" ? "OWNER_MANUAL_UPLOAD" : "ADMIN_MANUAL_UPLOAD",
+          },
         },
       });
       return created;
