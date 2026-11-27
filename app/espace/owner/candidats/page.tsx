@@ -1,11 +1,27 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
 
 export default async function OwnerCandidatesPage() {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== "OWNER") redirect("/connexion");
+  const userId = session?.user?.id;
+  const role = session?.user?.role;
+  if (!userId || !role) redirect("/connexion");
+
+  const isOwner = role === "OWNER";
+  if (!isOwner && (role !== "ADMIN" || !(await hasPermission(userId, role, "CANDIDATES_VIEW")))) {
+    redirect("/espace");
+  }
+
+  const [canManageCandidates, canViewDocuments, canDepositDocuments] = isOwner
+    ? [true, true, true]
+    : await Promise.all([
+        hasPermission(userId, role, "CANDIDATES_MANAGE"),
+        hasPermission(userId, role, "DOCUMENTS_VIEW"),
+        hasPermission(userId, role, "DOCUMENTS_DEPOSIT"),
+      ]);
 
   const candidates = await prisma.user.findMany({
     where: { role: "CANDIDAT", status: "ACTIVE" },
@@ -23,10 +39,12 @@ export default async function OwnerCandidatesPage() {
           country: true,
           experienceYears: true,
           primaryCategory: { select: { name: true } },
-          documents: {
-            select: { id: true, name: true, type: true, createdAt: true },
-            orderBy: { createdAt: "desc" },
-          },
+          documents: canViewDocuments
+            ? {
+                select: { id: true, name: true, type: true, createdAt: true },
+                orderBy: { createdAt: "desc" },
+              }
+            : false,
         },
       },
     },
@@ -36,13 +54,15 @@ export default async function OwnerCandidatesPage() {
     <section className="mx-auto w-[min(1180px,calc(100%-40px))] py-12 md:w-[min(1180px,calc(100%-72px))] md:py-20">
       <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">Owner · Candidats</p>
+          <p className="text-[10px] uppercase tracking-[0.35em] text-[#c7a15a]">{isOwner ? "Owner" : "Administration"} · Candidats</p>
           <h1 className="mt-4 font-serif text-4xl sm:text-5xl">Base candidats.</h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-white/50">
-            Accédez aux comptes CANDIDAT actifs et vérifiez les documents réellement rattachés à chaque profil.
+            {canViewDocuments
+              ? "Accédez aux comptes CANDIDAT actifs et vérifiez les documents réellement rattachés à chaque profil."
+              : "Consultez les profils CANDIDAT actifs autorisés à votre compte."}
           </p>
         </div>
-        <Link href="/espace/owner" className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65 hover:border-[#c7a15a] hover:text-[#c7a15a]">
+        <Link href={isOwner ? "/espace/owner" : "/espace/admin"} className="border border-white/15 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-white/65 hover:border-[#c7a15a] hover:text-[#c7a15a]">
           ← Retour au cockpit
         </Link>
       </div>
@@ -58,10 +78,12 @@ export default async function OwnerCandidatesPage() {
                   <h2 className="mt-2 font-serif text-2xl">{candidate.name || "Nom non renseigné"}</h2>
                   <p className="mt-2 text-sm text-white/45">{candidate.email}</p>
                 </div>
-                <div className="text-left md:text-right">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">Documents rattachés</p>
-                  <p className="mt-2 font-serif text-2xl text-[#c7a15a]">{profile?.documents.length ?? 0}</p>
-                </div>
+                {canViewDocuments ? (
+                  <div className="text-left md:text-right">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">Documents rattachés</p>
+                    <p className="mt-2 font-serif text-2xl text-[#c7a15a]">{profile?.documents.length ?? 0}</p>
+                  </div>
+                ) : null}
               </div>
 
               <div className="mt-6 grid gap-3 border-t border-white/10 pt-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -71,7 +93,7 @@ export default async function OwnerCandidatesPage() {
                 <div><p className="text-[10px] uppercase tracking-[0.14em] text-white/35">Catégorie</p><p className="mt-2 text-sm text-white/70">{profile?.primaryCategory?.name && typeof profile.primaryCategory.name === "object" && !Array.isArray(profile.primaryCategory.name) && "fr" in profile.primaryCategory.name ? String((profile.primaryCategory.name as Record<string, unknown>).fr ?? "—") : typeof profile?.primaryCategory?.name === "string" ? profile.primaryCategory.name : "—"}</p></div>
               </div>
 
-              {profile?.id ? (
+              {profile?.id && canManageCandidates && canDepositDocuments ? (
                 <form action="/api/owner/candidates/documents" method="post" encType="multipart/form-data" className="mt-6 grid gap-3 border border-[#c7a15a]/25 bg-black/20 p-4 sm:grid-cols-[1fr_180px_auto] sm:items-end">
                   <input type="hidden" name="candidateId" value={profile.id} />
                   <label className="block text-xs text-white/60">Ajouter un document dans l’espace de ce candidat
@@ -83,13 +105,13 @@ export default async function OwnerCandidatesPage() {
                     </select>
                   </label>
                   <button type="submit" className="border border-[#c7a15a] px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-[#c7a15a] hover:bg-[#c7a15a] hover:text-black">Ajouter au dossier</button>
-                  <p className="text-[11px] text-white/40 sm:col-span-3">Dépôt effectué par l’OWNER : le fichier sera directement visible dans les documents du candidat.</p>
+                  <p className="text-[11px] text-white/40 sm:col-span-3">Dépôt effectué par {isOwner ? "l’OWNER" : "un ADMIN autorisé"} : le fichier sera directement visible dans les documents du candidat.</p>
                 </form>
-              ) : (
+              ) : canManageCandidates && canDepositDocuments ? (
                 <p className="mt-6 border border-white/10 p-4 text-xs text-white/40">Ce compte n’a pas encore de fiche candidat. Le dépôt direct sera disponible dès la création de son profil.</p>
-              )}
+              ) : null}
 
-              <div className="mt-6 border-t border-white/10 pt-5">
+              {canViewDocuments ? <div className="mt-6 border-t border-white/10 pt-5">
                 <p className="text-[10px] uppercase tracking-[0.18em] text-white/35">CV / documents rattachés</p>
                 {profile?.documents.length ? (
                   <div className="mt-3 space-y-2">
@@ -108,7 +130,7 @@ export default async function OwnerCandidatesPage() {
                 ) : (
                   <p className="mt-3 text-sm text-white/40">Aucun CV ou document n’est actuellement rattaché à ce candidat.</p>
                 )}
-              </div>
+              </div> : null}
             </article>
           );
         })}

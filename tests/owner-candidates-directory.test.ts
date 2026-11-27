@@ -6,16 +6,28 @@ import path from "node:path";
 const root = process.cwd();
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("Owner candidate directory is server-protected and lists only active candidate accounts", () => {
+test("Candidate directory is server-protected and lists only active candidate accounts", () => {
   const page = read("app/espace/owner/candidats/page.tsx");
   assert.match(page, /const session = await auth\(\)/);
-  assert.match(page, /session\.user\.role !== "OWNER"/);
+  assert.match(page, /role !== "ADMIN" \|\| !\(await hasPermission\(userId, role, "CANDIDATES_VIEW"\)\)/);
+  assert.match(page, /hasPermission\(userId, role, "CANDIDATES_MANAGE"\)/);
+  assert.match(page, /hasPermission\(userId, role, "DOCUMENTS_VIEW"\)/);
+  assert.match(page, /documents: canViewDocuments/);
+  assert.match(page, /canManageCandidates && canDepositDocuments/);
   assert.match(page, /where: \{ role: "CANDIDAT", status: "ACTIVE" \}/);
   assert.match(page, /primaryCategory: \{ select: \{ name: true \} \}/);
-  assert.match(page, /documents: \{/);
   assert.match(page, /select: \{ id: true, name: true, type: true, createdAt: true \}/);
   assert.doesNotMatch(page, /cvUrl|storageUrl|documentUrl/);
   assert.match(page, /\/api\/candidats\/documents\/\$\{doc\.id\}/);
+});
+
+test("Candidate document uploads require view, manage and deposit permissions and audit the actor role", () => {
+  const route = read("app/api/owner/candidates/documents/route.ts");
+  for (const permission of ["CANDIDATES_VIEW", "CANDIDATES_MANAGE", "DOCUMENTS_DEPOSIT"]) {
+    assert.match(route, new RegExp(`hasPermission\\(actorUserId, actorRole, "${permission}"\\)`));
+  }
+  assert.match(route, /actorRole === "OWNER" \? "OWNER_CANDIDATE_DOCUMENT_UPLOAD" : "ADMIN_CANDIDATE_DOCUMENT_UPLOAD"/);
+  assert.match(route, /provenance: actorRole === "OWNER" \? "OWNER_MANUAL_UPLOAD" : "ADMIN_MANUAL_UPLOAD"/);
 });
 
 test("Owner cockpit count matches active CANDIDAT accounts and links the dedicated directory", () => {
